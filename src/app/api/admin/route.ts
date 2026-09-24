@@ -47,7 +47,23 @@ export async function GET(req: NextRequest) {
       getAllTicketsForAdmin(),
     ]);
 
-    const standardPackage = db.packages.find((p) => p.code === 'STANDARD_7_DAY');
+    let payments = db.payments;
+    let packagePrice = 2000;
+    if (process.env.DATA_STORE === 'supabase') {
+      const { getSupabaseAdminClient } = await import('@/lib/db/supabase-client');
+      const client = getSupabaseAdminClient();
+      if (client) {
+        const [payRes, pkgRes] = await Promise.all([
+          client.from('payments').select('*').order('created_at', { ascending: false }),
+          client.from('packages').select('price').eq('code', 'STANDARD_7_DAY').maybeSingle(),
+        ]);
+        if (payRes.data) payments = payRes.data as any;
+        if (pkgRes.data?.price) packagePrice = pkgRes.data.price;
+      }
+    } else {
+      const standardPackage = db.packages.find((p) => p.code === 'STANDARD_7_DAY');
+      packagePrice = standardPackage?.price || 2000;
+    }
 
     return NextResponse.json({
       stats,
@@ -56,8 +72,8 @@ export async function GET(req: NextRequest) {
       reports,
       dealers,
       tickets,
-      payments: db.payments,
-      packagePrice: standardPackage?.price || 2000,
+      payments,
+      packagePrice,
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -81,6 +97,13 @@ export async function POST(req: NextRequest) {
     switch (action) {
       case 'delist': {
         const success = await adminDelistListing(payload.listingId);
+        try {
+          const { revalidatePath } = await import('next/cache');
+          revalidatePath('/');
+          revalidatePath('/arac');
+          revalidatePath('/mulk');
+          revalidatePath(`/ilan/${payload.listingId}`);
+        } catch {}
         return NextResponse.json({ success });
       }
 

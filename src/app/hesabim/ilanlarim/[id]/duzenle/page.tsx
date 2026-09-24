@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { PhotoUploader, UploadedImage } from '@/components/forms/PhotoUploader';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 import { formatCurrency, formatTimeRemaining } from '@/lib/utils/format';
 import { getVehicleBrands, getModelsByBrand } from '@/lib/constants/vehicleCatalog';
 
@@ -73,6 +74,17 @@ export default function IlanDuzenlePage({
   const handleBrandChange = (newBrand: string) => {
     setBrand(newBrand);
     setModel('');
+  };
+
+  const handleSubcategoryChange = (newSub: string) => {
+    if (newSub !== subcategory) {
+      setSubcategory(newSub);
+      if (category === 'vehicle') {
+        // Reset brand and model when category changes (e.g. Otomobil -> Motosiklet)
+        setBrand('');
+        setModel('');
+      }
+    }
   };
 
   useEffect(() => {
@@ -366,27 +378,23 @@ export default function IlanDuzenlePage({
                 <label className="text-xs font-semibold text-[var(--text-muted)]">
                   {category === 'vehicle' ? 'Araç Kategorisi' : 'Mülk Türü'}
                 </label>
-                {category === 'vehicle' ? (
-                  <select
-                    value={subcategory}
-                    onChange={(e) => setSubcategory(e.target.value)}
-                    className="form-select text-sm"
-                  >
-                    <option value="Otomobil">Otomobil</option>
-                    <option value="SUV / Off-Road / Kamyonet">SUV / Off-Road / Kamyonet</option>
-                    <option value="Motosiklet">Motosiklet</option>
-                  </select>
-                ) : (
-                  <select
-                    value={subcategory}
-                    onChange={(e) => setSubcategory(e.target.value)}
-                    className="form-select text-sm"
-                  >
-                    <option value="Ev / Daire">Ev / Daire</option>
-                    <option value="İşyeri">İşyeri</option>
-                    <option value="Diğer Mülk">Diğer Mülk</option>
-                  </select>
-                )}
+                <CustomSelect
+                  value={subcategory}
+                  onChange={handleSubcategoryChange}
+                  options={
+                    category === 'vehicle'
+                      ? [
+                          { value: 'Otomobil', label: 'Otomobil' },
+                          { value: 'SUV / Off-Road / Kamyonet', label: 'SUV / Off-Road / Kamyonet' },
+                          { value: 'Motosiklet', label: 'Motosiklet' },
+                        ]
+                      : [
+                          { value: 'Ev / Daire', label: 'Ev / Daire' },
+                          { value: 'İşyeri', label: 'İşyeri' },
+                          { value: 'Diğer Mülk', label: 'Diğer Mülk' },
+                        ]
+                  }
+                />
               </div>
             </div>
 
@@ -418,38 +426,24 @@ export default function IlanDuzenlePage({
               {/* Marka */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-[var(--text-muted)]">Marka</label>
-                <select
+                <CustomSelect
                   value={brand}
-                  onChange={(e) => handleBrandChange(e.target.value)}
-                  required
-                  className="form-select text-sm"
-                >
-                  <option value="">Marka Seçiniz</option>
-                  {vehicleBrands.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
+                  onChange={handleBrandChange}
+                  placeholder="Marka Seçiniz"
+                  options={vehicleBrands.map((b) => ({ value: b, label: b }))}
+                />
               </div>
 
               {/* Model */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-[var(--text-muted)]">Model</label>
-                <select
+                <CustomSelect
                   value={model}
-                  onChange={(e) => setModel(e.target.value)}
+                  onChange={(v) => setModel(v)}
                   disabled={!brand}
-                  required
-                  className="form-select text-sm disabled:opacity-50"
-                >
-                  <option value="">{brand ? 'Model Seçiniz' : 'Önce Marka Seçiniz'}</option>
-                  {availableModels.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
+                  placeholder={brand ? 'Model Seçiniz' : 'Önce Marka Seçiniz'}
+                  options={availableModels.map((m) => ({ value: m, label: m }))}
+                />
               </div>
 
               {/* Plaka */}
@@ -481,42 +475,48 @@ export default function IlanDuzenlePage({
             {/* Performans & Donanım */}
             <div className="pt-2 space-y-3">
               <label className="text-xs font-semibold text-[var(--text-muted)]">Performans Geliştirmeleri (0 - 4)</label>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <span className="text-[11px] text-[var(--text-dim)]">Motor</span>
-                  <select
+                  <span className="text-[11px] text-[var(--text-dim)] font-medium">Motor</span>
+                  <CustomSelect
                     value={engineUpgrade}
-                    onChange={(e) => setEngineUpgrade(e.target.value)}
-                    className="form-select text-xs"
-                  >
-                    {[0, 1, 2, 3, 4].map((lvl) => (
-                      <option key={lvl} value={lvl}>Seviye {lvl}</option>
-                    ))}
-                  </select>
+                    onChange={(v) => setEngineUpgrade(v)}
+                    options={[
+                      { value: '0', label: 'Seviye 0' },
+                      { value: '1', label: 'Seviye 1' },
+                      { value: '2', label: 'Seviye 2' },
+                      { value: '3', label: 'Seviye 3' },
+                      { value: '4', label: 'Seviye 4' },
+                    ]}
+                  />
                 </div>
                 <div className="space-y-1">
-                  <span className="text-[11px] text-[var(--text-dim)]">Şanzıman</span>
-                  <select
+                  <span className="text-[11px] text-[var(--text-dim)] font-medium">Şanzıman</span>
+                  <CustomSelect
                     value={transmissionUpgrade}
-                    onChange={(e) => setTransmissionUpgrade(e.target.value)}
-                    className="form-select text-xs"
-                  >
-                    {[0, 1, 2, 3, 4].map((lvl) => (
-                      <option key={lvl} value={lvl}>Seviye {lvl}</option>
-                    ))}
-                  </select>
+                    onChange={(v) => setTransmissionUpgrade(v)}
+                    options={[
+                      { value: '0', label: 'Seviye 0' },
+                      { value: '1', label: 'Seviye 1' },
+                      { value: '2', label: 'Seviye 2' },
+                      { value: '3', label: 'Seviye 3' },
+                      { value: '4', label: 'Seviye 4' },
+                    ]}
+                  />
                 </div>
                 <div className="space-y-1">
-                  <span className="text-[11px] text-[var(--text-dim)]">Fren</span>
-                  <select
+                  <span className="text-[11px] text-[var(--text-dim)] font-medium">Fren</span>
+                  <CustomSelect
                     value={brakeUpgrade}
-                    onChange={(e) => setBrakeUpgrade(e.target.value)}
-                    className="form-select text-xs"
-                  >
-                    {[0, 1, 2, 3, 4].map((lvl) => (
-                      <option key={lvl} value={lvl}>Seviye {lvl}</option>
-                    ))}
-                  </select>
+                    onChange={(v) => setBrakeUpgrade(v)}
+                    options={[
+                      { value: '0', label: 'Seviye 0' },
+                      { value: '1', label: 'Seviye 1' },
+                      { value: '2', label: 'Seviye 2' },
+                      { value: '3', label: 'Seviye 3' },
+                      { value: '4', label: 'Seviye 4' },
+                    ]}
+                  />
                 </div>
               </div>
             </div>
@@ -573,31 +573,31 @@ export default function IlanDuzenlePage({
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-[var(--text-muted)]">Oda Sayısı</label>
-                <select
+                <CustomSelect
                   value={roomCount}
-                  onChange={(e) => setRoomCount(e.target.value)}
-                  className="form-select text-sm"
-                >
-                  <option value="Stüdyo">Stüdyo</option>
-                  <option value="1+0">1+0</option>
-                  <option value="1+1">1+1</option>
-                  <option value="2+1">2+1</option>
-                  <option value="3+1">3+1</option>
-                  <option value="4+1">4+1</option>
-                  <option value="5+1+">5+1+</option>
-                </select>
+                  onChange={(v) => setRoomCount(v)}
+                  options={[
+                    { value: 'Stüdyo', label: 'Stüdyo' },
+                    { value: '1+0', label: '1+0' },
+                    { value: '1+1', label: '1+1' },
+                    { value: '2+1', label: '2+1' },
+                    { value: '3+1', label: '3+1' },
+                    { value: '4+1', label: '4+1' },
+                    { value: '5+1+', label: '5+1+' },
+                  ]}
+                />
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-[var(--text-muted)]">Yapı Tipi</label>
-                <select
+                <CustomSelect
                   value={buildingType}
-                  onChange={(e) => setBuildingType(e.target.value)}
-                  className="form-select text-sm"
-                >
-                  <option value="Normal">Normal</option>
-                  <option value="Dubleks">Dubleks</option>
-                </select>
+                  onChange={(v) => setBuildingType(v)}
+                  options={[
+                    { value: 'Normal', label: 'Normal' },
+                    { value: 'Dubleks', label: 'Dubleks' },
+                  ]}
+                />
               </div>
             </div>
 

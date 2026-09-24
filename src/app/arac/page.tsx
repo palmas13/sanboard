@@ -10,8 +10,7 @@ interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const revalidate = 30;
 
 export default async function VehicleListingsPage({ searchParams }: PageProps) {
   const resolvedParams = await searchParams;

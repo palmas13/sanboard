@@ -17,13 +17,14 @@ import {
   PlusCircle,
   ListPlus,
   LifeBuoy,
-  Heart,
   Car,
   Home,
-  Edit,
   BadgeCheck,
+  UploadCloud,
+  ImageIcon,
 } from 'lucide-react';
 import { DealerProfile } from '@/types';
+import { resolveMediaUrl } from '@/lib/media/url';
 
 export default function HesabimKurumsalPage() {
   const { currentProfile } = useAuth();
@@ -33,12 +34,11 @@ export default function HesabimKurumsalPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Stats for approved dealers
+  // Stats for approved dealers (Item 10: Toplam Favori removed)
   const [stats, setStats] = useState({
     activeListings: 0,
     vehicleListings: 0,
     propertyListings: 0,
-    totalFavorites: 0,
   });
 
   // Application form fields
@@ -54,7 +54,8 @@ export default function HesabimKurumsalPage() {
   const [editPhone, setEditPhone] = useState('');
   const [editSanmail, setEditSanmail] = useState('');
 
-  const editFormRef = useRef<HTMLDivElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
 
   const fetchDealer = async () => {
     if (!currentProfile) return;
@@ -72,12 +73,12 @@ export default function HesabimKurumsalPage() {
       if (data.dealer) {
         setDealer(data.dealer);
         setEditCompanyName(data.dealer.company_name);
-        setEditDescription(data.dealer.description);
-        setEditLogoUrl(data.dealer.logo_url);
-        setEditBannerUrl(data.dealer.banner_url);
+        setEditDescription(data.dealer.description || '');
+        setEditLogoUrl(data.dealer.logo_path || data.dealer.logo_url || '');
+        setEditBannerUrl(data.dealer.banner_path || data.dealer.banner_url || '');
         setEditAddress(data.dealer.address || '');
         setEditPhone(data.dealer.phone || '');
-        setEditSanmail(data.dealer.sanmail_email || '');
+        setEditSanmail(data.dealer.sanmail_email || data.dealer.email || '');
       } else {
         setDealer(null);
       }
@@ -86,13 +87,11 @@ export default function HesabimKurumsalPage() {
         const active = listings.filter((l) => l.status === 'ACTIVE');
         const vehicles = active.filter((l) => l.category === 'vehicle').length;
         const properties = active.filter((l) => l.category === 'property').length;
-        const totalFavs = listings.reduce((sum, l) => sum + (l.favorite_count || 0), 0);
 
         setStats({
           activeListings: active.length,
           vehicleListings: vehicles,
           propertyListings: properties,
-          totalFavorites: totalFavs,
         });
       }
     } catch {
@@ -142,6 +141,40 @@ export default function HesabimKurumsalPage() {
     }
   };
 
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
+      setError('SVG formatı kabul edilmemektedir. Lütfen PNG, JPG, JPEG veya WEBP kullanınız.');
+      return;
+    }
+
+    setError('');
+    const reader = new FileReader();
+    reader.onload = () => {
+      setEditLogoUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleBannerFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
+      setError('SVG formatı kabul edilmemektedir. Lütfen PNG, JPG, JPEG veya WEBP kullanınız.');
+      return;
+    }
+
+    setError('');
+    const reader = new FileReader();
+    reader.onload = () => {
+      setEditBannerUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentProfile) return;
@@ -151,11 +184,11 @@ export default function HesabimKurumsalPage() {
     setSuccess('');
 
     try {
+      // Server will resolve dealer ownership directly from verified session
       const res = await fetch('/api/dealers/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          profileId: currentProfile.id,
           company_name: editCompanyName,
           description: editDescription,
           logo_url: editLogoUrl,
@@ -178,11 +211,13 @@ export default function HesabimKurumsalPage() {
     }
   };
 
-  const scrollToEditForm = () => {
-    if (editFormRef.current) {
-      editFormRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
+  const displayBanner = editBannerUrl.startsWith('data:image/')
+    ? editBannerUrl
+    : resolveMediaUrl(dealer?.banner_path || dealer?.banner_url);
+
+  const displayLogo = editLogoUrl.startsWith('data:image/')
+    ? editLogoUrl
+    : resolveMediaUrl(dealer?.logo_path || dealer?.logo_url);
 
   return (
     <div className="space-y-6">
@@ -211,12 +246,14 @@ export default function HesabimKurumsalPage() {
           {/* 1. UPPER PREMIUM HERO CARD */}
           <div className="relative rounded-2xl overflow-hidden border border-[#FF8A1F]/30 bg-gradient-to-br from-[#1a1208] via-[var(--bg-surface)] to-[var(--bg-surface)] shadow-xl">
             {/* Banner Background */}
-            <div
-              className="absolute inset-0 bg-cover bg-center opacity-25 mix-blend-luminosity pointer-events-none"
-              style={{
-                backgroundImage: `url(${dealer.banner_url || 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=1200'})`,
-              }}
-            />
+            {displayBanner ? (
+              <div
+                className="absolute inset-0 bg-cover bg-center opacity-25 mix-blend-luminosity pointer-events-none"
+                style={{ backgroundImage: `url(${displayBanner})` }}
+              />
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-r from-[#1a1208] to-[var(--bg-surface-secondary)] opacity-40 pointer-events-none" />
+            )}
             {/* Gradient Overlay for Contrast */}
             <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-surface)] via-[var(--bg-surface)]/80 to-transparent pointer-events-none" />
 
@@ -225,11 +262,17 @@ export default function HesabimKurumsalPage() {
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
                 {/* Logo */}
                 <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-[#FF8A1F] bg-[var(--bg-surface)] shadow-lg shrink-0 flex items-center justify-center">
-                  <img
-                    src={dealer.logo_url || 'https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=200'}
-                    alt={dealer.company_name}
-                    className="w-full h-full object-cover"
-                  />
+                  {displayLogo ? (
+                    <img
+                      src={displayLogo}
+                      alt={dealer.company_name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] flex items-center justify-center text-2xl font-black">
+                      {dealer.company_name?.charAt(0) || 'M'}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -242,6 +285,11 @@ export default function HesabimKurumsalPage() {
                       <BadgeCheck className="w-3 h-3" />
                       ONAYLI KURUMSAL PROFİL
                     </span>
+                    {dealer.public_id && (
+                      <span className="text-[10px] font-mono text-[var(--text-dim)] px-2 py-0.5 rounded bg-[var(--bg-surface-secondary)] border border-[var(--border-app)]">
+                        #{dealer.public_id}
+                      </span>
+                    )}
                   </div>
 
                   <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-main)] tracking-tight">
@@ -257,28 +305,19 @@ export default function HesabimKurumsalPage() {
               {/* Actions on Hero */}
               <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full md:w-auto shrink-0">
                 <Link
-                  href={`/magaza/${dealer.id}`}
+                  href={`/premium/${dealer.public_id || dealer.id}`}
                   target="_blank"
                   className="btn-primary text-xs py-2.5 px-4 flex items-center justify-center gap-1.5 shadow-md flex-1 sm:flex-none"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                   <span>Mağazayı Görüntüle</span>
                 </Link>
-
-                <button
-                  type="button"
-                  onClick={scrollToEditForm}
-                  className="btn-secondary text-xs py-2.5 px-4 flex items-center justify-center gap-1.5 flex-1 sm:flex-none cursor-pointer"
-                >
-                  <Edit className="w-3.5 h-3.5 text-[#FF8A1F]" />
-                  <span>Profili Düzenle</span>
-                </button>
               </div>
             </div>
           </div>
 
-          {/* 2. COMPACT STATS GRID (NO TOPLAM ÖDEME) */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* 2. COMPACT STATS GRID (Item 10: Toplam Favori Removed) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Aktif İlan */}
             <div className="surface-card p-4 rounded-xl border border-[var(--border-app)] space-y-1">
               <div className="flex items-center justify-between text-[var(--text-muted)]">
@@ -311,21 +350,10 @@ export default function HesabimKurumsalPage() {
                 {stats.propertyListings}
               </p>
             </div>
-
-            {/* Toplam Favori */}
-            <div className="surface-card p-4 rounded-xl border border-[var(--border-app)] space-y-1">
-              <div className="flex items-center justify-between text-[var(--text-muted)]">
-                <span className="text-xs font-semibold">Toplam Favori</span>
-                <Heart className="w-4 h-4 text-[#FF8A1F]" />
-              </div>
-              <p className="text-2xl font-black text-[#FF8A1F]">
-                {stats.totalFavorites}
-              </p>
-            </div>
           </div>
 
-          {/* 3. QUICK ACTIONS */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {/* 3. QUICK ACTIONS (Item 10: Redundant edit button removed) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Link
               href="/ilan-ver"
               className="surface-card surface-card-hover p-4 rounded-xl border border-[var(--border-app)] flex flex-col items-center justify-center text-center gap-2 group"
@@ -335,17 +363,6 @@ export default function HesabimKurumsalPage() {
               </div>
               <span className="text-xs font-bold text-[var(--text-main)]">Yeni İlan Oluştur</span>
             </Link>
-
-            <button
-              type="button"
-              onClick={scrollToEditForm}
-              className="surface-card surface-card-hover p-4 rounded-xl border border-[var(--border-app)] flex flex-col items-center justify-center text-center gap-2 group cursor-pointer"
-            >
-              <div className="w-9 h-9 rounded-lg bg-[var(--bg-surface-secondary)] text-[var(--text-main)] flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Edit className="w-5 h-5 text-[#FF8A1F]" />
-              </div>
-              <span className="text-xs font-bold text-[var(--text-main)]">Mağaza Profilini Düzenle</span>
-            </button>
 
             <Link
               href="/hesabim/ilanlarim"
@@ -369,7 +386,7 @@ export default function HesabimKurumsalPage() {
           </div>
 
           {/* 4. EDIT FORM SECTION */}
-          <div ref={editFormRef} className="surface-card p-6 sm:p-8 rounded-2xl border border-[var(--border-app)] space-y-6">
+          <div className="surface-card p-6 sm:p-8 rounded-2xl border border-[var(--border-app)] space-y-6">
             <div className="pb-4 border-b border-[var(--border-app)] flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold text-[var(--text-main)]">Kurumsal Vitrin Bilgileri</h2>
@@ -402,25 +419,82 @@ export default function HesabimKurumsalPage() {
                   />
                 </div>
 
+                {/* LOGO & BANNER FILE UPLOAD (Item 9: NO URL TEXT INPUTS) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-[var(--text-muted)]">Logo Görseli URL</label>
-                    <input
-                      type="text"
-                      value={editLogoUrl}
-                      onChange={(e) => setEditLogoUrl(e.target.value)}
-                      className="form-input text-xs"
-                    />
+                  {/* Logo Upload */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-[var(--text-muted)]">Mağaza Logosu</label>
+                    <div className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]">
+                      <div className="w-14 h-14 rounded-xl overflow-hidden border border-[var(--border-app)] bg-[var(--bg-surface)] shrink-0 flex items-center justify-center">
+                        {displayLogo ? (
+                          <img
+                            src={displayLogo}
+                            alt="Logo Önizleme"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <ImageIcon className="w-6 h-6 text-[var(--text-dim)]" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => logoInputRef.current?.click()}
+                          className="btn-secondary text-[11px] py-1.5 px-3 flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <UploadCloud className="w-3.5 h-3.5 text-[#FF8A1F]" />
+                          <span>Logo Yükle</span>
+                        </button>
+                        <p className="text-[10px] text-[var(--text-dim)] mt-1">
+                          PNG, JPG, WEBP (Max 512x512)
+                        </p>
+                      </div>
+                      <input
+                        ref={logoInputRef}
+                        type="file"
+                        accept="image/png, image/jpeg, image/jpg, image/webp"
+                        onChange={handleLogoFileChange}
+                        className="hidden"
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-[var(--text-muted)]">Banner (Kapak) Görseli URL</label>
-                    <input
-                      type="text"
-                      value={editBannerUrl}
-                      onChange={(e) => setEditBannerUrl(e.target.value)}
-                      className="form-input text-xs"
-                    />
+                  {/* Banner Upload */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-[var(--text-muted)]">Kapak Bannerı</label>
+                    <div className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]">
+                      <div className="w-20 h-14 rounded-xl overflow-hidden border border-[var(--border-app)] bg-[var(--bg-surface)] shrink-0 flex items-center justify-center">
+                        {displayBanner ? (
+                          <img
+                            src={displayBanner}
+                            alt="Banner Önizleme"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <ImageIcon className="w-6 h-6 text-[var(--text-dim)]" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => bannerInputRef.current?.click()}
+                          className="btn-secondary text-[11px] py-1.5 px-3 flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <UploadCloud className="w-3.5 h-3.5 text-[#FF8A1F]" />
+                          <span>Banner Yükle</span>
+                        </button>
+                        <p className="text-[10px] text-[var(--text-dim)] mt-1">
+                          PNG, JPG, WEBP (Max 1600px)
+                        </p>
+                      </div>
+                      <input
+                        ref={bannerInputRef}
+                        type="file"
+                        accept="image/png, image/jpeg, image/jpg, image/webp"
+                        onChange={handleBannerFileChange}
+                        className="hidden"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -443,7 +517,7 @@ export default function HesabimKurumsalPage() {
                       value={editPhone}
                       onChange={(e) => setEditPhone(e.target.value)}
                       placeholder="555-0192"
-                      className="form-input text-xs"
+                      className="form-input text-xs font-mono"
                     />
                   </div>
 
@@ -460,82 +534,89 @@ export default function HesabimKurumsalPage() {
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={actionLoading}
-                className="btn-primary py-2.5 px-6 text-sm font-bold flex items-center gap-2 shadow-md cursor-pointer"
-              >
-                {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                <span>Vitrin Bilgilerini Güncelle</span>
-              </button>
+              <div className="pt-2 flex items-center justify-end">
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="btn-primary text-xs py-2.5 px-6 flex items-center gap-2 shadow-md cursor-pointer"
+                >
+                  {actionLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  <span>Değişiklikleri Kaydet</span>
+                </button>
+              </div>
             </form>
           </div>
         </div>
       ) : dealer?.status === 'PENDING' ? (
-        /* PENDING STATUS CARD */
-        <div className="p-8 rounded-2xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] text-center space-y-3 max-w-lg mx-auto">
+        <div className="surface-card p-8 rounded-2xl border border-[var(--border-app)] text-center space-y-4 max-w-lg mx-auto">
           <div className="w-12 h-12 mx-auto rounded-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] flex items-center justify-center">
             <Clock className="w-6 h-6" />
           </div>
-          <h3 className="font-extrabold text-base text-[var(--text-main)]">
-            Kurumsal Başvurunuz İnceleniyor
-          </h3>
+          <h2 className="text-lg font-bold text-[var(--text-main)]">Başvurunuz İnceleniyor</h2>
           <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-            <strong className="text-[var(--text-main)]">{dealer.company_name}</strong> adına yaptığınız kurumsal vitrin başvurusu Sanboard yönetim ekibine iletilmiştir. Onaylandığında hesabınız otomatik olarak "Premium Satıcı" durumuna geçecektir.
+            "{dealer.company_name}" adıyla yaptığınız kurumsal satıcı başvurusu yönetim ekibimiz tarafından değerlendirilmektedir. Onaylandığında bu sayfadan kurumsal vitrininizi yönetebilirsiniz.
           </p>
+          <div className="pt-2">
+            <Link href="/hesabim/destek" className="btn-secondary text-xs py-2 px-4 inline-flex items-center gap-1.5">
+              <span>Destek Talebi Aç</span>
+            </Link>
+          </div>
         </div>
       ) : (
-        /* APPLICATION FORM FOR INDIVIDUAL USERS */
-        <div className="max-w-xl space-y-6">
-          <div className="p-4 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] space-y-2">
-            <div className="flex items-center gap-2 text-xs font-bold text-[#FF8A1F]">
-              <Building2 className="w-4 h-4" />
-              <span>Neden Kurumsal Satıcı Olmalısınız?</span>
+        <div className="surface-card p-6 sm:p-8 rounded-2xl border border-[var(--border-app)] space-y-6 max-w-2xl mx-auto">
+          <div className="text-center space-y-2">
+            <div className="w-12 h-12 mx-auto rounded-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] flex items-center justify-center">
+              <Building2 className="w-6 h-6" />
             </div>
-            <ul className="text-xs text-[var(--text-muted)] space-y-1 list-disc list-inside">
-              <li>Özel kurumsal mağaza sayfası ve banner vitrini (`/magaza/şirket-adı`)</li>
-              <li>İlanlarınızda dikkat çeken <strong>Premium Satıcı</strong> altın rozeti</li>
-              <li>Tüm araç ve mülk portföyünüzün tek bir kurumsal sayfada toplanması</li>
-            </ul>
+            <h2 className="text-xl font-black text-[var(--text-main)]">Kurumsal Satıcı Başvurusu</h2>
+            <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto">
+              San Andreas'ta galeri veya emlak işletmesiyseniz kurumsal mağaza profili açarak vitrininizi özelleştirebilirsiniz.
+            </p>
           </div>
 
           <form onSubmit={handleApply} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--text-muted)]">
-                Şirket / Galeri / Ofis Adı
-              </label>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Şirket / Galeri Adı</label>
               <input
                 type="text"
-                placeholder="Örn: Rockford Prestige Motors veya Vespucci Emlak"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
+                placeholder="Örn: Apex Motors, Vinewood Real Estate..."
                 required
-                className="form-input text-sm font-semibold"
+                className="form-input text-xs font-bold"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--text-muted)]">
-                Profil Açma Amacı & Faaliyet Alanı
-              </label>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Faaliyet Amacı & Detaylar</label>
               <textarea
                 rows={4}
-                placeholder="San Andreas'taki işletmenizin faaliyet alanını ve Sanboard kurumsal profilini ne amaçla kullanacağınızı kısaca belirtiniz..."
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
+                placeholder="İşletmenizin rolü, Los Santos'taki konumu ve faaliyetleri hakkında kısa bilgi..."
                 required
-                className="form-input text-sm resize-none"
+                className="form-input text-xs resize-none"
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={actionLoading}
-              className="btn-primary py-3 px-6 text-sm font-bold flex items-center justify-center gap-2 w-full sm:w-auto shadow-lg"
-            >
-              {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              <span>Kurumsal Başvuruyu Gönder</span>
-            </button>
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={actionLoading}
+                className="w-full btn-primary text-xs py-2.5 flex items-center justify-center gap-2 shadow-md cursor-pointer"
+              >
+                {actionLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                <span>Başvuruyu Gönder</span>
+              </button>
+            </div>
           </form>
         </div>
       )}

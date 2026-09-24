@@ -127,10 +127,25 @@ export function FilterSidebar({
   };
 
   const resetFilters = () => {
+    setSubcategory('all');
+    setQuery('');
+    setMinPrice('');
+    setMaxPrice('');
+    setLocation('all');
     setBrand('all');
     setModel('all');
-    const targetRoute = category === 'vehicle' ? '/arac' : '/mulk';
-    router.push(targetRoute);
+    setMinMileage('');
+    setMaxMileage('');
+    setTurbo('all');
+    setSubwoofer('all');
+    setTrade('all');
+    setRoomCount('all');
+    setFurnished('all');
+    setBalcony('all');
+    setBuildingType('all');
+
+    const cleanPath = category === 'vehicle' ? '/arac' : '/mulk';
+    router.replace(cleanPath);
     if (onFilterChange) onFilterChange();
   };
 

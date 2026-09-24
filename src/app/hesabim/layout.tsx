@@ -23,18 +23,19 @@ import {
 export default function HesabimLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentProfile, isAuthenticated, isAdmin, logout } = useAuth();
+  const { currentProfile, isAuthenticated, isLoading, isAdmin, logout } = useAuth();
 
   useEffect(() => {
-    if (!isAuthenticated || !currentProfile) {
+    if (!isLoading && !isAuthenticated) {
       router.push(`/giris?redirect=${encodeURIComponent(pathname)}`);
     }
-  }, [isAuthenticated, currentProfile, router, pathname]);
+  }, [isLoading, isAuthenticated, router, pathname]);
 
-  if (!isAuthenticated || !currentProfile) {
+  if (isLoading || !currentProfile) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center text-sm text-[var(--text-muted)]">
-        Giriş kontrol ediliyor...
+      <div className="min-h-[70vh] flex flex-col items-center justify-center gap-3 text-xs text-[var(--text-muted)]">
+        <div className="w-8 h-8 rounded-full border-2 border-[#FF8A1F] border-t-transparent animate-spin" />
+        <span>Oturum bilgileri yükleniyor...</span>
       </div>
     );
   }

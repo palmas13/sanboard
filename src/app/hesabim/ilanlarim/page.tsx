@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatTimeRemaining, formatDate } from '@/lib/utils/format';
 import { Listing } from '@/types';
+import { resolveMediaUrl } from '@/lib/media/url';
 
 export default function HesabimIlanlarimPage() {
   const { currentProfile } = useAuth();
@@ -122,10 +123,10 @@ export default function HesabimIlanlarimPage() {
         activeListings.length > 0 ? (
           <div className="space-y-4">
             {activeListings.map((listing) => {
-              const coverImg =
+              const rawCover =
                 listing.images?.find((i) => i.is_cover)?.storage_path ||
-                listing.images?.[0]?.storage_path ||
-                'https://images.unsplash.com/photo-1617788138017-80ad40651399?w=600';
+                listing.images?.[0]?.storage_path;
+              const coverImg = resolveMediaUrl(rawCover);
               const remaining = formatTimeRemaining(listing.expires_at);
 
               return (

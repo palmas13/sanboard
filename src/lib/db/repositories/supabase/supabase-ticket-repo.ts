@@ -157,4 +157,18 @@ export class SupabaseTicketRepository implements ITicketRepository {
 
     return !error;
   }
+
+  async getAllTickets(): Promise<SupportTicket[]> {
+    const client = this.getAdminClient();
+    const { data, error } = await client
+      .from('support_tickets')
+      .select('*')
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Supabase error fetching all tickets: ${error.message}`);
+    }
+
+    return (data || []) as SupportTicket[];
+  }
 }

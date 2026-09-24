@@ -5,6 +5,7 @@ import {
   createTicket,
   addTicketMessage,
   updateTicketStatus,
+  getAllTicketsForAdmin,
 } from '../../tickets';
 import { TicketStatus } from '@/types';
 
@@ -32,5 +33,9 @@ export class MemoryTicketRepository implements ITicketRepository {
 
   async updateTicketStatus(id: string, status: TicketStatus) {
     return updateTicketStatus(id, status);
+  }
+
+  async getAllTickets() {
+    return getAllTicketsForAdmin();
   }
 }

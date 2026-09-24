@@ -26,7 +26,7 @@ const DESC_MAX = 100;
 
 export default function YeniIlanOlusturPage() {
   const router = useRouter();
-  const { currentProfile, isAuthenticated } = useAuth();
+  const { currentProfile, isAuthenticated, isLoading } = useAuth();
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [submitting, setSubmitting] = useState(false);
@@ -76,6 +76,7 @@ export default function YeniIlanOlusturPage() {
 
   // Auth guard & Credit check
   useEffect(() => {
+    if (isLoading) return;
     if (!isAuthenticated || !currentProfile) {
       router.push('/giris?redirect=/ilan-ver/yeni');
       return;

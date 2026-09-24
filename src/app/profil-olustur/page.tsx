@@ -17,15 +17,13 @@ function ProfilOlusturContent() {
     id: charId,
     fullName: 'Ravi Blumon',
     hasProfile: false,
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=250&auto=format&fit=crop&q=80',
+    avatarUrl: '',
     sanmailEmail: 'ravi.blumon@sanmail.com',
     phone: '555-4309',
   };
 
   const [fullName] = useState(char.fullName);
-  const [avatarUrl, setAvatarUrl] = useState(
-    char.avatarUrl || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=250&auto=format&fit=crop&q=80'
-  );
+  const [avatarUrl, setAvatarUrl] = useState(char.avatarUrl || '');
   const [sanmailEmail, setSanmailEmail] = useState(
     char.sanmailEmail || `${char.fullName.toLowerCase().replace(' ', '.')}@sanmail.com`
   );
@@ -93,11 +91,17 @@ function ProfilOlusturContent() {
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Avatar Preview & URL */}
           <div className="flex items-center gap-4 p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)]">
-            <img
-              src={avatarUrl}
-              alt={fullName}
-              className="w-16 h-16 rounded-full object-cover border-2 border-[#FF8A1F] shadow-sm shrink-0"
-            />
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={fullName}
+                className="w-16 h-16 rounded-full object-cover border-2 border-[#FF8A1F] shadow-sm shrink-0"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border-2 border-[#FF8A1F] flex items-center justify-center font-black text-xl shrink-0">
+                {fullName?.charAt(0) || 'U'}
+              </div>
+            )}
             <div className="flex-1 space-y-1">
               <label className="text-xs font-semibold text-[var(--text-muted)] flex items-center gap-1">
                 <Camera className="w-3.5 h-3.5 text-[#FF8A1F]" />

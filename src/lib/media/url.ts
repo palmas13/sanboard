@@ -44,7 +44,7 @@ export function resolveMediaUrl(pathOrUrl?: string | null): string {
  */
 export function resolveAvatarUrl(
   pathOrUrl?: string | null,
-  fallbackUrl: string = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=250&auto=format&fit=crop&q=80'
+  fallbackUrl: string = ''
 ): string {
   const resolved = resolveMediaUrl(pathOrUrl);
   if (!resolved) {

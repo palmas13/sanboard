@@ -11,20 +11,19 @@ import { getListingRepository } from '@/lib/db/repositories';
 import { ListingCard } from '@/components/listings/ListingCard';
 import { PopularShowcase } from '@/components/home/PopularShowcase';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0; // Fresh listing feed
+export const revalidate = 30; // 30-second controlled server cache with targeted on-mutation invalidation
 
 export default async function HomePage() {
   const repo = getListingRepository();
-  const [vehicleListings, propertyListings, popularListings] = await Promise.all([
-    repo.getPublicListings({ category: 'vehicle', sort: 'newest' }),
-    repo.getPublicListings({ category: 'property', sort: 'newest' }),
-    repo.getPublicListings({ sort: 'popular' }),
-  ]);
+  const allListings = await repo.getPublicListings({ sort: 'newest' });
 
+  const vehicleListings = allListings.filter((l) => l.category === 'vehicle');
+  const propertyListings = allListings.filter((l) => l.category === 'property');
   const latestVehicles = vehicleListings.slice(0, 6);
   const latestProperties = propertyListings.slice(0, 6);
-  const popularFeed = popularListings.slice(0, 10);
+  const popularFeed = [...allListings]
+    .sort((a, b) => (b.favorite_count || 0) - (a.favorite_count || 0))
+    .slice(0, 10);
 
   return (
     <div className="space-y-12 pb-20">

@@ -248,7 +248,10 @@ export interface DealerProfile {
   slug?: string;
   description: string;
   logo_url: string;
+  logo_path?: string;
   banner_url: string;
+  banner_path?: string;
+  public_id?: number;
   address?: string;
   phone?: string;
   sanmail_email?: string;

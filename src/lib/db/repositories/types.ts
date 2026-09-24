@@ -94,12 +94,15 @@ export interface ITicketRepository {
   createTicket(params: { profileId: string; creatorName: string; subject: string; message: string }): Promise<{ success: boolean; ticket?: SupportTicket; error?: string }>;
   addTicketMessage(params: { ticketId: string; senderRole: 'USER' | 'ADMIN'; senderName: string; message: string }): Promise<{ success: boolean; message?: TicketMessage; error?: string }>;
   updateTicketStatus(id: string, status: TicketStatus): Promise<boolean>;
+  getAllTickets(): Promise<SupportTicket[]>;
 }
 
 export interface IDealerRepository {
   getDealerById(id: string): Promise<CorporateProfile | null>;
+  getDealerByPublicId?(publicId: number): Promise<CorporateProfile | null>;
   getDealerBySlug(slug: string): Promise<CorporateProfile | null>;
   getDealerByProfileId(profileId: string): Promise<CorporateProfile | null>;
+  getAllDealers?(): Promise<CorporateProfile[]>;
   createApplication(params: { profileId: string; companyName: string; purpose: string }): Promise<{ success: boolean; application?: CorporateApplication; error?: string }>;
   updateDealerProfile(id: string, data: Partial<CorporateProfile>): Promise<{ success: boolean; dealer?: CorporateProfile; error?: string }>;
 }

@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
 
     // Fallback to authenticated server session or cookie if not passed as query param
     if (!profileId) {
-      const session = await getServerSession();
+      const session = await getServerSession(req);
       profileId = session?.profileId || req.cookies.get('sanboard_profile_id')?.value || null;
     }
 
@@ -55,7 +55,7 @@ export async function PUT(req: NextRequest) {
     let profileId = body.profileId;
 
     if (!profileId) {
-      const session = await getServerSession();
+      const session = await getServerSession(req);
       profileId = session?.profileId || req.cookies.get('sanboard_profile_id')?.value || null;
     }
 

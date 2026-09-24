@@ -33,6 +33,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ authenticated: true, session });
 }
 
+import { getSupabaseAdminClient } from '@/lib/db/supabase-client';
+
 // POST create/issue signed session on character selection or login
 export async function POST(req: NextRequest) {
   try {
@@ -48,6 +50,33 @@ export async function POST(req: NextRequest) {
 
     // Resolve user account
     let account = STAGING_CHARACTER_ACCOUNTS[characterId];
+
+    if (!account && process.env.DATA_STORE === 'supabase') {
+      try {
+        const client = getSupabaseAdminClient();
+        if (client) {
+          const { data: profile } = await client
+            .from('character_profiles')
+            .select('id, user_id')
+            .or(`id.eq.${characterId},external_character_id.eq.${characterId}`)
+            .maybeSingle();
+
+          if (profile?.user_id) {
+            const { data: user } = await client
+              .from('users')
+              .select('id, role')
+              .eq('id', profile.user_id)
+              .maybeSingle();
+
+            if (user) {
+              account = { userId: user.id, role: user.role as any };
+            }
+          }
+        }
+      } catch {
+        // Fallback to memory
+      }
+    }
 
     if (!account) {
       // Check in memory store
@@ -79,6 +108,9 @@ export async function POST(req: NextRequest) {
     });
 
     response.headers.set('Set-Cookie', cookieHeader);
+    response.cookies.set('sanboard_profile_id', characterId, { path: '/', maxAge: 86400, sameSite: 'lax' });
+    response.cookies.set('sanboard_user_id', userId, { path: '/', maxAge: 86400, sameSite: 'lax' });
+    response.cookies.set('sanboard_role', role, { path: '/', maxAge: 86400, sameSite: 'lax' });
     return response;
   } catch (error: any) {
     return NextResponse.json(

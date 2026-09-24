@@ -268,6 +268,13 @@ export class SupabaseListingRepository implements IListingRepository {
     return {
       listing: {
         ...listing,
+        dealer: listing.corporate
+          ? {
+              ...listing.corporate,
+              profile_id: listing.corporate.owner_profile_id,
+              sanmail_email: listing.corporate.email,
+            }
+          : undefined,
         location: listing.category === 'vehicle' ? null : listing.location,
         previous_price: previousPrice,
         images: listing.listing_images || [],
@@ -547,6 +554,7 @@ export class SupabaseListingRepository implements IListingRepository {
     if (input.title) updateData.title = input.title;
     if (input.description) updateData.description = input.description;
     if (input.price !== undefined) updateData.price = input.price;
+    if (input.subcategory) updateData.subcategory = input.subcategory;
 
     if (existing.category === 'vehicle') {
       updateData.location = null;
@@ -580,25 +588,40 @@ export class SupabaseListingRepository implements IListingRepository {
     // Update category details if provided
     if (existing.category === 'vehicle') {
       const vehUpdate: any = {};
+      const vehicleCategory = input.subcategory || (input as any).vehicle_category;
+      if (vehicleCategory) vehUpdate.vehicle_category = vehicleCategory;
       if (input.brand !== undefined) vehUpdate.brand = input.brand;
       if (input.model !== undefined) vehUpdate.model = input.model;
-      if (input.mileage !== undefined) vehUpdate.mileage = input.mileage;
+      if (input.plate !== undefined) vehUpdate.plate = input.plate.trim().toUpperCase();
+      if (input.mileage !== undefined) vehUpdate.mileage = Number(input.mileage);
+      if (input.engine_upgrade !== undefined) vehUpdate.engine_upgrade = Number(input.engine_upgrade);
+      if (input.transmission_upgrade !== undefined) vehUpdate.transmission_upgrade = Number(input.transmission_upgrade);
+      if (input.brake_upgrade !== undefined) vehUpdate.brake_upgrade = Number(input.brake_upgrade);
       if (input.turbo !== undefined) vehUpdate.turbo = Boolean(input.turbo);
       if (input.subwoofer !== undefined) vehUpdate.subwoofer = Boolean(input.subwoofer);
       if (input.trade_available !== undefined) vehUpdate.trade_available = Boolean(input.trade_available);
 
       if (Object.keys(vehUpdate).length > 0) {
-        await client.from('vehicle_details').update(vehUpdate).eq('listing_id', id);
+        const { error: vehErr } = await client.from('vehicle_details').update(vehUpdate).eq('listing_id', id);
+        if (vehErr) {
+          return { success: false, error: `Araç detayları güncellenemedi: ${vehErr.message}` };
+        }
       }
     } else {
       const propUpdate: any = {};
-      if (input.floor !== undefined) propUpdate.floor = input.floor;
+      const propType = input.subcategory || (input as any).property_type;
+      if (propType) propUpdate.property_type = propType;
+      if (input.floor !== undefined) propUpdate.floor = Number(input.floor);
       if (input.room_count !== undefined) propUpdate.room_count = input.room_count;
+      if (input.building_type !== undefined) propUpdate.building_type = input.building_type;
       if (input.furnished !== undefined) propUpdate.furnished = Boolean(input.furnished);
       if (input.balcony !== undefined) propUpdate.balcony = Boolean(input.balcony);
 
       if (Object.keys(propUpdate).length > 0) {
-        await client.from('property_details').update(propUpdate).eq('listing_id', id);
+        const { error: propErr } = await client.from('property_details').update(propUpdate).eq('listing_id', id);
+        if (propErr) {
+          return { success: false, error: `Mülk detayları güncellenemedi: ${propErr.message}` };
+        }
       }
     }
 

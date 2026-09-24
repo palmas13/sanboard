@@ -4,6 +4,7 @@ import { MapPin, Calendar } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { FavoriteButton } from './FavoriteButton';
 import { PublicListingSummary } from '@/types';
+import { resolveMediaUrl } from '@/lib/media/url';
 
 interface ListingCardProps {
   listing: PublicListingSummary;
@@ -16,7 +17,7 @@ export function ListingCard({ listing, className = '' }: ListingCardProps) {
       ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=600&auto=format&fit=crop&q=80'
       : 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&auto=format&fit=crop&q=80';
 
-  const displayImage = listing.cover_image || fallbackImage;
+  const displayImage = resolveMediaUrl(listing.cover_image) || fallbackImage;
 
   return (
     <div

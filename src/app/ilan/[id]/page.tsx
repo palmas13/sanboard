@@ -22,8 +22,7 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const revalidate = 30;
 
 export default async function ListingDetailPage({ params }: PageProps) {
   const { id } = await params;

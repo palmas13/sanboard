@@ -23,35 +23,40 @@ export function SellerCard({ seller, dealer }: SellerCardProps) {
     );
   }
 
-  const isCorporate = Boolean(dealer || seller?.is_dealer);
+  // Source of truth: If dealer is linked to this listing, it is a corporate listing
+  const isCorporate = Boolean(dealer);
   const sanmailBaseUrl = process.env.NEXT_PUBLIC_SANMAIL_BASE_URL;
 
-  // Corporate values take precedence if corporate seller
+  // Real data sources: No mock names or fake fallbacks
   const displayName = isCorporate
-    ? dealer?.company_name || 'Blackline Motors'
+    ? dealer?.company_name || 'Kurumsal Mağaza'
     : seller?.full_name || 'İlan Sahibi';
 
   const displayAvatar = isCorporate
-    ? resolveMediaUrl(dealer?.logo_url) || 'https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=300'
+    ? resolveMediaUrl(dealer?.logo_path || dealer?.logo_url)
     : resolveAvatarUrl(seller?.avatar_path || seller?.avatar_url);
 
   const displayPhone = isCorporate
-    ? dealer?.phone || seller?.phone || '555-0192'
-    : seller?.phone || '555-0192';
+    ? dealer?.phone || seller?.phone || ''
+    : seller?.phone || '';
 
   const displayMail = isCorporate
-    ? dealer?.sanmail_email || dealer?.email || seller?.sanmail_email || 'kurumsal@sanmail.com'
-    : seller?.sanmail_email || 'satici@sanmail.com';
+    ? dealer?.sanmail_email || dealer?.email || seller?.sanmail_email || ''
+    : seller?.sanmail_email || '';
 
-  const storeId = dealer?.id || seller?.dealer_id || 'dealer-apex-01';
+  const publicStoreUrl = isCorporate
+    ? `/premium/${dealer?.public_id || dealer?.id}`
+    : null;
 
   const handleCopyPhone = () => {
+    if (!displayPhone) return;
     navigator.clipboard.writeText(displayPhone);
     setCopiedPhone(true);
     setTimeout(() => setCopiedPhone(false), 2000);
   };
 
   const handleCopyMail = () => {
+    if (!displayMail) return;
     navigator.clipboard.writeText(displayMail);
     setCopiedMail(true);
     setTimeout(() => setCopiedMail(false), 2000);
@@ -63,13 +68,23 @@ export function SellerCard({ seller, dealer }: SellerCardProps) {
     }`}>
       {/* Header Profile / Store Info */}
       <div className="flex items-center gap-3.5 pb-4 border-b border-[var(--border-app)]">
-        <img
-          src={displayAvatar}
-          alt={displayName}
-          className={`w-14 h-14 rounded-2xl object-cover border-2 shadow-sm shrink-0 ${
-            isCorporate ? 'border-[#FF8A1F] ring-2 ring-[#FF8A1F]/20' : 'border-[var(--border-app)] rounded-full'
-          }`}
-        />
+        {displayAvatar ? (
+          <img
+            src={displayAvatar}
+            alt={displayName}
+            className={`w-14 h-14 object-cover border-2 shadow-sm shrink-0 ${
+              isCorporate ? 'rounded-2xl border-[#FF8A1F] ring-2 ring-[#FF8A1F]/20' : 'rounded-full border-[var(--border-app)]'
+            }`}
+          />
+        ) : (
+          <div className={`w-14 h-14 flex items-center justify-center font-bold text-base shadow-sm shrink-0 ${
+            isCorporate
+              ? 'rounded-2xl bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border-2 border-[#FF8A1F]'
+              : 'rounded-full bg-[var(--bg-surface-secondary)] text-[var(--text-main)] border border-[var(--border-app)]'
+          }`}>
+            {displayName.charAt(0)}
+          </div>
+        )}
         <div className="space-y-1 min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider">
@@ -95,46 +110,50 @@ export function SellerCard({ seller, dealer }: SellerCardProps) {
       {/* Contact Details & Action CTAs */}
       <div className="space-y-2.5">
         {/* Phone */}
-        <div className="p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Phone className="w-4 h-4 text-[#FF8A1F] shrink-0" />
-            <div>
-              <p className="text-[10px] text-[var(--text-dim)]">
-                {isCorporate ? 'Kurumsal Telefon' : 'Telefon'}
-              </p>
-              <p className="text-xs font-bold text-[var(--text-main)] font-mono">{displayPhone}</p>
+        {displayPhone ? (
+          <div className="p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Phone className="w-4 h-4 text-[#FF8A1F] shrink-0" />
+              <div>
+                <p className="text-[10px] text-[var(--text-dim)]">
+                  {isCorporate ? 'Kurumsal Telefon' : 'Telefon'}
+                </p>
+                <p className="text-xs font-bold text-[var(--text-main)] font-mono">{displayPhone}</p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={handleCopyPhone}
+              className="p-1.5 rounded-lg border border-[var(--border-app)] hover:bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[#FF8A1F] transition-colors cursor-pointer"
+              title="Telefonu Kopyala"
+            >
+              {copiedPhone ? <Check className="w-4 h-4 text-[var(--color-success)]" /> : <Copy className="w-4 h-4" />}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={handleCopyPhone}
-            className="p-1.5 rounded-lg border border-[var(--border-app)] hover:bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[#FF8A1F] transition-colors cursor-pointer"
-            title="Telefonu Kopyala"
-          >
-            {copiedPhone ? <Check className="w-4 h-4 text-[var(--color-success)]" /> : <Copy className="w-4 h-4" />}
-          </button>
-        </div>
+        ) : null}
 
         {/* SanMail */}
-        <div className="p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] flex items-center justify-between">
-          <div className="flex items-center gap-2.5 truncate mr-2">
-            <Mail className="w-4 h-4 text-[#FF8A1F] shrink-0" />
-            <div className="truncate">
-              <p className="text-[10px] text-[var(--text-dim)]">
-                {isCorporate ? 'Kurumsal SanMail' : 'SanMail'}
-              </p>
-              <p className="text-xs font-bold text-[var(--text-main)] truncate">{displayMail}</p>
+        {displayMail ? (
+          <div className="p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] flex items-center justify-between">
+            <div className="flex items-center gap-2.5 truncate mr-2">
+              <Mail className="w-4 h-4 text-[#FF8A1F] shrink-0" />
+              <div className="truncate">
+                <p className="text-[10px] text-[var(--text-dim)]">
+                  {isCorporate ? 'Kurumsal SanMail' : 'SanMail'}
+                </p>
+                <p className="text-xs font-bold text-[var(--text-main)] truncate">{displayMail}</p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={handleCopyMail}
+              className="p-1.5 rounded-lg border border-[var(--border-app)] hover:bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[#FF8A1F] transition-colors cursor-pointer shrink-0"
+              title="Mail Adresini Kopyala"
+            >
+              {copiedMail ? <Check className="w-4 h-4 text-[var(--color-success)]" /> : <Copy className="w-4 h-4" />}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={handleCopyMail}
-            className="p-1.5 rounded-lg border border-[var(--border-app)] hover:bg-[var(--bg-surface-hover)] text-[var(--text-muted)] hover:text-[#FF8A1F] transition-colors cursor-pointer shrink-0"
-            title="Mail Adresini Kopyala"
-          >
-            {copiedMail ? <Check className="w-4 h-4 text-[var(--color-success)]" /> : <Copy className="w-4 h-4" />}
-          </button>
-        </div>
+        ) : null}
 
         {/* SanMail CTA Button */}
         {sanmailBaseUrl ? (
@@ -147,7 +166,7 @@ export function SellerCard({ seller, dealer }: SellerCardProps) {
             <ExternalLink className="w-3.5 h-3.5" />
             <span>SanMail'i Aç</span>
           </a>
-        ) : (
+        ) : displayMail ? (
           <button
             type="button"
             onClick={handleCopyMail}
@@ -156,16 +175,16 @@ export function SellerCard({ seller, dealer }: SellerCardProps) {
             <Mail className="w-3.5 h-3.5 text-[#FF8A1F]" />
             <span>{copiedMail ? 'SanMail Kopyalandı!' : 'SanMail ile İletişime Geç'}</span>
           </button>
-        )}
+        ) : null}
 
-        {/* Corporate Only: [ Mağazayı Görüntüle ] CTA Button */}
-        {isCorporate && (
+        {/* Corporate Only: [ Mağaza Profilini Görüntüle ] CTA Button */}
+        {isCorporate && publicStoreUrl && (
           <Link
-            href={`/magaza/${storeId}`}
+            href={publicStoreUrl}
             className="w-full btn-primary text-xs py-2.5 flex items-center justify-center gap-1.5 shadow-sm mt-1"
           >
             <Building2 className="w-3.5 h-3.5" />
-            <span>Mağazayı Görüntüle</span>
+            <span>Mağaza Profilini Görüntüle</span>
           </Link>
         )}
       </div>

@@ -6,6 +6,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { Heart, Loader2, MapPin, Calendar, Clock, AlertCircle } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
+import { resolveMediaUrl } from '@/lib/media/url';
 
 export default function HesabimFavorilerimPage() {
   const { user, currentProfile } = useAuth();
@@ -52,10 +53,10 @@ export default function HesabimFavorilerimPage() {
       ) : favorites.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
           {favorites.map((listing) => {
-            const coverImg =
+            const rawCover =
               listing.images?.find((i: any) => i.is_cover)?.storage_path ||
-              listing.images?.[0]?.storage_path ||
-              'https://images.unsplash.com/photo-1617788138017-80ad40651399?w=600';
+              listing.images?.[0]?.storage_path;
+            const coverImg = resolveMediaUrl(rawCover);
 
             const isExpired = listing.isExpired || listing.status === 'EXPIRED';
 

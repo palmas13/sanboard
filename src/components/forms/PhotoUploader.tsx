@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Upload, X, Star, AlertCircle, Plus, Image as ImageIcon } from 'lucide-react';
+import { Upload, X, Star, AlertCircle, Image as ImageIcon } from 'lucide-react';
 
 export interface UploadedImage {
   id: string;
@@ -21,7 +21,6 @@ const MAX_IMAGES = 3;
 
 export function PhotoUploader({ images, onChange }: PhotoUploaderProps) {
   const [error, setError] = useState<string>('');
-  const [urlInput, setUrlInput] = useState<string>('');
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError('');
@@ -66,33 +65,6 @@ export function PhotoUploader({ images, onChange }: PhotoUploaderProps) {
       };
       reader.readAsDataURL(file);
     }
-  };
-
-  const handleAddUrl = (urlToAdd: string) => {
-    setError('');
-    if (!urlToAdd.trim()) return;
-
-    if (images.length >= MAX_IMAGES) {
-      setError(`En fazla ${MAX_IMAGES} fotoğraf yükleyebilirsiniz.`);
-      return;
-    }
-
-    const isFirst = images.length === 0;
-    const newImage: UploadedImage = {
-      id: `img-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      storage_path: urlToAdd.trim(),
-      size_bytes: 850000,
-      is_cover: isFirst,
-      sort_order: images.length,
-    };
-
-    const updated = [...images, newImage];
-    if (!updated.some((img) => img.is_cover)) {
-      updated[0].is_cover = true;
-    }
-
-    onChange(updated);
-    setUrlInput('');
   };
 
   const handleSetCover = (id: string) => {
@@ -140,32 +112,6 @@ export function PhotoUploader({ images, onChange }: PhotoUploaderProps) {
             className="hidden"
           />
         </label>
-      </div>
-
-      {/* Direct URL Quick Add */}
-      <div className="p-3.5 rounded-xl bg-[var(--bg-surface-secondary)]/50 border border-[var(--border-app)] space-y-2">
-        <p className="text-xs font-semibold text-[var(--text-muted)]">
-          Veya doğrudan görsel bağlantısı (URL) ekle:
-        </p>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="https://..."
-            value={urlInput}
-            onChange={(e) => setUrlInput(e.target.value)}
-            disabled={images.length >= MAX_IMAGES}
-            className="form-input text-xs flex-1"
-          />
-          <button
-            type="button"
-            onClick={() => handleAddUrl(urlInput)}
-            disabled={!urlInput.trim() || images.length >= MAX_IMAGES}
-            className="btn-secondary text-xs px-3"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Ekle</span>
-          </button>
-        </div>
       </div>
 
       {/* Error Message */}

@@ -30,16 +30,18 @@ import {
   User as UserIcon,
 } from 'lucide-react';
 import { formatCurrency, formatDateTime } from '@/lib/utils/format';
+import { resolveMediaUrl } from '@/lib/media/url';
 
 export default function AdminPage() {
   const router = useRouter();
-  const { isAdmin, isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading, isAdmin } = useAuth();
 
   const [activeTab, setActiveTab] = useState<
     'listings' | 'users' | 'payments' | 'reports' | 'dealers' | 'tickets' | 'settings'
   >('listings');
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
   // Settings form state
@@ -57,27 +59,39 @@ export default function AdminPage() {
 
   const fetchData = async () => {
     setLoading(true);
+    setFetchError(false);
     try {
       const res = await fetch('/api/admin');
+      if (!res.ok) throw new Error('Yüklenemedi');
       const json = await res.json();
       setData(json);
       if (json.packagePrice) {
         setPackagePriceInput(String(json.packagePrice));
       }
     } catch {
-      // Ignore
+      setFetchError(true);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    if (isLoading) return;
     if (!isAuthenticated) {
       router.push('/giris?redirect=/yonetim');
       return;
     }
     fetchData();
-  }, [isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, router]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[75vh] flex flex-col items-center justify-center gap-3 text-xs text-[var(--text-muted)]">
+        <div className="w-8 h-8 rounded-full border-2 border-[#FF8A1F] border-t-transparent animate-spin" />
+        <span>Yönetim oturumu doğrulanıyor...</span>
+      </div>
+    );
+  }
 
   if (!isAdmin) {
     return (
@@ -295,32 +309,68 @@ export default function AdminPage() {
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3.5">
         <div className="surface-card p-4 rounded-xl border border-[var(--border-app)]">
           <p className="text-[11px] text-[var(--text-muted)] font-semibold">Toplam Kullanıcı</p>
-          <p className="text-xl font-black text-[var(--text-main)] mt-1">{stats.totalUsers}</p>
+          {loading ? (
+            <div className="h-7 w-12 bg-[var(--bg-surface-secondary)] animate-pulse rounded mt-1" />
+          ) : fetchError ? (
+            <span className="text-[11px] text-[var(--color-danger)] font-medium block mt-1">Yüklenemedi</span>
+          ) : (
+            <p className="text-xl font-black text-[var(--text-main)] mt-1">{stats.totalUsers}</p>
+          )}
         </div>
 
         <div className="surface-card p-4 rounded-xl border border-[var(--border-app)]">
           <p className="text-[11px] text-[var(--text-muted)] font-semibold">Aktif İlan</p>
-          <p className="text-xl font-black text-[var(--color-success)] mt-1">{stats.activeListings}</p>
+          {loading ? (
+            <div className="h-7 w-12 bg-[var(--bg-surface-secondary)] animate-pulse rounded mt-1" />
+          ) : fetchError ? (
+            <span className="text-[11px] text-[var(--color-danger)] font-medium block mt-1">Yüklenemedi</span>
+          ) : (
+            <p className="text-xl font-black text-[var(--color-success)] mt-1">{stats.activeListings}</p>
+          )}
         </div>
 
         <div className="surface-card p-4 rounded-xl border border-[var(--border-app)]">
           <p className="text-[11px] text-[var(--text-muted)] font-semibold">Süresi Dolan</p>
-          <p className="text-xl font-black text-[var(--color-danger)] mt-1">{stats.expiredListings}</p>
+          {loading ? (
+            <div className="h-7 w-12 bg-[var(--bg-surface-secondary)] animate-pulse rounded mt-1" />
+          ) : fetchError ? (
+            <span className="text-[11px] text-[var(--color-danger)] font-medium block mt-1">Yüklenemedi</span>
+          ) : (
+            <p className="text-xl font-black text-[var(--color-danger)] mt-1">{stats.expiredListings}</p>
+          )}
         </div>
 
         <div className="surface-card p-4 rounded-xl border border-[var(--border-app)]">
           <p className="text-[11px] text-[var(--text-muted)] font-semibold">Kurumsal Başvuru</p>
-          <p className="text-xl font-black text-[#FF8A1F] mt-1">{pendingDealersCount}</p>
+          {loading ? (
+            <div className="h-7 w-12 bg-[var(--bg-surface-secondary)] animate-pulse rounded mt-1" />
+          ) : fetchError ? (
+            <span className="text-[11px] text-[var(--color-danger)] font-medium block mt-1">Yüklenemedi</span>
+          ) : (
+            <p className="text-xl font-black text-[#FF8A1F] mt-1">{pendingDealersCount}</p>
+          )}
         </div>
 
         <div className="surface-card p-4 rounded-xl border border-[var(--border-app)]">
           <p className="text-[11px] text-[var(--text-muted)] font-semibold">Açık Destek</p>
-          <p className="text-xl font-black text-[#FF8A1F] mt-1">{openTicketsCount}</p>
+          {loading ? (
+            <div className="h-7 w-12 bg-[var(--bg-surface-secondary)] animate-pulse rounded mt-1" />
+          ) : fetchError ? (
+            <span className="text-[11px] text-[var(--color-danger)] font-medium block mt-1">Yüklenemedi</span>
+          ) : (
+            <p className="text-xl font-black text-[#FF8A1F] mt-1">{openTicketsCount}</p>
+          )}
         </div>
 
         <div className="surface-card p-4 rounded-xl border border-[var(--border-app)]">
           <p className="text-[11px] text-[var(--text-muted)] font-semibold">Toplam Gelir</p>
-          <p className="text-xl font-black text-[#FF8A1F] mt-1">{formatCurrency(stats.totalRevenue)}</p>
+          {loading ? (
+            <div className="h-7 w-16 bg-[var(--bg-surface-secondary)] animate-pulse rounded mt-1" />
+          ) : fetchError ? (
+            <span className="text-[11px] text-[var(--color-danger)] font-medium block mt-1">Yüklenemedi</span>
+          ) : (
+            <p className="text-xl font-black text-[#FF8A1F] mt-1">{formatCurrency(stats.totalRevenue)}</p>
+          )}
         </div>
       </div>
 
@@ -520,19 +570,34 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-app)]">
-                {(data?.dealers || []).length > 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-xs text-[var(--text-muted)]">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-[#FF8A1F]" />
+                        <span>Kurumsal mağaza başvuruları yükleniyor...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (data?.dealers || []).length > 0 ? (
                   (data?.dealers || []).map((d: any) => (
                     <tr key={d.id} className="hover:bg-[var(--bg-surface-secondary)]/30 transition-colors">
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
-                          <img
-                            src={d.logo_url || 'https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=100'}
-                            alt={d.company_name}
-                            className="w-9 h-9 rounded-lg object-cover border border-[var(--border-app)] shrink-0"
-                          />
+                          {d.logo_path || d.logo_url ? (
+                            <img
+                              src={resolveMediaUrl(d.logo_path || d.logo_url)}
+                              alt={d.company_name}
+                              className="w-9 h-9 rounded-lg object-cover border border-[var(--border-app)] shrink-0"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-lg bg-[var(--brand-orange-subtle)] border border-[#FF8A1F]/30 text-[#FF8A1F] flex items-center justify-center font-bold text-xs shrink-0">
+                              {d.company_name?.charAt(0) || 'K'}
+                            </div>
+                          )}
                           <div>
                             <p className="font-bold text-[var(--text-main)]">{d.company_name}</p>
-                            <p className="text-[10px] text-[var(--text-dim)] font-mono">{d.id}</p>
+                            <p className="text-[10px] text-[var(--text-dim)] font-mono">{d.public_id ? `#${d.public_id}` : d.id}</p>
                           </div>
                         </div>
                       </td>
@@ -584,7 +649,7 @@ export default function AdminPage() {
                           ) : d.status === 'APPROVED' ? (
                             <>
                               <Link
-                                href={`/magaza/${d.id}`}
+                                href={`/premium/${d.public_id || d.id}`}
                                 target="_blank"
                                 className="btn-secondary text-[11px] py-1 px-2.5 flex items-center gap-1"
                               >

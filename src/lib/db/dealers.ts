@@ -118,6 +118,12 @@ export async function updateDealerProfile(
 }
 
 export async function getAllDealers(): Promise<DealerProfile[]> {
+  if (process.env.DATA_STORE === 'supabase') {
+    const repo = getDealerRepository();
+    if (typeof (repo as any).getAllDealers === 'function') {
+      return (repo as any).getAllDealers();
+    }
+  }
   ensureDealers();
   return [...db.dealers].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -128,6 +134,52 @@ export async function updateDealerStatus(
   dealerId: string,
   status: DealerStatus
 ): Promise<boolean> {
+  if (process.env.DATA_STORE === 'supabase') {
+    const { getSupabaseAdminClient } = await import('./supabase-client');
+    const client = getSupabaseAdminClient();
+    if (!client) return false;
+
+    // Check if dealerId is a corporate_application
+    const { data: app } = await client.from('corporate_applications').select('*').eq('id', dealerId).maybeSingle();
+    if (app) {
+      await client.from('corporate_applications').update({ status }).eq('id', dealerId);
+      if (status === 'APPROVED') {
+        // Create or update corporate profile
+        const { data: newStore } = await client
+          .from('corporate_profiles')
+          .insert({
+            owner_profile_id: app.applicant_profile_id,
+            company_name: app.company_name,
+            slug: app.company_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+            description: app.purpose,
+            status: 'APPROVED',
+          })
+          .select()
+          .single();
+
+        if (newStore) {
+          await client.from('character_profiles').update({ is_dealer: true, dealer_id: newStore.id }).eq('id', app.applicant_profile_id);
+        }
+      }
+      return true;
+    }
+
+    // Check corporate_profiles
+    const { data: store } = await client.from('corporate_profiles').select('*').eq('id', dealerId).maybeSingle();
+    if (store) {
+      await client.from('corporate_profiles').update({ status, updated_at: new Date().toISOString() }).eq('id', dealerId);
+      if (store.owner_profile_id) {
+        await client.from('character_profiles').update({
+          is_dealer: status === 'APPROVED',
+          dealer_id: status === 'APPROVED' ? dealerId : null,
+        }).eq('id', store.owner_profile_id);
+      }
+      return true;
+    }
+
+    return false;
+  }
+
   ensureDealers();
   const dealer = db.dealers.find((d) => d.id === dealerId);
   if (!dealer) return false;

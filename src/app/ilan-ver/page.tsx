@@ -7,10 +7,11 @@ import { PlusCircle, Loader2 } from 'lucide-react';
 
 export default function IlanVerRouterPage() {
   const router = useRouter();
-  const { currentProfile, isAuthenticated } = useAuth();
+  const { currentProfile, isAuthenticated, isLoading } = useAuth();
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
+    if (isLoading) return;
     if (!isAuthenticated || !currentProfile) {
       router.push('/giris?redirect=/ilan-ver');
       return;

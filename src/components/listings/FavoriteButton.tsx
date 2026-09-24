@@ -22,7 +22,7 @@ export function FavoriteButton({
   showCount = true,
   onToggle,
 }: FavoriteButtonProps) {
-  const { currentProfile, isAuthenticated } = useAuth();
+  const { currentProfile, isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [isFavorited, setIsFavorited] = useState(initialIsFavorited);
   const [count, setCount] = useState(initialCount);
@@ -37,6 +37,8 @@ export function FavoriteButton({
   const handleToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (authLoading) return;
 
     if (!isAuthenticated || !currentProfile) {
       router.push(`/giris?redirect=/ilan/${listingId}`);
@@ -63,7 +65,15 @@ export function FavoriteButton({
       });
 
       if (res.status === 401) {
-        router.push(`/giris?redirect=/ilan/${listingId}`);
+        // Double check session with server before redirecting
+        const checkRes = await fetch('/api/auth/session').catch(() => null);
+        if (!checkRes || checkRes.status === 401) {
+          router.push(`/giris?redirect=/ilan/${listingId}`);
+          return;
+        }
+        // Session is actually alive; revert optimistic change without forced logout
+        setIsFavorited(prevFavorited);
+        setCount(prevCount);
         return;
       }
 

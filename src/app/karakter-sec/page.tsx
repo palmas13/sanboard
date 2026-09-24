@@ -3,7 +3,7 @@
 import React, { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
-import { ChevronRight, UserPlus, CheckCircle2 } from 'lucide-react';
+import { ChevronRight, UserPlus, CheckCircle2, Loader2 } from 'lucide-react';
 import { SanboardLogo } from '@/components/common/SanboardLogo';
 import { resolveAvatarUrl } from '@/lib/media/url';
 
@@ -11,12 +11,24 @@ function KarakterSecContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/';
-  const { characters, selectCharacter, currentProfile } = useAuth();
+  const { characters, characterProfiles, selectCharacter, currentProfile } = useAuth();
+  const [switchingId, setSwitchingId] = React.useState<string | null>(null);
 
-  const handleSelect = (characterId: string, hasProfile: boolean) => {
+  const handleSelect = async (characterId: string, hasProfile: boolean) => {
+    if (switchingId) return;
+
     if (hasProfile) {
-      selectCharacter(characterId);
-      router.push(redirect);
+      setSwitchingId(characterId);
+      try {
+        const res = await selectCharacter(characterId);
+        if (res) {
+          router.push(redirect);
+        } else {
+          setSwitchingId(null);
+        }
+      } catch {
+        setSwitchingId(null);
+      }
     } else {
       router.push(`/profil-olustur?charId=${characterId}&redirect=${encodeURIComponent(redirect)}`);
     }
@@ -45,17 +57,23 @@ function KarakterSecContent() {
               .map((n) => n[0])
               .join('');
 
-            const charAvatar =
-              (currentProfile?.id === char.id && (currentProfile.avatar_path || currentProfile.avatar_url)
-                ? resolveAvatarUrl(currentProfile.avatar_path || currentProfile.avatar_url)
-                : null) || resolveAvatarUrl(char.avatarUrl);
+            // Resolve avatar strictly from real Supabase profile (NO mock/static avatar flash)
+            const profile = characterProfiles[char.id] || (currentProfile?.id === char.id ? currentProfile : null);
+            const avatarPath = profile?.avatar_path || profile?.avatar_url;
+            const charAvatar = avatarPath ? resolveAvatarUrl(avatarPath) : null;
+            const isSwitching = switchingId === char.id;
 
             return (
               <button
                 key={char.id}
                 type="button"
+                disabled={Boolean(switchingId)}
                 onClick={() => handleSelect(char.id, char.hasProfile)}
-                className="w-full surface-card surface-card-hover p-4 rounded-xl flex items-center justify-between gap-4 text-left transition-all border border-[var(--border-app)] hover:border-[#FF8A1F] cursor-pointer group"
+                className={`w-full surface-card surface-card-hover p-4 rounded-xl flex items-center justify-between gap-4 text-left transition-all border ${
+                  isSwitching
+                    ? 'border-[#FF8A1F] bg-[var(--brand-orange-subtle)]/20 cursor-wait'
+                    : 'border-[var(--border-app)] hover:border-[#FF8A1F] cursor-pointer'
+                } group`}
               >
                 <div className="flex items-center gap-3.5">
                   {charAvatar ? (
@@ -90,7 +108,11 @@ function KarakterSecContent() {
                   </div>
                 </div>
 
-                <ChevronRight className="w-5 h-5 text-[var(--text-dim)] group-hover:text-[#FF8A1F] group-hover:translate-x-1 transition-all" />
+                {isSwitching ? (
+                  <Loader2 className="w-5 h-5 text-[#FF8A1F] animate-spin" />
+                ) : (
+                  <ChevronRight className="w-5 h-5 text-[var(--text-dim)] group-hover:text-[#FF8A1F] group-hover:translate-x-1 transition-all" />
+                )}
               </button>
             );
           })}
