@@ -130,6 +130,7 @@ export interface PublicListingSummary {
   published_at?: string;
   cover_image?: string;
   favorite_count: number;
+  is_favorited?: boolean;
   is_locked: true;
 }
 
