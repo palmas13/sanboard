@@ -6,6 +6,7 @@ import {
   ITicketRepository,
   IDealerRepository,
   IPaymentRepository,
+  IAuditRepository,
 } from './types';
 import { MemoryListingRepository } from './memory/memory-listing-repo';
 import { MemoryNotificationRepository } from './memory/memory-notification-repo';
@@ -13,12 +14,14 @@ import { MemoryUserRepository } from './memory/memory-user-repo';
 import { MemoryTicketRepository } from './memory/memory-ticket-repo';
 import { MemoryDealerRepository } from './memory/memory-dealer-repo';
 import { MemoryPaymentRepository } from './memory/memory-payment-repo';
+import { MemoryAuditRepository } from './memory/memory-audit-repo';
 import { SupabaseListingRepository } from './supabase/supabase-listing-repo';
 import { SupabaseNotificationRepository } from './supabase/supabase-notification-repo';
 import { SupabaseUserRepository } from './supabase/supabase-user-repo';
 import { SupabaseTicketRepository } from './supabase/supabase-ticket-repo';
 import { SupabaseDealerRepository } from './supabase/supabase-dealer-repo';
 import { SupabasePaymentRepository } from './supabase/supabase-payment-repo';
+import { SupabaseAuditRepository } from './supabase/supabase-audit-repo';
 
 export * from './types';
 
@@ -96,3 +99,15 @@ export function getPaymentRepository(): IPaymentRepository {
   }
   return paymentRepoInstance;
 }
+
+let auditRepoInstance: IAuditRepository | null = null;
+
+export function getAuditRepository(): IAuditRepository {
+  if (!auditRepoInstance) {
+    auditRepoInstance = shouldUseSupabase()
+      ? new SupabaseAuditRepository()
+      : new MemoryAuditRepository();
+  }
+  return auditRepoInstance;
+}
+

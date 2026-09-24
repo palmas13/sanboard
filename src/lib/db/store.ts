@@ -452,6 +452,15 @@ class SanboardDatabase {
       },
     },
   ];
+
+  auditLogs: Array<{
+    id: string;
+    event_type: string;
+    user_id?: string | null;
+    profile_id?: string | null;
+    metadata?: Record<string, any>;
+    created_at: string;
+  }> = [];
 }
 
 // Singleton storage instance for application runtime

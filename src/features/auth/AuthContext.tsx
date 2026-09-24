@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { CharacterProfile, User } from '@/types';
+import { GtaWorldCharacter } from '@/lib/integrations/gtaworld/types';
 import { MOCK_CHARACTERS } from '@/lib/integrations/gtaworld/mock-provider';
 import { resolveMediaUrl } from '@/lib/media/url';
 
@@ -10,7 +11,7 @@ export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 interface AuthContextType {
   user: User | null;
   currentProfile: CharacterProfile | null;
-  characters: typeof MOCK_CHARACTERS;
+  characters: GtaWorldCharacter[];
   characterProfiles: Record<string, CharacterProfile>;
   authStatus: AuthStatus;
   isLoading: boolean;
@@ -65,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [currentProfile, setCurrentProfile] = useState<CharacterProfile | null>(null);
   const [characterProfiles, setCharacterProfiles] = useState<Record<string, CharacterProfile>>({});
-  const [characters] = useState(MOCK_CHARACTERS);
+  const [characters, setCharacters] = useState<GtaWorldCharacter[]>(MOCK_CHARACTERS);
 
   const saveState = useCallback(
     (newUser: User | null, newProfile: CharacterProfile | null) => {
@@ -122,10 +123,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentProfile, user, saveState]);
 
+  // Fetch authorized characters from API
+  const loadCharacters = useCallback(async () => {
+    try {
+      const res = await fetch('/api/user/characters');
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.success && Array.isArray(data.characters) && data.characters.length > 0) {
+          setCharacters(data.characters);
+          return data.characters as GtaWorldCharacter[];
+        }
+      }
+    } catch {
+      // Ignore network errors
+    }
+    return characters;
+  }, [characters]);
+
   // Load known character profiles from Supabase in the background for character chooser
-  const loadCharacterProfiles = useCallback(async () => {
+  const loadCharacterProfiles = useCallback(async (charsList?: GtaWorldCharacter[]) => {
+    const list = charsList || characters;
     const profileMap: Record<string, CharacterProfile> = {};
-    for (const char of characters) {
+    for (const char of list) {
       if (char.hasProfile) {
         try {
           const res = await fetch(`/api/user/profile?profileId=${char.id}`);
@@ -187,13 +206,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAuthStatus('unauthenticated');
       })
       .finally(() => {
-        loadCharacterProfiles().catch(() => {});
+        loadCharacters()
+          .then((chars) => {
+            loadCharacterProfiles(chars).catch(() => {});
+          })
+          .catch(() => {});
       });
-  }, [loadCharacterProfiles]);
+  }, [loadCharacters, loadCharacterProfiles]);
 
   const selectCharacter = async (characterId: string): Promise<CharacterProfile | null> => {
-    const char = characters.find((c) => c.id === characterId);
-    if (!char) return null;
+    const char = characters.find((c) => c.id === characterId) || {
+      id: characterId,
+      fullName: 'Karakter',
+      hasProfile: true,
+    };
 
     setAuthStatus('loading');
 
@@ -268,7 +294,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const login = async () => {
-    await selectCharacter('44444444-4444-4444-4444-444444444441');
+    window.location.href = '/api/auth/gtaworld/login';
   };
 
   const logout = async () => {

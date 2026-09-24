@@ -114,3 +114,24 @@ export interface IPaymentRepository {
   completePayment(orderId: string, externalPaymentId?: string): Promise<{ success: boolean; credit?: any; error?: string }>;
   getUserPayments(profileId: string): Promise<any[]>;
 }
+
+export interface AuditRecord {
+  id: string;
+  event_type: string;
+  user_id?: string | null;
+  profile_id?: string | null;
+  metadata?: Record<string, any>;
+  created_at: string;
+}
+
+export interface IAuditRepository {
+  recordEvent(event: {
+    eventType: string;
+    userId?: string | null;
+    profileId?: string | null;
+    metadata?: Record<string, any>;
+    timestamp?: string;
+  }): Promise<void>;
+  getAuditLogs(limit?: number): Promise<AuditRecord[]>;
+}
+

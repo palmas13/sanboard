@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSessionToken, createSessionCookie, clearSessionCookie, getServerSession } from '@/lib/auth/session';
 import { db } from '@/lib/db/store';
+import { getSupabaseAdminClient } from '@/lib/db/supabase-client';
+import { recordAuditEvent } from '@/lib/audit';
 
-// Known staging/mock character to user account mapping
+// Known staging/mock character to user account mapping for mock/staging development
 const STAGING_CHARACTER_ACCOUNTS: Record<string, { userId: string; role: 'USER' | 'ADMIN' }> = {
   // Production DB UUIDs
   '44444444-4444-4444-4444-444444444441': {
@@ -33,9 +35,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ authenticated: true, session });
 }
 
-import { getSupabaseAdminClient } from '@/lib/db/supabase-client';
-
-// POST create/issue signed session on character selection or login
+// POST create/issue signed session on character selection or character switch
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -48,55 +48,118 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Resolve user account
-    let account = STAGING_CHARACTER_ACCOUNTS[characterId];
+    const currentSession = await getServerSession(req);
 
-    if (!account && process.env.DATA_STORE === 'supabase') {
+    // 1. Resolve character profile from Supabase or Memory
+    let profile: { id: string; user_id: string; full_name?: string } | null = null;
+
+    if (process.env.DATA_STORE === 'supabase') {
       try {
         const client = getSupabaseAdminClient();
         if (client) {
-          const { data: profile } = await client
+          const { data } = await client
             .from('character_profiles')
-            .select('id, user_id')
+            .select('id, user_id, full_name')
             .or(`id.eq.${characterId},external_character_id.eq.${characterId}`)
             .maybeSingle();
 
-          if (profile?.user_id) {
-            const { data: user } = await client
-              .from('users')
-              .select('id, role')
-              .eq('id', profile.user_id)
-              .maybeSingle();
-
-            if (user) {
-              account = { userId: user.id, role: user.role as any };
-            }
+          if (data) {
+            profile = data;
           }
         }
       } catch {
-        // Fallback to memory
+        // Fallback
       }
     }
 
-    if (!account) {
-      // Check in memory store
-      const profile = db.profiles.find((p) => p.id === characterId || p.external_character_id === characterId);
-      if (profile) {
-        const user = db.users.find((u) => u.id === profile.user_id);
-        if (user) {
-          account = { userId: user.id, role: user.role as any };
+    if (!profile) {
+      const memoryProfile = db.profiles.find(
+        (p) => p.id === characterId || p.external_character_id === characterId
+      );
+      if (memoryProfile) {
+        profile = {
+          id: memoryProfile.id,
+          user_id: memoryProfile.user_id,
+          full_name: memoryProfile.full_name,
+        };
+      }
+    }
+
+    // 2. Strict Character Ownership Verification:
+    // If an authenticated session already exists, the selected character MUST belong to this user!
+    if (currentSession?.userId && profile) {
+      if (profile.user_id !== currentSession.userId) {
+        await recordAuditEvent({
+          eventType: 'AUTH_LOGIN_FAILURE',
+          userId: currentSession.userId,
+          profileId: characterId,
+          metadata: {
+            reason: 'unauthorized_character_selection_attempt',
+            requestedProfileId: characterId,
+          },
+        });
+
+        return NextResponse.json(
+          { error: 'Bu karakter profili mevcut hesabınıza ait değildir.' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // 3. Resolve user identity and role
+    let userId: string;
+    let role: 'USER' | 'ADMIN';
+    const targetProfileId = profile?.id || characterId;
+
+    if (currentSession?.userId) {
+      userId = currentSession.userId;
+      role = currentSession.role;
+    } else {
+      // In mock/staging without an existing session, resolve from staging account mapping
+      let account = STAGING_CHARACTER_ACCOUNTS[characterId];
+      if (!account && profile) {
+        if (process.env.DATA_STORE === 'supabase') {
+          try {
+            const client = getSupabaseAdminClient();
+            if (client) {
+              const { data: u } = await client
+                .from('users')
+                .select('id, role')
+                .eq('id', profile.user_id)
+                .maybeSingle();
+              if (u) account = { userId: u.id, role: u.role as any };
+            }
+          } catch {
+            // ignore
+          }
+        }
+        if (!account) {
+          const u = db.users.find((usr) => usr.id === profile?.user_id);
+          if (u) account = { userId: u.id, role: u.role as any };
         }
       }
+
+      userId = account?.userId || (characterId.startsWith('usr-') ? characterId : `usr-${characterId}`);
+      role = account?.role || 'USER';
     }
 
-    // Default fallback if not found in table
-    const userId = account?.userId || (characterId.startsWith('usr-') ? characterId : `usr-${characterId}`);
-    const role: 'USER' | 'ADMIN' = account?.role || 'USER';
-
+    // 4. Create signed HMAC session token
     const token = createSessionToken({
       userId,
       role,
-      profileId: characterId,
+      profileId: targetProfileId,
+    });
+
+    // 5. Record Audit Event
+    const isSwitch = Boolean(currentSession?.profileId && currentSession.profileId !== targetProfileId);
+    await recordAuditEvent({
+      eventType: isSwitch ? 'CHARACTER_SWITCHED' : 'CHARACTER_SELECTED',
+      userId,
+      profileId: targetProfileId,
+      metadata: {
+        characterName: profile?.full_name,
+        previousProfileId: currentSession?.profileId || null,
+      },
     });
 
     const cookieHeader = createSessionCookie(token);
@@ -104,13 +167,14 @@ export async function POST(req: NextRequest) {
     const response = NextResponse.json({
       success: true,
       user: { id: userId, role },
-      profileId: characterId,
+      profileId: targetProfileId,
     });
 
     response.headers.set('Set-Cookie', cookieHeader);
-    response.cookies.set('sanboard_profile_id', characterId, { path: '/', maxAge: 86400, sameSite: 'lax' });
+    response.cookies.set('sanboard_profile_id', targetProfileId, { path: '/', maxAge: 86400, sameSite: 'lax' });
     response.cookies.set('sanboard_user_id', userId, { path: '/', maxAge: 86400, sameSite: 'lax' });
     response.cookies.set('sanboard_role', role, { path: '/', maxAge: 86400, sameSite: 'lax' });
+
     return response;
   } catch (error: any) {
     return NextResponse.json(
@@ -121,8 +185,25 @@ export async function POST(req: NextRequest) {
 }
 
 // DELETE logout / clear session
-export async function DELETE() {
-  const response = NextResponse.json({ success: true });
-  response.headers.set('Set-Cookie', clearSessionCookie());
-  return response;
+export async function DELETE(req: NextRequest) {
+  try {
+    const currentSession = await getServerSession(req);
+    if (currentSession?.userId) {
+      await recordAuditEvent({
+        eventType: 'AUTH_LOGOUT',
+        userId: currentSession.userId,
+        profileId: currentSession.profileId || null,
+      });
+    }
+
+    const response = NextResponse.json({ success: true });
+    response.headers.set('Set-Cookie', clearSessionCookie());
+    response.cookies.set('sanboard_profile_id', '', { path: '/', maxAge: 0 });
+    response.cookies.set('sanboard_user_id', '', { path: '/', maxAge: 0 });
+    response.cookies.set('sanboard_role', '', { path: '/', maxAge: 0 });
+
+    return response;
+  } catch {
+    return NextResponse.json({ success: true });
+  }
 }
