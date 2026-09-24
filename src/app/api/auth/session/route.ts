@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSessionToken, createSessionCookie, clearSessionCookie, getServerSession } from '@/lib/auth/session';
+import { createSessionToken, setSessionCookieOnResponse, clearSessionCookieOnResponse, getServerSession } from '@/lib/auth/session';
 import { db } from '@/lib/db/store';
 import { getSupabaseAdminClient } from '@/lib/db/supabase-client';
 import { recordAuditEvent } from '@/lib/audit';
 
 // Known staging/mock character to user account mapping for mock/staging development
+// In mock mode, Mavis and Zade are characters of the SAME UCP account
 const STAGING_CHARACTER_ACCOUNTS: Record<string, { userId: string; role: 'USER' | 'ADMIN' }> = {
   // Production DB UUIDs
   '44444444-4444-4444-4444-444444444441': {
@@ -12,8 +13,8 @@ const STAGING_CHARACTER_ACCOUNTS: Record<string, { userId: string; role: 'USER' 
     role: 'ADMIN',
   },
   '44444444-4444-4444-4444-444444444442': {
-    userId: '33333333-3333-3333-3333-333333333333',
-    role: 'USER',
+    userId: '22222222-2222-2222-2222-222222222222',
+    role: 'ADMIN',
   },
   // Legacy / memory IDs
   'char-mavis-01': {
@@ -21,8 +22,8 @@ const STAGING_CHARACTER_ACCOUNTS: Record<string, { userId: string; role: 'USER' 
     role: 'ADMIN',
   },
   'char-zade-02': {
-    userId: '33333333-3333-3333-3333-333333333333',
-    role: 'USER',
+    userId: '22222222-2222-2222-2222-222222222222',
+    role: 'ADMIN',
   },
 };
 
@@ -85,9 +86,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const isMock = process.env.USE_MOCK_GTAWORLD_AUTH !== 'false';
+    const isMockCharacter = isMock && (
+      characterId === '44444444-4444-4444-4444-444444444441' ||
+      characterId === '44444444-4444-4444-4444-444444444442' ||
+      characterId === 'char-mavis-01' ||
+      characterId === 'char-zade-02'
+    );
+
     // 2. Strict Character Ownership Verification:
     // If an authenticated session already exists, the selected character MUST belong to this user!
-    if (currentSession?.userId && profile) {
+    // In mock mode, MOCK_CHARACTERS belong to the active mock account.
+    if (currentSession?.userId && profile && !isMockCharacter) {
       if (profile.user_id !== currentSession.userId) {
         await recordAuditEvent({
           eventType: 'AUTH_LOGIN_FAILURE',
@@ -162,15 +172,13 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const cookieHeader = createSessionCookie(token);
-
     const response = NextResponse.json({
       success: true,
       user: { id: userId, role },
       profileId: targetProfileId,
     });
 
-    response.headers.set('Set-Cookie', cookieHeader);
+    setSessionCookieOnResponse(response, token);
     response.cookies.set('sanboard_profile_id', targetProfileId, { path: '/', maxAge: 86400, sameSite: 'lax' });
     response.cookies.set('sanboard_user_id', userId, { path: '/', maxAge: 86400, sameSite: 'lax' });
     response.cookies.set('sanboard_role', role, { path: '/', maxAge: 86400, sameSite: 'lax' });
@@ -197,7 +205,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     const response = NextResponse.json({ success: true });
-    response.headers.set('Set-Cookie', clearSessionCookie());
+    clearSessionCookieOnResponse(response);
     response.cookies.set('sanboard_profile_id', '', { path: '/', maxAge: 0 });
     response.cookies.set('sanboard_user_id', '', { path: '/', maxAge: 0 });
     response.cookies.set('sanboard_role', '', { path: '/', maxAge: 0 });

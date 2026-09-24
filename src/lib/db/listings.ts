@@ -200,10 +200,11 @@ export async function getPublicListings(filters: ListingFilterParams = {}): Prom
  */
 export async function getListingById(
   id: string,
-  viewerProfileId?: string
+  viewerProfileId?: string,
+  viewerUserId?: string
 ): Promise<{ listing: PublicListingSummary | MemberListingDetail | null; isLocked: boolean; isOwner: boolean }> {
   if (isSupabaseConfiguredMode()) {
-    return getSupabaseRepo().getListingById(id, viewerProfileId);
+    return getSupabaseRepo().getListingById(id, viewerProfileId, viewerUserId);
   }
   const listing = db.listings.find((l) => l.id === id);
   if (!listing) {
@@ -220,16 +221,17 @@ export async function getListingById(
   }
 
   const favoriteCount = db.favorites.filter((f) => f.listing_id === listing.id).length;
-  const isFavorited = viewerProfileId
-    ? db.favorites.some((f) => f.listing_id === listing.id && f.profile_id === viewerProfileId)
+  const isFavorited = (viewerUserId || viewerProfileId)
+    ? db.favorites.some((f) => f.listing_id === listing.id && (viewerUserId ? f.user_id === viewerUserId : f.profile_id === viewerProfileId))
     : false;
 
   // Unauthenticated user -> return safe PublicListingSummary (locked)
-  if (!viewerProfileId) {
+  if (!viewerProfileId && !viewerUserId) {
     return {
       listing: {
         ...sanitizeListingForPublic(listing),
         favorite_count: favoriteCount,
+        is_favorited: isFavorited,
       },
       isLocked: true,
       isOwner: false,

@@ -22,7 +22,7 @@ export function FavoriteButton({
   showCount = true,
   onToggle,
 }: FavoriteButtonProps) {
-  const { currentProfile, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, authStatus } = useAuth();
   const router = useRouter();
   const [isFavorited, setIsFavorited] = useState(initialIsFavorited);
   const [count, setCount] = useState(initialCount);
@@ -38,9 +38,11 @@ export function FavoriteButton({
     e.preventDefault();
     e.stopPropagation();
 
-    if (authLoading) return;
+    // If auth state is initializing, don't execute yet
+    if (authStatus === 'loading') return;
 
-    if (!isAuthenticated || !currentProfile) {
+    // If client is confirmed unauthenticated, redirect to login
+    if (authStatus === 'unauthenticated' || !isAuthenticated) {
       router.push(`/giris?redirect=/ilan/${listingId}`);
       return;
     }
@@ -65,25 +67,26 @@ export function FavoriteButton({
       });
 
       if (res.status === 401) {
-        // Double check session with server before redirecting
-        const checkRes = await fetch('/api/auth/session').catch(() => null);
-        if (!checkRes || checkRes.status === 401) {
-          router.push(`/giris?redirect=/ilan/${listingId}`);
-          return;
-        }
-        // Session is actually alive; revert optimistic change without forced logout
+        // Conclusively unauthenticated from server: revert and redirect to login
+        setIsFavorited(prevFavorited);
+        setCount(prevCount);
+        router.push(`/giris?redirect=/ilan/${listingId}`);
+        return;
+      }
+
+      if (!res.ok) {
+        // 403 business error, 409 duplicate, 500 server error: revert WITHOUT redirecting
         setIsFavorited(prevFavorited);
         setCount(prevCount);
         return;
       }
 
-      if (!res.ok) throw new Error();
       const data = await res.json();
       setIsFavorited(data.isFavorited);
       setCount(data.count);
       onToggle?.(data.isFavorited, data.count);
     } catch {
-      // Revert on error
+      // Network or fetch exception: revert WITHOUT redirecting
       setIsFavorited(prevFavorited);
       setCount(prevCount);
     } finally {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGtaWorldAuthProvider } from '@/lib/integrations/gtaworld';
 import { syncGtaWorldAccountAndCharacters } from '@/lib/auth/gtaworld-sync';
-import { createSessionToken, createSessionCookie } from '@/lib/auth/session';
+import { createSessionToken, setSessionCookieOnResponse } from '@/lib/auth/session';
 import { recordAuditEvent } from '@/lib/audit';
 
 export async function GET(req: NextRequest) {
@@ -150,8 +150,8 @@ export async function GET(req: NextRequest) {
 
     const response = NextResponse.redirect(new URL(destinationUrl, req.url));
 
-    // Set signed HMAC session cookie
-    response.headers.set('Set-Cookie', createSessionCookie(token));
+    // Set signed HMAC session cookie directly on response object
+    setSessionCookieOnResponse(response, token);
 
     // Clear temporary OAuth attempt cookie
     response.cookies.set('gtaw_oauth_attempt', '', {

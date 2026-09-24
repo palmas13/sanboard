@@ -36,9 +36,9 @@ const MOCK_CHARACTER_ACCOUNTS: Record<string, User> = {
     updated_at: '2026-09-01T10:00:00Z',
   },
   '44444444-4444-4444-4444-444444444442': {
-    id: '33333333-3333-3333-3333-333333333333',
+    id: '22222222-2222-2222-2222-222222222222',
     provider: 'GTAWORLD',
-    role: 'USER',
+    role: 'ADMIN',
     status: 'ACTIVE',
     created_at: '2026-09-10T12:00:00Z',
     updated_at: '2026-09-10T12:00:00Z',
@@ -52,9 +52,9 @@ const MOCK_CHARACTER_ACCOUNTS: Record<string, User> = {
     updated_at: '2026-09-01T10:00:00Z',
   },
   'char-zade-02': {
-    id: '33333333-3333-3333-3333-333333333333',
+    id: '22222222-2222-2222-2222-222222222222',
     provider: 'GTAWORLD',
-    role: 'USER',
+    role: 'ADMIN',
     status: 'ACTIVE',
     created_at: '2026-09-10T12:00:00Z',
     updated_at: '2026-09-10T12:00:00Z',
@@ -109,62 +109,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const refreshProfile = useCallback(async () => {
-    if (!currentProfile?.id) return;
+    const profileId = currentProfile?.id;
+    if (!profileId) return;
     try {
-      const res = await fetch(`/api/user/profile?profileId=${currentProfile.id}`);
+      const res = await fetch(`/api/user/profile?profileId=${profileId}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.success && data.profile) {
-          saveState(user, data.profile);
+        if (data?.success && data.profile) {
+          const updated = data.profile as CharacterProfile;
+          setCurrentProfile(updated);
+          setCharacterProfiles((prev) => ({
+            ...prev,
+            [updated.id]: updated,
+          }));
         }
       }
     } catch {
       // Ignore network errors on background refresh
     }
-  }, [currentProfile, user, saveState]);
+  }, [currentProfile]);
 
-  // Fetch authorized characters from API
-  const loadCharacters = useCallback(async () => {
-    try {
-      const res = await fetch('/api/user/characters');
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.success && Array.isArray(data.characters) && data.characters.length > 0) {
-          setCharacters(data.characters);
-          return data.characters as GtaWorldCharacter[];
-        }
-      }
-    } catch {
-      // Ignore network errors
-    }
-    return characters;
-  }, [characters]);
-
-  // Load known character profiles from Supabase in the background for character chooser
-  const loadCharacterProfiles = useCallback(async (charsList?: GtaWorldCharacter[]) => {
-    const list = charsList || characters;
-    const profileMap: Record<string, CharacterProfile> = {};
-    for (const char of list) {
-      if (char.hasProfile) {
-        try {
-          const res = await fetch(`/api/user/profile?profileId=${char.id}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data?.success && data.profile) {
-              profileMap[char.id] = data.profile;
-            }
-          }
-        } catch {
-          // Ignore
-        }
-      }
-    }
-    if (Object.keys(profileMap).length > 0) {
-      setCharacterProfiles((prev) => ({ ...prev, ...profileMap }));
-    }
-  }, [characters]);
-
+  // Initial session hydration: runs strictly ONCE on mount
   useEffect(() => {
+    let isMounted = true;
+
     // Purge legacy localStorage auth cache if present
     try {
       localStorage.removeItem('sanboard-auth-state');
@@ -176,9 +144,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Ignore
     }
 
-    // Hydrate current session directly from Supabase /api/user/profile
-    fetch('/api/user/profile')
-      .then(async (res) => {
+    async function initSession() {
+      try {
+        const res = await fetch('/api/user/profile');
+        if (!isMounted) return;
+
         if (res.ok) {
           const data = await res.json();
           if (data?.success && data.profile) {
@@ -193,26 +163,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               };
+
             setUser(linkedUser);
             setCurrentProfile(profile);
             setCharacterProfiles((prev) => ({ ...prev, [profile.id]: profile }));
             setAuthStatus('authenticated');
+
+            // Load authorized characters once in background
+            try {
+              const charRes = await fetch('/api/user/characters');
+              if (charRes.ok && isMounted) {
+                const charData = await charRes.json();
+                if (charData?.success && Array.isArray(charData.characters) && charData.characters.length > 0) {
+                  setCharacters(charData.characters);
+                }
+              }
+            } catch {
+              // Ignore background character errors
+            }
             return;
           }
         }
+
         setAuthStatus('unauthenticated');
-      })
-      .catch(() => {
-        setAuthStatus('unauthenticated');
-      })
-      .finally(() => {
-        loadCharacters()
-          .then((chars) => {
-            loadCharacterProfiles(chars).catch(() => {});
-          })
-          .catch(() => {});
-      });
-  }, [loadCharacters, loadCharacterProfiles]);
+      } catch {
+        if (isMounted) {
+          setAuthStatus('unauthenticated');
+        }
+      }
+    }
+
+    initSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const selectCharacter = async (characterId: string): Promise<CharacterProfile | null> => {
     const char = characters.find((c) => c.id === characterId) || {
@@ -220,8 +206,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       fullName: 'Karakter',
       hasProfile: true,
     };
-
-    setAuthStatus('loading');
 
     try {
       // 1. Establish server-side signed HMAC session first and await confirmation
@@ -232,20 +216,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (!sessionRes.ok) {
-        setAuthStatus('unauthenticated');
         return null;
       }
 
       const sessionData = await sessionRes.json();
-      const userId = sessionData.user?.id || (characterId.startsWith('usr-') ? characterId : `usr-${characterId}`);
-      const role = (sessionData.user?.role || 'USER') as 'USER' | 'ADMIN';
+      const userId = sessionData.user?.id || user?.id || (characterId.startsWith('usr-') ? characterId : `usr-${characterId}`);
+      const role = (sessionData.user?.role || user?.role || 'USER') as 'USER' | 'ADMIN';
 
       const linkedUser: User = {
         id: userId,
         provider: 'GTAWORLD',
         role,
         status: 'ACTIVE',
-        created_at: new Date().toISOString(),
+        created_at: user?.created_at || new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
@@ -288,7 +271,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return profile;
     } catch (err) {
       console.error('Character switch error:', err);
-      setAuthStatus('unauthenticated');
       return null;
     }
   };
@@ -303,20 +285,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.href = '/';
   };
 
-  const updateCurrentProfile = (data: Partial<CharacterProfile>) => {
-    if (!currentProfile) return;
-    const updated = {
-      ...currentProfile,
-      ...data,
-      updated_at: new Date().toISOString(),
-    };
-    if (updated.avatar_path && !updated.avatar_url) {
-      updated.avatar_url = resolveMediaUrl(updated.avatar_path);
-    }
-    saveState(user, updated);
-  };
+  const updateCurrentProfile = useCallback((data: Partial<CharacterProfile>) => {
+    setCurrentProfile((prev) => {
+      if (!prev) return null;
+      const updated = {
+        ...prev,
+        ...data,
+        updated_at: new Date().toISOString(),
+      };
+      if (updated.avatar_path && !updated.avatar_url) {
+        updated.avatar_url = resolveMediaUrl(updated.avatar_path);
+      }
+      setCharacterProfiles((prevMap) => ({
+        ...prevMap,
+        [updated.id]: updated,
+      }));
+      return updated;
+    });
+  }, []);
 
-  const isAuthenticated = authStatus === 'authenticated' && Boolean(user && currentProfile);
+  const isAuthenticated = authStatus === 'authenticated' && Boolean(user);
   const isLoading = authStatus === 'loading';
 
   return (

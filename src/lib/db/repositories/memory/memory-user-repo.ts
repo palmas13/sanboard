@@ -9,8 +9,19 @@ export class MemoryUserRepository implements IUserRepository {
   }
 
   async getProfileById(id: string): Promise<CharacterProfile | null> {
-    const profile = db.profiles.find((p) => p.id === id);
-    return profile || null;
+    const profile = db.profiles.find(
+      (p) => p.id === id || p.external_character_id === id
+    );
+    if (profile) return profile;
+
+    if (id === '44444444-4444-4444-4444-444444444441') {
+      return db.profiles.find((p) => p.id === 'char-mavis-01') || null;
+    }
+    if (id === '44444444-4444-4444-4444-444444444442') {
+      return db.profiles.find((p) => p.id === 'char-zade-02') || null;
+    }
+
+    return null;
   }
 
   async getProfilesByUserId(userId: string): Promise<CharacterProfile[]> {

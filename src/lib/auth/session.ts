@@ -161,3 +161,33 @@ export function clearSessionCookie(): string {
   const isProd = process.env.NODE_ENV === 'production';
   return `sanboard_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${isProd ? '; Secure' : ''}`;
 }
+
+/**
+ * Sets the signed session cookie directly on a NextResponse object.
+ * This guarantees the cookie is not overwritten by subsequent response.cookies.set() calls.
+ */
+export function setSessionCookieOnResponse(response: import('next/server').NextResponse, token: string): void {
+  const isProd = process.env.NODE_ENV === 'production';
+  response.cookies.set('sanboard_session', token, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: DEFAULT_EXPIRY_SECONDS,
+    secure: isProd,
+  });
+}
+
+/**
+ * Clears the signed session cookie directly on a NextResponse object.
+ */
+export function clearSessionCookieOnResponse(response: import('next/server').NextResponse): void {
+  const isProd = process.env.NODE_ENV === 'production';
+  response.cookies.set('sanboard_session', '', {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 0,
+    secure: isProd,
+  });
+}
+

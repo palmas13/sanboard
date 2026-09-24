@@ -16,8 +16,8 @@ export class MemoryListingRepository implements IListingRepository {
     return getPublicListings(params);
   }
 
-  async getListingById(id: string, viewerProfileId?: string, _viewerUserId?: string) {
-    return getListingById(id, viewerProfileId);
+  async getListingById(id: string, viewerProfileId?: string, viewerUserId?: string) {
+    return getListingById(id, viewerProfileId, viewerUserId);
   }
 
   async createListing(input: CreateListingInput, profileId: string) {

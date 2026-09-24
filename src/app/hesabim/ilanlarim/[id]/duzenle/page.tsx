@@ -88,7 +88,9 @@ export default function IlanDuzenlePage({
   };
 
   useEffect(() => {
-    if (!isAuthenticated || !currentProfile) return;
+    if (!isAuthenticated || !currentProfile?.id) return;
+    // Do not re-fetch and overwrite in-progress edits if already loaded
+    if (listingData && listingData.id === id) return;
 
     async function loadListing() {
       setLoading(true);
@@ -141,7 +143,7 @@ export default function IlanDuzenlePage({
     }
 
     loadListing();
-  }, [id, currentProfile, isAuthenticated]);
+  }, [id, currentProfile?.id, isAuthenticated, listingData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
