@@ -9,6 +9,8 @@ export class MockStorageProvider implements StorageProvider {
     return `/mock-storage/${key}`;
   }
 
+  private objects: Map<string, { size: number; lastModified: Date }> = new Map();
+
   async upload(
     fileBuffer: Buffer | Uint8Array,
     options: StorageUploadOptions
@@ -33,6 +35,8 @@ export class MockStorageProvider implements StorageProvider {
     const base64 = Buffer.from(fileBuffer).toString('base64');
     const dataUrl = `data:${options.contentType || 'image/webp'};base64,${base64}`;
 
+    this.objects.set(key, { size: fileBuffer.byteLength, lastModified: new Date() });
+
     return {
       success: true,
       url: dataUrl,
@@ -42,7 +46,21 @@ export class MockStorageProvider implements StorageProvider {
     };
   }
 
-  async delete(_key: string): Promise<StorageDeleteResult> {
+  async delete(key: string): Promise<StorageDeleteResult> {
+    this.objects.delete(key);
     return { success: true };
+  }
+
+  async list(prefix?: string): Promise<{
+    objects: { key: string; size: number; lastModified?: Date }[];
+    isTruncated: boolean;
+  }> {
+    const res: { key: string; size: number; lastModified?: Date }[] = [];
+    for (const [k, v] of this.objects.entries()) {
+      if (!prefix || k.startsWith(prefix)) {
+        res.push({ key: k, size: v.size, lastModified: v.lastModified });
+      }
+    }
+    return { objects: res, isTruncated: false };
   }
 }

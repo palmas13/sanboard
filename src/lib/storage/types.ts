@@ -48,4 +48,16 @@ export interface StorageProvider {
    * Returns true if provider is configured and available for live uploads.
    */
   isAvailable(): boolean;
+
+  /**
+   * Lists stored objects with pagination.
+   */
+  list?(
+    prefix?: string,
+    continuationToken?: string
+  ): Promise<{
+    objects: { key: string; size: number; lastModified?: Date }[];
+    nextContinuationToken?: string;
+    isTruncated: boolean;
+  }>;
 }

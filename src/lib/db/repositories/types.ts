@@ -93,6 +93,7 @@ export interface INotificationRepository {
 export interface IUserRepository {
   getUserById(id: string): Promise<User | null>;
   getProfileById(id: string): Promise<CharacterProfile | null>;
+  getProfileByPublicId?(publicId: number): Promise<CharacterProfile | null>;
   getProfilesByUserId(userId: string): Promise<CharacterProfile[]>;
   createProfile(data: {
     userId: string;

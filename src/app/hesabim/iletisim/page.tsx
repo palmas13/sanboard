@@ -101,7 +101,7 @@ export default function HesabimIletisimPage() {
             type="text"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="örnek: 1308 veya 555-0100"
+            placeholder=""
             className="form-input text-sm"
           />
           <p className="text-[11px] text-[var(--text-dim)]">
@@ -119,7 +119,7 @@ export default function HesabimIletisimPage() {
             type="text"
             value={sanmailEmail}
             onChange={(e) => setSanmailEmail(e.target.value)}
-            placeholder="örnek: isim.soyisim@sanmail.com"
+            placeholder=""
             className="form-input text-sm"
           />
           <p className="text-[11px] text-[var(--text-dim)]">

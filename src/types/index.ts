@@ -49,6 +49,7 @@ export interface CharacterProfile {
   phone: string;
   is_dealer?: boolean;
   dealer_id?: string;
+  public_id?: number;
   created_at: string;
   updated_at: string;
 }

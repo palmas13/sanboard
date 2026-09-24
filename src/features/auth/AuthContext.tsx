@@ -22,6 +22,7 @@ interface AuthContextType {
   selectCharacter: (characterId: string) => Promise<CharacterProfile | null>;
   updateCurrentProfile: (data: Partial<CharacterProfile>) => void;
   refreshProfile: () => Promise<void>;
+  refreshCharacters: () => Promise<GtaWorldCharacter[] | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,6 +59,30 @@ const MOCK_CHARACTER_ACCOUNTS: Record<string, User> = {
     status: 'ACTIVE',
     created_at: '2026-09-10T12:00:00Z',
     updated_at: '2026-09-10T12:00:00Z',
+  },
+  '44444444-4444-4444-4444-444444444443': {
+    id: '22222222-2222-2222-2222-222222222222',
+    provider: 'GTAWORLD',
+    role: 'ADMIN',
+    status: 'ACTIVE',
+    created_at: '2026-09-15T10:00:00Z',
+    updated_at: '2026-09-15T10:00:00Z',
+  },
+  'b0de6077-d32b-42dc-909f-d12719749f96': {
+    id: '22222222-2222-2222-2222-222222222222',
+    provider: 'GTAWORLD',
+    role: 'ADMIN',
+    status: 'ACTIVE',
+    created_at: '2026-09-15T10:00:00Z',
+    updated_at: '2026-09-15T10:00:00Z',
+  },
+  'char-ravi-03': {
+    id: '22222222-2222-2222-2222-222222222222',
+    provider: 'GTAWORLD',
+    role: 'ADMIN',
+    status: 'ACTIVE',
+    created_at: '2026-09-15T10:00:00Z',
+    updated_at: '2026-09-15T10:00:00Z',
   },
 };
 
@@ -186,6 +211,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         setAuthStatus('unauthenticated');
+        try {
+          const charRes = await fetch('/api/user/characters');
+          if (charRes.ok && isMounted) {
+            const charData = await charRes.json();
+            if (charData?.success && Array.isArray(charData.characters) && charData.characters.length > 0) {
+              setCharacters(charData.characters);
+            }
+          }
+        } catch {
+          // Ignore
+        }
       } catch {
         if (isMounted) {
           setAuthStatus('unauthenticated');
@@ -267,6 +303,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       document.cookie = `sanboard_user_id=${linkedUser.id}; path=/; max-age=86400; SameSite=Lax`;
       document.cookie = `sanboard_role=${linkedUser.role}; path=/; max-age=86400; SameSite=Lax`;
 
+      // Refresh characters in background to keep hasProfile up-to-date
+      fetch('/api/user/characters')
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.success && Array.isArray(d.characters)) setCharacters(d.characters);
+        })
+        .catch(() => {});
+
       return profile;
     } catch (err) {
       console.error('Character switch error:', err);
@@ -303,6 +347,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const refreshCharacters = useCallback(async (): Promise<GtaWorldCharacter[] | null> => {
+    try {
+      const res = await fetch('/api/user/characters');
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.success && Array.isArray(data.characters) && data.characters.length > 0) {
+          setCharacters(data.characters);
+          return data.characters;
+        }
+      }
+    } catch {
+      // Ignore background errors
+    }
+    return null;
+  }, []);
+
   const isAuthenticated = authStatus === 'authenticated' && Boolean(user);
   const isLoading = authStatus === 'loading';
 
@@ -322,6 +382,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         selectCharacter,
         updateCurrentProfile,
         refreshProfile,
+        refreshCharacters,
       }}
     >
       {children}

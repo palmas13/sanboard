@@ -14,6 +14,7 @@ interface SellerCardProps {
 export function SellerCard({ seller, dealer }: SellerCardProps) {
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [copiedMail, setCopiedMail] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   if (!seller && !dealer) {
     return (
@@ -44,9 +45,11 @@ export function SellerCard({ seller, dealer }: SellerCardProps) {
     ? dealer?.sanmail_email || dealer?.email || ''
     : seller?.sanmail_email || '';
 
-  const publicStoreUrl = isCorporate
+  const publicUrl = isCorporate
     ? `/premium/${dealer?.public_id || dealer?.id}`
-    : null;
+    : `/user/${seller?.public_id || seller?.id}`;
+
+  const publicStoreUrl = isCorporate ? publicUrl : null;
 
   const handleCopyPhone = () => {
     if (!displayPhone) return;
@@ -68,23 +71,26 @@ export function SellerCard({ seller, dealer }: SellerCardProps) {
     }`}>
       {/* Header Profile / Store Info */}
       <div className="flex items-center gap-3.5 pb-4 border-b border-[var(--border-app)]">
-        {displayAvatar ? (
-          <img
-            src={displayAvatar}
-            alt={displayName}
-            className={`w-14 h-14 object-cover border-2 shadow-sm shrink-0 ${
-              isCorporate ? 'rounded-2xl border-[#FF8A1F] ring-2 ring-[#FF8A1F]/20' : 'rounded-full border-[var(--border-app)]'
-            }`}
-          />
-        ) : (
-          <div className={`w-14 h-14 flex items-center justify-center font-bold text-base shadow-sm shrink-0 ${
-            isCorporate
-              ? 'rounded-2xl bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border-2 border-[#FF8A1F]'
-              : 'rounded-full bg-[var(--bg-surface-secondary)] text-[var(--text-main)] border border-[var(--border-app)]'
-          }`}>
-            {displayName.charAt(0)}
-          </div>
-        )}
+        <Link href={publicUrl} className="shrink-0 group">
+          {displayAvatar && !imgError ? (
+            <img
+              src={displayAvatar}
+              alt={displayName}
+              onError={() => setImgError(true)}
+              className={`w-14 h-14 object-cover border-2 shadow-sm transition-transform group-hover:scale-105 ${
+                isCorporate ? 'rounded-2xl border-[#FF8A1F] ring-2 ring-[#FF8A1F]/20' : 'rounded-full border-[var(--border-app)] group-hover:border-[#FF8A1F]'
+              }`}
+            />
+          ) : (
+            <div className={`w-14 h-14 flex items-center justify-center font-bold text-base shadow-sm transition-transform group-hover:scale-105 ${
+              isCorporate
+                ? 'rounded-2xl bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border-2 border-[#FF8A1F]'
+                : 'rounded-full bg-[var(--bg-surface-secondary)] text-[var(--text-main)] border border-[var(--border-app)] group-hover:border-[#FF8A1F]'
+            }`}>
+              {displayName.charAt(0)}
+            </div>
+          )}
+        </Link>
         <div className="space-y-1 min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider">
@@ -97,9 +103,11 @@ export function SellerCard({ seller, dealer }: SellerCardProps) {
               </span>
             )}
           </div>
-          <h3 className="font-extrabold text-base text-[var(--text-main)] truncate">
-            {displayName}
-          </h3>
+          <Link href={publicUrl} className="block group">
+            <h3 className="font-extrabold text-base text-[var(--text-main)] truncate group-hover:text-[#FF8A1F] transition-colors">
+              {displayName}
+            </h3>
+          </Link>
           <div className="flex items-center gap-1 text-[11px] text-[var(--color-success)] font-medium">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
             <span>{isCorporate ? 'Onaylı Kurumsal Galeri' : 'Onaylı Karakter'}</span>

@@ -143,12 +143,22 @@ export async function updateDealerStatus(
     const { data: app } = await client.from('corporate_applications').select('*').eq('id', dealerId).maybeSingle();
     if (app) {
       await client.from('corporate_applications').update({ status }).eq('id', dealerId);
+
+      const { data: profile } = await client
+        .from('character_profiles')
+        .select('id, user_id, full_name')
+        .or(`id.eq.${app.applicant_profile_id},external_character_id.eq.${app.applicant_profile_id}`)
+        .maybeSingle();
+
+      const targetUserId = profile?.user_id;
+      const targetProfileId = profile?.id || app.applicant_profile_id;
+
       if (status === 'APPROVED') {
         // Create or update corporate profile
         const { data: newStore } = await client
           .from('corporate_profiles')
           .insert({
-            owner_profile_id: app.applicant_profile_id,
+            owner_profile_id: targetProfileId,
             company_name: app.company_name,
             slug: app.company_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
             description: app.purpose,
@@ -158,7 +168,31 @@ export async function updateDealerStatus(
           .single();
 
         if (newStore) {
-          await client.from('character_profiles').update({ is_dealer: true, dealer_id: newStore.id }).eq('id', app.applicant_profile_id);
+          await client.from('character_profiles').update({ is_dealer: true, dealer_id: newStore.id }).eq('id', targetProfileId);
+        }
+
+        if (targetUserId) {
+          const { getNotificationRepository } = await import('./repositories');
+          await getNotificationRepository().createNotification({
+            user_id: targetUserId,
+            type: 'SYSTEM',
+            title: 'Kurumsal Profiliniz Onaylandı',
+            message: `"${app.company_name}" adına yaptığınız kurumsal satış başvurusu onaylanmıştır. Artık kurumsal mağazanızı yönetebilirsiniz.`,
+            entity_type: 'application',
+            entity_id: app.id,
+          });
+        }
+      } else if (status === 'REJECTED') {
+        if (targetUserId) {
+          const { getNotificationRepository } = await import('./repositories');
+          await getNotificationRepository().createNotification({
+            user_id: targetUserId,
+            type: 'SYSTEM',
+            title: 'Kurumsal Başvurunuz Reddedildi',
+            message: `"${app.company_name}" adına yaptığınız kurumsal satış başvurusu reddedilmiştir.`,
+            entity_type: 'application',
+            entity_id: app.id,
+          });
         }
       }
       return true;

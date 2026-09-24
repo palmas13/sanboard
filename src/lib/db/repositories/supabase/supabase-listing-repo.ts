@@ -3,6 +3,7 @@ import { getSupabaseClient, getSupabaseAdminClient } from '../../supabase-client
 import { Listing, MemberListingDetail, PublicListingSummary } from '@/types';
 import { ListingFilterParams } from '../../listings';
 import { uploadListingImage } from '@/lib/storage';
+import { deleteMediaSafely } from '@/lib/storage/lifecycle';
 import { resolveUserId, resolveProfileId, isUuid } from '../../id-mapper';
 
 export class SupabaseListingRepository implements IListingRepository {
@@ -650,6 +651,20 @@ export class SupabaseListingRepository implements IListingRepository {
 
     // Update images if provided
     if (input.images) {
+      // 1. Collect existing images to detect removed objects for R2 cleanup
+      const { data: existingImgs } = await client
+        .from('listing_images')
+        .select('storage_path')
+        .eq('listing_id', id);
+
+      const oldPaths = new Set(
+        (existingImgs || [])
+          .map((img: any) => img.storage_path)
+          .filter((p: any) => Boolean(p) && typeof p === 'string')
+      );
+
+      const retainedPaths = new Set<string>();
+
       await client.from('listing_images').delete().eq('listing_id', id);
       for (let i = 0; i < input.images.length; i++) {
         let finalPath = input.images[i].storage_path;
@@ -665,6 +680,8 @@ export class SupabaseListingRepository implements IListingRepository {
           }
         }
 
+        retainedPaths.add(finalPath);
+
         await client.from('listing_images').insert({
           listing_id: id,
           storage_path: finalPath,
@@ -672,6 +689,14 @@ export class SupabaseListingRepository implements IListingRepository {
           is_cover: Boolean(input.images[i].is_cover ?? i === 0),
           size_bytes: input.images[i].size_bytes || 500000,
         });
+      }
+
+      // 2. Safely delete removed objects from R2
+      const mediaType = existing.category === 'vehicle' ? 'VEHICLE_IMAGE' : 'PROPERTY_IMAGE';
+      for (const oldKey of oldPaths) {
+        if (!retainedPaths.has(oldKey)) {
+          await deleteMediaSafely(oldKey, mediaType, 'LISTING_IMAGE_REMOVED').catch(() => {});
+        }
       }
     }
 
@@ -701,11 +726,29 @@ export class SupabaseListingRepository implements IListingRepository {
 
     if (updateErr) return { success: false, error: updateErr.message };
 
-    // Clean up favorites and images
+    // 1. Fetch images to collect exact storage paths before deleting DB rows
+    const { data: existingImages } = await client
+      .from('listing_images')
+      .select('storage_path')
+      .eq('listing_id', id);
+
+    const imageKeys = (existingImages || [])
+      .map((img: any) => img.storage_path)
+      .filter((k: any) => Boolean(k) && typeof k === 'string');
+
+    // 2. Clean up favorites and images from database
     await client.from('favorites').delete().eq('listing_id', id);
     await client.from('listing_images').delete().eq('listing_id', id);
 
-    // Audit log
+    // 3. Asynchronously / safely delete each physical image from R2
+    const mediaType = listing.category === 'vehicle' ? 'VEHICLE_IMAGE' : 'PROPERTY_IMAGE';
+    for (const key of imageKeys) {
+      deleteMediaSafely(key, mediaType, 'LISTING_SOLD').catch((err) => {
+        console.error(`Failed to clean R2 media for sold listing ${id}: ${key}`, err);
+      });
+    }
+
+    // 4. Audit log
     await client.from('sold_listing_audit').insert({
       original_listing_id: id,
       seller_profile_id: safeProfileId,

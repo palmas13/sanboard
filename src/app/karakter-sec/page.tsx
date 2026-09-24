@@ -11,8 +11,13 @@ function KarakterSecContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/';
-  const { characters, characterProfiles, selectCharacter, currentProfile } = useAuth();
+  const { characters, characterProfiles, selectCharacter, currentProfile, refreshCharacters } = useAuth();
   const [switchingId, setSwitchingId] = React.useState<string | null>(null);
+  const [imgErrors, setImgErrors] = React.useState<Record<string, boolean>>({});
+
+  React.useEffect(() => {
+    refreshCharacters().catch(() => {});
+  }, [refreshCharacters]);
 
   const handleSelect = async (characterId: string, hasProfile: boolean) => {
     if (switchingId) return;
@@ -58,17 +63,28 @@ function KarakterSecContent() {
               .join('');
 
             // Resolve avatar strictly from real Supabase profile (NO mock/static avatar flash)
-            const profile = characterProfiles[char.id] || (currentProfile?.id === char.id ? currentProfile : null);
-            const avatarPath = profile?.avatar_path || profile?.avatar_url;
+            const profile =
+              characterProfiles[char.id] ||
+              Object.values(characterProfiles).find(
+                (p) => p.external_character_id === char.id || p.full_name?.toLowerCase() === char.fullName.toLowerCase()
+              ) ||
+              (currentProfile?.external_character_id === char.id || currentProfile?.full_name?.toLowerCase() === char.fullName.toLowerCase()
+                ? currentProfile
+                : null);
+
+            const effectiveHasProfile = Boolean(char.hasProfile || profile);
+            const targetId = profile?.id || char.id;
+            const avatarPath = profile?.avatar_path || profile?.avatar_url || (char.hasProfile ? char.avatarUrl : null);
             const charAvatar = avatarPath ? resolveAvatarUrl(avatarPath) : null;
-            const isSwitching = switchingId === char.id;
+            const isSwitching = switchingId === targetId || switchingId === char.id;
+            const hasImgError = imgErrors[char.id];
 
             return (
               <button
                 key={char.id}
                 type="button"
                 disabled={Boolean(switchingId)}
-                onClick={() => handleSelect(char.id, char.hasProfile)}
+                onClick={() => handleSelect(targetId, effectiveHasProfile)}
                 className={`w-full surface-card surface-card-hover p-4 rounded-xl flex items-center justify-between gap-4 text-left transition-all border ${
                   isSwitching
                     ? 'border-[#FF8A1F] bg-[var(--brand-orange-subtle)]/20 cursor-wait'
@@ -76,10 +92,11 @@ function KarakterSecContent() {
                 } group`}
               >
                 <div className="flex items-center gap-3.5">
-                  {charAvatar ? (
+                  {charAvatar && !hasImgError ? (
                     <img
                       src={charAvatar}
                       alt={char.fullName}
+                      onError={() => setImgErrors((prev) => ({ ...prev, [char.id]: true }))}
                       className="w-12 h-12 rounded-full object-cover border border-[var(--border-app)] group-hover:border-[#FF8A1F] transition-colors"
                     />
                   ) : (
@@ -93,7 +110,7 @@ function KarakterSecContent() {
                       {char.fullName}
                     </h3>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      {char.hasProfile ? (
+                      {effectiveHasProfile ? (
                         <span className="inline-flex items-center gap-1 text-xs text-[var(--color-success)] font-medium">
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>Profil mevcut</span>

@@ -29,6 +29,7 @@ import { resolveMediaUrl } from '@/lib/media/url';
 export default function HesabimKurumsalPage() {
   const { currentProfile } = useAuth();
   const [dealer, setDealer] = useState<DealerProfile | null>(null);
+  const [application, setApplication] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
@@ -65,11 +66,19 @@ export default function HesabimKurumsalPage() {
       const promises: Promise<any>[] = [
         fetch(`/api/dealers/profile?profileId=${currentProfile.id}`),
         fetch(`/api/dealers/listings?profileId=${currentProfile.id}`),
+        fetch(`/api/dealers/apply?profileId=${currentProfile.id}`),
       ];
 
-      const [dealerRes, listingsRes] = await Promise.all(promises);
+      const [dealerRes, listingsRes, applyRes] = await Promise.all(promises);
       const data = await dealerRes.json();
       const listingsData = await listingsRes.json();
+      const applyData = await applyRes.json();
+
+      if (applyData?.success && applyData.application) {
+        setApplication(applyData.application);
+      } else {
+        setApplication(null);
+      }
 
       if (data.dealer) {
         setDealer(data.dealer);
@@ -135,6 +144,7 @@ export default function HesabimKurumsalPage() {
       if (!res.ok) throw new Error(data.error || 'Başvuru iletilemedi.');
 
       setSuccess('Kurumsal başvurunuz başarıyla yönetime iletildi.');
+      setApplication({ company_name: companyName.trim(), purpose: purpose.trim(), status: 'PENDING' });
       await fetchDealer();
     } catch (err: any) {
       setError(err.message || 'Bir hata oluştu.');
@@ -627,14 +637,17 @@ export default function HesabimKurumsalPage() {
             </form>
           </div>
         </div>
-      ) : dealer?.status === 'PENDING' ? (
+      ) : dealer?.status === 'PENDING' || application?.status === 'PENDING' ? (
         <div className="surface-card p-8 rounded-2xl border border-[var(--border-app)] text-center space-y-4 max-w-lg mx-auto">
           <div className="w-12 h-12 mx-auto rounded-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] flex items-center justify-center">
             <Clock className="w-6 h-6" />
           </div>
           <h2 className="text-lg font-bold text-[var(--text-main)]">Başvurunuz İnceleniyor</h2>
+          <div className="p-4 rounded-xl bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border border-[#FF8A1F]/30 text-xs font-semibold leading-relaxed">
+            Başvurunuz Sanboard yetkilileri tarafından incelenmektedir, kısa süre içerisinde tarafınıza dönüş yapılacaktır.
+          </div>
           <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-            "{dealer.company_name}" adıyla yaptığınız kurumsal satıcı başvurusu yönetim ekibimiz tarafından değerlendirilmektedir. Onaylandığında bu sayfadan kurumsal vitrininizi yönetebilirsiniz.
+            &ldquo;{application?.company_name || dealer?.company_name}&rdquo; adıyla yaptığınız kurumsal satıcı başvurusu yönetim ekibimiz tarafından değerlendirilmektedir. Onaylandığında bu sayfadan kurumsal vitrininizi yönetebilirsiniz.
           </p>
           <div className="pt-2">
             <Link href="/hesabim/destek" className="btn-secondary text-xs py-2 px-4 inline-flex items-center gap-1.5">

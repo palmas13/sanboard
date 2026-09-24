@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -25,6 +25,8 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
   const pathname = usePathname();
   const router = useRouter();
   const { currentProfile, isAuthenticated, isLoading, isAdmin, logout } = useAuth();
+
+  const [headerImgError, setHeaderImgError] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -68,10 +70,11 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
       {/* Top Character Identity Header Spanning Full Width */}
       <div className="surface-card p-6 sm:p-7 rounded-2xl border border-[var(--border-app)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 shadow-sm">
         <div className="flex items-center gap-5">
-          {resolvedAvatar ? (
+          {resolvedAvatar && !headerImgError ? (
             <img
               src={resolvedAvatar}
               alt={currentProfile.full_name}
+              onError={() => setHeaderImgError(true)}
               className="w-16 h-16 rounded-full object-cover border-2 border-[#FF8A1F] shadow-sm shrink-0"
             />
           ) : (

@@ -1,5 +1,12 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { StorageProvider, StorageUploadOptions, StorageUploadResult, StorageDeleteResult } from './types';
+
+const ALLOWED_STORAGE_PREFIXES = [
+  'avatars/',
+  'listings/',
+  'dealers/logos/',
+  'dealers/banners/',
+];
 
 export class CloudflareR2StorageProvider implements StorageProvider {
   private client: S3Client | null = null;
@@ -145,6 +152,16 @@ export class CloudflareR2StorageProvider implements StorageProvider {
       }
       cleanKey = cleanKey.replace(/^\/+/, '');
 
+      // Security check: reject path traversal and non-allowed prefixes
+      if (cleanKey.includes('..') || cleanKey.includes('\\')) {
+        return { success: false, error: 'Geçersiz dosya anahtarı.' };
+      }
+
+      const hasValidPrefix = ALLOWED_STORAGE_PREFIXES.some((p) => cleanKey.startsWith(p));
+      if (!hasValidPrefix) {
+        return { success: false, error: 'Bu dizindeki dosyaları silme yetkiniz yok.' };
+      }
+
       const command = new DeleteObjectCommand({
         Bucket: this.bucketName,
         Key: cleanKey,
@@ -157,6 +174,43 @@ export class CloudflareR2StorageProvider implements StorageProvider {
         success: false,
         error: err?.message || 'Dosya silinemedi.',
       };
+    }
+  }
+
+  async list(
+    prefix?: string,
+    continuationToken?: string
+  ): Promise<{
+    objects: { key: string; size: number; lastModified?: Date }[];
+    nextContinuationToken?: string;
+    isTruncated: boolean;
+  }> {
+    if (!this.isAvailable() || !this.client) {
+      return { objects: [], isTruncated: false };
+    }
+
+    try {
+      const command = new ListObjectsV2Command({
+        Bucket: this.bucketName,
+        Prefix: prefix ? prefix.replace(/^\/+/, '') : undefined,
+        ContinuationToken: continuationToken,
+        MaxKeys: 1000,
+      });
+
+      const response = await this.client.send(command);
+      const objects = (response.Contents || []).map((item) => ({
+        key: item.Key || '',
+        size: item.Size || 0,
+        lastModified: item.LastModified,
+      }));
+
+      return {
+        objects,
+        nextContinuationToken: response.NextContinuationToken,
+        isTruncated: Boolean(response.IsTruncated),
+      };
+    } catch (_err: any) {
+      return { objects: [], isTruncated: false };
     }
   }
 }

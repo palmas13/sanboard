@@ -45,6 +45,7 @@ export function ListingCard({ listing, className = '' }: ListingCardProps) {
             <FavoriteButton
               listingId={listing.id}
               initialCount={listing.favorite_count}
+              initialIsFavorited={listing.is_favorited}
               size="sm"
             />
           </div>
@@ -54,7 +55,7 @@ export function ListingCard({ listing, className = '' }: ListingCardProps) {
         <div className="p-4 flex flex-col flex-1">
           {/* Price */}
           <div className="flex items-baseline gap-2 flex-wrap">
-            {listing.previous_price && listing.previous_price !== listing.price && (
+            {listing.previous_price && listing.price < listing.previous_price && (
               <span className="text-xs font-semibold text-[var(--text-muted)] line-through">
                 {formatCurrency(listing.previous_price)}
               </span>

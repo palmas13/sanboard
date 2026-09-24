@@ -155,7 +155,10 @@ describe('Media URL Resolution & Backward Compatibility', () => {
     assert.strictEqual(resolveMediaUrl(unsplashUrl), unsplashUrl);
 
     const existingR2Url = 'https://pub-454798ec1d264d749a7f16dac2c48498.r2.dev/avatars/old.jpg';
-    assert.strictEqual(resolveMediaUrl(existingR2Url), existingR2Url);
+    assert.strictEqual(
+      resolveMediaUrl(existingR2Url),
+      'https://sanboard-media.esin18457.workers.dev/avatars/old.jpg'
+    );
   });
 
   it('should preserve base64 data URLs for optimistic preview', () => {

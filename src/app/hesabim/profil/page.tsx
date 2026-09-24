@@ -96,6 +96,7 @@ export default function HesabimProfilPage() {
     }
   };
 
+  const [avatarImgError, setAvatarImgError] = useState(false);
   const displayAvatar = avatarFile ? avatarUrl : resolveAvatarUrl(avatarUrl);
 
   return (
@@ -130,10 +131,11 @@ export default function HesabimProfilPage() {
             className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-[#FF8A1F] shadow-lg group cursor-pointer shrink-0 transition-transform hover:scale-105"
             title="Fotoğrafı Değiştir"
           >
-            {displayAvatar ? (
+            {displayAvatar && !avatarImgError ? (
               <img
                 src={displayAvatar}
                 alt="Karakter Avatarı"
+                onError={() => setAvatarImgError(true)}
                 className="w-full h-full object-cover"
               />
             ) : (

@@ -28,8 +28,33 @@ function ProfilOlusturContent() {
   const [sanmailEmail, setSanmailEmail] = useState(char.sanmailEmail || '');
   const [phone, setPhone] = useState(char.phone || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [checkingExisting, setCheckingExisting] = useState(true);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    async function checkExistingProfile() {
+      try {
+        const res = await fetch(`/api/user/profile?profileId=${charId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.success && data.profile && active) {
+            await selectCharacter(data.profile.id);
+            router.push(redirect);
+            return;
+          }
+        }
+      } catch {
+        // Continue to form
+      }
+      if (active) setCheckingExisting(false);
+    }
+    checkExistingProfile();
+    return () => {
+      active = false;
+    };
+  }, [charId, redirect, router, selectCharacter]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError('');
@@ -111,6 +136,17 @@ function ProfilOlusturContent() {
       setIsSubmitting(false);
     }
   };
+
+  if (checkingExisting) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <div className="surface-card p-8 rounded-2xl border border-[var(--border-app)] text-center space-y-3">
+          <div className="w-8 h-8 mx-auto border-2 border-[#FF8A1F] border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs text-[var(--text-muted)]">Profil durumu kontrol ediliyor...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
@@ -220,7 +256,7 @@ function ProfilOlusturContent() {
               type="text"
               value={sanmailEmail}
               onChange={(e) => setSanmailEmail(e.target.value)}
-              placeholder="örnek: ravi@sanmail.com"
+              placeholder=""
               className="form-input text-sm"
             />
             <p className="text-[11px] text-[var(--text-dim)]">
@@ -238,7 +274,7 @@ function ProfilOlusturContent() {
               type="text"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="örnek: 1308 veya 555-0100"
+              placeholder=""
               className="form-input text-sm"
             />
             <p className="text-[11px] text-[var(--text-dim)]">

@@ -29,6 +29,7 @@ export function Navbar() {
   const { currentProfile, isAuthenticated, isAdmin, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [navbarImgError, setNavbarImgError] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -98,24 +99,38 @@ export function Navbar() {
           <NotificationDropdown />
 
           {/* User Auth Section */}
-          {isAuthenticated && currentProfile ? (
-            <div className="relative" ref={dropdownRef}>
-              <button
-                type="button"
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="flex items-center gap-2.5 p-1.5 pr-2.5 rounded-lg border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer"
-                aria-expanded={dropdownOpen}
-              >
-                <img
-                  src={resolveAvatarUrl(currentProfile.avatar_path || currentProfile.avatar_url)}
-                  alt={currentProfile.full_name}
-                  className="w-7 h-7 rounded-full object-cover border border-[var(--border-app)]"
-                />
-                <span className="hidden sm:inline text-xs font-semibold text-[var(--text-main)] max-w-[110px] truncate">
-                  {currentProfile.full_name}
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-              </button>
+          {isAuthenticated && currentProfile ? (() => {
+            const rawAvatar = currentProfile.avatar_path || currentProfile.avatar_url;
+            const resolvedNavAvatar = resolveAvatarUrl(rawAvatar);
+            const navInitials = currentProfile.full_name
+              ? currentProfile.full_name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
+              : 'SB';
+
+            return (
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  className="flex items-center gap-2.5 p-1.5 pr-2.5 rounded-lg border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer"
+                  aria-expanded={dropdownOpen}
+                >
+                  {resolvedNavAvatar && !navbarImgError ? (
+                    <img
+                      src={resolvedNavAvatar}
+                      alt={currentProfile.full_name}
+                      onError={() => setNavbarImgError(true)}
+                      className="w-7 h-7 rounded-full object-cover border border-[var(--border-app)]"
+                    />
+                  ) : (
+                    <div className="w-7 h-7 rounded-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] font-bold text-[11px] flex items-center justify-center border border-[#FF8A1F]/30 shrink-0">
+                      {navInitials}
+                    </div>
+                  )}
+                  <span className="hidden sm:inline text-xs font-semibold text-[var(--text-main)] max-w-[110px] truncate">
+                    {currentProfile.full_name}
+                  </span>
+                  <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                </button>
 
               {dropdownOpen && (
                 <div className="absolute right-0 mt-2 w-56 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface)] shadow-2xl py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
@@ -190,7 +205,8 @@ export function Navbar() {
                 </div>
               )}
             </div>
-          ) : (
+            );
+          })() : (
             <Link
               href="/giris"
               className="btn-secondary text-sm py-2 px-4 font-semibold"

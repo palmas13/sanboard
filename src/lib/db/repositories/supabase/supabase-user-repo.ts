@@ -1,7 +1,8 @@
 import { IUserRepository } from '../types';
 import { getSupabaseClient, getSupabaseAdminClient } from '../../supabase-client';
 import { CharacterProfile, User } from '@/types';
-import { uploadProfileAvatar, getStorageProvider } from '@/lib/storage';
+import { uploadProfileAvatar } from '@/lib/storage';
+import { deleteMediaSafely } from '@/lib/storage/lifecycle';
 import { resolveUserId, resolveProfileId, isUuid } from '../../id-mapper';
 
 export class SupabaseUserRepository implements IUserRepository {
@@ -38,7 +39,12 @@ export class SupabaseUserRepository implements IUserRepository {
     const safeId = resolveProfileId(id);
     if (!isUuid(safeId)) return null;
 
-    const { data, error } = await client.from('character_profiles').select('*').eq('id', safeId).maybeSingle();
+    const { data, error } = await client
+      .from('character_profiles')
+      .select('*')
+      .or(`id.eq.${safeId},external_character_id.eq.${safeId}`)
+      .maybeSingle();
+
     if (error) {
       throw new Error(`Supabase error fetching character profile: ${error.message}`);
     }
@@ -46,6 +52,31 @@ export class SupabaseUserRepository implements IUserRepository {
 
     const profile = data as CharacterProfile;
     // Canonicalize avatar_path so UI can always read avatar_path
+    if (!profile.avatar_path && profile.avatar_url) {
+      profile.avatar_path = profile.avatar_url;
+    }
+    return profile;
+  }
+
+  async getProfileByPublicId(publicId: number): Promise<CharacterProfile | null> {
+    const client = this.getAdminClient();
+    if (!publicId || isNaN(publicId)) return null;
+
+    const { data, error } = await client
+      .from('character_profiles')
+      .select('*')
+      .eq('public_id', publicId)
+      .maybeSingle();
+
+    if (error) {
+      if (error.code === '42703' || error.message.includes('public_id')) {
+        return null;
+      }
+      throw new Error(`Supabase error fetching profile by public_id: ${error.message}`);
+    }
+    if (!data) return null;
+
+    const profile = data as CharacterProfile;
     if (!profile.avatar_path && profile.avatar_url) {
       profile.avatar_path = profile.avatar_url;
     }
@@ -148,12 +179,7 @@ export class SupabaseUserRepository implements IUserRepository {
     // 5. Handle update failure -> clean up orphan object if we just uploaded it
     if (error || !updated) {
       if (isNewUpload && newAvatarKey) {
-        try {
-          const storage = getStorageProvider();
-          await storage.delete(newAvatarKey);
-        } catch {
-          // ignore cleanup error
-        }
+        await deleteMediaSafely(newAvatarKey, 'AVATAR', 'AVATAR_UPLOAD_ROLLBACK');
       }
       return { success: false, error: error?.message || 'Profil güncellenemedi.' };
     }
@@ -165,12 +191,7 @@ export class SupabaseUserRepository implements IUserRepository {
 
     // 6. DB update succeeded -> safely delete old avatar from R2 if replaced
     if (isNewUpload && oldAvatarKey && oldAvatarKey !== newAvatarKey) {
-      try {
-        const storage = getStorageProvider();
-        await storage.delete(oldAvatarKey);
-      } catch {
-        // Non-blocking cleanup
-      }
+      await deleteMediaSafely(oldAvatarKey, 'AVATAR', 'AVATAR_REPLACED');
     }
 
     return { success: true, profile: updatedProfile };

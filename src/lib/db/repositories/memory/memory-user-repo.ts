@@ -24,6 +24,16 @@ export class MemoryUserRepository implements IUserRepository {
     return null;
   }
 
+  async getProfileByPublicId(publicId: number): Promise<CharacterProfile | null> {
+    const profile = db.profiles.find((p) => p.public_id === publicId);
+    if (profile) return profile;
+
+    if (publicId === 1) return db.profiles.find((p) => p.id === 'char-mavis-01') || null;
+    if (publicId === 2) return db.profiles.find((p) => p.id === 'char-zade-02') || null;
+
+    return null;
+  }
+
   async getProfilesByUserId(userId: string): Promise<CharacterProfile[]> {
     return db.profiles.filter((p) => p.user_id === userId);
   }

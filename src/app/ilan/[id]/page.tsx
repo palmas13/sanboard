@@ -11,6 +11,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { getListingRepository } from '@/lib/db/repositories';
+import { getServerSession } from '@/lib/auth/session';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { ListingGallery } from '@/components/listings/ListingGallery';
 import { SellerCard } from '@/components/listings/SellerCard';
@@ -24,16 +25,73 @@ interface PageProps {
 
 export const revalidate = 30;
 
+function VehicleSpecSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 pb-1 border-b border-[var(--border-app)]">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#FF8A1F]" />
+        <h4 className="text-[11px] font-bold text-[#FF8A1F] uppercase tracking-wider">
+          {title}
+        </h4>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function VehicleSpecItem({
+  label,
+  value,
+  highlight,
+  badge,
+  span2,
+}: {
+  label: string;
+  value: React.ReactNode;
+  highlight?: boolean;
+  badge?: boolean;
+  span2?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--bg-surface-secondary)]/60 border border-[var(--border-app)]/50 gap-2 min-h-[38px] ${
+        span2 ? 'sm:col-span-2' : ''
+      }`}
+    >
+      <span className="text-[var(--text-muted)] text-xs truncate">{label}</span>
+      {badge ? (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-[#FF8A1F]/15 text-[#FF8A1F] border border-[#FF8A1F]/30 shrink-0">
+          {value}
+        </span>
+      ) : (
+        <span
+          className={`font-semibold text-right truncate shrink-0 ${
+            highlight ? 'text-[#FF8A1F] font-bold' : 'text-[var(--text-main)]'
+          }`}
+        >
+          {value}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default async function ListingDetailPage({ params }: PageProps) {
   const { id } = await params;
 
-  // Retrieve current user profile ID and user ID from cookies if present
+  // Retrieve current user profile ID and user ID from signed session or cookies
   const cookieStore = await cookies();
   const profileIdCookie = cookieStore.get('sanboard_profile_id')?.value;
   const userIdCookie = cookieStore.get('sanboard_user_id')?.value;
 
+  const session = await getServerSession();
+  const userId = session?.userId || userIdCookie;
+  const profileId = session?.profileId || profileIdCookie;
+
   const repo = getListingRepository();
-  const { listing, isLocked, isOwner } = await repo.getListingById(id, profileIdCookie, userIdCookie);
+  const { listing, isLocked, isOwner } = await repo.getListingById(id, profileId, userId);
 
   if (!listing) {
     notFound();
@@ -104,7 +162,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
               Fiyat
             </span>
             <div className="flex items-baseline gap-2 flex-wrap md:justify-end">
-              {listing.previous_price && listing.previous_price !== listing.price && (
+              {listing.previous_price && listing.price < listing.previous_price && (
                 <span className="text-base sm:text-lg font-semibold text-[var(--text-muted)] line-through">
                   {formatCurrency(listing.previous_price)}
                 </span>
@@ -189,28 +247,18 @@ export default async function ListingDetailPage({ params }: PageProps) {
           ) : (
             /* MEMBER-ONLY FULL TECHNICAL DATA */
             <>
-              {/* Technical Specifications Compact Table */}
+              {/* Technical Specifications Compact Grid */}
               <div className="surface-card rounded-2xl border border-[var(--border-app)] overflow-hidden shadow-sm">
-                <div className="px-4 py-3 bg-[var(--bg-surface-secondary)] border-b border-[var(--border-app)]">
+                <div className="px-4 py-3 bg-[var(--bg-surface-secondary)] border-b border-[var(--border-app)] flex items-center justify-between">
                   <h3 className="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider">
-                    {isVehicle ? 'Teknik Bilgiler' : 'Mülk Özellikleri'}
+                    {isVehicle ? 'Teknik Özellikler' : 'Mülk Özellikleri'}
                   </h3>
+                  <span className="text-[11px] font-mono text-[var(--text-dim)]">
+                    {listing.listing_number}
+                  </span>
                 </div>
 
-                <div className="divide-y divide-[var(--border-app)] text-xs sm:text-[13px]">
-                  <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                    <span className="text-[var(--text-muted)]">İlan No</span>
-                    <span className="font-mono font-semibold text-[var(--text-main)] text-right">
-                      {listing.listing_number}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                    <span className="text-[var(--text-muted)]">İlan Tarihi</span>
-                    <span className="font-medium text-[var(--text-main)] text-right">
-                      {formatDate(listing.published_at)}
-                    </span>
-                  </div>
-
+                <div className="p-4 sm:p-5 space-y-4">
                   {/* Vehicle Specific Rows Grouped Cleanly */}
                   {isVehicle && (listing as MemberListingDetail).vehicle_details && (() => {
                     const vd = (listing as MemberListingDetail).vehicle_details!;
@@ -221,173 +269,115 @@ export default async function ListingDetailPage({ params }: PageProps) {
                     };
                     return (
                       <>
-                        {/* ARAÇ BİLGİLERİ */}
-                        {vd.brand && (
-                          <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                            <span className="text-[var(--text-muted)]">Marka</span>
-                            <span className="font-bold text-[var(--text-main)] text-right">{vd.brand}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                          <span className="text-[var(--text-muted)]">Model</span>
-                          <span className="font-bold text-[var(--text-main)] text-right">{vd.model}</span>
-                        </div>
-                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                          <span className="text-[var(--text-muted)]">Kategori</span>
-                          <span className="font-semibold text-[var(--text-main)] text-right">{vd.vehicle_category}</span>
-                        </div>
-                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                          <span className="text-[var(--text-muted)]">Plaka</span>
-                          <span className="font-mono font-bold text-[var(--text-main)] uppercase text-right">{vd.plate}</span>
-                        </div>
-                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                          <span className="text-[var(--text-muted)]">Kilometre</span>
-                          <span className="font-semibold text-[var(--text-main)] text-right">{vd.mileage.toLocaleString('tr-TR')} km</span>
-                        </div>
-                        {vd.fuel_type && (
-                          <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                            <span className="text-[var(--text-muted)]">Yakıt Türü</span>
-                            <span className="font-semibold text-[var(--text-main)] text-right">{fuelLabels[vd.fuel_type] || vd.fuel_type}</span>
-                          </div>
-                        )}
+                        {/* 1. ARAÇ BİLGİLERİ */}
+                        <VehicleSpecSection title="Temel Bilgiler">
+                          <VehicleSpecItem label="İlan Tarihi" value={formatDate(listing.published_at)} />
+                          {vd.brand && <VehicleSpecItem label="Marka" value={vd.brand} />}
+                          <VehicleSpecItem label="Model" value={vd.model} highlight />
+                          <VehicleSpecItem label="Kategori" value={vd.vehicle_category || 'Belirtilmemiş'} />
+                          <VehicleSpecItem label="Plaka" value={vd.plate || 'Belirtilmemiş'} />
+                          <VehicleSpecItem label="Kilometre" value={`${vd.mileage.toLocaleString('tr-TR')} km`} />
+                          {vd.fuel_type && (
+                            <VehicleSpecItem label="Yakıt Türü" value={fuelLabels[vd.fuel_type] || vd.fuel_type} />
+                          )}
+                        </VehicleSpecSection>
 
-                        {/* SECTION HEADER: MEKANİK DURUM */}
-                        <div className="px-4 py-2 bg-[var(--bg-surface-secondary)]/70 text-[11px] font-bold text-[#FF8A1F] uppercase tracking-wider">
-                          Mekanik Durum
-                        </div>
-                        {vd.engine_health !== undefined && vd.engine_health !== null && (
-                          <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                            <span className="text-[var(--text-muted)]">Motor Sağlığı</span>
-                            <span className="font-bold text-emerald-400 text-right">%{vd.engine_health}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                          <span className="text-[var(--text-muted)]">Motor Upgrade</span>
-                          <span className="font-bold text-[#FF8A1F] text-right">Seviye {vd.engine_upgrade}</span>
-                        </div>
-                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                          <span className="text-[var(--text-muted)]">Şanzıman Upgrade</span>
-                          <span className="font-bold text-[#FF8A1F] text-right">Seviye {vd.transmission_upgrade}</span>
-                        </div>
-                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                          <span className="text-[var(--text-muted)]">Fren Upgrade</span>
-                          <span className="font-bold text-[#FF8A1F] text-right">Seviye {vd.brake_upgrade}</span>
-                        </div>
-                        {vd.suspension && (
-                          <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                            <span className="text-[var(--text-muted)]">Süspansiyon</span>
-                            <span className="font-semibold text-[var(--text-main)] text-right">{vd.suspension}</span>
-                          </div>
-                        )}
-
-                        {/* SECTION HEADER: GÜVENLİK */}
-                        {(vd.lock_level !== undefined || vd.alarm_level !== undefined || vd.anti_theft_level !== undefined) && (
-                          <>
-                            <div className="px-4 py-2 bg-[var(--bg-surface-secondary)]/70 text-[11px] font-bold text-[#FF8A1F] uppercase tracking-wider">
-                              Güvenlik
-                            </div>
-                            {vd.lock_level !== undefined && vd.lock_level !== null && (
-                              <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                                <span className="text-[var(--text-muted)]">Kilit Seviyesi</span>
-                                <span className="font-semibold text-[var(--text-main)] text-right">Seviye {vd.lock_level}</span>
+                        {/* 2. MEKANİK DURUM */}
+                        <VehicleSpecSection title="Mekanik Durum">
+                          {vd.engine_health !== undefined && vd.engine_health !== null && (
+                            <div className="sm:col-span-2 flex flex-col justify-center px-3 py-2 rounded-lg bg-[var(--bg-surface-secondary)]/60 border border-[var(--border-app)]/50 gap-1.5 min-h-[46px]">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-[var(--text-muted)]">Motor Sağlığı</span>
+                                <span
+                                  className={`font-bold ${
+                                    vd.engine_health >= 70
+                                      ? 'text-emerald-400'
+                                      : vd.engine_health >= 40
+                                      ? 'text-amber-400'
+                                      : 'text-red-400'
+                                  }`}
+                                >
+                                  %{vd.engine_health}
+                                </span>
                               </div>
+                              <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden border border-white/5">
+                                <div
+                                  className={`h-full rounded-full transition-all ${
+                                    vd.engine_health >= 70
+                                      ? 'bg-emerald-500'
+                                      : vd.engine_health >= 40
+                                      ? 'bg-amber-500'
+                                      : 'bg-red-500'
+                                  }`}
+                                  style={{ width: `${Math.min(100, Math.max(0, vd.engine_health))}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                          <VehicleSpecItem label="Motor Upgrade" value={`Seviye ${vd.engine_upgrade}`} badge />
+                          <VehicleSpecItem label="Şanzıman Upgrade" value={`Seviye ${vd.transmission_upgrade}`} badge />
+                          <VehicleSpecItem label="Fren Upgrade" value={`Seviye ${vd.brake_upgrade}`} badge />
+                          {vd.suspension && <VehicleSpecItem label="Süspansiyon" value={vd.suspension} />}
+                        </VehicleSpecSection>
+
+                        {/* 3. GÜVENLİK */}
+                        {(vd.lock_level !== undefined || vd.alarm_level !== undefined || vd.anti_theft_level !== undefined) && (
+                          <VehicleSpecSection title="Güvenlik Donanımı">
+                            {vd.lock_level !== undefined && vd.lock_level !== null && (
+                              <VehicleSpecItem label="Kilit Seviyesi" value={`Seviye ${vd.lock_level}`} badge />
                             )}
                             {vd.alarm_level !== undefined && vd.alarm_level !== null && (
-                              <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                                <span className="text-[var(--text-muted)]">Alarm Seviyesi</span>
-                                <span className="font-semibold text-[var(--text-main)] text-right">Seviye {vd.alarm_level}</span>
-                              </div>
+                              <VehicleSpecItem label="Alarm Seviyesi" value={`Seviye ${vd.alarm_level}`} badge />
                             )}
                             {vd.anti_theft_level !== undefined && vd.anti_theft_level !== null && (
-                              <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                                <span className="text-[var(--text-muted)]">Hırsızlık Önleme</span>
-                                <span className="font-semibold text-[var(--text-main)] text-right">Seviye {vd.anti_theft_level}</span>
-                              </div>
+                              <VehicleSpecItem label="Hırsızlık Önleme" value={`Seviye ${vd.anti_theft_level}`} badge />
                             )}
-                          </>
+                          </VehicleSpecSection>
                         )}
 
-                        {/* SECTION HEADER: EK DONANIM */}
-                        <div className="px-4 py-2 bg-[var(--bg-surface-secondary)]/70 text-[11px] font-bold text-[#FF8A1F] uppercase tracking-wider">
-                          Ek Donanım
-                        </div>
-                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                          <span className="text-[var(--text-muted)]">Turbo</span>
-                          <span className="font-semibold text-[var(--text-main)] text-right">{vd.turbo ? 'Var' : 'Yok'}</span>
-                        </div>
-                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                          <span className="text-[var(--text-muted)]">Subwoofer</span>
-                          <span className="font-semibold text-[var(--text-main)] text-right">{vd.subwoofer ? 'Var' : 'Yok'}</span>
-                        </div>
-
-                        {/* SECTION HEADER: FİYATLANDIRMA */}
-                        <div className="px-4 py-2 bg-[var(--bg-surface-secondary)]/70 text-[11px] font-bold text-[#FF8A1F] uppercase tracking-wider">
-                          Fiyatlandırma & Satış
-                        </div>
-                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                          <span className="text-[var(--text-muted)]">Satış Fiyatı</span>
-                          <span className="font-black text-base text-[#FF8A1F] text-right">{formatCurrency(listing.price)}</span>
-                        </div>
-                        {vd.factory_price !== undefined && vd.factory_price !== null && vd.factory_price > 0 && (
-                          <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                            <span className="text-[var(--text-muted)]">Fabrika Çıkış Fiyatı</span>
-                            <span className="font-semibold text-[var(--text-main)] text-right">{formatCurrency(vd.factory_price)}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                          <span className="text-[var(--text-muted)]">Takasa Açık</span>
-                          <span className="font-semibold text-[var(--text-main)] text-right">{vd.trade_available ? 'Evet' : 'Hayır'}</span>
-                        </div>
+                        {/* 4. EK DONANIM & SATIŞ */}
+                        <VehicleSpecSection title="Ek Donanım & Satış">
+                          <VehicleSpecItem label="Turbo" value={vd.turbo ? 'Var' : 'Yok'} />
+                          <VehicleSpecItem label="Subwoofer" value={vd.subwoofer ? 'Var' : 'Yok'} />
+                          <VehicleSpecItem label="Takasa Açık" value={vd.trade_available ? 'Evet' : 'Hayır'} />
+                          {vd.factory_price !== undefined && vd.factory_price !== null && vd.factory_price > 0 && (
+                            <VehicleSpecItem label="Fabrika Çıkış Fiyatı" value={formatCurrency(vd.factory_price)} />
+                          )}
+                        </VehicleSpecSection>
                       </>
                     );
                   })()}
 
                   {/* Property Specific Rows (Location IS shown for properties) */}
                   {!isVehicle && (listing as MemberListingDetail).property_details && (
-                    <>
-                      <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                        <span className="text-[var(--text-muted)]">Konum</span>
-                        <span className="font-medium text-[var(--text-main)] text-right">
-                          {listing.location}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                        <span className="text-[var(--text-muted)]">Mülk Türü</span>
-                        <span className="font-bold text-[var(--text-main)] text-right">
-                          {(listing as MemberListingDetail).property_details?.property_type}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                        <span className="text-[var(--text-muted)]">Oda Sayısı</span>
-                        <span className="font-bold text-[var(--text-main)] text-right">
-                          {(listing as MemberListingDetail).property_details?.room_count}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                        <span className="text-[var(--text-muted)]">Bulunduğu Kat</span>
-                        <span className="font-semibold text-[var(--text-main)] text-right">
-                          {(listing as MemberListingDetail).property_details?.floor}. Kat
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                        <span className="text-[var(--text-muted)]">Yapı Tipi</span>
-                        <span className="font-semibold text-[var(--text-main)] text-right">
-                          {(listing as MemberListingDetail).property_details?.building_type}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                        <span className="text-[var(--text-muted)]">Eşyalı</span>
-                        <span className="font-semibold text-[var(--text-main)] text-right">
-                          {(listing as MemberListingDetail).property_details?.furnished ? 'Evet' : 'Hayır'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                        <span className="text-[var(--text-muted)]">Balkon / Teras</span>
-                        <span className="font-semibold text-[var(--text-main)] text-right">
-                          {(listing as MemberListingDetail).property_details?.balcony ? 'Var' : 'Yok'}
-                        </span>
-                      </div>
-                    </>
+                    <VehicleSpecSection title="Mülk Detayları">
+                      <VehicleSpecItem label="İlan Tarihi" value={formatDate(listing.published_at)} />
+                      <VehicleSpecItem label="Konum" value={listing.location} highlight />
+                      <VehicleSpecItem
+                        label="Mülk Türü"
+                        value={(listing as MemberListingDetail).property_details?.property_type || 'Belirtilmemiş'}
+                      />
+                      <VehicleSpecItem
+                        label="Oda Sayısı"
+                        value={(listing as MemberListingDetail).property_details?.room_count || 'Belirtilmemiş'}
+                      />
+                      <VehicleSpecItem
+                        label="Bulunduğu Kat"
+                        value={`${(listing as MemberListingDetail).property_details?.floor}. Kat`}
+                      />
+                      <VehicleSpecItem
+                        label="Yapı Tipi"
+                        value={(listing as MemberListingDetail).property_details?.building_type || 'Belirtilmemiş'}
+                      />
+                      <VehicleSpecItem
+                        label="Eşyalı"
+                        value={(listing as MemberListingDetail).property_details?.furnished ? 'Evet' : 'Hayır'}
+                      />
+                      <VehicleSpecItem
+                        label="Balkon / Teras"
+                        value={(listing as MemberListingDetail).property_details?.balcony ? 'Var' : 'Yok'}
+                      />
+                    </VehicleSpecSection>
                   )}
                 </div>
               </div>
