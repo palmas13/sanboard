@@ -314,41 +314,49 @@ export class SupabaseListingRepository implements IListingRepository {
     // VEHICLE listings MUST have location = null; PROPERTY listings must have valid location
     const finalLocation = input.category === 'vehicle' ? null : (input.location?.trim() || null);
 
+    const sellerType = input.seller_type || (input.corporate_profile_id ? 'CORPORATE' : 'INDIVIDUAL');
+    const corporateProfileId = input.corporate_profile_id || null;
+
+    const insertPayload: any = {
+      listing_number: listingNumber,
+      seller_profile_id: safeProfileId,
+      seller_type: sellerType,
+      corporate_profile_id: corporateProfileId,
+      category: input.category,
+      subcategory: input.subcategory,
+      title: input.title,
+      description: input.description,
+      price: input.price,
+      location: finalLocation,
+      status: 'ACTIVE',
+      published_at: now.toISOString(),
+      expires_at: expires.toISOString(),
+    };
+
     let { data: newListing, error: insertError } = await client
       .from('listings')
-      .insert({
-        listing_number: listingNumber,
-        seller_profile_id: safeProfileId,
-        category: input.category,
-        subcategory: input.subcategory,
-        title: input.title,
-        description: input.description,
-        price: input.price,
-        location: finalLocation,
-        status: 'ACTIVE',
-        published_at: now.toISOString(),
-        expires_at: expires.toISOString(),
-      })
+      .insert(insertPayload)
       .select()
       .single();
 
-    // Defensive fallback: if database still has NOT NULL on location (pending migration execution)
-    if (insertError && insertError.code === '23502' && insertError.message?.includes('location') && input.category === 'vehicle') {
+    // Defensive fallback: if column seller_type doesn't exist yet on remote DB
+    if (insertError && insertError.message?.includes('seller_type')) {
+      delete insertPayload.seller_type;
       const retry = await client
         .from('listings')
-        .insert({
-          listing_number: listingNumber,
-          seller_profile_id: safeProfileId,
-          category: input.category,
-          subcategory: input.subcategory,
-          title: input.title,
-          description: input.description,
-          price: input.price,
-          location: '',
-          status: 'ACTIVE',
-          published_at: now.toISOString(),
-          expires_at: expires.toISOString(),
-        })
+        .insert(insertPayload)
+        .select()
+        .single();
+      newListing = retry.data;
+      insertError = retry.error;
+    }
+
+    // Defensive fallback: if database still has NOT NULL on location (pending migration execution)
+    if (insertError && insertError.code === '23502' && insertError.message?.includes('location') && input.category === 'vehicle') {
+      insertPayload.location = '';
+      const retry = await client
+        .from('listings')
+        .insert(insertPayload)
         .select()
         .single();
       newListing = retry.data;
@@ -384,6 +392,13 @@ export class SupabaseListingRepository implements IListingRepository {
         turbo: Boolean(input.turbo),
         subwoofer: Boolean(input.subwoofer),
         trade_available: Boolean(input.trade_available),
+        lock_level: input.lock_level !== undefined && input.lock_level !== null ? Number(input.lock_level) : null,
+        alarm_level: input.alarm_level !== undefined && input.alarm_level !== null ? Number(input.alarm_level) : null,
+        anti_theft_level: input.anti_theft_level !== undefined && input.anti_theft_level !== null ? Number(input.anti_theft_level) : null,
+        engine_health: input.engine_health !== undefined && input.engine_health !== null ? Number(input.engine_health) : null,
+        suspension: input.suspension ? String(input.suspension).trim() : null,
+        fuel_type: input.fuel_type ? String(input.fuel_type).trim() : null,
+        factory_price: input.factory_price !== undefined && input.factory_price !== null ? Number(input.factory_price) : null,
       });
       if (vehErr) {
         return { success: false, error: `Araç detayları kaydedilemedi: ${vehErr.message}` };
@@ -526,18 +541,19 @@ export class SupabaseListingRepository implements IListingRepository {
           new_price: newPrice,
         });
 
-        // Price Drop Notification: ONLY if newPrice < oldPrice, exclude seller
-        if (newPrice < oldPrice) {
+        // Price Change Notification: Triggered whenever newPrice !== oldPrice, exclude seller
+        if (newPrice !== oldPrice) {
           const { data: favs } = await client.from('favorites').select('user_id').eq('listing_id', id);
           const sellerUserId = existing.seller?.user_id;
 
           if (favs && favs.length > 0) {
             const userIds = [...new Set(favs.map((f: any) => f.user_id).filter((uid: string) => uid && uid !== sellerUserId))];
+            const isDrop = newPrice < oldPrice;
             for (const uid of userIds) {
               await client.from('notifications').insert({
                 user_id: uid,
-                type: 'LISTING_PRICE_DROP',
-                title: 'Favori İlanınızın Fiyatı Düştü',
+                type: isDrop ? 'LISTING_PRICE_DROP' : 'LISTING_PRICE_CHANGE',
+                title: isDrop ? 'Favori İlanınızın Fiyatı Düştü' : 'Favori İlanınızın Fiyatı Değişti',
                 message: `${existing.title} ilanının fiyatı $${oldPrice.toLocaleString('en-US')} → $${newPrice.toLocaleString('en-US')} olarak güncellendi.`,
                 entity_type: 'listing',
                 entity_id: id,
@@ -600,6 +616,13 @@ export class SupabaseListingRepository implements IListingRepository {
       if (input.turbo !== undefined) vehUpdate.turbo = Boolean(input.turbo);
       if (input.subwoofer !== undefined) vehUpdate.subwoofer = Boolean(input.subwoofer);
       if (input.trade_available !== undefined) vehUpdate.trade_available = Boolean(input.trade_available);
+      if (input.lock_level !== undefined) vehUpdate.lock_level = input.lock_level !== null ? Number(input.lock_level) : null;
+      if (input.alarm_level !== undefined) vehUpdate.alarm_level = input.alarm_level !== null ? Number(input.alarm_level) : null;
+      if (input.anti_theft_level !== undefined) vehUpdate.anti_theft_level = input.anti_theft_level !== null ? Number(input.anti_theft_level) : null;
+      if (input.engine_health !== undefined) vehUpdate.engine_health = input.engine_health !== null ? Number(input.engine_health) : null;
+      if (input.suspension !== undefined) vehUpdate.suspension = input.suspension ? String(input.suspension).trim() : null;
+      if (input.fuel_type !== undefined) vehUpdate.fuel_type = input.fuel_type ? String(input.fuel_type).trim() : null;
+      if (input.factory_price !== undefined) vehUpdate.factory_price = input.factory_price !== null ? Number(input.factory_price) : null;
 
       if (Object.keys(vehUpdate).length > 0) {
         const { error: vehErr } = await client.from('vehicle_details').update(vehUpdate).eq('listing_id', id);
@@ -706,10 +729,62 @@ export class SupabaseListingRepository implements IListingRepository {
         listing_images (*)
       `)
       .eq('seller_profile_id', safeProfileId)
+      .is('corporate_profile_id', null)
       .order('created_at', { ascending: false });
 
     if (error) {
       throw new Error(`Supabase error fetching user listings: ${error.message}`);
+    }
+
+    const rows = data || [];
+    const ids = rows.map((r: any) => r.id);
+
+    const priceHistoryMap: Record<string, number> = {};
+    if (ids.length > 0) {
+      const { data: histories } = await client
+        .from('listing_price_history')
+        .select('listing_id, old_price, changed_at')
+        .in('listing_id', ids)
+        .order('changed_at', { ascending: false });
+
+      if (histories) {
+        for (const h of histories) {
+          if (!priceHistoryMap[h.listing_id]) priceHistoryMap[h.listing_id] = h.old_price;
+        }
+      }
+    }
+
+    return rows.map((item: any) => ({
+      ...item,
+      location: item.category === 'vehicle' ? null : item.location,
+      previous_price: priceHistoryMap[item.id] && priceHistoryMap[item.id] !== item.price ? priceHistoryMap[item.id] : undefined,
+      images: item.listing_images || [],
+    }));
+  }
+
+  async getCorporateListings(corporateProfileId: string): Promise<Listing[]> {
+    const client = this.getClient();
+    const safeCorporateId = resolveProfileId(corporateProfileId);
+
+    let query = client
+      .from('listings')
+      .select(`
+        *,
+        vehicle_details (*),
+        property_details (*),
+        listing_images (*)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (isUuid(safeCorporateId)) {
+      query = query.eq('corporate_profile_id', safeCorporateId);
+    } else {
+      query = query.or(`corporate_profile_id.eq.${corporateProfileId}`);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(`Supabase error fetching corporate listings: ${error.message}`);
     }
 
     const rows = data || [];

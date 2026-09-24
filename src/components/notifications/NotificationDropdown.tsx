@@ -29,7 +29,7 @@ export function NotificationDropdown() {
   const fetchNotifications = async () => {
     if (!user) return;
     try {
-      const res = await fetch(`/api/notifications?userId=${user.id}`);
+      const res = await fetch('/api/notifications');
       if (!res.ok) return;
       const data = await res.json();
       setNotifications(data.notifications || []);
@@ -165,6 +165,7 @@ export function NotificationDropdown() {
   const getIcon = (type: string) => {
     switch (type) {
       case 'LISTING_PRICE_DROP':
+      case 'LISTING_PRICE_CHANGE':
         return <ArrowDownCircle className="w-4 h-4 text-[#FF8A1F]" />;
       case 'SUPPORT_REPLY':
         return <LifeBuoy className="w-4 h-4 text-emerald-400" />;

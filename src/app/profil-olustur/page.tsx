@@ -1,16 +1,16 @@
 'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
-import { User, Mail, Phone, Camera, Save, ArrowLeft } from 'lucide-react';
+import { User, Mail, Phone, Camera, Save, ArrowLeft, Trash2, Upload } from 'lucide-react';
 import Link from 'next/link';
 
 function ProfilOlusturContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const charId = searchParams.get('charId') || 'char-ravi-03';
-  const redirect = searchParams.get('redirect') || '/';
+  const charId = searchParams.get('charId') || '44444444-4444-4444-4444-444444444443';
+  const redirect = searchParams.get('redirect') || '/hesabim';
 
   const { characters, selectCharacter } = useAuth();
   const char = characters.find((c) => c.id === charId) || {
@@ -18,47 +18,96 @@ function ProfilOlusturContent() {
     fullName: 'Ravi Blumon',
     hasProfile: false,
     avatarUrl: '',
-    sanmailEmail: 'ravi.blumon@sanmail.com',
-    phone: '555-4309',
+    sanmailEmail: '',
+    phone: '',
   };
 
   const [fullName] = useState(char.fullName);
-  const [avatarUrl, setAvatarUrl] = useState(char.avatarUrl || '');
-  const [sanmailEmail, setSanmailEmail] = useState(
-    char.sanmailEmail || `${char.fullName.toLowerCase().replace(' ', '.')}@sanmail.com`
-  );
-  const [phone, setPhone] = useState(char.phone || '555-4309');
+  const [avatarPreview, setAvatarPreview] = useState<string>(char.avatarUrl || '');
+  const [avatarData, setAvatarData] = useState<string>('');
+  const [sanmailEmail, setSanmailEmail] = useState(char.sanmailEmail || '');
+  const [phone, setPhone] = useState(char.phone || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setError('');
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
+      setError('SVG formatı desteklenmemektedir. Lütfen JPG, PNG veya WEBP yükleyin.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const acceptedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!acceptedTypes.includes(file.type)) {
+      setError('Desteklenen formatlar: JPG, JPEG, PNG, WEBP');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Dosya boyutu en fazla 5MB olabilir.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      setAvatarPreview(result);
+      setAvatarData(result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveAvatar = () => {
+    setAvatarPreview('');
+    setAvatarData('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!phone || phone.length < 5) {
-      setError('Lütfen geçerli bir telefon numarası giriniz.');
-      return;
+    let formattedSanMail = sanmailEmail.trim();
+    if (formattedSanMail && !formattedSanMail.includes('@')) {
+      formattedSanMail = `${formattedSanMail}@sanmail.com`;
     }
 
-    if (!sanmailEmail || !sanmailEmail.includes('@')) {
-      setError('Lütfen geçerli bir SanMail adresi giriniz.');
-      return;
-    }
+    const formattedPhone = phone.trim();
 
     setIsSubmitting(true);
 
     try {
-      // Create character profile in system
-      char.hasProfile = true;
-      char.avatarUrl = avatarUrl;
-      char.sanmailEmail = sanmailEmail;
-      char.phone = phone;
+      const res = await fetch('/api/user/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          characterId: char.id,
+          fullName,
+          avatarData: avatarData || undefined,
+          sanmailEmail: formattedSanMail || undefined,
+          phone: formattedPhone || undefined,
+        }),
+      });
 
-      selectCharacter(char.id);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setError(data.error || 'Profil oluşturulurken bir hata oluştu.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Establish client session state with newly returned profile
+      await selectCharacter(data.profile.id);
       router.push(redirect);
     } catch {
-      setError('Profil kaydedilirken bir hata oluştu.');
-    } finally {
+      setError('Profil kaydedilirken bir bağlantı hatası oluştu.');
       setIsSubmitting(false);
     }
   };
@@ -89,31 +138,58 @@ function ProfilOlusturContent() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Avatar Preview & URL */}
-          <div className="flex items-center gap-4 p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)]">
-            {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt={fullName}
-                className="w-16 h-16 rounded-full object-cover border-2 border-[#FF8A1F] shadow-sm shrink-0"
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border-2 border-[#FF8A1F] flex items-center justify-center font-black text-xl shrink-0">
-                {fullName?.charAt(0) || 'U'}
+          {/* Avatar Upload (File Picker Only, URL Input Removed) */}
+          <div className="p-4 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] space-y-3">
+            <label className="text-xs font-semibold text-[var(--text-muted)] flex items-center gap-1.5">
+              <Camera className="w-3.5 h-3.5 text-[#FF8A1F]" />
+              <span>Profil Fotoğrafı (İsteğe Bağlı)</span>
+            </label>
+
+            <div className="flex items-center gap-4">
+              {avatarPreview ? (
+                <img
+                  src={avatarPreview}
+                  alt={fullName}
+                  className="w-16 h-16 rounded-full object-cover border-2 border-[#FF8A1F] shadow-sm shrink-0"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border-2 border-[#FF8A1F] flex items-center justify-center font-black text-xl shrink-0">
+                  {fullName?.charAt(0) || 'U'}
+                </div>
+              )}
+
+              <div className="flex-1 space-y-2">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] hover:bg-[var(--border-app)] text-xs font-medium text-[var(--text-main)] border border-[var(--border-app)] transition-colors"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-[#FF8A1F]" />
+                    <span>Bilgisayardan Seç</span>
+                  </button>
+                  {avatarPreview && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveAvatar}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[var(--color-danger-subtle)] text-[var(--color-danger)] text-xs font-medium hover:opacity-80 transition-opacity"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Kaldır</span>
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-[var(--text-dim)]">
+                  Desteklenen formatlar: JPG, JPEG, PNG, WEBP
+                </p>
               </div>
-            )}
-            <div className="flex-1 space-y-1">
-              <label className="text-xs font-semibold text-[var(--text-muted)] flex items-center gap-1">
-                <Camera className="w-3.5 h-3.5 text-[#FF8A1F]" />
-                <span>Profil Fotoğrafı URL</span>
-              </label>
-              <input
-                type="text"
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-                placeholder="https://..."
-                className="form-input text-xs"
-              />
             </div>
           </div>
 
@@ -134,38 +210,39 @@ function ProfilOlusturContent() {
             </p>
           </div>
 
-          {/* SanMail Email */}
+          {/* SanMail Email (Starts Empty, Optional) */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-[var(--text-muted)] flex items-center gap-1.5">
               <Mail className="w-3.5 h-3.5 text-[#FF8A1F]" />
-              <span>SanMail Adresi</span>
+              <span>SanMail Adresi (İsteğe Bağlı)</span>
             </label>
             <input
-              type="email"
+              type="text"
               value={sanmailEmail}
               onChange={(e) => setSanmailEmail(e.target.value)}
-              placeholder="isim.soyisim@sanmail.com"
-              required
+              placeholder="örnek: ravi@sanmail.com"
               className="form-input text-sm"
             />
+            <p className="text-[11px] text-[var(--text-dim)]">
+              İlanlarınızda görünecek IC e-posta adresiniz. Boş bırakabilirsiniz.
+            </p>
           </div>
 
-          {/* Phone */}
+          {/* Phone (Starts Empty, Optional, allows short IC numbers e.g. 1308) */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-[var(--text-muted)] flex items-center gap-1.5">
               <Phone className="w-3.5 h-3.5 text-[#FF8A1F]" />
-              <span>İletişim Numarası (Telefon)</span>
+              <span>İletişim Numarası / Telefon (İsteğe Bağlı)</span>
             </label>
             <input
               type="text"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="555-0100"
-              required
+              placeholder="örnek: 1308 veya 555-0100"
               className="form-input text-sm"
             />
             <p className="text-[11px] text-[var(--text-dim)]">
-              İlanlarınızda yalnızca Sanboard üyelerinin görebileceği telefon numaranızdır.
+              GTA World IC telefon numaranız (kısa numaralar geçerlidir). Boş bırakabilirsiniz.
             </p>
           </div>
 

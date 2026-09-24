@@ -7,29 +7,25 @@ import { GtaWorldCharacter } from '@/lib/integrations/gtaworld/types';
 
 export async function GET(req: NextRequest) {
   const isMock = process.env.USE_MOCK_GTAWORLD_AUTH !== 'false';
-
-  // 1. If in mock development mode, always serve MOCK_CHARACTERS
-  if (isMock) {
-    return NextResponse.json({
-      success: true,
-      characters: MOCK_CHARACTERS,
-      isMock: true,
-    });
-  }
-
-  // 2. Real OAuth mode: Must have valid authenticated session
   const session = await getServerSession(req);
-  if (!session?.userId) {
+  const userId = session?.userId || (isMock ? '22222222-2222-2222-2222-222222222222' : null);
+
+  if (!userId) {
+    if (isMock) {
+      return NextResponse.json({
+        success: true,
+        characters: MOCK_CHARACTERS,
+        isMock: true,
+      });
+    }
     return NextResponse.json(
       { error: 'Karakterleri listelemek için oturum açmalısınız.', characters: [] },
       { status: 401 }
     );
   }
 
-  const userId = session.userId;
-  const characters: GtaWorldCharacter[] = [];
-
-  // Fetch real synchronized character profiles for this account
+  // 1. Fetch real / synchronized character profiles from DB for this account
+  let dbProfiles: any[] = [];
   if (process.env.DATA_STORE === 'supabase') {
     try {
       const client = getSupabaseAdminClient();
@@ -41,38 +37,67 @@ export async function GET(req: NextRequest) {
           .order('created_at', { ascending: true });
 
         if (!error && profiles) {
-          for (const p of profiles) {
-            characters.push({
-              id: p.id,
-              fullName: p.full_name,
-              hasProfile: true,
-              avatarUrl: p.avatar_path || p.avatar_url || '',
-              avatarPath: p.avatar_path || p.avatar_url || '',
-              sanmailEmail: p.sanmail_email,
-              phone: p.phone,
-            });
-          }
+          dbProfiles = profiles;
         }
       }
     } catch {
-      // Fallback to memory
+      // fallback
     }
   }
 
-  if (characters.length === 0) {
-    const memoryProfiles = db.profiles.filter((p) => p.user_id === userId);
-    for (const p of memoryProfiles) {
-      characters.push({
-        id: p.id,
-        fullName: p.full_name,
-        hasProfile: true,
-        avatarUrl: p.avatar_path || p.avatar_url || '',
-        avatarPath: p.avatar_path || p.avatar_url || '',
-        sanmailEmail: p.sanmail_email,
-        phone: p.phone,
-      });
-    }
+  if (dbProfiles.length === 0) {
+    dbProfiles = db.profiles.filter((p) => p.user_id === userId);
   }
+
+  if (isMock) {
+    // Merge mock character list with persisted profiles
+    const merged = MOCK_CHARACTERS.map((char) => {
+      // Find matching DB profile by external_character_id or full_name or id
+      const matched = dbProfiles.find(
+        (p) =>
+          p.id === char.id ||
+          p.external_character_id === char.id ||
+          p.full_name?.toLowerCase() === char.fullName.toLowerCase()
+      );
+
+      if (matched) {
+        return {
+          ...char,
+          id: matched.id,
+          fullName: matched.full_name,
+          hasProfile: true,
+          avatarUrl: matched.avatar_path || matched.avatar_url || '',
+          avatarPath: matched.avatar_path || matched.avatar_url || '',
+          sanmailEmail: matched.sanmail_email || '',
+          phone: matched.phone || '',
+        };
+      }
+
+      return {
+        ...char,
+        hasProfile: false,
+        avatarUrl: '',
+        sanmailEmail: '',
+        phone: '',
+      };
+    });
+
+    return NextResponse.json({
+      success: true,
+      characters: merged,
+      isMock: true,
+    });
+  }
+
+  const characters: GtaWorldCharacter[] = dbProfiles.map((p) => ({
+    id: p.id,
+    fullName: p.full_name,
+    hasProfile: true,
+    avatarUrl: p.avatar_path || p.avatar_url || '',
+    avatarPath: p.avatar_path || p.avatar_url || '',
+    sanmailEmail: p.sanmail_email || '',
+    phone: p.phone || '',
+  }));
 
   return NextResponse.json({
     success: true,

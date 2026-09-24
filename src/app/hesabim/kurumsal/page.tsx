@@ -34,12 +34,13 @@ export default function HesabimKurumsalPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Stats for approved dealers (Item 10: Toplam Favori removed)
+  // Stats for approved dealers
   const [stats, setStats] = useState({
     activeListings: 0,
     vehicleListings: 0,
     propertyListings: 0,
   });
+  const [storeListings, setStoreListings] = useState<any[]>([]);
 
   // Application form fields
   const [companyName, setCompanyName] = useState('');
@@ -63,12 +64,12 @@ export default function HesabimKurumsalPage() {
     try {
       const promises: Promise<any>[] = [
         fetch(`/api/dealers/profile?profileId=${currentProfile.id}`),
-        fetch(`/api/user/listings?profileId=${currentProfile.id}`),
+        fetch(`/api/dealers/listings?profileId=${currentProfile.id}`),
       ];
 
       const [dealerRes, listingsRes] = await Promise.all(promises);
       const data = await dealerRes.json();
-      const listings = await listingsRes.json();
+      const listingsData = await listingsRes.json();
 
       if (data.dealer) {
         setDealer(data.dealer);
@@ -83,17 +84,18 @@ export default function HesabimKurumsalPage() {
         setDealer(null);
       }
 
-      if (Array.isArray(listings)) {
-        const active = listings.filter((l) => l.status === 'ACTIVE');
-        const vehicles = active.filter((l) => l.category === 'vehicle').length;
-        const properties = active.filter((l) => l.category === 'property').length;
+      const listings = Array.isArray(listingsData.listings) ? listingsData.listings : [];
+      setStoreListings(listings);
 
-        setStats({
-          activeListings: active.length,
-          vehicleListings: vehicles,
-          propertyListings: properties,
-        });
-      }
+      const active = listings.filter((l: any) => l.status === 'ACTIVE');
+      const vehicles = active.filter((l: any) => l.category === 'vehicle').length;
+      const properties = active.filter((l: any) => l.category === 'property').length;
+
+      setStats({
+        activeListings: active.length,
+        vehicleListings: vehicles,
+        propertyListings: properties,
+      });
     } catch {
       // Ignore
     } finally {
@@ -352,40 +354,114 @@ export default function HesabimKurumsalPage() {
             </div>
           </div>
 
-          {/* 3. QUICK ACTIONS (Item 10: Redundant edit button removed) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* 3. QUICK ACTIONS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Link
-              href="/ilan-ver"
-              className="surface-card surface-card-hover p-4 rounded-xl border border-[var(--border-app)] flex flex-col items-center justify-center text-center gap-2 group"
+              href="/ilan-ver?corporate=true"
+              className="surface-card surface-card-hover p-4 rounded-xl border border-[#FF8A1F]/30 bg-gradient-to-r from-[var(--brand-orange-subtle)] to-transparent flex items-center gap-3.5 group"
             >
-              <div className="w-9 h-9 rounded-lg bg-[var(--brand-orange-subtle)] text-[#FF8A1F] flex items-center justify-center group-hover:scale-110 transition-transform">
-                <PlusCircle className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-xl bg-[#FF8A1F] text-black flex items-center justify-center group-hover:scale-105 transition-transform shadow-md shrink-0">
+                <PlusCircle className="w-5 h-5 stroke-[2.5]" />
               </div>
-              <span className="text-xs font-bold text-[var(--text-main)]">Yeni İlan Oluştur</span>
+              <div>
+                <span className="text-xs font-bold text-[var(--text-main)] block">Yeni Mağaza İlanı</span>
+                <span className="text-[11px] text-[var(--text-muted)]">Kurumsal vitrininize özel ilan yayınlayın</span>
+              </div>
             </Link>
 
             <Link
-              href="/hesabim/ilanlarim"
-              className="surface-card surface-card-hover p-4 rounded-xl border border-[var(--border-app)] flex flex-col items-center justify-center text-center gap-2 group"
+              href={`/premium/${dealer.public_id || dealer.id}`}
+              target="_blank"
+              className="surface-card surface-card-hover p-4 rounded-xl border border-[var(--border-app)] flex items-center gap-3.5 group"
             >
-              <div className="w-9 h-9 rounded-lg bg-[var(--bg-surface-secondary)] text-[var(--text-main)] flex items-center justify-center group-hover:scale-110 transition-transform">
-                <ListPlus className="w-5 h-5 text-[var(--color-success)]" />
+              <div className="w-10 h-10 rounded-xl bg-[var(--bg-surface-secondary)] text-[#FF8A1F] flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+                <ExternalLink className="w-5 h-5" />
               </div>
-              <span className="text-xs font-bold text-[var(--text-main)]">İlanları Yönet</span>
-            </Link>
-
-            <Link
-              href="/hesabim/destek"
-              className="surface-card surface-card-hover p-4 rounded-xl border border-[var(--border-app)] flex flex-col items-center justify-center text-center gap-2 group"
-            >
-              <div className="w-9 h-9 rounded-lg bg-[var(--bg-surface-secondary)] text-[var(--text-main)] flex items-center justify-center group-hover:scale-110 transition-transform">
-                <LifeBuoy className="w-5 h-5 text-emerald-400" />
+              <div>
+                <span className="text-xs font-bold text-[var(--text-main)] block">Kamuya Açık Vitrin</span>
+                <span className="text-[11px] text-[var(--text-muted)]">Oyuncuların gördüğü mağaza sayfasını aç</span>
               </div>
-              <span className="text-xs font-bold text-[var(--text-main)]">Destek</span>
             </Link>
           </div>
 
-          {/* 4. EDIT FORM SECTION */}
+          {/* 4. MAĞAZA ENVANTERİ (Corporate Store Inventory) */}
+          <div className="surface-card p-6 sm:p-7 rounded-2xl border border-[var(--border-app)] space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-app)]">
+              <div>
+                <h2 className="text-base font-bold text-[var(--text-main)] flex items-center gap-2">
+                  <ListPlus className="w-4 h-4 text-[#FF8A1F]" />
+                  <span>Mağaza Envanteri</span>
+                </h2>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                  Yalnızca kurumsal mağazanıza ait ve kamuya açık vitrinde listelenen ilanlar.
+                </p>
+              </div>
+              <Link
+                href="/ilan-ver?corporate=true"
+                className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-sm"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>İlan Ekle</span>
+              </Link>
+            </div>
+
+            {storeListings.length === 0 ? (
+              <div className="p-8 text-center rounded-xl bg-[var(--bg-surface-secondary)]/50 border border-dashed border-[var(--border-app)] space-y-2">
+                <p className="text-xs text-[var(--text-muted)]">
+                  Henüz mağazanıza ait kurumsal ilan bulunmuyor.
+                </p>
+                <Link
+                  href="/ilan-ver?corporate=true"
+                  className="inline-flex items-center gap-1 text-xs text-[#FF8A1F] hover:underline font-semibold"
+                >
+                  <span>İlk mağaza ilanınızı oluşturun ›</span>
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {storeListings.map((l: any) => {
+                  const cover = l.images?.find((img: any) => img.is_cover)?.storage_path || l.images?.[0]?.storage_path || l.cover_image;
+                  const imgUrl = resolveMediaUrl(cover);
+                  return (
+                    <div
+                      key={l.id}
+                      className="rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/40 p-3 space-y-2 flex flex-col justify-between"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-14 h-14 rounded-lg bg-[var(--bg-surface)] overflow-hidden shrink-0 border border-[var(--border-app)] flex items-center justify-center">
+                          {imgUrl ? (
+                            <img src={imgUrl} alt={l.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <Car className="w-5 h-5 text-[var(--text-dim)]" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[10px] font-mono text-[var(--text-dim)] block">{l.listing_number}</span>
+                          <h4 className="text-xs font-bold text-[var(--text-main)] truncate">{l.title}</h4>
+                          <span className="text-xs font-extrabold text-[#FF8A1F]">${Number(l.price).toLocaleString('en-US')}</span>
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t border-[var(--border-app)] flex items-center justify-between text-[11px]">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${l.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-zinc-500/10 text-zinc-400'}`}>
+                          {l.status === 'ACTIVE' ? 'Yayında' : l.status === 'SOLD' ? 'Satıldı' : l.status}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <Link href={`/ilan/${l.id}`} className="text-[var(--text-muted)] hover:text-[var(--text-main)]">
+                            Görüntüle
+                          </Link>
+                          <Link href={`/hesabim/ilanlarim/${l.id}/duzenle`} className="text-[#FF8A1F] hover:underline font-medium">
+                            Düzenle
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 5. EDIT FORM SECTION */}
           <div className="surface-card p-6 sm:p-8 rounded-2xl border border-[var(--border-app)] space-y-6">
             <div className="pb-4 border-b border-[var(--border-app)] flex items-center justify-between">
               <div>

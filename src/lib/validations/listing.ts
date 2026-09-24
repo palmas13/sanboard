@@ -54,6 +54,8 @@ export const baseListingFields = {
       (imgs) => imgs.filter((img) => img.is_cover).length === 1,
       'Tam olarak bir vitrin fotoğrafı seçilmelidir'
     ),
+  seller_type: z.enum(['INDIVIDUAL', 'CORPORATE']).optional().nullable(),
+  corporate_profile_id: z.string().uuid().optional().nullable(),
 };
 
 export const baseListingSchema = z.object({
@@ -81,6 +83,13 @@ export const vehicleListingSchema = z.object({
   turbo: z.boolean().default(false),
   subwoofer: z.boolean().default(false),
   trade_available: z.boolean().default(false),
+  lock_level: z.number().int().min(0).optional().nullable(),
+  alarm_level: z.number().int().min(0).optional().nullable(),
+  anti_theft_level: z.number().int().min(0).optional().nullable(),
+  engine_health: z.number().int().min(0).max(100).optional().nullable(),
+  suspension: z.string().trim().optional().nullable(),
+  fuel_type: z.enum(['BENZIN', 'DIZEL', 'ELEKTRIK']).optional().nullable(),
+  factory_price: z.number().min(0).optional().nullable(),
 });
 
 export const propertyListingSchema = z.object({

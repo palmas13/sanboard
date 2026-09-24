@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getListingRepository } from '@/lib/db/repositories';
+import { getListingRepository, getDealerRepository } from '@/lib/db/repositories';
 import { listingUnionSchema } from '@/lib/validations/listing';
+import { getServerSession } from '@/lib/auth/session';
+import { revalidatePath } from 'next/cache';
 
 // Public listings search endpoint
 export async function GET(req: NextRequest) {
@@ -38,19 +40,38 @@ export async function GET(req: NextRequest) {
   }
 }
 
-import { revalidatePath } from 'next/cache';
-
 // Create new listing consuming 1 credit
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(req);
     const body = await req.json();
-    const { sellerProfileId, ...listingData } = body;
+    const { sellerProfileId, corporate, isCorporate, ...listingData } = body;
 
-    if (!sellerProfileId) {
+    const trustedProfileId = session?.profileId || sellerProfileId;
+
+    if (!trustedProfileId) {
       return NextResponse.json(
-        { error: 'Satıcı profili zorunludur.' },
-        { status: 400 }
+        { error: 'Satıcı profili zorunludur. Lütfen oturum açın.' },
+        { status: 401 }
       );
+    }
+
+    // Corporate Seller Authorization Check
+    const wantsCorporate = corporate === true || isCorporate === true || listingData.seller_type === 'CORPORATE';
+    if (wantsCorporate) {
+      const dealerRepo = getDealerRepository();
+      const dealer = await dealerRepo.getDealerByProfileId(trustedProfileId);
+      if (!dealer || dealer.status !== 'APPROVED') {
+        return NextResponse.json(
+          { error: 'Onaylı kurumsal mağazanız bulunmamaktadır. Kurumsal ilan yayınlayamazsınız.' },
+          { status: 403 }
+        );
+      }
+      listingData.seller_type = 'CORPORATE';
+      listingData.corporate_profile_id = dealer.id;
+    } else {
+      listingData.seller_type = 'INDIVIDUAL';
+      listingData.corporate_profile_id = null;
     }
 
     // Server-side Zod validation
@@ -61,7 +82,7 @@ export async function POST(req: NextRequest) {
     }
 
     const repo = getListingRepository();
-    const result = await repo.createListing(parsed.data, sellerProfileId);
+    const result = await repo.createListing(parsed.data, trustedProfileId);
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
@@ -85,12 +106,14 @@ export async function POST(req: NextRequest) {
 // Update existing listing (owner only)
 export async function PUT(req: NextRequest) {
   try {
+    const session = await getServerSession(req);
     const body = await req.json();
     const { id, sellerProfileId, userId: explicitUserId, ...listingData } = body;
-    const userId = explicitUserId || req.cookies.get('sanboard_user_id')?.value;
-    const role = req.cookies.get('sanboard_role')?.value;
+    const userId = session?.userId || explicitUserId || req.cookies.get('sanboard_user_id')?.value;
+    const role = session?.role || req.cookies.get('sanboard_role')?.value;
+    const trustedProfileId = session?.profileId || sellerProfileId;
 
-    if (!id || !sellerProfileId) {
+    if (!id || !trustedProfileId) {
       return NextResponse.json(
         { error: 'id ve sellerProfileId zorunludur.' },
         { status: 400 }
@@ -104,7 +127,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const repo = getListingRepository();
-    const result = await repo.updateListing(id, parsed.data, sellerProfileId, userId, role);
+    const result = await repo.updateListing(id, parsed.data, trustedProfileId, userId, role);
 
     if (!result.success) {
       const isForbidden = result.error?.includes('yetkiniz yok');

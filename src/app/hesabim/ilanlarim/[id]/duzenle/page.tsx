@@ -57,6 +57,13 @@ export default function IlanDuzenlePage({
   const [turbo, setTurbo] = useState(false);
   const [subwoofer, setSubwoofer] = useState(false);
   const [tradeAvailable, setTradeAvailable] = useState(false);
+  const [lockLevel, setLockLevel] = useState('');
+  const [alarmLevel, setAlarmLevel] = useState('');
+  const [antiTheftLevel, setAntiTheftLevel] = useState('');
+  const [engineHealth, setEngineHealth] = useState('');
+  const [suspension, setSuspension] = useState('');
+  const [fuelType, setFuelType] = useState<string>('BENZIN');
+  const [factoryPrice, setFactoryPrice] = useState('');
 
   // Property Details
   const [floor, setFloor] = useState('1');
@@ -125,6 +132,13 @@ export default function IlanDuzenlePage({
           setTurbo(Boolean(vd.turbo));
           setSubwoofer(Boolean(vd.subwoofer));
           setTradeAvailable(Boolean(vd.trade_available));
+          setLockLevel(vd.lock_level !== null && vd.lock_level !== undefined ? String(vd.lock_level) : '');
+          setAlarmLevel(vd.alarm_level !== null && vd.alarm_level !== undefined ? String(vd.alarm_level) : '');
+          setAntiTheftLevel(vd.anti_theft_level !== null && vd.anti_theft_level !== undefined ? String(vd.anti_theft_level) : '');
+          setEngineHealth(vd.engine_health !== null && vd.engine_health !== undefined ? String(vd.engine_health) : '');
+          setSuspension(vd.suspension || '');
+          setFuelType(vd.fuel_type || 'BENZIN');
+          setFactoryPrice(vd.factory_price !== null && vd.factory_price !== undefined ? String(vd.factory_price) : '');
         }
 
         if (l.category === 'property' && l.property_details) {
@@ -209,6 +223,27 @@ export default function IlanDuzenlePage({
       };
 
       if (category === 'vehicle') {
+        if (engineHealth !== '' && (Number(engineHealth) < 0 || Number(engineHealth) > 100)) {
+          setError('Motor sağlığı %0 ile %100 arasında olmalıdır.');
+          return;
+        }
+        if (lockLevel !== '' && Number(lockLevel) < 0) {
+          setError('Kilit seviyesi 0 veya daha büyük olmalıdır.');
+          return;
+        }
+        if (alarmLevel !== '' && Number(alarmLevel) < 0) {
+          setError('Alarm seviyesi 0 veya daha büyük olmalıdır.');
+          return;
+        }
+        if (antiTheftLevel !== '' && Number(antiTheftLevel) < 0) {
+          setError('Hırsızlık önleme seviyesi 0 veya daha büyük olmalıdır.');
+          return;
+        }
+        if (factoryPrice !== '' && Number(factoryPrice) < 0) {
+          setError('Fabrika çıkış fiyatı 0 veya daha büyük olmalıdır.');
+          return;
+        }
+
         payload.vehicle_category = subcategory;
         payload.brand = brand;
         payload.model = model;
@@ -220,6 +255,13 @@ export default function IlanDuzenlePage({
         payload.turbo = turbo;
         payload.subwoofer = subwoofer;
         payload.trade_available = tradeAvailable;
+        payload.lock_level = lockLevel !== '' ? Number(lockLevel) : null;
+        payload.alarm_level = alarmLevel !== '' ? Number(alarmLevel) : null;
+        payload.anti_theft_level = antiTheftLevel !== '' ? Number(antiTheftLevel) : null;
+        payload.engine_health = engineHealth !== '' ? Number(engineHealth) : null;
+        payload.suspension = suspension.trim() || null;
+        payload.fuel_type = fuelType || null;
+        payload.factory_price = factoryPrice !== '' ? Number(factoryPrice) : null;
       } else {
         payload.location = location.trim();
         payload.property_type = subcategory;
@@ -474,12 +516,12 @@ export default function IlanDuzenlePage({
               </div>
             </div>
 
-            {/* Performans & Donanım */}
+            {/* MEKANİK */}
             <div className="pt-2 space-y-3">
-              <label className="text-xs font-semibold text-[var(--text-muted)]">Performans Geliştirmeleri (0 - 4)</label>
+              <h4 className="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider">Mekanik & Performans</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <span className="text-[11px] text-[var(--text-dim)] font-medium">Motor</span>
+                  <span className="text-[11px] text-[var(--text-dim)] font-medium">Motor Geliştirmesi</span>
                   <CustomSelect
                     value={engineUpgrade}
                     onChange={(v) => setEngineUpgrade(v)}
@@ -493,7 +535,7 @@ export default function IlanDuzenlePage({
                   />
                 </div>
                 <div className="space-y-1">
-                  <span className="text-[11px] text-[var(--text-dim)] font-medium">Şanzıman</span>
+                  <span className="text-[11px] text-[var(--text-dim)] font-medium">Şanzıman Geliştirmesi</span>
                   <CustomSelect
                     value={transmissionUpgrade}
                     onChange={(v) => setTransmissionUpgrade(v)}
@@ -507,7 +549,7 @@ export default function IlanDuzenlePage({
                   />
                 </div>
                 <div className="space-y-1">
-                  <span className="text-[11px] text-[var(--text-dim)] font-medium">Fren</span>
+                  <span className="text-[11px] text-[var(--text-dim)] font-medium">Fren Geliştirmesi</span>
                   <CustomSelect
                     value={brakeUpgrade}
                     onChange={(v) => setBrakeUpgrade(v)}
@@ -521,39 +563,131 @@ export default function IlanDuzenlePage({
                   />
                 </div>
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <div className="space-y-1">
+                  <label className="text-[11px] text-[var(--text-dim)] font-medium">Motor Sağlığı (%0 - 100)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={engineHealth}
+                    onChange={(e) => setEngineHealth(e.target.value)}
+                    placeholder="Örn: 100"
+                    className="form-input text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] text-[var(--text-dim)] font-medium">Süspansiyon</label>
+                  <input
+                    type="text"
+                    value={suspension}
+                    onChange={(e) => setSuspension(e.target.value)}
+                    placeholder="Örn: Stok, Spor, Yarış..."
+                    className="form-input text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] text-[var(--text-dim)] font-medium">Yakıt Türü</label>
+                  <CustomSelect
+                    value={fuelType}
+                    onChange={(v) => setFuelType(v)}
+                    options={[
+                      { value: 'BENZIN', label: 'Benzin' },
+                      { value: 'DIZEL', label: 'Dizel' },
+                      { value: 'ELEKTRIK', label: 'Elektrik' },
+                    ]}
+                  />
+                </div>
+              </div>
             </div>
 
-            {/* Ek Donanımlar */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-              <label className="flex items-center gap-2.5 p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={turbo}
-                  onChange={(e) => setTurbo(e.target.checked)}
-                  className="rounded border-[var(--border-app)] text-[#FF8A1F] focus:ring-[#FF8A1F]"
-                />
-                <span className="text-xs font-semibold text-[var(--text-main)]">Turbo Şarj</span>
-              </label>
+            {/* GÜVENLİK */}
+            <div className="pt-2 space-y-3">
+              <h4 className="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider">Güvenlik Seviyeleri</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] text-[var(--text-dim)] font-medium">Kilit Seviyesi</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={lockLevel}
+                    onChange={(e) => setLockLevel(e.target.value)}
+                    placeholder="Örn: 2"
+                    className="form-input text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] text-[var(--text-dim)] font-medium">Alarm Seviyesi</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={alarmLevel}
+                    onChange={(e) => setAlarmLevel(e.target.value)}
+                    placeholder="Örn: 1"
+                    className="form-input text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] text-[var(--text-dim)] font-medium">Hırsızlık Önleme Seviyesi</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={antiTheftLevel}
+                    onChange={(e) => setAntiTheftLevel(e.target.value)}
+                    placeholder="Örn: 3"
+                    className="form-input text-sm"
+                  />
+                </div>
+              </div>
+            </div>
 
-              <label className="flex items-center gap-2.5 p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={subwoofer}
-                  onChange={(e) => setSubwoofer(e.target.checked)}
-                  className="rounded border-[var(--border-app)] text-[#FF8A1F] focus:ring-[#FF8A1F]"
-                />
-                <span className="text-xs font-semibold text-[var(--text-main)]">Subwoofer Ses</span>
-              </label>
+            {/* EK DONANIM & SATIŞ */}
+            <div className="pt-2 space-y-3">
+              <h4 className="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider">Ek Donanım & Satış</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <label className="flex items-center gap-2.5 p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={turbo}
+                    onChange={(e) => setTurbo(e.target.checked)}
+                    className="rounded border-[var(--border-app)] text-[#FF8A1F] focus:ring-[#FF8A1F]"
+                  />
+                  <span className="text-xs font-semibold text-[var(--text-main)]">Turbo Şarj</span>
+                </label>
 
-              <label className="flex items-center gap-2.5 p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] cursor-pointer">
+                <label className="flex items-center gap-2.5 p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={subwoofer}
+                    onChange={(e) => setSubwoofer(e.target.checked)}
+                    className="rounded border-[var(--border-app)] text-[#FF8A1F] focus:ring-[#FF8A1F]"
+                  />
+                  <span className="text-xs font-semibold text-[var(--text-main)]">Subwoofer Ses</span>
+                </label>
+
+                <label className="flex items-center gap-2.5 p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={tradeAvailable}
+                    onChange={(e) => setTradeAvailable(e.target.checked)}
+                    className="rounded border-[var(--border-app)] text-[#FF8A1F] focus:ring-[#FF8A1F]"
+                  />
+                  <span className="text-xs font-semibold text-[var(--text-main)]">Takasa Açık</span>
+                </label>
+              </div>
+
+              <div className="space-y-1.5 pt-2 max-w-sm">
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Fabrika Çıkış Fiyatı ($)</label>
                 <input
-                  type="checkbox"
-                  checked={tradeAvailable}
-                  onChange={(e) => setTradeAvailable(e.target.checked)}
-                  className="rounded border-[var(--border-app)] text-[#FF8A1F] focus:ring-[#FF8A1F]"
+                  type="number"
+                  min="0"
+                  value={factoryPrice}
+                  onChange={(e) => setFactoryPrice(e.target.value)}
+                  placeholder="Örn: 85000"
+                  className="form-input text-sm"
                 />
-                <span className="text-xs font-semibold text-[var(--text-main)]">Takasa Açık</span>
-              </label>
+              </div>
             </div>
           </div>
         ) : (

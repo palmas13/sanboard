@@ -310,13 +310,16 @@ export async function createListingWithCredit(
   const listingNumber = generateListingNumber(db.listings.length + 1);
 
   const sellerProfile = db.profiles.find((p) => p.id === sellerProfileId);
-  const corporateProfileId = sellerProfile?.is_dealer ? sellerProfile.dealer_id : undefined;
+  const isCorporateRequest = input.seller_type === 'CORPORATE';
+  const corporateProfileId = isCorporateRequest && sellerProfile?.is_dealer ? (input.corporate_profile_id || sellerProfile.dealer_id) : undefined;
+  const sellerType = corporateProfileId ? 'CORPORATE' : 'INDIVIDUAL';
 
   const newListing: Listing = {
     id: newId,
     listing_number: listingNumber,
     seller_profile_id: sellerProfileId,
     corporate_profile_id: corporateProfileId,
+    seller_type: sellerType,
     category: input.category,
     subcategory: input.subcategory,
     title: input.title,
@@ -342,6 +345,13 @@ export async function createListingWithCredit(
       turbo: Boolean(input.turbo),
       subwoofer: Boolean(input.subwoofer),
       trade_available: Boolean(input.trade_available),
+      lock_level: input.lock_level !== undefined && input.lock_level !== null ? Number(input.lock_level) : null,
+      alarm_level: input.alarm_level !== undefined && input.alarm_level !== null ? Number(input.alarm_level) : null,
+      anti_theft_level: input.anti_theft_level !== undefined && input.anti_theft_level !== null ? Number(input.anti_theft_level) : null,
+      engine_health: input.engine_health !== undefined && input.engine_health !== null ? Number(input.engine_health) : null,
+      suspension: input.suspension || null,
+      fuel_type: (input.fuel_type as any) || null,
+      factory_price: input.factory_price !== undefined && input.factory_price !== null ? Number(input.factory_price) : null,
     } : undefined,
     property_details: input.category === 'property' ? {
       listing_id: newId,
@@ -419,6 +429,13 @@ export async function updateListing(
     listing.vehicle_details.turbo = Boolean(input.turbo);
     listing.vehicle_details.subwoofer = Boolean(input.subwoofer);
     listing.vehicle_details.trade_available = Boolean(input.trade_available);
+    if (input.lock_level !== undefined) listing.vehicle_details.lock_level = input.lock_level !== null ? Number(input.lock_level) : null;
+    if (input.alarm_level !== undefined) listing.vehicle_details.alarm_level = input.alarm_level !== null ? Number(input.alarm_level) : null;
+    if (input.anti_theft_level !== undefined) listing.vehicle_details.anti_theft_level = input.anti_theft_level !== null ? Number(input.anti_theft_level) : null;
+    if (input.engine_health !== undefined) listing.vehicle_details.engine_health = input.engine_health !== null ? Number(input.engine_health) : null;
+    if (input.suspension !== undefined) listing.vehicle_details.suspension = input.suspension || null;
+    if (input.fuel_type !== undefined) listing.vehicle_details.fuel_type = (input.fuel_type as any) || null;
+    if (input.factory_price !== undefined) listing.vehicle_details.factory_price = input.factory_price !== null ? Number(input.factory_price) : null;
   }
 
   if (listing.category === 'property' && listing.property_details) {
@@ -434,8 +451,8 @@ export async function updateListing(
   // Preserve published_at and expires_at completely!
   listing.updated_at = new Date().toISOString();
 
-  // Price Drop Check & Notification Trigger
-  if (newPrice < oldPrice) {
+  // Price Change Check & Notification Trigger
+  if (newPrice !== oldPrice) {
     // 1. Record in price history
     if (!db.priceHistories) db.priceHistories = [];
     db.priceHistories.push({
@@ -462,11 +479,12 @@ export async function updateListing(
       });
 
     // 4. Create notifications for favorited users
+    const isDrop = newPrice < oldPrice;
     notifiedUserIds.forEach((uid) => {
       createNotification({
         user_id: uid,
-        type: 'LISTING_PRICE_DROP',
-        title: 'Favori İlanınızın Fiyatı Düştü',
+        type: isDrop ? 'LISTING_PRICE_DROP' : 'LISTING_PRICE_CHANGE',
+        title: isDrop ? 'Favori İlanınızın Fiyatı Düştü' : 'Favori İlanınızın Fiyatı Değişti',
         message: `${listing.title} ilanının fiyatı $${oldPrice.toLocaleString('en-US')} → $${newPrice.toLocaleString('en-US')} olarak güncellendi.`,
         entity_type: 'listing',
         entity_id: listing.id,
@@ -519,13 +537,34 @@ export async function markListingAsSold(
 }
 
 /**
- * Get listings owned by a user (Active & Expired).
+ * Get listings owned by a user (Active & Expired) - Strictly individual listings.
  */
 export async function getUserListings(sellerProfileId: string): Promise<Listing[]> {
   if (isSupabaseConfiguredMode()) {
     return getSupabaseRepo().getUserListings(sellerProfileId);
   }
-  const listings = db.listings.filter((l) => l.seller_profile_id === sellerProfileId);
+  const listings = db.listings.filter((l) => l.seller_profile_id === sellerProfileId && !l.corporate_profile_id);
+  const now = new Date();
+
+  return listings.map((l) => {
+    const isExpired = l.expires_at ? new Date(l.expires_at) <= now : false;
+    const favCount = db.favorites.filter((f) => f.listing_id === l.id).length;
+    return {
+      ...l,
+      status: l.status === 'ACTIVE' && isExpired ? 'EXPIRED' : l.status,
+      favorite_count: favCount,
+    };
+  });
+}
+
+/**
+ * Get listings belonging to a corporate store profile.
+ */
+export async function getCorporateListings(corporateProfileId: string): Promise<Listing[]> {
+  if (isSupabaseConfiguredMode()) {
+    return getSupabaseRepo().getCorporateListings(corporateProfileId);
+  }
+  const listings = db.listings.filter((l) => l.corporate_profile_id === corporateProfileId);
   const now = new Date();
 
   return listings.map((l) => {

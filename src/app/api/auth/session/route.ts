@@ -25,6 +25,14 @@ const STAGING_CHARACTER_ACCOUNTS: Record<string, { userId: string; role: 'USER' 
     userId: '22222222-2222-2222-2222-222222222222',
     role: 'ADMIN',
   },
+  '44444444-4444-4444-4444-444444444443': {
+    userId: '22222222-2222-2222-2222-222222222222',
+    role: 'ADMIN',
+  },
+  'char-ravi-03': {
+    userId: '22222222-2222-2222-2222-222222222222',
+    role: 'ADMIN',
+  },
 };
 
 // GET current session info
@@ -90,8 +98,10 @@ export async function POST(req: NextRequest) {
     const isMockCharacter = isMock && (
       characterId === '44444444-4444-4444-4444-444444444441' ||
       characterId === '44444444-4444-4444-4444-444444444442' ||
+      characterId === '44444444-4444-4444-4444-444444444443' ||
       characterId === 'char-mavis-01' ||
-      characterId === 'char-zade-02'
+      characterId === 'char-zade-02' ||
+      characterId === 'char-ravi-03'
     );
 
     // 2. Strict Character Ownership Verification:

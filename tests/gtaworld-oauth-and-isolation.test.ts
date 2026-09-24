@@ -72,7 +72,7 @@ describe('GTA World Upstream Response & Defensive Validation', () => {
     assert.ok(userRes.user);
     assert.strictEqual(userRes.user.id, 1);
     assert.strictEqual(userRes.user.username, 'mavis_player');
-    assert.strictEqual(userRes.user.character.length, 2);
+    assert.strictEqual(userRes.user.character.length, 3);
   });
 });
 

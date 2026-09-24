@@ -109,28 +109,37 @@ export async function syncGtaWorldAccountAndCharacters(
           syncedProfiles.push(existingProfile as CharacterProfile);
         }
       } else {
-        // Create new character profile
-        const sanitizedFirst = char.firstname.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const sanitizedLast = char.lastname.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const defaultSanmail = `${sanitizedFirst}.${sanitizedLast}@sanmail.com`;
-        const defaultPhone = `555-${Math.floor(1000 + Math.random() * 9000)}`;
+        const insertPayload: Record<string, any> = {
+          user_id: user.id,
+          external_character_id: extCharId,
+          full_name: canonicalName,
+          avatar_path: null,
+          avatar_url: null,
+          sanmail_email: null,
+          phone: null,
+          is_dealer: false,
+          created_at: now,
+          updated_at: now,
+        };
 
-        const { data: created, error: insertErr } = await client
+        let { data: created, error: insertErr } = await client
           .from('character_profiles')
-          .insert({
-            user_id: user.id,
-            external_character_id: extCharId,
-            full_name: canonicalName,
-            avatar_path: null,
-            avatar_url: null,
-            sanmail_email: defaultSanmail,
-            phone: defaultPhone,
-            is_dealer: false,
-            created_at: now,
-            updated_at: now,
-          })
+          .insert(insertPayload)
           .select()
           .single();
+
+        // Defensive fallback: if remote live DB still has NOT NULL constraint pending migration execution
+        if (insertErr && (insertErr.code === '23502' || insertErr.message?.includes('not-null'))) {
+          insertPayload.sanmail_email = '';
+          insertPayload.phone = '';
+          const retry = await client
+            .from('character_profiles')
+            .insert(insertPayload)
+            .select()
+            .single();
+          created = retry.data;
+          insertErr = retry.error;
+        }
 
         if (!insertErr && created) {
           syncedProfiles.push(created as CharacterProfile);
@@ -199,9 +208,6 @@ export async function syncGtaWorldAccountAndCharacters(
       profile.updated_at = now;
       syncedProfiles.push(profile);
     } else {
-      const sanitizedFirst = char.firstname.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const sanitizedLast = char.lastname.toLowerCase().replace(/[^a-z0-9]/g, '');
-
       profile = {
         id: `char-${extCharId}`,
         user_id: user.id,
@@ -209,8 +215,8 @@ export async function syncGtaWorldAccountAndCharacters(
         full_name: canonicalName,
         avatar_path: '',
         avatar_url: '',
-        sanmail_email: `${sanitizedFirst}.${sanitizedLast}@sanmail.com`,
-        phone: `555-${Math.floor(1000 + Math.random() * 9000)}`,
+        sanmail_email: '',
+        phone: '',
         created_at: now,
         updated_at: now,
       };

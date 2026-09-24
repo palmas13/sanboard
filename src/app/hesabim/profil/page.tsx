@@ -130,11 +130,17 @@ export default function HesabimProfilPage() {
             className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-[#FF8A1F] shadow-lg group cursor-pointer shrink-0 transition-transform hover:scale-105"
             title="Fotoğrafı Değiştir"
           >
-            <img
-              src={displayAvatar}
-              alt="Karakter Avatarı"
-              className="w-full h-full object-cover"
-            />
+            {displayAvatar ? (
+              <img
+                src={displayAvatar}
+                alt="Karakter Avatarı"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] flex items-center justify-center font-black text-3xl">
+                {currentProfile?.full_name?.charAt(0) || 'U'}
+              </div>
+            )}
             {/* Hover overlay with camera icon */}
             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-1">
               <Camera className="w-6 h-6 text-[#FF8A1F]" />
@@ -151,7 +157,7 @@ export default function HesabimProfilPage() {
                 Maksimum <strong className="text-[var(--text-main)]">2 MB</strong> dosya boyutu
               </p>
               <p className="text-[11px] text-[var(--text-dim)]">
-                Desteklenen formatlar: JPG, JPEG, PNG, WEBP (Otomatik WebP optimizasyonu)
+                Desteklenen formatlar: JPG, JPEG, PNG, WEBP
               </p>
             </div>
 

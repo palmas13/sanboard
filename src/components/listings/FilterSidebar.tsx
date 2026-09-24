@@ -172,15 +172,16 @@ export function FilterSidebar({
         <label className="text-xs font-semibold text-[var(--text-muted)]">
           {category === 'vehicle' ? 'Model veya Kelime' : 'Mülk Ara veya Kelime'}
         </label>
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+        <div className="relative flex items-center">
+          <Search className="w-4 h-4 absolute left-3 text-[var(--text-dim)] pointer-events-none shrink-0" />
           <input
             type="text"
             placeholder={category === 'vehicle' ? 'Örn: Schafter V12...' : 'Örn: Manzaralı daire...'}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
-            className="form-input pl-9 text-xs"
+            className="form-input text-xs w-full"
+            style={{ paddingLeft: '2.5rem' }}
           />
         </div>
       </div>

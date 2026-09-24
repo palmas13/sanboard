@@ -127,20 +127,35 @@ export class SupabaseTicketRepository implements ITicketRepository {
 
     // If admin replied, send notification to ticket owner
     if (params.senderRole === 'ADMIN') {
-      const { data: ticket } = await client.from('support_tickets').select('profile_id').eq('id', params.ticketId).single();
-      if (ticket) {
-        const { data: prof } = await client.from('character_profiles').select('user_id').eq('id', ticket.profile_id).single();
-        if (prof?.user_id) {
-          await client.from('notifications').insert({
-            user_id: prof.user_id,
-            type: 'SUPPORT_REPLY',
-            title: 'Destek Talebiniz Yanıtlandı',
-            message: `#${params.ticketId} numaralı destek talebinize yönetici tarafından yanıt geldi.`,
-            entity_type: 'ticket',
-            entity_id: params.ticketId,
-            metadata: { ticketId: params.ticketId },
-          });
+      try {
+        const { data: ticket } = await client
+          .from('support_tickets')
+          .select('profile_id, subject')
+          .eq('id', params.ticketId)
+          .maybeSingle();
+
+        if (ticket?.profile_id) {
+          const { data: prof } = await client
+            .from('character_profiles')
+            .select('user_id')
+            .or(`id.eq.${ticket.profile_id},external_character_id.eq.${ticket.profile_id}`)
+            .maybeSingle();
+
+          if (prof?.user_id) {
+            await client.from('notifications').insert({
+              user_id: prof.user_id,
+              type: 'SUPPORT_REPLY',
+              title: 'Destek Talebiniz Yanıtlandı',
+              message: 'Destek talebinize yetkili tarafından yanıt verildi.',
+              entity_type: 'ticket',
+              entity_id: params.ticketId,
+              metadata: { ticketId: params.ticketId, subject: ticket.subject },
+              created_at: new Date().toISOString(),
+            });
+          }
         }
+      } catch {
+        // Notification creation should not corrupt ticket message insertion
       }
     }
 

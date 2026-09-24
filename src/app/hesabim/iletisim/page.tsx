@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
 import { Phone, Mail, Save, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 
 export default function HesabimIletisimPage() {
-  const { currentProfile, updateCurrentProfile } = useAuth();
+  const { currentProfile, updateCurrentProfile, refreshProfile } = useAuth();
 
   const [phone, setPhone] = useState(currentProfile?.phone || '');
   const [sanmailEmail, setSanmailEmail] = useState(currentProfile?.sanmail_email || '');
@@ -13,23 +13,28 @@ export default function HesabimIletisimPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    if (currentProfile) {
+      setPhone(currentProfile.phone || '');
+      setSanmailEmail(currentProfile.sanmail_email || '');
+    }
+  }, [currentProfile]);
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentProfile) return;
 
-    if (!phone || phone.length < 5) {
-      setError('Geçerli bir telefon numarası giriniz.');
-      return;
-    }
-
-    if (!sanmailEmail || !sanmailEmail.includes('@')) {
-      setError('Geçerli bir SanMail adresi giriniz.');
-      return;
-    }
-
-    setSubmitting(true);
     setError('');
     setSuccess(false);
+
+    let formattedSanMail = sanmailEmail.trim();
+    if (formattedSanMail && !formattedSanMail.includes('@')) {
+      formattedSanMail = `${formattedSanMail}@sanmail.com`;
+    }
+
+    const formattedPhone = phone.trim();
+
+    setSubmitting(true);
 
     try {
       const res = await fetch('/api/user/profile', {
@@ -37,17 +42,22 @@ export default function HesabimIletisimPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           profileId: currentProfile.id,
-          phone: phone.trim(),
-          sanmail_email: sanmailEmail.trim(),
+          phone: formattedPhone,
+          sanmail_email: formattedSanMail,
         }),
       });
 
-      if (!res.ok) throw new Error('İletişim bilgileri güncellenemedi.');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'İletişim bilgileri güncellenemedi.');
+      }
 
       updateCurrentProfile({
-        phone: phone.trim(),
-        sanmail_email: sanmailEmail.trim(),
+        phone: formattedPhone,
+        sanmail_email: formattedSanMail,
       });
+
+      await refreshProfile();
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
@@ -67,15 +77,15 @@ export default function HesabimIletisimPage() {
       </div>
 
       {success && (
-        <div className="p-3.5 rounded-xl bg-[var(--color-success-subtle)] text-[var(--color-success)] text-xs font-semibold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4" />
+        <div className="p-3.5 rounded-xl bg-[var(--color-success-subtle)] text-[var(--color-success)] text-xs font-semibold flex items-center gap-2 border border-emerald-500/20">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>İletişim bilgileri başarıyla güncellendi.</span>
         </div>
       )}
 
       {error && (
-        <div className="p-3.5 rounded-xl bg-[var(--color-danger-subtle)] text-[var(--color-danger)] text-xs font-semibold flex items-center gap-2">
-          <AlertCircle className="w-4 h-4" />
+        <div className="p-3.5 rounded-xl bg-[var(--color-danger-subtle)] text-[var(--color-danger)] text-xs font-semibold flex items-center gap-2 border border-[rgba(229,72,77,0.3)]">
+          <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
@@ -91,10 +101,12 @@ export default function HesabimIletisimPage() {
             type="text"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="555-0100"
-            required
+            placeholder="örnek: 1308 veya 555-0100"
             className="form-input text-sm"
           />
+          <p className="text-[11px] text-[var(--text-dim)]">
+            GTA World IC telefon numaranız (4 haneli, 6 haneli veya standart IC numaralar kabul edilir).
+          </p>
         </div>
 
         {/* SanMail */}
@@ -104,11 +116,10 @@ export default function HesabimIletisimPage() {
             <span>SanMail E-posta Adresi</span>
           </label>
           <input
-            type="email"
+            type="text"
             value={sanmailEmail}
             onChange={(e) => setSanmailEmail(e.target.value)}
-            placeholder="isim.soyisim@sanmail.com"
-            required
+            placeholder="örnek: isim.soyisim@sanmail.com"
             className="form-input text-sm"
           />
           <p className="text-[11px] text-[var(--text-dim)]">

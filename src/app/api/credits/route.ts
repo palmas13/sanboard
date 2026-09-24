@@ -4,7 +4,10 @@ import { getPaymentRepository } from '@/lib/db/repositories';
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const profileId = searchParams.get('profileId');
+    let profileId = searchParams.get('profileId');
+    if (!profileId) {
+      profileId = req.cookies.get('sanboard_profile_id')?.value || null;
+    }
 
     if (!profileId) {
       return NextResponse.json(

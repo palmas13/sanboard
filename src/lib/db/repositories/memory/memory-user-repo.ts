@@ -44,4 +44,52 @@ export class MemoryUserRepository implements IUserRepository {
     Object.assign(profile, data, { updated_at: new Date().toISOString() });
     return { success: true, profile };
   }
+
+  async createProfile(data: {
+    userId: string;
+    fullName: string;
+    externalCharacterId?: string;
+    avatarData?: string;
+    sanmailEmail?: string;
+    phone?: string;
+  }): Promise<{ success: boolean; profile?: CharacterProfile; error?: string }> {
+    const trimmedName = data.fullName.trim();
+    const extId = data.externalCharacterId ? String(data.externalCharacterId) : undefined;
+
+    let profile = db.profiles.find(
+      (p) =>
+        p.user_id === data.userId &&
+        (p.id === extId || p.external_character_id === extId || p.full_name.toLowerCase() === trimmedName.toLowerCase())
+    );
+
+    const now = new Date().toISOString();
+    if (profile) {
+      if (data.sanmailEmail !== undefined) profile.sanmail_email = data.sanmailEmail;
+      if (data.phone !== undefined) profile.phone = data.phone;
+      if (data.avatarData) {
+        profile.avatar_url = data.avatarData;
+        profile.avatar_path = data.avatarData;
+      }
+      profile.updated_at = now;
+      return { success: true, profile };
+    }
+
+    const newId = extId || `char-${Date.now()}`;
+    profile = {
+      id: newId,
+      user_id: data.userId,
+      external_character_id: extId,
+      full_name: trimmedName,
+      avatar_path: data.avatarData || '',
+      avatar_url: data.avatarData || '',
+      sanmail_email: data.sanmailEmail || '',
+      phone: data.phone || '',
+      is_dealer: false,
+      created_at: now,
+      updated_at: now,
+    };
+
+    db.profiles.push(profile);
+    return { success: true, profile };
+  }
 }

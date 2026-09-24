@@ -63,6 +63,9 @@ export interface ListingImage {
   created_at: string;
 }
 
+export type FuelType = 'BENZIN' | 'DIZEL' | 'ELEKTRIK';
+export type SellerType = 'INDIVIDUAL' | 'CORPORATE';
+
 export interface VehicleDetails {
   listing_id: string;
   vehicle_category: VehicleCategory;
@@ -76,6 +79,15 @@ export interface VehicleDetails {
   turbo: boolean;
   subwoofer: boolean;
   trade_available: boolean;
+
+  // New LFM vehicle fields
+  lock_level?: number | null;
+  alarm_level?: number | null;
+  anti_theft_level?: number | null;
+  engine_health?: number | null;
+  suspension?: string | null;
+  fuel_type?: FuelType | null;
+  factory_price?: number | null;
 }
 
 export interface PropertyDetails {
@@ -93,6 +105,7 @@ export interface Listing {
   listing_number: string; // e.g. #SB-100028
   seller_profile_id: string;
   corporate_profile_id?: string;
+  seller_type?: SellerType;
   category: ListingCategory;
   subcategory: VehicleCategory | PropertyType;
   title: string; // max 60
@@ -121,6 +134,7 @@ export interface PublicListingSummary {
   id: string;
   listing_number: string;
   corporate_profile_id?: string;
+  seller_type?: SellerType;
   category: ListingCategory;
   subcategory: string;
   title: string;
@@ -194,6 +208,7 @@ export interface ListingPriceHistory {
 
 export type NotificationType =
   | 'LISTING_PRICE_DROP'
+  | 'LISTING_PRICE_CHANGE'
   | 'SUPPORT_REPLY'
   | 'SYSTEM'
   | 'LISTING_EXPIRES_SOON'
@@ -211,6 +226,8 @@ export interface Notification {
   metadata?: Record<string, any>;
   read_at?: string | null;
   created_at: string;
+  is_read?: boolean;
+  link?: string;
 }
 
 export type ReportReason =

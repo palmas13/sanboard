@@ -32,7 +32,7 @@ export default function HesabimBildirimlerPage() {
     if (!user) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/notifications?userId=${user.id}`);
+      const res = await fetch('/api/notifications');
       if (!res.ok) return;
       const data = await res.json();
       setNotifications(data.notifications || []);
@@ -119,6 +119,7 @@ export default function HesabimBildirimlerPage() {
   const getIcon = (type: string) => {
     switch (type) {
       case 'LISTING_PRICE_DROP':
+      case 'LISTING_PRICE_CHANGE':
         return <ArrowDownCircle className="w-5 h-5 text-[#FF8A1F]" />;
       case 'SUPPORT_REPLY':
         return <LifeBuoy className="w-5 h-5 text-emerald-400" />;

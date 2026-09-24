@@ -211,73 +211,136 @@ export default async function ListingDetailPage({ params }: PageProps) {
                     </span>
                   </div>
 
-                  {/* Vehicle Specific Rows (NO Location for Vehicles) */}
-                  {isVehicle && (listing as MemberListingDetail).vehicle_details && (
-                    <>
-                      {(listing as MemberListingDetail).vehicle_details?.brand && (
+                  {/* Vehicle Specific Rows Grouped Cleanly */}
+                  {isVehicle && (listing as MemberListingDetail).vehicle_details && (() => {
+                    const vd = (listing as MemberListingDetail).vehicle_details!;
+                    const fuelLabels: Record<string, string> = {
+                      BENZIN: 'Benzin',
+                      DIZEL: 'Dizel',
+                      ELEKTRIK: 'Elektrik',
+                    };
+                    return (
+                      <>
+                        {/* ARAÇ BİLGİLERİ */}
+                        {vd.brand && (
+                          <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
+                            <span className="text-[var(--text-muted)]">Marka</span>
+                            <span className="font-bold text-[var(--text-main)] text-right">{vd.brand}</span>
+                          </div>
+                        )}
                         <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                          <span className="text-[var(--text-muted)]">Marka</span>
-                          <span className="font-bold text-[var(--text-main)] text-right">
-                            {(listing as MemberListingDetail).vehicle_details?.brand}
-                          </span>
+                          <span className="text-[var(--text-muted)]">Model</span>
+                          <span className="font-bold text-[var(--text-main)] text-right">{vd.model}</span>
                         </div>
-                      )}
-                      <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                        <span className="text-[var(--text-muted)]">Model</span>
-                        <span className="font-bold text-[var(--text-main)] text-right">
-                          {(listing as MemberListingDetail).vehicle_details?.model}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                        <span className="text-[var(--text-muted)]">Plaka</span>
-                        <span className="font-mono font-bold text-[var(--text-main)] uppercase text-right">
-                          {(listing as MemberListingDetail).vehicle_details?.plate}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                        <span className="text-[var(--text-muted)]">Kilometre</span>
-                        <span className="font-semibold text-[var(--text-main)] text-right">
-                          {(listing as MemberListingDetail).vehicle_details?.mileage.toLocaleString('tr-TR')} km
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                        <span className="text-[var(--text-muted)]">Motor</span>
-                        <span className="font-bold text-[#FF8A1F] text-right">
-                          Seviye {(listing as MemberListingDetail).vehicle_details?.engine_upgrade}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                        <span className="text-[var(--text-muted)]">Şanzıman</span>
-                        <span className="font-bold text-[#FF8A1F] text-right">
-                          Seviye {(listing as MemberListingDetail).vehicle_details?.transmission_upgrade}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                        <span className="text-[var(--text-muted)]">Fren</span>
-                        <span className="font-bold text-[#FF8A1F] text-right">
-                          Seviye {(listing as MemberListingDetail).vehicle_details?.brake_upgrade}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                        <span className="text-[var(--text-muted)]">Turbo</span>
-                        <span className="font-semibold text-[var(--text-main)] text-right">
-                          {(listing as MemberListingDetail).vehicle_details?.turbo ? 'Var' : 'Yok'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                        <span className="text-[var(--text-muted)]">Subwoofer</span>
-                        <span className="font-semibold text-[var(--text-main)] text-right">
-                          {(listing as MemberListingDetail).vehicle_details?.subwoofer ? 'Var' : 'Yok'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
-                        <span className="text-[var(--text-muted)]">Takasa Açık</span>
-                        <span className="font-semibold text-[var(--text-main)] text-right">
-                          {(listing as MemberListingDetail).vehicle_details?.trade_available ? 'Evet' : 'Hayır'}
-                        </span>
-                      </div>
-                    </>
-                  )}
+                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
+                          <span className="text-[var(--text-muted)]">Kategori</span>
+                          <span className="font-semibold text-[var(--text-main)] text-right">{vd.vehicle_category}</span>
+                        </div>
+                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
+                          <span className="text-[var(--text-muted)]">Plaka</span>
+                          <span className="font-mono font-bold text-[var(--text-main)] uppercase text-right">{vd.plate}</span>
+                        </div>
+                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
+                          <span className="text-[var(--text-muted)]">Kilometre</span>
+                          <span className="font-semibold text-[var(--text-main)] text-right">{vd.mileage.toLocaleString('tr-TR')} km</span>
+                        </div>
+                        {vd.fuel_type && (
+                          <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
+                            <span className="text-[var(--text-muted)]">Yakıt Türü</span>
+                            <span className="font-semibold text-[var(--text-main)] text-right">{fuelLabels[vd.fuel_type] || vd.fuel_type}</span>
+                          </div>
+                        )}
+
+                        {/* SECTION HEADER: MEKANİK DURUM */}
+                        <div className="px-4 py-2 bg-[var(--bg-surface-secondary)]/70 text-[11px] font-bold text-[#FF8A1F] uppercase tracking-wider">
+                          Mekanik Durum
+                        </div>
+                        {vd.engine_health !== undefined && vd.engine_health !== null && (
+                          <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
+                            <span className="text-[var(--text-muted)]">Motor Sağlığı</span>
+                            <span className="font-bold text-emerald-400 text-right">%{vd.engine_health}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
+                          <span className="text-[var(--text-muted)]">Motor Upgrade</span>
+                          <span className="font-bold text-[#FF8A1F] text-right">Seviye {vd.engine_upgrade}</span>
+                        </div>
+                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
+                          <span className="text-[var(--text-muted)]">Şanzıman Upgrade</span>
+                          <span className="font-bold text-[#FF8A1F] text-right">Seviye {vd.transmission_upgrade}</span>
+                        </div>
+                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
+                          <span className="text-[var(--text-muted)]">Fren Upgrade</span>
+                          <span className="font-bold text-[#FF8A1F] text-right">Seviye {vd.brake_upgrade}</span>
+                        </div>
+                        {vd.suspension && (
+                          <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
+                            <span className="text-[var(--text-muted)]">Süspansiyon</span>
+                            <span className="font-semibold text-[var(--text-main)] text-right">{vd.suspension}</span>
+                          </div>
+                        )}
+
+                        {/* SECTION HEADER: GÜVENLİK */}
+                        {(vd.lock_level !== undefined || vd.alarm_level !== undefined || vd.anti_theft_level !== undefined) && (
+                          <>
+                            <div className="px-4 py-2 bg-[var(--bg-surface-secondary)]/70 text-[11px] font-bold text-[#FF8A1F] uppercase tracking-wider">
+                              Güvenlik
+                            </div>
+                            {vd.lock_level !== undefined && vd.lock_level !== null && (
+                              <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
+                                <span className="text-[var(--text-muted)]">Kilit Seviyesi</span>
+                                <span className="font-semibold text-[var(--text-main)] text-right">Seviye {vd.lock_level}</span>
+                              </div>
+                            )}
+                            {vd.alarm_level !== undefined && vd.alarm_level !== null && (
+                              <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
+                                <span className="text-[var(--text-muted)]">Alarm Seviyesi</span>
+                                <span className="font-semibold text-[var(--text-main)] text-right">Seviye {vd.alarm_level}</span>
+                              </div>
+                            )}
+                            {vd.anti_theft_level !== undefined && vd.anti_theft_level !== null && (
+                              <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
+                                <span className="text-[var(--text-muted)]">Hırsızlık Önleme</span>
+                                <span className="font-semibold text-[var(--text-main)] text-right">Seviye {vd.anti_theft_level}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {/* SECTION HEADER: EK DONANIM */}
+                        <div className="px-4 py-2 bg-[var(--bg-surface-secondary)]/70 text-[11px] font-bold text-[#FF8A1F] uppercase tracking-wider">
+                          Ek Donanım
+                        </div>
+                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
+                          <span className="text-[var(--text-muted)]">Turbo</span>
+                          <span className="font-semibold text-[var(--text-main)] text-right">{vd.turbo ? 'Var' : 'Yok'}</span>
+                        </div>
+                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
+                          <span className="text-[var(--text-muted)]">Subwoofer</span>
+                          <span className="font-semibold text-[var(--text-main)] text-right">{vd.subwoofer ? 'Var' : 'Yok'}</span>
+                        </div>
+
+                        {/* SECTION HEADER: FİYATLANDIRMA */}
+                        <div className="px-4 py-2 bg-[var(--bg-surface-secondary)]/70 text-[11px] font-bold text-[#FF8A1F] uppercase tracking-wider">
+                          Fiyatlandırma & Satış
+                        </div>
+                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
+                          <span className="text-[var(--text-muted)]">Satış Fiyatı</span>
+                          <span className="font-black text-base text-[#FF8A1F] text-right">{formatCurrency(listing.price)}</span>
+                        </div>
+                        {vd.factory_price !== undefined && vd.factory_price !== null && vd.factory_price > 0 && (
+                          <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
+                            <span className="text-[var(--text-muted)]">Fabrika Çıkış Fiyatı</span>
+                            <span className="font-semibold text-[var(--text-main)] text-right">{formatCurrency(vd.factory_price)}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between px-4 py-2.5 min-h-[42px]">
+                          <span className="text-[var(--text-muted)]">Takasa Açık</span>
+                          <span className="font-semibold text-[var(--text-main)] text-right">{vd.trade_available ? 'Evet' : 'Hayır'}</span>
+                        </div>
+                      </>
+                    );
+                  })()}
 
                   {/* Property Specific Rows (Location IS shown for properties) */}
                   {!isVehicle && (listing as MemberListingDetail).property_details && (

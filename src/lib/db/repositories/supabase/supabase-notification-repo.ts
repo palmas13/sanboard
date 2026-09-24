@@ -35,7 +35,17 @@ export class SupabaseNotificationRepository implements INotificationRepository {
       throw new Error(`Supabase error fetching notifications: ${error.message}`);
     }
 
-    return (data || []) as Notification[];
+    const mapped = (data || []).map((n: any) => ({
+      ...n,
+      is_read: Boolean(n.read_at),
+      link: n.entity_type === 'ticket' && n.entity_id
+        ? `/hesabim/destek/${n.entity_id}`
+        : n.entity_type === 'listing' && n.entity_id
+        ? `/ilan/${n.entity_id}`
+        : undefined,
+    }));
+
+    return mapped as Notification[];
   }
 
   async getUnreadCount(userId: string): Promise<number> {
@@ -58,12 +68,13 @@ export class SupabaseNotificationRepository implements INotificationRepository {
 
   async markAsRead(userId: string, notificationId: string): Promise<{ success: boolean; notification?: Notification; error?: string }> {
     const client = this.getAdminClient();
+    const safeUserId = resolveUserId(userId);
 
     const { data, error } = await client
       .from('notifications')
       .update({ read_at: new Date().toISOString() })
       .eq('id', notificationId)
-      .eq('user_id', userId)
+      .eq('user_id', safeUserId)
       .select()
       .single();
 
@@ -71,16 +82,27 @@ export class SupabaseNotificationRepository implements INotificationRepository {
       return { success: false, error: error.message };
     }
 
-    return { success: true, notification: data as Notification };
+    const notif = data ? {
+      ...data,
+      is_read: Boolean(data.read_at),
+      link: data.entity_type === 'ticket' && data.entity_id
+        ? `/hesabim/destek/${data.entity_id}`
+        : data.entity_type === 'listing' && data.entity_id
+        ? `/ilan/${data.entity_id}`
+        : undefined,
+    } : undefined;
+
+    return { success: true, notification: notif as Notification };
   }
 
   async markAllAsRead(userId: string): Promise<{ success: boolean; count: number }> {
     const client = this.getAdminClient();
+    const safeUserId = resolveUserId(userId);
 
     const { data, error } = await client
       .from('notifications')
       .update({ read_at: new Date().toISOString() })
-      .eq('user_id', userId)
+      .eq('user_id', safeUserId)
       .is('read_at', null)
       .select('id');
 

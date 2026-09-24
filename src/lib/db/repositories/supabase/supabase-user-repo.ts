@@ -175,4 +175,106 @@ export class SupabaseUserRepository implements IUserRepository {
 
     return { success: true, profile: updatedProfile };
   }
+
+  async createProfile(data: {
+    userId: string;
+    fullName: string;
+    externalCharacterId?: string;
+    avatarData?: string;
+    sanmailEmail?: string;
+    phone?: string;
+  }): Promise<{ success: boolean; profile?: CharacterProfile; error?: string }> {
+    const client = this.getAdminClient();
+    const safeUserId = resolveUserId(data.userId);
+    if (!isUuid(safeUserId)) {
+      return { success: false, error: 'Geçersiz kullanıcı ID.' };
+    }
+
+    if (!data.fullName || !data.fullName.trim()) {
+      return { success: false, error: 'Karakter adı zorunludur.' };
+    }
+
+    const trimmedName = data.fullName.trim();
+    const extId = data.externalCharacterId ? String(data.externalCharacterId) : null;
+
+    // 1. Idempotency check: Does profile already exist for this user & character?
+    const { data: existingProfiles } = await client
+      .from('character_profiles')
+      .select('*')
+      .eq('user_id', safeUserId);
+
+    const matched = (existingProfiles || []).find((p: any) => {
+      if (extId && p.external_character_id === extId) return true;
+      if (p.full_name?.toLowerCase() === trimmedName.toLowerCase()) return true;
+      return false;
+    });
+
+    if (matched) {
+      // Update with newly provided fields if present
+      const updates: Partial<CharacterProfile> = {};
+      if (data.sanmailEmail !== undefined) updates.sanmail_email = data.sanmailEmail;
+      if (data.phone !== undefined) updates.phone = data.phone;
+      if (data.avatarData) updates.avatar_url = data.avatarData;
+
+      if (Object.keys(updates).length > 0) {
+        return this.updateProfile(matched.id, updates);
+      }
+
+      if (!matched.avatar_path && matched.avatar_url) matched.avatar_path = matched.avatar_url;
+      return { success: true, profile: matched as CharacterProfile };
+    }
+
+    // 2. Insert new character profile
+    const insertPayload: Record<string, any> = {
+      user_id: safeUserId,
+      external_character_id: extId,
+      full_name: trimmedName,
+      avatar_path: null,
+      avatar_url: null,
+      sanmail_email: data.sanmailEmail?.trim() || null,
+      phone: data.phone?.trim() || null,
+      is_dealer: false,
+    };
+
+    let { data: created, error: insertErr } = await client
+      .from('character_profiles')
+      .insert(insertPayload)
+      .select()
+      .single();
+
+    // Defensive fallback: if remote live DB still has NOT NULL constraint pending migration execution
+    if (insertErr && (insertErr.code === '23502' || insertErr.message?.includes('not-null'))) {
+      insertPayload.sanmail_email = data.sanmailEmail?.trim() || '';
+      insertPayload.phone = data.phone?.trim() || '';
+      const retry = await client
+        .from('character_profiles')
+        .insert(insertPayload)
+        .select()
+        .single();
+      created = retry.data;
+      insertErr = retry.error;
+    }
+
+    if (insertErr || !created) {
+      return { success: false, error: insertErr?.message || 'Profil oluşturulamadı.' };
+    }
+
+    let profile = created as CharacterProfile;
+
+    // 3. If avatarData was provided, upload to R2 and update avatar_path
+    if (data.avatarData && data.avatarData.startsWith('data:image/')) {
+      const updateRes = await this.updateProfile(profile.id, {
+        avatar_url: data.avatarData,
+      });
+      if (updateRes.success && updateRes.profile) {
+        profile = updateRes.profile;
+      }
+    }
+
+    if (!profile.avatar_path && profile.avatar_url) {
+      profile.avatar_path = profile.avatar_url;
+    }
+
+    return { success: true, profile };
+  }
 }

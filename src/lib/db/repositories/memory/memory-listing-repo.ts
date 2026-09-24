@@ -36,6 +36,11 @@ export class MemoryListingRepository implements IListingRepository {
     return getUserListings(profileId);
   }
 
+  async getCorporateListings(corporateProfileId: string) {
+    const { getCorporateListings: fetchCorporate } = await import('../../listings');
+    return fetchCorporate(corporateProfileId);
+  }
+
   async toggleFavorite(listingId: string, userId: string) {
     return toggleFavorite(userId, listingId, userId);
   }

@@ -250,9 +250,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           full_name: char.fullName,
           avatar_path: '',
           avatar_url: '',
-          sanmail_email:
-            char.sanmailEmail || `${char.fullName.toLowerCase().replace(' ', '.')}@sanmail.com`,
-          phone: char.phone || '555-0100',
+          sanmail_email: char.sanmailEmail || '',
+          phone: char.phone || '',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };

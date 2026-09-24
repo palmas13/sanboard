@@ -14,7 +14,16 @@ export async function getUserNotifications(userId: string): Promise<Notification
   ensureNotifications();
   return db.notifications
     .filter((n) => n.user_id === userId)
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .map((n) => ({
+      ...n,
+      is_read: Boolean(n.read_at),
+      link: n.entity_type === 'ticket' && n.entity_id
+        ? `/hesabim/destek/${n.entity_id}`
+        : n.entity_type === 'listing' && n.entity_id
+        ? `/ilan/${n.entity_id}`
+        : undefined,
+    }));
 }
 
 /**
@@ -47,7 +56,18 @@ export async function markNotificationAsRead(
     notif.read_at = new Date().toISOString();
   }
 
-  return { success: true, notification: notif };
+  return {
+    success: true,
+    notification: {
+      ...notif,
+      is_read: true,
+      link: notif.entity_type === 'ticket' && notif.entity_id
+        ? `/hesabim/destek/${notif.entity_id}`
+        : notif.entity_type === 'listing' && notif.entity_id
+        ? `/ilan/${notif.entity_id}`
+        : undefined,
+    },
+  };
 }
 
 /**

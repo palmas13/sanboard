@@ -64,9 +64,8 @@ export default async function PremiumStoreVitrinPage({ params }: PageProps) {
     notFound();
   }
 
-  const ownerProfileId = dealer.owner_profile_id || dealer.profile_id;
   const listingRepo = getListingRepository();
-  const allListings = await listingRepo.getUserListings(ownerProfileId);
+  const allListings = await listingRepo.getCorporateListings(dealer.id);
   const vehicles = allListings.filter((l) => l.category === 'vehicle' && l.status === 'ACTIVE');
   const properties = allListings.filter((l) => l.category === 'property' && l.status === 'ACTIVE');
 

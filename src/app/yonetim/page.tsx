@@ -473,14 +473,15 @@ export default function AdminPage() {
         <div className="surface-card rounded-2xl border border-[var(--border-app)] p-6 space-y-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <h3 className="font-bold text-base text-[var(--text-main)]">Tüm İlanlar</h3>
-            <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+            <div className="relative w-full sm:w-64 flex items-center">
+              <Search className="w-4 h-4 absolute left-3 text-[var(--text-dim)] pointer-events-none" />
               <input
                 type="text"
                 placeholder="İlan ara..."
                 value={searchListingQuery}
                 onChange={(e) => setSearchListingQuery(e.target.value)}
-                className="form-input pl-9 text-xs py-1.5"
+                className="form-input text-xs py-1.5 w-full"
+                style={{ paddingLeft: '2.5rem' }}
               />
             </div>
           </div>

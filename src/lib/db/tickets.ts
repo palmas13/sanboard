@@ -147,7 +147,7 @@ export async function addTicketMessage(params: {
         user_id: creatorProfile.user_id,
         type: 'SUPPORT_REPLY',
         title: 'Destek Talebiniz Yanıtlandı',
-        message: `#${ticket.id} numaralı destek talebinize yönetici tarafından yanıt geldi.`,
+        message: 'Destek talebinize yetkili tarafından yanıt verildi.',
         entity_type: 'ticket',
         entity_id: ticket.id,
         metadata: { ticketId: ticket.id, subject: ticket.subject },

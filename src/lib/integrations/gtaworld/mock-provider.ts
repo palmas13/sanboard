@@ -29,8 +29,8 @@ export const MOCK_CHARACTERS: GtaWorldCharacter[] = [
     fullName: 'Ravi Blumon',
     hasProfile: false,
     avatarUrl: '',
-    sanmailEmail: 'ravi.blumon@sanmail.com',
-    phone: '555-4309',
+    sanmailEmail: '',
+    phone: '',
   },
 ];
 
@@ -96,6 +96,12 @@ export class MockGtaWorldAuthProvider implements GtaWorldAuthProvider {
             memberid: 1,
             firstname: 'Zade',
             lastname: 'Vexnera',
+          },
+          {
+            id: 7891234,
+            memberid: 1,
+            firstname: 'Ravi',
+            lastname: 'Blumon',
           },
         ],
       },

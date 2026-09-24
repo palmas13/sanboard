@@ -5,12 +5,22 @@ import { getServerSession } from '@/lib/auth/session';
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(req);
-    const userId = session?.userId || req.nextUrl.searchParams.get('userId');
+    const isMock = process.env.USE_MOCK_GTAWORLD_AUTH !== 'false';
+    const userId = session?.userId || (isMock ? '22222222-2222-2222-2222-222222222222' : null);
 
     if (!userId) {
       return NextResponse.json(
         { error: 'Yetkisiz erişim. Lütfen giriş yapın.' },
         { status: 401 }
+      );
+    }
+
+    // Security: If query param userId is passed, verify it matches authenticated session user
+    const queryUserId = req.nextUrl.searchParams.get('userId');
+    if (queryUserId && queryUserId !== userId && session?.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Başka bir kullanıcının bildirimlerine erişim yetkiniz yok.' },
+        { status: 403 }
       );
     }
 
@@ -34,11 +44,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const action = body.action;
     const session = await getServerSession(req);
-    const userId = session?.userId || body.userId;
-    const notificationId = body.notificationId;
+    const isMock = process.env.USE_MOCK_GTAWORLD_AUTH !== 'false';
+    const userId = session?.userId || (isMock ? '22222222-2222-2222-2222-222222222222' : null);
 
     if (!userId) {
       return NextResponse.json(
@@ -46,6 +54,10 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       );
     }
+
+    const body = await req.json().catch(() => ({}));
+    const action = body.action;
+    const notificationId = body.notificationId;
 
     const repo = getNotificationRepository();
 

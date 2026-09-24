@@ -18,6 +18,7 @@ import {
   LifeBuoy,
   Crown,
   Shield,
+  ArrowRight,
 } from 'lucide-react';
 
 export default function HesabimLayout({ children }: { children: React.ReactNode }) {
@@ -40,6 +41,9 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
     );
   }
 
+  const avatarSrc = currentProfile.avatar_path || currentProfile.avatar_url;
+  const resolvedAvatar = avatarSrc ? resolveAvatarUrl(avatarSrc) : '';
+
   const menuItems = [
     { href: '/hesabim', label: 'Genel Bakış', icon: LayoutDashboard },
     { href: '/hesabim/profil', label: 'Profilim', icon: User },
@@ -60,37 +64,64 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      {/* Top Banner */}
-      <div className="surface-card p-6 rounded-2xl border border-[var(--border-app)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <img
-            src={resolveAvatarUrl(currentProfile.avatar_path || currentProfile.avatar_url)}
-            alt={currentProfile.full_name}
-            className="w-14 h-14 rounded-full object-cover border-2 border-[#FF8A1F] shadow-sm shrink-0"
-          />
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-xs text-[var(--text-muted)]">Karakter Paneli</p>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      {/* Top Character Identity Header Spanning Full Width */}
+      <div className="surface-card p-6 sm:p-7 rounded-2xl border border-[var(--border-app)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 shadow-sm">
+        <div className="flex items-center gap-5">
+          {resolvedAvatar ? (
+            <img
+              src={resolvedAvatar}
+              alt={currentProfile.full_name}
+              className="w-16 h-16 rounded-full object-cover border-2 border-[#FF8A1F] shadow-sm shrink-0"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border-2 border-[#FF8A1F] flex items-center justify-center font-black text-2xl shadow-sm shrink-0">
+              {currentProfile.full_name?.charAt(0) || 'U'}
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-[var(--text-muted)]">Karakter Paneli</span>
               {currentProfile.is_dealer && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border border-[rgba(255,138,31,0.25)]">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border border-[rgba(255,138,31,0.25)]">
                   <Crown className="w-3 h-3" />
                   Kurumsal Mağaza
                 </span>
               )}
+              {isAdmin && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  <Shield className="w-3 h-3" />
+                  Yönetici
+                </span>
+              )}
             </div>
-            <h1 className="text-xl font-bold text-[var(--text-main)]">
+
+            <h1 className="text-2xl font-black text-[var(--text-main)] tracking-tight">
               {currentProfile.full_name}
             </h1>
-            <p className="text-xs text-[#FF8A1F] mt-0.5">{currentProfile.sanmail_email}</p>
+
+            {/* SanMail only if configured, otherwise subtle CTA */}
+            {currentProfile.sanmail_email ? (
+              <p className="text-xs font-medium text-[#FF8A1F]">{currentProfile.sanmail_email}</p>
+            ) : (
+              <Link
+                href="/hesabim/iletisim"
+                className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[#FF8A1F] transition-colors"
+              >
+                <span>İletişim bilgilerini tamamla</span>
+                <ArrowRight className="w-3 h-3" />
+              </Link>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           {currentProfile.is_dealer && currentProfile.dealer_id && (
             <Link
               href={`/magaza/${currentProfile.dealer_id}`}
-              className="btn-secondary text-xs py-2.5 px-3.5 shadow-sm"
+              className="btn-secondary text-xs py-2.5 px-4 shadow-sm"
               target="_blank"
             >
               <span>Mağazamı Aç</span>
@@ -98,7 +129,7 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
           )}
           <Link
             href="/ilan-ver"
-            className="btn-primary text-xs py-2.5 px-4 shadow-sm"
+            className="btn-primary text-xs py-2.5 px-4 shadow-sm flex items-center gap-2"
           >
             <PlusCircle className="w-4 h-4" />
             <span>Yeni İlan Ver</span>
@@ -106,10 +137,10 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
         </div>
       </div>
 
-      {/* Main Grid: Sidebar + Subpage Content */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-8 items-start">
-        {/* Sidebar Nav */}
-        <aside className="surface-card p-3 rounded-2xl border border-[var(--border-app)] space-y-1 md:sticky md:top-20">
+      {/* Main Grid: Shared Alignments (Sidebar + Content) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Sticky Sidebar Navigation */}
+        <aside className="lg:col-span-3 surface-card p-3 rounded-2xl border border-[var(--border-app)] space-y-1 lg:sticky lg:top-24 shadow-sm">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -117,7 +148,7 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
+                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                   isActive
                     ? 'text-[#FF8A1F] bg-[var(--brand-orange-subtle)] font-bold'
                     : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-surface-secondary)]'
@@ -128,7 +159,7 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
                   <span>{item.label}</span>
                 </div>
                 {item.badge && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-[#FF8A1F] text-black">
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#FF8A1F] text-black">
                     {item.badge}
                   </span>
                 )}
@@ -138,9 +169,8 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
 
           <div className="pt-2 border-t border-[var(--border-app)] mt-2">
             <button
-              type="button"
-              onClick={logout}
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-[var(--color-danger)] hover:bg-[var(--color-danger-subtle)] transition-colors cursor-pointer text-left"
+              onClick={() => logout()}
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-[var(--color-danger)] hover:bg-[var(--color-danger-subtle)] transition-colors text-left"
             >
               <LogOut className="w-4 h-4 shrink-0" />
               <span>Çıkış Yap</span>
@@ -148,8 +178,10 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
           </div>
         </aside>
 
-        {/* Dynamic Subpage Section */}
-        <main className="md:col-span-3">{children}</main>
+        {/* Main Content Area */}
+        <main className="lg:col-span-9 min-w-0">
+          {children}
+        </main>
       </div>
     </div>
   );

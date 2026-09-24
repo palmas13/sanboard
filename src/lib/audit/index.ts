@@ -9,7 +9,8 @@ export type AuditEventType =
   | 'AUTH_LOGOUT'
   | 'PAYMENT_SUCCESS'
   | 'CREDIT_PURCHASED'
-  | 'LISTING_PUBLISHED';
+  | 'LISTING_PUBLISHED'
+  | 'PROFILE_CREATED';
 
 export interface AuditEventPayload {
   eventType: AuditEventType;

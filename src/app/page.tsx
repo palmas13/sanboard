@@ -10,6 +10,7 @@ import {
 import { getListingRepository } from '@/lib/db/repositories';
 import { ListingCard } from '@/components/listings/ListingCard';
 import { PopularShowcase } from '@/components/home/PopularShowcase';
+import { HeroTypewriter } from '@/components/home/HeroTypewriter';
 
 export const revalidate = 30; // 30-second controlled server cache with targeted on-mutation invalidation
 
@@ -28,19 +29,20 @@ export default async function HomePage() {
   return (
     <div className="space-y-12 pb-20">
       {/* 1. HERO SECTION */}
-      <section className="relative pt-12 pb-14 px-4 sm:px-6 lg:px-8 border-b border-[var(--border-app)] bg-gradient-to-b from-[var(--bg-surface)] to-[var(--bg-app)]">
-        <div className="max-w-5xl mx-auto text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--brand-orange-subtle)] border border-[rgba(255,138,31,0.25)] text-[#FF8A1F] text-xs font-semibold">
+      <section className="relative pt-14 pb-16 px-4 sm:px-6 lg:px-8 border-b border-[var(--border-app)] bg-gradient-to-b from-[var(--bg-surface)] via-[var(--bg-surface)]/80 to-[var(--bg-app)] overflow-hidden">
+        {/* Subtle background glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-64 bg-radial from-[#FF8A1F]/10 via-transparent to-transparent pointer-events-none blur-3xl" />
+
+        <div className="relative max-w-5xl mx-auto text-center space-y-5">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[var(--brand-orange-subtle)] border border-[rgba(255,138,31,0.25)] text-[#FF8A1F] text-xs font-semibold shadow-sm">
             <Sparkles className="w-3.5 h-3.5" />
             <span>GTA World Roleplay İlan Platformu</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-[var(--text-main)]">
-            San Andreas'ta <span className="text-[#FF8A1F]">aradığını</span> bul.
-          </h1>
+          <HeroTypewriter />
 
-          <p className="text-base sm:text-lg text-[var(--text-muted)] max-w-2xl mx-auto">
-            Araç ve mülk ilanlarını incele veya kendi ilanını oluştur. Alıcı ve satıcıları buluşturan en güvenilir Los Santos vitrini.
+          <p className="text-sm sm:text-base text-[var(--text-muted)] max-w-2xl mx-auto leading-relaxed">
+            Araç ve mülk ilanlarını incele, kendi ilanını oluştur ve Los Santos&apos;ta alıcılarla satıcıları güvenli şekilde buluştur.
           </p>
         </div>
       </section>

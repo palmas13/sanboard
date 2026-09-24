@@ -32,7 +32,7 @@ export interface CreateListingInput {
   model?: string;
   year?: number;
   mileage?: number;
-  fuel_type?: string;
+  fuel_type?: string | null;
   transmission?: string;
   color?: string;
   engine_state?: string;
@@ -44,6 +44,14 @@ export interface CreateListingInput {
   engine_upgrade?: number;
   transmission_upgrade?: number;
   brake_upgrade?: number;
+  lock_level?: number | null;
+  alarm_level?: number | null;
+  anti_theft_level?: number | null;
+  engine_health?: number | null;
+  suspension?: string | null;
+  factory_price?: number | null;
+  seller_type?: 'INDIVIDUAL' | 'CORPORATE' | null;
+  corporate_profile_id?: string | null;
   // Property details
   property_type?: string;
   floor?: number;
@@ -60,6 +68,7 @@ export interface IListingRepository {
   updateListing(id: string, input: Partial<CreateListingInput>, profileId: string, userId?: string, role?: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   markListingAsSold(id: string, profileId: string): Promise<{ success: boolean; error?: string }>;
   getUserListings(profileId: string): Promise<Listing[]>;
+  getCorporateListings(corporateProfileId: string): Promise<Listing[]>;
   toggleFavorite(listingId: string, userId: string): Promise<{ isFavorited: boolean; count: number }>;
   removeFavorite(listingId: string, userId: string): Promise<{ success: boolean; count: number }>;
   getUserFavorites(userId: string): Promise<(Listing & { isExpired: boolean })[]>;
@@ -85,6 +94,14 @@ export interface IUserRepository {
   getUserById(id: string): Promise<User | null>;
   getProfileById(id: string): Promise<CharacterProfile | null>;
   getProfilesByUserId(userId: string): Promise<CharacterProfile[]>;
+  createProfile(data: {
+    userId: string;
+    fullName: string;
+    externalCharacterId?: string;
+    avatarData?: string;
+    sanmailEmail?: string;
+    phone?: string;
+  }): Promise<{ success: boolean; profile?: CharacterProfile; error?: string }>;
   updateProfile(id: string, data: Partial<CharacterProfile>): Promise<{ success: boolean; profile?: CharacterProfile; error?: string }>;
 }
 

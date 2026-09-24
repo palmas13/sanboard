@@ -37,11 +37,11 @@ export function SellerCard({ seller, dealer }: SellerCardProps) {
     : resolveAvatarUrl(seller?.avatar_path || seller?.avatar_url);
 
   const displayPhone = isCorporate
-    ? dealer?.phone || seller?.phone || ''
+    ? dealer?.phone || ''
     : seller?.phone || '';
 
   const displayMail = isCorporate
-    ? dealer?.sanmail_email || dealer?.email || seller?.sanmail_email || ''
+    ? dealer?.sanmail_email || dealer?.email || ''
     : seller?.sanmail_email || '';
 
   const publicStoreUrl = isCorporate

@@ -6,18 +6,18 @@ import { useAuth } from '@/features/auth/AuthContext';
 import {
   Car,
   Home,
-  CheckCircle2,
   ArrowRight,
   ArrowLeft,
-  Upload,
   Eye,
   Send,
   AlertCircle,
   Loader2,
   MapPin,
   Calendar,
+  Crown,
 } from 'lucide-react';
 import { PhotoUploader, UploadedImage } from '@/components/forms/PhotoUploader';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 import { formatCurrency } from '@/lib/utils/format';
 import { getVehicleBrands, getModelsByBrand } from '@/lib/constants/vehicleCatalog';
 
@@ -28,6 +28,7 @@ export default function YeniIlanOlusturPage() {
   const router = useRouter();
   const { currentProfile, isAuthenticated, isLoading } = useAuth();
 
+  const [isCorporate, setIsCorporate] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -63,6 +64,13 @@ export default function YeniIlanOlusturPage() {
   const [turbo, setTurbo] = useState(false);
   const [subwoofer, setSubwoofer] = useState(false);
   const [tradeAvailable, setTradeAvailable] = useState(false);
+  const [lockLevel, setLockLevel] = useState('');
+  const [alarmLevel, setAlarmLevel] = useState('');
+  const [antiTheftLevel, setAntiTheftLevel] = useState('');
+  const [engineHealth, setEngineHealth] = useState('');
+  const [suspension, setSuspension] = useState('');
+  const [fuelType, setFuelType] = useState<string>('BENZIN');
+  const [factoryPrice, setFactoryPrice] = useState('');
 
   // Property Details
   const [floor, setFloor] = useState('1');
@@ -75,6 +83,15 @@ export default function YeniIlanOlusturPage() {
   const [images, setImages] = useState<UploadedImage[]>([]);
 
   // Auth guard & Credit check
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('corporate') === 'true') {
+        setIsCorporate(true);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (isLoading) return;
     if (!isAuthenticated || !currentProfile) {
@@ -146,6 +163,26 @@ export default function YeniIlanOlusturPage() {
         errors.push('Kilometre negatif olamaz.');
         invalid.mileage = true;
       }
+      if (engineHealth !== '' && (Number(engineHealth) < 0 || Number(engineHealth) > 100)) {
+        errors.push('Motor sağlığı %0 ile %100 arasında olmalıdır.');
+        invalid.engineHealth = true;
+      }
+      if (lockLevel !== '' && Number(lockLevel) < 0) {
+        errors.push('Kilit seviyesi 0 veya daha büyük olmalıdır.');
+        invalid.lockLevel = true;
+      }
+      if (alarmLevel !== '' && Number(alarmLevel) < 0) {
+        errors.push('Alarm seviyesi 0 veya daha büyük olmalıdır.');
+        invalid.alarmLevel = true;
+      }
+      if (antiTheftLevel !== '' && Number(antiTheftLevel) < 0) {
+        errors.push('Hırsızlık önleme seviyesi 0 veya daha büyük olmalıdır.');
+        invalid.antiTheftLevel = true;
+      }
+      if (factoryPrice !== '' && Number(factoryPrice) < 0) {
+        errors.push('Fabrika çıkış fiyatı 0 veya daha büyük olmalıdır.');
+        invalid.factoryPrice = true;
+      }
     }
 
     if (errors.length > 0) {
@@ -198,6 +235,8 @@ export default function YeniIlanOlusturPage() {
       description: description.trim(),
       price: Number(price),
       images,
+      corporate: isCorporate && Boolean(currentProfile.is_dealer),
+      seller_type: isCorporate && Boolean(currentProfile.is_dealer) ? 'CORPORATE' : 'INDIVIDUAL',
     };
 
     if (category === 'vehicle') {
@@ -211,6 +250,13 @@ export default function YeniIlanOlusturPage() {
       payload.turbo = turbo;
       payload.subwoofer = subwoofer;
       payload.trade_available = tradeAvailable;
+      payload.lock_level = lockLevel !== '' ? Number(lockLevel) : null;
+      payload.alarm_level = alarmLevel !== '' ? Number(alarmLevel) : null;
+      payload.anti_theft_level = antiTheftLevel !== '' ? Number(antiTheftLevel) : null;
+      payload.engine_health = engineHealth !== '' ? Number(engineHealth) : null;
+      payload.suspension = suspension.trim() || null;
+      payload.fuel_type = fuelType || null;
+      payload.factory_price = factoryPrice !== '' ? Number(factoryPrice) : null;
     } else {
       payload.location = location.trim();
       payload.floor = Number(floor);
@@ -243,11 +289,19 @@ export default function YeniIlanOlusturPage() {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* Stepper Header */}
       <div className="text-center space-y-2">
+        {isCorporate && currentProfile?.is_dealer && (
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#FF8A1F]/10 border border-[#FF8A1F]/30 text-[#FF8A1F] text-xs font-bold mb-1">
+            <Crown className="w-3.5 h-3.5 fill-[#FF8A1F]" />
+            <span>Kurumsal Mağaza İlanı Modu</span>
+          </div>
+        )}
         <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)]">
-          Yeni İlan Oluştur
+          {isCorporate && currentProfile?.is_dealer ? 'Yeni Mağaza İlanı Oluştur' : 'Yeni İlan Oluştur'}
         </h1>
         <p className="text-xs sm:text-sm text-[var(--text-muted)]">
-          7 Günlük Standart İlan hakkını kullanarak ilanını San Andreas'a duyur.
+          {isCorporate && currentProfile?.is_dealer
+            ? 'Kurumsal vitrininize özel ilanınızı oluşturun ve Los Santos pazarında öne çıkın.'
+            : '7 Günlük Standart İlan hakkını kullanarak ilanını San Andreas\'a duyur.'}
         </p>
 
         {/* Stepper pills */}
@@ -482,161 +536,257 @@ export default function YeniIlanOlusturPage() {
 
             {/* VEHICLE TECHNICAL FIELDS */}
             {category === 'vehicle' && (
-              <div className="pt-4 border-t border-[var(--border-app)] space-y-4">
-                <h3 className="text-xs font-bold text-[#FF8A1F] uppercase tracking-wider">
-                  Araç Teknik Özellikleri
-                </h3>
+              <div className="pt-4 border-t border-[var(--border-app)] space-y-5">
+                {/* 1. TEMEL BİLGİLER */}
+                <div className="space-y-3">
+                  <h3 className="text-xs font-bold text-[#FF8A1F] uppercase tracking-wider">
+                    Temel Araç Bilgileri
+                  </h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Marka Selection */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-[var(--text-muted)] flex items-center justify-between">
-                      <span>Marka</span>
-                      <span className="text-[10px] text-[#FF8A1F] font-bold">Zorunlu</span>
-                    </label>
-                    <select
-                      value={brand}
-                      onChange={(e) => handleBrandChange(e.target.value)}
-                      className={`form-input text-sm cursor-pointer ${invalidFields.brand ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
-                    >
-                      <option value="">Marka seçin</option>
-                      {vehicleBrands.map((b) => (
-                        <option key={b} value={b}>
-                          {b}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Marka Selection */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-[var(--text-muted)] flex items-center justify-between">
+                        <span>Marka</span>
+                        <span className="text-[10px] text-[#FF8A1F] font-bold">Zorunlu</span>
+                      </label>
+                      <CustomSelect
+                        value={brand}
+                        onChange={handleBrandChange}
+                        placeholder="Marka seçin"
+                        options={vehicleBrands.map((b) => ({ value: b, label: b }))}
+                      />
+                    </div>
+
+                    {/* Model Selection (Dependent on Marka) */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-[var(--text-muted)] flex items-center justify-between">
+                        <span>Model</span>
+                        <span className="text-[10px] text-[#FF8A1F] font-bold">Zorunlu</span>
+                      </label>
+                      <CustomSelect
+                        value={model}
+                        onChange={(v) => setModel(v)}
+                        disabled={!brand}
+                        placeholder={!brand ? 'Önce marka seçin' : 'Model seçin'}
+                        options={availableModels.map((m) => ({ value: m, label: m }))}
+                      />
+                    </div>
                   </div>
 
-                  {/* Model Selection (Dependent on Marka) */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-[var(--text-muted)] flex items-center justify-between">
-                      <span>Model</span>
-                      <span className="text-[10px] text-[#FF8A1F] font-bold">Zorunlu</span>
-                    </label>
-                    <select
-                      value={model}
-                      onChange={(e) => setModel(e.target.value)}
-                      disabled={!brand}
-                      className={`form-input text-sm cursor-pointer transition-opacity ${
-                        !brand ? 'opacity-50 cursor-not-allowed bg-[var(--bg-surface-secondary)] text-[var(--text-dim)]' : ''
-                      } ${invalidFields.model ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
-                    >
-                      <option value="">
-                        {!brand ? 'Önce marka seçin' : 'Model seçin'}
-                      </option>
-                      {availableModels.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-[var(--text-muted)]">Plaka</label>
+                      <input
+                        type="text"
+                        placeholder="62LS901"
+                        value={plate}
+                        onChange={(e) => setPlate(e.target.value.toUpperCase())}
+                        className={`form-input text-sm uppercase font-mono font-bold ${invalidFields.plate ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-[var(--text-muted)]">Kilometre</label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="4200"
+                        value={mileage}
+                        onChange={(e) => setMileage(e.target.value)}
+                        className={`form-input text-sm ${invalidFields.mileage ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-[var(--text-muted)]">Plaka</label>
-                    <input
-                      type="text"
-                      placeholder="62LS901"
-                      value={plate}
-                      onChange={(e) => setPlate(e.target.value)}
-                      className={`form-input text-sm uppercase ${invalidFields.plate ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
-                    />
+                {/* 2. MEKANİK & PERFORMANS */}
+                <div className="pt-3 border-t border-[var(--border-app)] space-y-3">
+                  <h3 className="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider">
+                    Mekanik & Performans
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] text-[var(--text-dim)] font-medium">Motor Geliştirmesi</label>
+                      <CustomSelect
+                        value={engineUpgrade}
+                        onChange={(v) => setEngineUpgrade(v)}
+                        options={[
+                          { value: '0', label: 'Seviye 0' },
+                          { value: '1', label: 'Seviye 1' },
+                          { value: '2', label: 'Seviye 2' },
+                          { value: '3', label: 'Seviye 3' },
+                          { value: '4', label: 'Seviye 4' },
+                        ]}
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] text-[var(--text-dim)] font-medium">Şanzıman Geliştirmesi</label>
+                      <CustomSelect
+                        value={transmissionUpgrade}
+                        onChange={(v) => setTransmissionUpgrade(v)}
+                        options={[
+                          { value: '0', label: 'Seviye 0' },
+                          { value: '1', label: 'Seviye 1' },
+                          { value: '2', label: 'Seviye 2' },
+                          { value: '3', label: 'Seviye 3' },
+                          { value: '4', label: 'Seviye 4' },
+                        ]}
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] text-[var(--text-dim)] font-medium">Fren Geliştirmesi</label>
+                      <CustomSelect
+                        value={brakeUpgrade}
+                        onChange={(v) => setBrakeUpgrade(v)}
+                        options={[
+                          { value: '0', label: 'Seviye 0' },
+                          { value: '1', label: 'Seviye 1' },
+                          { value: '2', label: 'Seviye 2' },
+                          { value: '3', label: 'Seviye 3' },
+                          { value: '4', label: 'Seviye 4' },
+                        ]}
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-[var(--text-muted)]">Kilometre</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    <div className="space-y-1">
+                      <label className="text-[11px] text-[var(--text-dim)] font-medium">Motor Sağlığı (%0 - 100)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        placeholder="100"
+                        value={engineHealth}
+                        onChange={(e) => setEngineHealth(e.target.value)}
+                        className={`form-input text-sm ${invalidFields.engineHealth ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] text-[var(--text-dim)] font-medium">Süspansiyon</label>
+                      <input
+                        type="text"
+                        placeholder="Örn: Stok, Spor..."
+                        value={suspension}
+                        onChange={(e) => setSuspension(e.target.value)}
+                        className="form-input text-sm"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] text-[var(--text-dim)] font-medium">Yakıt Türü</label>
+                      <CustomSelect
+                        value={fuelType}
+                        onChange={(v) => setFuelType(v)}
+                        options={[
+                          { value: 'BENZIN', label: 'Benzin' },
+                          { value: 'DIZEL', label: 'Dizel' },
+                          { value: 'ELEKTRIK', label: 'Elektrik' },
+                        ]}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. GÜVENLİK */}
+                <div className="pt-3 border-t border-[var(--border-app)] space-y-3">
+                  <h3 className="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider">
+                    Güvenlik Seviyeleri
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] text-[var(--text-dim)] font-medium">Kilit Seviyesi</label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="Örn: 2"
+                        value={lockLevel}
+                        onChange={(e) => setLockLevel(e.target.value)}
+                        className={`form-input text-sm ${invalidFields.lockLevel ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] text-[var(--text-dim)] font-medium">Alarm Seviyesi</label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="Örn: 1"
+                        value={alarmLevel}
+                        onChange={(e) => setAlarmLevel(e.target.value)}
+                        className={`form-input text-sm ${invalidFields.alarmLevel ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] text-[var(--text-dim)] font-medium">Hırsızlık Önleme Seviyesi</label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="Örn: 3"
+                        value={antiTheftLevel}
+                        onChange={(e) => setAntiTheftLevel(e.target.value)}
+                        className={`form-input text-sm ${invalidFields.antiTheftLevel ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. EK DONANIM & SATIŞ */}
+                <div className="pt-3 border-t border-[var(--border-app)] space-y-3">
+                  <h3 className="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider">
+                    Ek Donanım & Satış
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <label className="flex items-center gap-2.5 p-3 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={turbo}
+                        onChange={(e) => setTurbo(e.target.checked)}
+                        className="rounded border-[var(--border-app)] text-[#FF8A1F] focus:ring-[#FF8A1F]"
+                      />
+                      <span className="text-xs font-semibold text-[var(--text-main)]">Turbo Şarj</span>
+                    </label>
+
+                    <label className="flex items-center gap-2.5 p-3 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={subwoofer}
+                        onChange={(e) => setSubwoofer(e.target.checked)}
+                        className="rounded border-[var(--border-app)] text-[#FF8A1F] focus:ring-[#FF8A1F]"
+                      />
+                      <span className="text-xs font-semibold text-[var(--text-main)]">Subwoofer Ses</span>
+                    </label>
+
+                    <label className="flex items-center gap-2.5 p-3 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={tradeAvailable}
+                        onChange={(e) => setTradeAvailable(e.target.checked)}
+                        className="rounded border-[var(--border-app)] text-[#FF8A1F] focus:ring-[#FF8A1F]"
+                      />
+                      <span className="text-xs font-semibold text-[var(--text-main)]">Takasa Açık</span>
+                    </label>
+                  </div>
+
+                  <div className="space-y-1.5 pt-1 max-w-sm">
+                    <label className="text-xs font-semibold text-[var(--text-muted)]">Fabrika Çıkış Fiyatı ($)</label>
                     <input
                       type="number"
-                      placeholder="4200"
-                      value={mileage}
-                      onChange={(e) => setMileage(e.target.value)}
-                      className={`form-input text-sm ${invalidFields.mileage ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
+                      min="0"
+                      placeholder="Örn: 85000"
+                      value={factoryPrice}
+                      onChange={(e) => setFactoryPrice(e.target.value)}
+                      className={`form-input text-sm ${invalidFields.factoryPrice ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
                     />
                   </div>
-                </div>
-
-                {/* Upgrades (0 to 4) */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-[var(--text-muted)]">Motor Geliştirmesi</label>
-                    <select
-                      value={engineUpgrade}
-                      onChange={(e) => setEngineUpgrade(e.target.value)}
-                      className="form-input text-sm"
-                    >
-                      <option value="0">Seviye 0</option>
-                      <option value="1">Seviye 1</option>
-                      <option value="2">Seviye 2</option>
-                      <option value="3">Seviye 3</option>
-                      <option value="4">Seviye 4</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-[var(--text-muted)]">Şanzıman Geliştirmesi</label>
-                    <select
-                      value={transmissionUpgrade}
-                      onChange={(e) => setTransmissionUpgrade(e.target.value)}
-                      className="form-input text-sm"
-                    >
-                      <option value="0">Seviye 0</option>
-                      <option value="1">Seviye 1</option>
-                      <option value="2">Seviye 2</option>
-                      <option value="3">Seviye 3</option>
-                      <option value="4">Seviye 4</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-[var(--text-muted)]">Fren Geliştirmesi</label>
-                    <select
-                      value={brakeUpgrade}
-                      onChange={(e) => setBrakeUpgrade(e.target.value)}
-                      className="form-input text-sm"
-                    >
-                      <option value="0">Seviye 0</option>
-                      <option value="1">Seviye 1</option>
-                      <option value="2">Seviye 2</option>
-                      <option value="3">Seviye 3</option>
-                      <option value="4">Seviye 4</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Booleans: Turbo, Subwoofer, Trade */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                  <label className="flex items-center gap-2 p-3 rounded-lg border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={turbo}
-                      onChange={(e) => setTurbo(e.target.checked)}
-                      className="w-4 h-4 accent-[#FF8A1F]"
-                    />
-                    <span className="text-xs font-semibold text-[var(--text-main)]">Turbo: Var</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 p-3 rounded-lg border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={subwoofer}
-                      onChange={(e) => setSubwoofer(e.target.checked)}
-                      className="w-4 h-4 accent-[#FF8A1F]"
-                    />
-                    <span className="text-xs font-semibold text-[var(--text-main)]">Subwoofer: Var</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 p-3 rounded-lg border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={tradeAvailable}
-                      onChange={(e) => setTradeAvailable(e.target.checked)}
-                      className="w-4 h-4 accent-[#FF8A1F]"
-                    />
-                    <span className="text-xs font-semibold text-[var(--text-main)]">Takasa Açık</span>
-                  </label>
                 </div>
               </div>
             )}
