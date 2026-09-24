@@ -1,0 +1,134 @@
+'use client';
+
+import React, { useState } from 'react';
+import { useAuth } from '@/features/auth/AuthContext';
+import { Phone, Mail, Save, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+
+export default function HesabimIletisimPage() {
+  const { currentProfile, updateCurrentProfile } = useAuth();
+
+  const [phone, setPhone] = useState(currentProfile?.phone || '');
+  const [sanmailEmail, setSanmailEmail] = useState(currentProfile?.sanmail_email || '');
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentProfile) return;
+
+    if (!phone || phone.length < 5) {
+      setError('Geçerli bir telefon numarası giriniz.');
+      return;
+    }
+
+    if (!sanmailEmail || !sanmailEmail.includes('@')) {
+      setError('Geçerli bir SanMail adresi giriniz.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError('');
+    setSuccess(false);
+
+    try {
+      const res = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId: currentProfile.id,
+          phone: phone.trim(),
+          sanmail_email: sanmailEmail.trim(),
+        }),
+      });
+
+      if (!res.ok) throw new Error('İletişim bilgileri güncellenemedi.');
+
+      updateCurrentProfile({
+        phone: phone.trim(),
+        sanmail_email: sanmailEmail.trim(),
+      });
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Bir hata oluştu.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="surface-card p-6 sm:p-8 rounded-2xl border border-[var(--border-app)] space-y-6">
+      <div className="pb-4 border-b border-[var(--border-app)]">
+        <h2 className="text-xl font-bold text-[var(--text-main)]">İletişim Bilgilerim</h2>
+        <p className="text-xs text-[var(--text-muted)] mt-0.5">
+          İlanlarınızda yalnızca Sanboard üyelerinin görebileceği irtibat kanallarını yönetebilirsiniz.
+        </p>
+      </div>
+
+      {success && (
+        <div className="p-3.5 rounded-xl bg-[var(--color-success-subtle)] text-[var(--color-success)] text-xs font-semibold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4" />
+          <span>İletişim bilgileri başarıyla güncellendi.</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="p-3.5 rounded-xl bg-[var(--color-danger-subtle)] text-[var(--color-danger)] text-xs font-semibold flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <form onSubmit={handleSave} className="space-y-5 max-w-xl">
+        {/* Phone */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-[var(--text-muted)] flex items-center gap-1.5">
+            <Phone className="w-3.5 h-3.5 text-[#FF8A1F]" />
+            <span>Telefon Numarası</span>
+          </label>
+          <input
+            type="text"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="555-0100"
+            required
+            className="form-input text-sm"
+          />
+        </div>
+
+        {/* SanMail */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-[var(--text-muted)] flex items-center gap-1.5">
+            <Mail className="w-3.5 h-3.5 text-[#FF8A1F]" />
+            <span>SanMail E-posta Adresi</span>
+          </label>
+          <input
+            type="email"
+            value={sanmailEmail}
+            onChange={(e) => setSanmailEmail(e.target.value)}
+            placeholder="isim.soyisim@sanmail.com"
+            required
+            className="form-input text-sm"
+          />
+          <p className="text-[11px] text-[var(--text-dim)]">
+            Alıcılar sizinle bu SanMail adresi üzerinden iletişime geçer.
+          </p>
+        </div>
+
+        <button
+          type="submit"
+          disabled={submitting}
+          className="btn-primary py-2.5 px-6 text-sm font-bold flex items-center gap-2"
+        >
+          {submitting ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Save className="w-4 h-4" />
+          )}
+          <span>Bilgileri Kaydet</span>
+        </button>
+      </form>
+    </div>
+  );
+}

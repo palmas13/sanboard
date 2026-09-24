@@ -1,0 +1,99 @@
+import { db } from './store';
+import { Notification, NotificationType } from '@/types';
+
+function ensureNotifications() {
+  if (!db.notifications) {
+    db.notifications = [];
+  }
+}
+
+/**
+ * Get all notifications for a specific user, sorted newest first.
+ */
+export async function getUserNotifications(userId: string): Promise<Notification[]> {
+  ensureNotifications();
+  return db.notifications
+    .filter((n) => n.user_id === userId)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+/**
+ * Get count of unread notifications for a specific user.
+ */
+export async function getUnreadNotificationCount(userId: string): Promise<number> {
+  ensureNotifications();
+  return db.notifications.filter((n) => n.user_id === userId && !n.read_at).length;
+}
+
+/**
+ * Mark a single notification as read with ownership validation.
+ */
+export async function markNotificationAsRead(
+  userId: string,
+  notificationId: string
+): Promise<{ success: boolean; notification?: Notification; error?: string }> {
+  ensureNotifications();
+  const notif = db.notifications.find((n) => n.id === notificationId);
+
+  if (!notif) {
+    return { success: false, error: 'Bildirim bulunamadı.' };
+  }
+
+  if (notif.user_id !== userId) {
+    return { success: false, error: 'Bu bildirimi güncelleme yetkiniz yok.' };
+  }
+
+  if (!notif.read_at) {
+    notif.read_at = new Date().toISOString();
+  }
+
+  return { success: true, notification: notif };
+}
+
+/**
+ * Mark all notifications as read for a specific user.
+ */
+export async function markAllNotificationsAsRead(userId: string): Promise<{ success: boolean; count: number }> {
+  ensureNotifications();
+  const now = new Date().toISOString();
+  let updatedCount = 0;
+
+  db.notifications.forEach((n) => {
+    if (n.user_id === userId && !n.read_at) {
+      n.read_at = now;
+      updatedCount++;
+    }
+  });
+
+  return { success: true, count: updatedCount };
+}
+
+/**
+ * Create a new notification.
+ */
+export async function createNotification(params: {
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  entity_type?: 'listing' | 'ticket' | 'application' | 'system';
+  entity_id?: string;
+  metadata?: Record<string, any>;
+}): Promise<Notification> {
+  ensureNotifications();
+  const newNotif: Notification = {
+    id: `notif-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    user_id: params.user_id,
+    type: params.type,
+    title: params.title,
+    message: params.message,
+    entity_type: params.entity_type,
+    entity_id: params.entity_id,
+    metadata: params.metadata,
+    read_at: null,
+    created_at: new Date().toISOString(),
+  };
+
+  db.notifications.unshift(newNotif);
+  return newNotif;
+}
