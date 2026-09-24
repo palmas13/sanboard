@@ -142,7 +142,7 @@ export async function getAllUsersForAdmin(): Promise<{ user: User; profileCount:
         .from('users')
         .select(`
           *,
-          character_profiles (id)
+          character_profiles (id, full_name, avatar_path, public_id)
         `)
         .order('created_at', { ascending: false });
 
@@ -159,13 +159,14 @@ export async function getAllUsersForAdmin(): Promise<{ user: User; profileCount:
           updated_at: u.updated_at,
         },
         profileCount: u.character_profiles?.length || 0,
+        characters: u.character_profiles || [],
       }));
     }
   }
 
   return db.users.map((u) => {
-    const profileCount = db.profiles.filter((p) => p.user_id === u.id).length;
-    return { user: u, profileCount };
+    const characters = db.profiles.filter((p) => p.user_id === u.id);
+    return { user: u, profileCount: characters.length, characters };
   });
 }
 

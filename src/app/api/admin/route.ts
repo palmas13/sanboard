@@ -16,13 +16,40 @@ import { db } from '@/lib/db/store';
 import { getServerSession } from '@/lib/auth/session';
 
 async function checkAdminAccess(req: NextRequest): Promise<boolean> {
-  // Authenticate strictly via cryptographically signed session
-  const session = await getServerSession(req);
-  if (session && session.role === 'ADMIN') return true;
-
   // Internal secret header for backend service calls
   const secretHeader = req.headers.get('x-sanboard-secret');
   if (secretHeader && process.env.SUPABASE_SECRET_KEY && secretHeader === process.env.SUPABASE_SECRET_KEY) {
+    return true;
+  }
+
+  // Authenticate strictly via cryptographically signed session
+  const session = await getServerSession(req);
+  if (!session?.userId) return false;
+
+  // Verify role strictly against database source of truth
+  if (process.env.DATA_STORE === 'supabase') {
+    try {
+      const { getSupabaseAdminClient } = await import('@/lib/db/supabase-client');
+      const client = getSupabaseAdminClient();
+      if (client) {
+        const { data: dbUser } = await client
+          .from('users')
+          .select('role, status')
+          .eq('id', session.userId)
+          .maybeSingle();
+
+        if (dbUser && dbUser.role === 'ADMIN' && dbUser.status === 'ACTIVE') {
+          return true;
+        }
+        return false;
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  const user = db.users.find((u) => u.id === session.userId);
+  if (user && user.role === 'ADMIN' && user.status === 'ACTIVE') {
     return true;
   }
 
@@ -131,7 +158,8 @@ export async function POST(req: NextRequest) {
       case 'updateDealer': {
         const success = await updateDealerStatus(
           payload.dealerId,
-          payload.status
+          payload.status,
+          payload.rejectionReason
         );
         return NextResponse.json({ success });
       }

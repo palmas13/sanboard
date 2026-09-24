@@ -36,33 +36,13 @@ export async function GET(req: NextRequest) {
   try {
     const profileId = req.nextUrl.searchParams.get('profileId');
     if (!profileId) {
-      return NextResponse.json({ error: 'profileId zorunludur' }, { status: 400 });
+      return NextResponse.json({ success: true, application: null });
     }
 
-    if (process.env.DATA_STORE === 'supabase') {
-      const { getSupabaseAdminClient } = await import('@/lib/db/supabase-client');
-      const client = getSupabaseAdminClient();
-      if (client) {
-        const { data: profile } = await client
-          .from('character_profiles')
-          .select('id, external_character_id')
-          .or(`id.eq.${profileId},external_character_id.eq.${profileId}`)
-          .maybeSingle();
-
-        const pId = profile?.id || profileId;
-        const { data: app, error } = await client
-          .from('corporate_applications')
-          .select('*')
-          .eq('applicant_profile_id', pId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (error) {
-          return NextResponse.json({ success: true, application: null });
-        }
-        return NextResponse.json({ success: true, application: app || null });
-      }
+    const repo = getDealerRepository();
+    if (typeof repo.getApplicationByProfileId === 'function') {
+      const app = await repo.getApplicationByProfileId(profileId);
+      return NextResponse.json({ success: true, application: app });
     }
 
     return NextResponse.json({ success: true, application: null });

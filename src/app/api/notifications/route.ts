@@ -5,8 +5,7 @@ import { getServerSession } from '@/lib/auth/session';
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(req);
-    const isMock = process.env.USE_MOCK_GTAWORLD_AUTH !== 'false';
-    const userId = session?.userId || (isMock ? '22222222-2222-2222-2222-222222222222' : null);
+    const userId = session?.userId;
 
     if (!userId) {
       return NextResponse.json(
@@ -15,7 +14,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Security: If query param userId is passed, verify it matches authenticated session user
+    // Security: Only allow fetching the authenticated session user's notifications
     const queryUserId = req.nextUrl.searchParams.get('userId');
     if (queryUserId && queryUserId !== userId && session?.role !== 'ADMIN') {
       return NextResponse.json(
@@ -45,8 +44,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(req);
-    const isMock = process.env.USE_MOCK_GTAWORLD_AUTH !== 'false';
-    const userId = session?.userId || (isMock ? '22222222-2222-2222-2222-222222222222' : null);
+    const userId = session?.userId;
 
     if (!userId) {
       return NextResponse.json(

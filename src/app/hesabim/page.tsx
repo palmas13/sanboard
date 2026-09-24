@@ -31,32 +31,19 @@ export default function HesabimOverviewPage() {
 
     async function fetchStats() {
       try {
-        const [listingsRes, favsRes, creditsRes] = await Promise.all([
-          fetch(`/api/user/listings?profileId=${currentProfile?.id}`),
-          fetch(`/api/user/favorites`),
-          fetch(`/api/credits?profileId=${currentProfile?.id}`),
-        ]);
-
-        const listings = await listingsRes.json();
-        const favs = await favsRes.json();
-        const credits = await creditsRes.json();
-
-        // Strictly personal listings: exclude corporate listings
-        const personalListings = Array.isArray(listings)
-          ? listings.filter((l: any) => l.seller_type !== 'CORPORATE' && !l.corporate_profile_id)
-          : [];
-
-        const active = personalListings.filter((l: any) => l.status === 'ACTIVE').length;
-        const expired = personalListings.filter((l: any) => l.status === 'EXPIRED').length;
-        const totalReceivedFavs = personalListings.reduce((sum: number, l: any) => sum + (l.favorite_count || 0), 0);
-
-        setStats({
-          activeListings: active,
-          expiredListings: expired,
-          favoritesCount: Array.isArray(favs) ? favs.length : 0,
-          availableCredits: credits.availableCredits || 0,
-          totalReceivedFavorites: totalReceivedFavs,
-        });
+        const res = await fetch('/api/account/bootstrap');
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.success) {
+            setStats({
+              activeListings: data.stats?.activeListings || 0,
+              expiredListings: data.stats?.expiredListings || 0,
+              favoritesCount: data.stats?.favoritesCount || 0,
+              availableCredits: data.credits?.availableCredits || 0,
+              totalReceivedFavorites: data.stats?.totalReceivedFavorites || 0,
+            });
+          }
+        }
       } catch {
         // Fallback defaults
       } finally {
@@ -141,9 +128,13 @@ export default function HesabimOverviewPage() {
           </div>
           <div>
             <p className="text-xs text-[var(--text-muted)] font-medium">Aktif Bireysel İlanlarım</p>
-            <p className="text-2xl font-black text-[var(--text-main)]">
-              {loading ? '-' : stats.activeListings}
-            </p>
+            {loading ? (
+              <div className="h-8 w-12 rounded-lg bg-[var(--bg-surface-secondary)] animate-pulse mt-1" />
+            ) : (
+              <p className="text-2xl font-black text-[var(--text-main)]">
+                {stats.activeListings}
+              </p>
+            )}
           </div>
         </div>
 
@@ -154,9 +145,13 @@ export default function HesabimOverviewPage() {
           </div>
           <div>
             <p className="text-xs text-[var(--text-muted)] font-medium">Süresi Dolan İlanlarım</p>
-            <p className="text-2xl font-black text-[var(--text-main)]">
-              {loading ? '-' : stats.expiredListings}
-            </p>
+            {loading ? (
+              <div className="h-8 w-12 rounded-lg bg-[var(--bg-surface-secondary)] animate-pulse mt-1" />
+            ) : (
+              <p className="text-2xl font-black text-[var(--text-main)]">
+                {stats.expiredListings}
+              </p>
+            )}
           </div>
         </div>
 
@@ -167,9 +162,13 @@ export default function HesabimOverviewPage() {
           </div>
           <div>
             <p className="text-xs text-[var(--text-muted)] font-medium">Favorilerim</p>
-            <p className="text-2xl font-black text-[var(--text-main)]">
-              {loading ? '-' : stats.favoritesCount}
-            </p>
+            {loading ? (
+              <div className="h-8 w-12 rounded-lg bg-[var(--bg-surface-secondary)] animate-pulse mt-1" />
+            ) : (
+              <p className="text-2xl font-black text-[var(--text-main)]">
+                {stats.favoritesCount}
+              </p>
+            )}
           </div>
         </div>
       </div>

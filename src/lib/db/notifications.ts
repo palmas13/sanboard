@@ -54,6 +54,7 @@ export async function markNotificationAsRead(
 
   if (!notif.read_at) {
     notif.read_at = new Date().toISOString();
+    notif.is_read = true;
   }
 
   return {

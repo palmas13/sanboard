@@ -45,6 +45,26 @@ export class MemoryUserRepository implements IUserRepository {
     const profile = db.profiles.find((p) => p.id === id);
     if (!profile) return { success: false, error: 'Profil bulunamadı.' };
 
+    if (data.sanmail_email && data.sanmail_email.trim()) {
+      const emailLower = data.sanmail_email.trim().toLowerCase();
+      const existing = db.profiles.find(
+        (p) => p.id !== id && p.sanmail_email && p.sanmail_email.trim().toLowerCase() === emailLower
+      );
+      if (existing) {
+        return { success: false, error: 'Bu SanMail adresi başka bir karakter tarafından kullanılmaktadır.' };
+      }
+    }
+
+    if (data.phone && data.phone.trim()) {
+      const phoneClean = data.phone.trim();
+      const existing = db.profiles.find(
+        (p) => p.id !== id && p.phone && p.phone.trim() === phoneClean
+      );
+      if (existing) {
+        return { success: false, error: 'Bu telefon numarası başka bir karakter tarafından kullanılmaktadır.' };
+      }
+    }
+
     if (data.avatar_path && !data.avatar_url) {
       data.avatar_url = data.avatar_path;
     } else if (data.avatar_url && !data.avatar_path) {
@@ -65,6 +85,26 @@ export class MemoryUserRepository implements IUserRepository {
   }): Promise<{ success: boolean; profile?: CharacterProfile; error?: string }> {
     const trimmedName = data.fullName.trim();
     const extId = data.externalCharacterId ? String(data.externalCharacterId) : undefined;
+
+    if (data.sanmailEmail && data.sanmailEmail.trim()) {
+      const emailLower = data.sanmailEmail.trim().toLowerCase();
+      const existing = db.profiles.find(
+        (p) => p.sanmail_email && p.sanmail_email.trim().toLowerCase() === emailLower && p.id !== extId
+      );
+      if (existing) {
+        return { success: false, error: 'Bu SanMail adresi başka bir karakter tarafından kullanılmaktadır.' };
+      }
+    }
+
+    if (data.phone && data.phone.trim()) {
+      const phoneClean = data.phone.trim();
+      const existing = db.profiles.find(
+        (p) => p.phone && p.phone.trim() === phoneClean && p.id !== extId
+      );
+      if (existing) {
+        return { success: false, error: 'Bu telefon numarası başka bir karakter tarafından kullanılmaktadır.' };
+      }
+    }
 
     let profile = db.profiles.find(
       (p) =>

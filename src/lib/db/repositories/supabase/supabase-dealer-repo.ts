@@ -1,6 +1,6 @@
 import { IDealerRepository } from '../types';
 import { getSupabaseClient, getSupabaseAdminClient } from '../../supabase-client';
-import { CorporateApplication, CorporateProfile } from '@/types';
+import { CorporateApplication, CorporateProfile, CharacterProfile } from '@/types';
 import { uploadCorporateLogo, uploadCorporateBanner, getStorageProvider } from '@/lib/storage';
 
 export class SupabaseDealerRepository implements IDealerRepository {
@@ -233,5 +233,251 @@ export class SupabaseDealerRepository implements IDealerRepository {
     }
 
     return { success: true, dealer: resData as CorporateProfile };
+  }
+
+  async getApplicationByProfileId(profileId: string): Promise<CorporateApplication | null> {
+    const client = this.getAdminClient();
+    const { data: profile } = await client
+      .from('character_profiles')
+      .select('id, external_character_id')
+      .or(`id.eq.${profileId},external_character_id.eq.${profileId}`)
+      .maybeSingle();
+
+    const pId = profile?.id || profileId;
+    const { data: app } = await client
+      .from('corporate_applications')
+      .select('*')
+      .eq('applicant_profile_id', pId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    return app as CorporateApplication | null;
+  }
+
+  async getAllApplications(): Promise<CorporateApplication[]> {
+    const client = this.getAdminClient();
+    const { data, error } = await client
+      .from('corporate_applications')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) return [];
+    return (data || []) as CorporateApplication[];
+  }
+
+  async reviewApplication(
+    applicationId: string,
+    status: 'APPROVED' | 'REJECTED',
+    rejectionReason?: string,
+    reviewerUserId?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const client = this.getAdminClient();
+
+    const { data: app, error: appErr } = await client
+      .from('corporate_applications')
+      .select('*')
+      .eq('id', applicationId)
+      .maybeSingle();
+
+    if (appErr || !app) {
+      return { success: false, error: 'Başvuru bulunamadı.' };
+    }
+
+    const { data: profile } = await client
+      .from('character_profiles')
+      .select('id, user_id, full_name, avatar_path, avatar_url, phone, sanmail_email')
+      .or(`id.eq.${app.applicant_profile_id},external_character_id.eq.${app.applicant_profile_id}`)
+      .maybeSingle();
+
+    const targetUserId = profile?.user_id;
+    const targetProfileId = profile?.id || app.applicant_profile_id;
+
+    if (status === 'APPROVED') {
+      await client
+        .from('corporate_applications')
+        .update({ status: 'APPROVED', reviewed_by: reviewerUserId, reviewed_at: new Date().toISOString() })
+        .eq('id', applicationId);
+
+      const slug = app.company_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      const { data: newStore } = await client
+        .from('corporate_profiles')
+        .insert({
+          owner_profile_id: targetProfileId,
+          company_name: app.company_name,
+          slug,
+          description: app.purpose,
+          status: 'APPROVED',
+          subscription_status: 'INACTIVE',
+          boost_credits: 3,
+        })
+        .select()
+        .single();
+
+      if (newStore) {
+        await client
+          .from('character_profiles')
+          .update({ is_dealer: true, dealer_id: newStore.id })
+          .eq('id', targetProfileId);
+      }
+
+      if (targetUserId) {
+        const { getNotificationRepository } = await import('../index');
+        await getNotificationRepository().createNotification({
+          user_id: targetUserId,
+          type: 'CORPORATE_APPLICATION_APPROVED',
+          title: 'Kurumsal Profiliniz Onaylandı',
+          message: `"${app.company_name}" adına yaptığınız kurumsal satış başvurusu onaylanmıştır. Kurumsal panelden üyeliğinizi aktif ederek avantajlardan yararlanabilirsiniz.`,
+          entity_type: 'application',
+          entity_id: app.id,
+        });
+      }
+    } else if (status === 'REJECTED') {
+      const reason = rejectionReason || 'Fiziksel işletme bilgileri doğrulanamadığı için başvurunuz reddedildi.';
+      await client
+        .from('corporate_applications')
+        .update({
+          status: 'REJECTED',
+          rejection_reason: reason,
+          reviewed_by: reviewerUserId,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', applicationId);
+
+      if (targetUserId) {
+        const { getNotificationRepository } = await import('../index');
+        await getNotificationRepository().createNotification({
+          user_id: targetUserId,
+          type: 'CORPORATE_APPLICATION_REJECTED',
+          title: 'Kurumsal Başvurunuz Reddedildi',
+          message: `Kurumsal hesap başvurunuz reddedildi. Neden: ${reason}`,
+          entity_type: 'application',
+          entity_id: app.id,
+        });
+      }
+    }
+
+    return { success: true };
+  }
+
+  async activateSubscription(dealerId: string): Promise<{ success: boolean; dealer?: CorporateProfile; error?: string }> {
+    const client = this.getAdminClient();
+    const expiresAt = new Date(Date.now() + 30 * 86400000).toISOString();
+
+    const { data, error } = await client
+      .from('corporate_profiles')
+      .update({
+        subscription_status: 'ACTIVE',
+        subscription_expires_at: expiresAt,
+        boost_credits: 3,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', dealerId)
+      .select()
+      .maybeSingle();
+
+    if (error || !data) {
+      return { success: false, error: error?.message || 'Üyelik aktif edilemedi.' };
+    }
+
+    return { success: true, dealer: data as CorporateProfile };
+  }
+
+  async boostListing(
+    dealerId: string,
+    listingId: string
+  ): Promise<{ success: boolean; error?: string; remainingBoosts?: number; featured_until?: string }> {
+    const client = this.getAdminClient();
+
+    const dealer = await this.getDealerById(dealerId);
+    if (!dealer) return { success: false, error: 'Kurumsal mağaza bulunamadı.' };
+    if (dealer.subscription_status !== 'ACTIVE') {
+      return { success: false, error: 'Kurumsal üyeliğiniz aktif değil. Öne çıkarma hakkı kullanamazsınız.' };
+    }
+    if (!dealer.boost_credits || dealer.boost_credits <= 0) {
+      return { success: false, error: 'Bu abonelik dönemi için öne çıkarma hakkınız tükenmiştir.' };
+    }
+
+    const { data: listing, error: listErr } = await client
+      .from('listings')
+      .select('id, status, is_featured, featured_until')
+      .eq('id', listingId)
+      .maybeSingle();
+
+    if (listErr || !listing) return { success: false, error: 'İlan bulunamadı.' };
+    if (listing.status !== 'ACTIVE') {
+      return { success: false, error: 'Yalnızca aktif yayındaki ilanlar öne çıkarılabilir.' };
+    }
+
+    const now = new Date();
+    if (listing.is_featured && listing.featured_until && new Date(listing.featured_until) > now) {
+      return { success: false, error: 'Bu ilan zaten aktif olarak öne çıkarılmış durumdadır.' };
+    }
+
+    const boostEnd = new Date(now.getTime() + 24 * 3600 * 1000).toISOString();
+    const newCredits = dealer.boost_credits - 1;
+
+    await Promise.all([
+      client.from('listings').update({ is_featured: true, featured_until: boostEnd }).eq('id', listingId),
+      client.from('corporate_profiles').update({ boost_credits: newCredits }).eq('id', dealerId),
+    ]);
+
+    return { success: true, remainingBoosts: newCredits, featured_until: boostEnd };
+  }
+
+  async toggleFollow(
+    followerProfileId: string,
+    corporateProfileId: string
+  ): Promise<{ isFollowing: boolean; count: number; followerCount?: number }> {
+    const client = this.getAdminClient();
+
+    const { data: existing } = await client
+      .from('corporate_followers')
+      .select('id')
+      .eq('follower_profile_id', followerProfileId)
+      .eq('corporate_profile_id', corporateProfileId)
+      .maybeSingle();
+
+    let isFollowing = false;
+    if (existing) {
+      await client.from('corporate_followers').delete().eq('id', existing.id);
+      isFollowing = false;
+    } else {
+      await client.from('corporate_followers').insert({
+        follower_profile_id: followerProfileId,
+        corporate_profile_id: corporateProfileId,
+      });
+      isFollowing = true;
+    }
+
+    const { count } = await client
+      .from('corporate_followers')
+      .select('*', { count: 'exact', head: true })
+      .eq('corporate_profile_id', corporateProfileId);
+
+    return { isFollowing, count: count || 0, followerCount: count || 0 };
+  }
+
+  async getFollowers(corporateProfileId: string): Promise<CharacterProfile[]> {
+    const client = this.getAdminClient();
+    const { data, error } = await client
+      .from('corporate_followers')
+      .select('follower:character_profiles (*)')
+      .eq('corporate_profile_id', corporateProfileId);
+
+    if (error) return [];
+    return (data || []).map((row: any) => row.follower).filter(Boolean) as CharacterProfile[];
+  }
+
+  async isFollowing(followerProfileId: string, corporateProfileId: string): Promise<boolean> {
+    const client = this.getAdminClient();
+    const { data } = await client
+      .from('corporate_followers')
+      .select('id')
+      .eq('follower_profile_id', followerProfileId)
+      .eq('corporate_profile_id', corporateProfileId)
+      .maybeSingle();
+
+    return Boolean(data);
   }
 }

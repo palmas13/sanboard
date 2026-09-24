@@ -28,7 +28,11 @@ export async function POST(req: NextRequest) {
 
     const repo = getListingRepository();
     const result = await repo.toggleFavorite(listingId, sessionUserId);
-    return NextResponse.json(result);
+    return NextResponse.json({
+      success: true,
+      isFavorited: result.isFavorited,
+      count: result.count,
+    });
   } catch (error: any) {
     return NextResponse.json(
       { error: error?.message || 'Bir hata oluştu.' },
@@ -98,7 +102,11 @@ export async function DELETE(req: NextRequest) {
 
     const repo = getListingRepository();
     const result = await repo.removeFavorite(listingId, sessionUserId);
-    return NextResponse.json(result);
+    return NextResponse.json({
+      success: true,
+      isFavorited: false,
+      count: result.count,
+    });
   } catch (error: any) {
     return NextResponse.json(
       { error: error?.message || 'Favoriden çıkarılamadı.' },

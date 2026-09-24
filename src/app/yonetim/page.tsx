@@ -57,6 +57,11 @@ export default function AdminPage() {
   const [adminReplyMessage, setAdminReplyMessage] = useState('');
   const [ticketReplying, setTicketReplying] = useState(false);
 
+  // Corporate application rejection modal state
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectTargetDealer, setRejectTargetDealer] = useState<any | null>(null);
+  const [rejectionReasonInput, setRejectionReasonInput] = useState('Fiziksel işletme bilgileri doğrulanamadığı için başvurunuz reddedildi.');
+
   const fetchData = async () => {
     setLoading(true);
     setFetchError(false);
@@ -178,18 +183,29 @@ export default function AdminPage() {
     }
   };
 
-  const handleDealerAction = async (dealerId: string, status: 'APPROVED' | 'REJECTED') => {
+  const handleDealerAction = async (dealerId: string, status: 'APPROVED' | 'REJECTED', reason?: string) => {
     setActionLoading(true);
     try {
       await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'updateDealer', payload: { dealerId, status } }),
+        body: JSON.stringify({
+          action: 'updateDealer',
+          payload: { dealerId, status, rejectionReason: reason },
+        }),
       });
       await fetchData();
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handleConfirmReject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rejectTargetDealer) return;
+    await handleDealerAction(rejectTargetDealer.id, 'REJECTED', rejectionReasonInput);
+    setRejectModalOpen(false);
+    setRejectTargetDealer(null);
   };
 
   const openTicketDetail = async (ticket: any) => {
@@ -305,77 +321,92 @@ export default function AdminPage() {
         </button>
       </div>
 
-      {/* Admin Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3.5">
-        <div className="surface-card p-4 rounded-xl border border-[var(--border-app)]">
-          <p className="text-[11px] text-[var(--text-muted)] font-semibold">Toplam Kullanıcı</p>
+      {/* Compact 4-KPI Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 1. Toplam Kullanıcı */}
+        <div className="surface-card p-5 rounded-2xl border border-[var(--border-app)] hover:border-[#FF8A1F]/30 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-[var(--text-muted)] font-semibold">Toplam Kullanıcı</span>
+            <div className="w-8 h-8 rounded-lg bg-[var(--brand-orange-subtle)] text-[#FF8A1F] flex items-center justify-center">
+              <Users className="w-4 h-4" />
+            </div>
+          </div>
           {loading ? (
-            <div className="h-7 w-12 bg-[var(--bg-surface-secondary)] animate-pulse rounded mt-1" />
+            <div className="h-8 w-16 bg-[var(--bg-surface-secondary)] animate-pulse rounded mt-2" />
           ) : fetchError ? (
-            <span className="text-[11px] text-[var(--color-danger)] font-medium block mt-1">Yüklenemedi</span>
+            <span className="text-xs text-[var(--color-danger)] font-medium block mt-2">Yüklenemedi</span>
           ) : (
-            <p className="text-xl font-black text-[var(--text-main)] mt-1">{stats.totalUsers}</p>
+            <p className="text-2xl font-black text-[var(--text-main)] mt-2">{stats.totalUsers}</p>
           )}
         </div>
 
-        <div className="surface-card p-4 rounded-xl border border-[var(--border-app)]">
-          <p className="text-[11px] text-[var(--text-muted)] font-semibold">Aktif İlan</p>
+        {/* 2. Aktif İlan */}
+        <div className="surface-card p-5 rounded-2xl border border-[var(--border-app)] hover:border-[var(--color-success)]/30 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-[var(--text-muted)] font-semibold">Aktif İlan</span>
+            <div className="w-8 h-8 rounded-lg bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center">
+              <ListFilter className="w-4 h-4" />
+            </div>
+          </div>
           {loading ? (
-            <div className="h-7 w-12 bg-[var(--bg-surface-secondary)] animate-pulse rounded mt-1" />
+            <div className="h-8 w-16 bg-[var(--bg-surface-secondary)] animate-pulse rounded mt-2" />
           ) : fetchError ? (
-            <span className="text-[11px] text-[var(--color-danger)] font-medium block mt-1">Yüklenemedi</span>
+            <span className="text-xs text-[var(--color-danger)] font-medium block mt-2">Yüklenemedi</span>
           ) : (
-            <p className="text-xl font-black text-[var(--color-success)] mt-1">{stats.activeListings}</p>
+            <p className="text-2xl font-black text-[var(--color-success)] mt-2">{stats.activeListings}</p>
           )}
         </div>
 
-        <div className="surface-card p-4 rounded-xl border border-[var(--border-app)]">
-          <p className="text-[11px] text-[var(--text-muted)] font-semibold">Süresi Dolan</p>
+        {/* 3. Bekleyen Destek */}
+        <div className="surface-card p-5 rounded-2xl border border-[var(--border-app)] hover:border-[#FF8A1F]/30 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-[var(--text-muted)] font-semibold">Bekleyen Destek</span>
+            <div className="w-8 h-8 rounded-lg bg-[var(--brand-orange-subtle)] text-[#FF8A1F] flex items-center justify-center">
+              <LifeBuoy className="w-4 h-4" />
+            </div>
+          </div>
           {loading ? (
-            <div className="h-7 w-12 bg-[var(--bg-surface-secondary)] animate-pulse rounded mt-1" />
+            <div className="h-8 w-16 bg-[var(--bg-surface-secondary)] animate-pulse rounded mt-2" />
           ) : fetchError ? (
-            <span className="text-[11px] text-[var(--color-danger)] font-medium block mt-1">Yüklenemedi</span>
+            <span className="text-xs text-[var(--color-danger)] font-medium block mt-2">Yüklenemedi</span>
           ) : (
-            <p className="text-xl font-black text-[var(--color-danger)] mt-1">{stats.expiredListings}</p>
+            <p className="text-2xl font-black text-[#FF8A1F] mt-2">{openTicketsCount}</p>
           )}
         </div>
 
-        <div className="surface-card p-4 rounded-xl border border-[var(--border-app)]">
-          <p className="text-[11px] text-[var(--text-muted)] font-semibold">Kurumsal Başvuru</p>
+        {/* 4. Bekleyen Kurumsal Başvuru */}
+        <div className="surface-card p-5 rounded-2xl border border-[var(--border-app)] hover:border-[#FF8A1F]/30 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-[var(--text-muted)] font-semibold">Kurumsal Başvuru</span>
+            <div className="w-8 h-8 rounded-lg bg-[var(--brand-orange-subtle)] text-[#FF8A1F] flex items-center justify-center">
+              <Building2 className="w-4 h-4" />
+            </div>
+          </div>
           {loading ? (
-            <div className="h-7 w-12 bg-[var(--bg-surface-secondary)] animate-pulse rounded mt-1" />
+            <div className="h-8 w-16 bg-[var(--bg-surface-secondary)] animate-pulse rounded mt-2" />
           ) : fetchError ? (
-            <span className="text-[11px] text-[var(--color-danger)] font-medium block mt-1">Yüklenemedi</span>
+            <span className="text-xs text-[var(--color-danger)] font-medium block mt-2">Yüklenemedi</span>
           ) : (
-            <p className="text-xl font-black text-[#FF8A1F] mt-1">{pendingDealersCount}</p>
-          )}
-        </div>
-
-        <div className="surface-card p-4 rounded-xl border border-[var(--border-app)]">
-          <p className="text-[11px] text-[var(--text-muted)] font-semibold">Açık Destek</p>
-          {loading ? (
-            <div className="h-7 w-12 bg-[var(--bg-surface-secondary)] animate-pulse rounded mt-1" />
-          ) : fetchError ? (
-            <span className="text-[11px] text-[var(--color-danger)] font-medium block mt-1">Yüklenemedi</span>
-          ) : (
-            <p className="text-xl font-black text-[#FF8A1F] mt-1">{openTicketsCount}</p>
-          )}
-        </div>
-
-        <div className="surface-card p-4 rounded-xl border border-[var(--border-app)]">
-          <p className="text-[11px] text-[var(--text-muted)] font-semibold">Toplam Gelir</p>
-          {loading ? (
-            <div className="h-7 w-16 bg-[var(--bg-surface-secondary)] animate-pulse rounded mt-1" />
-          ) : fetchError ? (
-            <span className="text-[11px] text-[var(--color-danger)] font-medium block mt-1">Yüklenemedi</span>
-          ) : (
-            <p className="text-xl font-black text-[#FF8A1F] mt-1">{formatCurrency(stats.totalRevenue)}</p>
+            <p className="text-2xl font-black text-[#FF8A1F] mt-2">{pendingDealersCount}</p>
           )}
         </div>
       </div>
 
       {/* Tabs Navigation */}
       <div className="flex border-b border-[var(--border-app)] gap-2 overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => setActiveTab('users')}
+          className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
+            activeTab === 'users'
+              ? 'border-[#FF8A1F] text-[#FF8A1F]'
+              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Kullanıcılar ({data?.users?.length || 0})</span>
+        </button>
+
         <button
           type="button"
           onClick={() => setActiveTab('listings')}
@@ -386,20 +417,7 @@ export default function AdminPage() {
           }`}
         >
           <ListFilter className="w-4 h-4" />
-          <span>İlan Yönetimi</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('dealers')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
-            activeTab === 'dealers'
-              ? 'border-[#FF8A1F] text-[#FF8A1F]'
-              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          <span>Kurumsal Başvurular {pendingDealersCount > 0 && `(${pendingDealersCount})`}</span>
+          <span>İlan Yönetimi ({data?.listings?.length || 0})</span>
         </button>
 
         <button
@@ -417,15 +435,15 @@ export default function AdminPage() {
 
         <button
           type="button"
-          onClick={() => setActiveTab('users')}
+          onClick={() => setActiveTab('dealers')}
           className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
-            activeTab === 'users'
+            activeTab === 'dealers'
               ? 'border-[#FF8A1F] text-[#FF8A1F]'
               : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'
           }`}
         >
-          <Users className="w-4 h-4" />
-          <span>Kullanıcılar</span>
+          <Building2 className="w-4 h-4" />
+          <span>Kurumsal Başvurular {pendingDealersCount > 0 && `(${pendingDealersCount})`}</span>
         </button>
 
         <button
@@ -641,8 +659,12 @@ export default function AdminPage() {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleDealerAction(d.id, 'REJECTED')}
-                                className="btn-secondary text-[11px] py-1 px-2.5"
+                                onClick={() => {
+                                  setRejectTargetDealer(d);
+                                  setRejectionReasonInput('Fiziksel işletme bilgileri doğrulanamadığı için başvurunuz reddedildi.');
+                                  setRejectModalOpen(true);
+                                }}
+                                className="btn-secondary text-[11px] py-1 px-2.5 text-red-400 hover:text-red-300"
                               >
                                 Reddet
                               </button>
@@ -798,53 +820,113 @@ export default function AdminPage() {
       {/* TAB CONTENT 4: KULLANICILAR */}
       {activeTab === 'users' && (
         <div className="surface-card rounded-2xl border border-[var(--border-app)] p-6 space-y-4">
-          <h3 className="font-bold text-base text-[var(--text-main)]">Kayıtlı Kullanıcılar</h3>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-base text-[var(--text-main)]">Kayıtlı Kullanıcılar</h3>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">Sistemde kayıtlı hesaplar, rolleri ve bağlı karakter profilleri</p>
+            </div>
+            <div className="text-xs text-[var(--text-muted)] font-medium">
+              Toplam: <span className="font-bold text-[var(--text-main)]">{data?.users?.length || 0}</span> hesap
+            </div>
+          </div>
           <div className="overflow-x-auto rounded-xl border border-[var(--border-app)]">
             <table className="w-full text-left text-xs">
               <thead className="bg-[var(--bg-surface-secondary)] border-b border-[var(--border-app)] text-[var(--text-muted)] uppercase tracking-wider font-semibold">
                 <tr>
-                  <th className="py-3 px-4">User ID</th>
-                  <th className="py-3 px-4">Rol</th>
-                  <th className="py-3 px-4">Karakter Sayısı</th>
-                  <th className="py-3 px-4">Durum</th>
-                  <th className="py-3 px-4 text-right">İşlem</th>
+                  <th className="py-3.5 px-4">Karakter / Hesap</th>
+                  <th className="py-3.5 px-4">Yetki (Rol)</th>
+                  <th className="py-3.5 px-4">Karakterler</th>
+                  <th className="py-3.5 px-4">Kayıt Tarihi</th>
+                  <th className="py-3.5 px-4">Durum</th>
+                  <th className="py-3.5 px-4 text-right">İşlem</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-app)]">
-                {(data?.users || []).map((item: any) => (
-                  <tr key={item.user.id} className="hover:bg-[var(--bg-surface-secondary)]/30 transition-colors">
-                    <td className="py-3 px-4 font-mono font-semibold text-[var(--text-main)]">{item.user.id}</td>
-                    <td className="py-3 px-4">
-                      <span className="badge-tag">{item.user.role}</span>
-                    </td>
-                    <td className="py-3 px-4 text-[var(--text-main)] font-semibold">{item.profileCount}</td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          item.user.status === 'ACTIVE'
-                            ? 'bg-[var(--color-success-subtle)] text-[var(--color-success)]'
-                            : 'bg-[var(--color-danger-subtle)] text-[var(--color-danger)]'
-                        }`}
-                      >
-                        {item.user.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleBan(item.user.id)}
-                        className={`text-[11px] py-1 px-2.5 rounded-lg font-semibold inline-flex items-center gap-1 cursor-pointer ${
-                          item.user.status === 'ACTIVE'
-                            ? 'bg-[var(--color-danger-subtle)] text-[var(--color-danger)] hover:bg-[var(--color-danger)] hover:text-white'
-                            : 'bg-[var(--color-success-subtle)] text-[var(--color-success)] hover:bg-[var(--color-success)] hover:text-white'
-                        }`}
-                      >
-                        <Ban className="w-3 h-3" />
-                        <span>{item.user.status === 'ACTIVE' ? 'Engelle (Ban)' : 'Engeli Kaldır'}</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {(data?.users || []).map((item: any) => {
+                  const mainChar = item.characters && item.characters.length > 0 ? item.characters[0] : null;
+                  const allChars = item.characters || [];
+                  const isAdminRole = item.user.role === 'ADMIN';
+
+                  return (
+                    <tr key={item.user.id} className="hover:bg-[var(--bg-surface-secondary)]/30 transition-colors">
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] flex items-center justify-center shrink-0 overflow-hidden text-[var(--text-muted)]">
+                            {mainChar?.avatar_path ? (
+                              <img
+                                src={resolveMediaUrl(mainChar.avatar_path)}
+                                alt={mainChar.full_name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <UserIcon className="w-4 h-4" />
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-sm text-[var(--text-main)]">
+                              {mainChar?.full_name || 'İsimsiz Profil'}
+                            </div>
+                            <div className="font-mono text-[10px] text-[var(--text-dim)]">
+                              ID: {item.user.id.slice(0, 13)}...
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {isAdminRole ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-[#FF8A1F]/15 text-[#FF8A1F] border border-[#FF8A1F]/30">
+                            <Shield className="w-3 h-3" />
+                            ADMIN
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-[var(--bg-surface-secondary)] text-[var(--text-muted)] border border-[var(--border-app)]">
+                            USER
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-semibold text-[var(--text-main)]">
+                            {item.profileCount} Karakter
+                          </span>
+                          {allChars.length > 0 && (
+                            <span className="text-[10px] text-[var(--text-muted)] truncate max-w-[180px]">
+                              {allChars.map((c: any) => c.full_name).join(', ')}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-[var(--text-muted)]">
+                        {item.user.created_at ? formatDateTime(item.user.created_at) : '—'}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            item.user.status === 'ACTIVE'
+                              ? 'bg-[var(--color-success-subtle)] text-[var(--color-success)]'
+                              : 'bg-[var(--color-danger-subtle)] text-[var(--color-danger)]'
+                          }`}
+                        >
+                          {item.user.status === 'ACTIVE' ? 'Aktif' : 'Engelli'}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleBan(item.user.id)}
+                          className={`text-[11px] py-1 px-2.5 rounded-lg font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors ${
+                            item.user.status === 'ACTIVE'
+                              ? 'bg-[var(--color-danger-subtle)] text-[var(--color-danger)] hover:bg-[var(--color-danger)] hover:text-white'
+                              : 'bg-[var(--color-success-subtle)] text-[var(--color-success)] hover:bg-[var(--color-success)] hover:text-white'
+                          }`}
+                        >
+                          <Ban className="w-3 h-3" />
+                          <span>{item.user.status === 'ACTIVE' ? 'Engelle (Ban)' : 'Engeli Kaldır'}</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1127,6 +1209,63 @@ export default function AdminPage() {
                 Bu destek talebi kapatılmıştır. Yeni yanıt göndermek için yukarıdan talebi yeniden açabilirsiniz.
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Corporate Application Rejection Modal */}
+      {rejectModalOpen && rejectTargetDealer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
+          <div className="surface-card w-full max-w-md rounded-2xl border border-[var(--border-app)] shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-app)]">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-red-400" />
+                <h3 className="font-bold text-sm text-[var(--text-main)]">Kurumsal Başvuruyu Reddet</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRejectModalOpen(false)}
+                className="p-1 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-main)]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[var(--text-muted)]">
+              <strong>{rejectTargetDealer.company_name}</strong> adlı başvuruyu reddetmek üzeresiniz. Başvuru sahibine görüntülenecek ve bildirim olarak iletilecek reddedilme nedenini giriniz:
+            </p>
+
+            <form onSubmit={handleConfirmReject} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Reddedilme Nedeni</label>
+                <textarea
+                  rows={3}
+                  value={rejectionReasonInput}
+                  onChange={(e) => setRejectionReasonInput(e.target.value)}
+                  required
+                  placeholder="Örn: Fiziksel işletme bilgileri doğrulanamadığı için başvurunuz reddedildi."
+                  className="form-input text-xs resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRejectModalOpen(false)}
+                  className="btn-secondary text-xs py-2 px-4"
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading || !rejectionReasonInput.trim()}
+                  className="btn-danger text-xs py-2 px-4 flex items-center gap-1.5 cursor-pointer shadow-md"
+                >
+                  {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                  <span>Reddet ve Bildir</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -43,6 +43,11 @@ export interface ListingFilterParams {
 export function sanitizeListingForPublic(listing: Listing): PublicListingSummary {
   const coverImg = listing.images?.find((i) => i.is_cover)?.storage_path || listing.images?.[0]?.storage_path;
   const favCount = db.favorites.filter((f) => f.listing_id === listing.id).length;
+  const now = new Date();
+  const isFeatured = Boolean(
+    listing.is_featured &&
+    (!listing.featured_until || new Date(listing.featured_until) > now)
+  );
 
   return {
     id: listing.id,
@@ -56,6 +61,10 @@ export function sanitizeListingForPublic(listing: Listing): PublicListingSummary
     cover_image: coverImg,
     favorite_count: favCount,
     is_locked: true,
+    is_featured: isFeatured,
+    featured_until: listing.featured_until,
+    seller_type: listing.seller_type,
+    corporate_profile_id: listing.corporate_profile_id,
   };
 }
 
@@ -175,10 +184,17 @@ export async function getPublicListings(filters: ListingFilterParams = {}): Prom
     result = result.filter((l) => l.property_details?.building_type === filters.buildingType);
   }
 
-  // 9. Sorting
+  // 9. Sorting (Featured listings always appear first!)
   const getFavCount = (id: string) => db.favorites.filter((f) => f.listing_id === id).length;
 
   result.sort((a, b) => {
+    const aFeatured = Boolean(a.is_featured && (!a.featured_until || new Date(a.featured_until) > now));
+    const bFeatured = Boolean(b.is_featured && (!b.featured_until || new Date(b.featured_until) > now));
+
+    if (aFeatured !== bFeatured) {
+      return aFeatured ? -1 : 1;
+    }
+
     switch (filters.sort) {
       case 'price_asc':
         return a.price - b.price;
@@ -305,14 +321,14 @@ export async function createListingWithCredit(
   }
 
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // exactly 7 days
-  const newId = `lst-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-  const listingNumber = generateListingNumber(db.listings.length + 1);
-
   const sellerProfile = db.profiles.find((p) => p.id === sellerProfileId);
   const isCorporateRequest = input.seller_type === 'CORPORATE';
   const corporateProfileId = isCorporateRequest && sellerProfile?.is_dealer ? (input.corporate_profile_id || sellerProfile.dealer_id) : undefined;
   const sellerType = corporateProfileId ? 'CORPORATE' : 'INDIVIDUAL';
+  const durationDays = sellerType === 'CORPORATE' ? 14 : 7;
+  const expiresAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+  const newId = `lst-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const listingNumber = generateListingNumber(db.listings.length + 1);
 
   const newListing: Listing = {
     id: newId,

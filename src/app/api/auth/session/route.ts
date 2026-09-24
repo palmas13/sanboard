@@ -26,12 +26,16 @@ const STAGING_CHARACTER_ACCOUNTS: Record<string, { userId: string; role: 'USER' 
     role: 'ADMIN',
   },
   '44444444-4444-4444-4444-444444444443': {
-    userId: '22222222-2222-2222-2222-222222222222',
-    role: 'ADMIN',
+    userId: '33333333-3333-3333-3333-333333333333',
+    role: 'USER',
+  },
+  'b0de6077-d32b-42dc-909f-d12719749f96': {
+    userId: '33333333-3333-3333-3333-333333333333',
+    role: 'USER',
   },
   'char-ravi-03': {
-    userId: '22222222-2222-2222-2222-222222222222',
-    role: 'ADMIN',
+    userId: '33333333-3333-3333-3333-333333333333',
+    role: 'USER',
   },
 };
 

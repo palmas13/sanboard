@@ -1,5 +1,7 @@
 import {
   CharacterProfile,
+  CorporateApplication,
+  CorporateFollower,
   DealerProfile,
   Favorite,
   Listing,
@@ -18,6 +20,24 @@ import {
 // In-memory persistent state during server runtime
 class SanboardDatabase {
   users: User[] = [
+    {
+      id: '22222222-2222-2222-2222-222222222222',
+      provider: 'GTAWORLD',
+      external_user_id: 'gta-mock-user-1',
+      role: 'ADMIN',
+      status: 'ACTIVE',
+      created_at: '2026-09-01T10:00:00Z',
+      updated_at: '2026-09-01T10:00:00Z',
+    },
+    {
+      id: '33333333-3333-3333-3333-333333333333',
+      provider: 'GTAWORLD',
+      external_user_id: 'gta-mock-user-2',
+      role: 'USER',
+      status: 'ACTIVE',
+      created_at: '2026-09-10T12:00:00Z',
+      updated_at: '2026-09-10T12:00:00Z',
+    },
     {
       id: 'usr-admin-1',
       provider: 'GTAWORLD',
@@ -81,10 +101,20 @@ class SanboardDatabase {
       sanmail_email: 'apex.motors@sanmail.com',
       purpose: 'San Andreas genelinde kurumsal otomobil galerisi ve emlak ofisi işletmek.',
       status: 'APPROVED',
+      subscription_status: 'ACTIVE',
+      subscription_expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+      boost_credits: 3,
+      public_id: 1,
+      social_media: {
+        facebrowser: 'https://facebrowser.gtaw/apexmotors',
+      },
       created_at: '2026-09-02T10:00:00Z',
       updated_at: '2026-09-02T10:00:00Z',
     },
   ];
+
+  applications: CorporateApplication[] = [];
+  followers: CorporateFollower[] = [];
 
   packages: ListingPackage[] = [
     {

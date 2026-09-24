@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { MapPin, Calendar } from 'lucide-react';
+import { MapPin, Calendar, Sparkles } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { FavoriteButton } from './FavoriteButton';
 import { PublicListingSummary } from '@/types';
@@ -33,8 +33,14 @@ export function ListingCard({ listing, className = '' }: ListingCardProps) {
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
 
-          {/* Category Tag */}
-          <div className="absolute top-2.5 left-2.5">
+          {/* Category Tag & Featured Badge */}
+          <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
+            {listing.is_featured && (
+              <span className="badge-tag bg-gradient-to-r from-amber-500 to-[#FF8A1F] text-white border-amber-400/30 font-extrabold text-[10px] tracking-wider uppercase px-2 py-0.5 shadow-md flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-white fill-white" />
+                ÖNE ÇIKAN
+              </span>
+            )}
             <span className="badge-tag bg-black/65 backdrop-blur-md text-white border-white/10 font-semibold text-[11px]">
               {listing.subcategory}
             </span>

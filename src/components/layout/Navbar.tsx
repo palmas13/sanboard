@@ -26,7 +26,7 @@ import { resolveAvatarUrl } from '@/lib/media/url';
 
 export function Navbar() {
   const pathname = usePathname();
-  const { currentProfile, isAuthenticated, isAdmin, logout } = useAuth();
+  const { currentProfile, isAuthenticated, isLoading, isAdmin, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [navbarImgError, setNavbarImgError] = useState(false);
@@ -206,7 +206,9 @@ export function Navbar() {
               )}
             </div>
             );
-          })() : (
+          })() : isLoading ? (
+            <div className="h-8 w-20 rounded-lg bg-[var(--bg-surface-secondary)] animate-pulse border border-[var(--border-app)]" />
+          ) : (
             <Link
               href="/giris"
               className="btn-secondary text-sm py-2 px-4 font-semibold"

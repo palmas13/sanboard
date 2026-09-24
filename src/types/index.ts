@@ -115,6 +115,8 @@ export interface Listing {
   previous_price?: number;
   location: string | null;
   status: ListingStatus;
+  is_featured?: boolean;
+  featured_until?: string | null;
   published_at?: string;
   expires_at?: string;
   created_at: string;
@@ -146,6 +148,8 @@ export interface PublicListingSummary {
   cover_image?: string;
   favorite_count: number;
   is_favorited?: boolean;
+  is_featured?: boolean;
+  featured_until?: string | null;
   is_locked: true;
 }
 
@@ -214,7 +218,8 @@ export type NotificationType =
   | 'SYSTEM'
   | 'LISTING_EXPIRES_SOON'
   | 'CORPORATE_APPLICATION_APPROVED'
-  | 'CORPORATE_APPLICATION_REJECTED';
+  | 'CORPORATE_APPLICATION_REJECTED'
+  | 'NEW_CORPORATE_LISTING';
 
 export interface Notification {
   id: string;
@@ -258,6 +263,7 @@ export interface SoldListingAudit {
 }
 
 export type DealerStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type CorporateSubscriptionStatus = 'INACTIVE' | 'ACTIVE' | 'EXPIRED';
 
 export interface DealerProfile {
   id: string;
@@ -279,11 +285,30 @@ export interface DealerProfile {
   is_verified?: boolean;
   purpose?: string;
   status: DealerStatus;
+  subscription_status?: CorporateSubscriptionStatus;
+  subscription_expires_at?: string | null;
+  boost_credits?: number;
+  social_media?: {
+    twitter?: string;
+    instagram?: string;
+    discord?: string;
+    facebrowser?: string;
+  };
+  follower_count?: number;
+  is_following?: boolean;
   created_at: string;
   updated_at: string;
 }
 
 export type CorporateProfile = DealerProfile;
+
+export interface CorporateFollower {
+  id: string;
+  follower_profile_id: string;
+  corporate_profile_id: string;
+  created_at: string;
+  follower?: CharacterProfile;
+}
 
 export interface CorporateApplication {
   id: string;
@@ -291,6 +316,7 @@ export interface CorporateApplication {
   company_name: string;
   purpose: string;
   status: DealerStatus;
+  rejection_reason?: string;
   reviewed_by?: string;
   reviewed_at?: string;
   created_at: string;

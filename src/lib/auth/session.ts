@@ -122,20 +122,29 @@ export function verifySessionToken(token: string): SessionPayload | null {
 export async function getServerSession(
   req?: NextRequest | Request
 ): Promise<SessionPayload | null> {
-  if (!req) return null;
-
   let rawToken: string | undefined;
 
-  if ('cookies' in req && typeof req.cookies?.get === 'function') {
-    rawToken = req.cookies.get('sanboard_session')?.value;
-  }
+  if (req) {
+    if ('cookies' in req && typeof req.cookies?.get === 'function') {
+      rawToken = req.cookies.get('sanboard_session')?.value;
+    }
 
-  // Fallback to reading from standard Cookie header
-  if (!rawToken) {
-    const cookieHeader = req.headers.get('cookie') || '';
-    const match = cookieHeader.match(/(?:^|;\s*)sanboard_session=([^;]+)/);
-    if (match) {
-      rawToken = decodeURIComponent(match[1]);
+    // Fallback to reading from standard Cookie header
+    if (!rawToken) {
+      const cookieHeader = req.headers.get('cookie') || '';
+      const match = cookieHeader.match(/(?:^|;\s*)sanboard_session=([^;]+)/);
+      if (match) {
+        rawToken = decodeURIComponent(match[1]);
+      }
+    }
+  } else {
+    // Next.js App Router Server Component / Layout context
+    try {
+      const { cookies } = await import('next/headers');
+      const cookieStore = await cookies();
+      rawToken = cookieStore.get('sanboard_session')?.value;
+    } catch {
+      return null;
     }
   }
 

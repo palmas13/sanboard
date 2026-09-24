@@ -2,6 +2,7 @@ import React from 'react';
 import { notFound, redirect } from 'next/navigation';
 import { getDealerRepository, getListingRepository } from '@/lib/db/repositories';
 import { ListingCard } from '@/components/listings/ListingCard';
+import { CorporateStoreFollow } from '@/components/dealers/CorporateStoreFollow';
 import {
   Crown,
   MapPin,
@@ -11,6 +12,9 @@ import {
   Home,
   ShieldCheck,
   Calendar,
+  AlertCircle,
+  Globe,
+  Share2,
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/format';
 import { resolveMediaUrl } from '@/lib/media/url';
@@ -60,8 +64,19 @@ export default async function PremiumStoreVitrinPage({ params }: PageProps) {
     dealer = all;
   }
 
-  if (!dealer || dealer.status !== 'APPROVED') {
+  if (!dealer || dealer.status !== 'APPROVED' || dealer.subscription_status === 'INACTIVE') {
     notFound();
+  }
+
+  // Follower count lookup
+  let followerCount = dealer.follower_count || 0;
+  if (!dealer.follower_count && typeof (dealerRepo as any).getFollowers === 'function') {
+    try {
+      const followersList = await (dealerRepo as any).getFollowers(dealer.id);
+      followerCount = followersList.length;
+    } catch {
+      // Ignore
+    }
   }
 
   const listingRepo = getListingRepository();
@@ -81,6 +96,7 @@ export default async function PremiumStoreVitrinPage({ params }: PageProps) {
     cover_image: l.images?.find((i: any) => i.is_cover)?.storage_path || l.images?.[0]?.storage_path,
     favorite_count: l.favorite_count || 0,
     is_locked: true as const,
+    is_featured: l.is_featured,
   });
 
   const vehicleSummaries = vehicles.map(mapToSummary);
@@ -88,6 +104,9 @@ export default async function PremiumStoreVitrinPage({ params }: PageProps) {
 
   const logoSrc = resolveMediaUrl(dealer.logo_path || dealer.logo_url);
   const bannerSrc = resolveMediaUrl(dealer.banner_path || dealer.banner_url);
+
+  const isExpired = dealer.subscription_status === 'EXPIRED';
+  const social = dealer.social_media || {};
 
   return (
     <div className="space-y-8 pb-16">
@@ -105,10 +124,20 @@ export default async function PremiumStoreVitrinPage({ params }: PageProps) {
         <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-app)] via-black/40 to-transparent" />
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+        {/* Expired Subscription Notice Banner */}
+        {isExpired && (
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <span>
+              Bu işletmenin kurumsal Sanboard üyeliği sona ermiştir. Önceden yayınlanmış ilanlar süreleri dolana kadar yayında kalır.
+            </span>
+          </div>
+        )}
+
         {/* Dealer Header Profile Card */}
         <div className="surface-card -mt-20 sm:-mt-24 p-6 sm:p-8 rounded-2xl border border-[var(--border-app)] shadow-2xl relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 flex-1 min-w-0">
             <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden border-4 border-[var(--bg-surface)] shadow-lg bg-[var(--bg-surface)] shrink-0 flex items-center justify-center">
               {logoSrc ? (
                 <img
@@ -122,7 +151,7 @@ export default async function PremiumStoreVitrinPage({ params }: PageProps) {
                 </div>
               )}
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)]">
                   {dealer.company_name}
@@ -162,25 +191,80 @@ export default async function PremiumStoreVitrinPage({ params }: PageProps) {
                   <span>Doğrulanmış Kurumsal Üye</span>
                 </div>
               </div>
+
+              {/* Social Media Links (Corporate Profile Only) */}
+              {(social.facebrowser || social.twitter || social.instagram || social.website || social.discord) && (
+                <div className="flex items-center gap-2 pt-1 flex-wrap">
+                  <span className="text-[11px] font-bold text-[var(--text-dim)] flex items-center gap-1">
+                    <Share2 className="w-3 h-3 text-[#FF8A1F]" />
+                    <span>Sosyal:</span>
+                  </span>
+                  {social.facebrowser && (
+                    <a
+                      href={social.facebrowser}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2 py-0.5 rounded-md bg-[var(--bg-surface-secondary)] hover:bg-[#FF8A1F]/20 text-[11px] text-[var(--text-main)] hover:text-[#FF8A1F] border border-[var(--border-app)] transition-colors"
+                    >
+                      Facebrowser
+                    </a>
+                  )}
+                  {social.twitter && (
+                    <a
+                      href={social.twitter}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2 py-0.5 rounded-md bg-[var(--bg-surface-secondary)] hover:bg-[#FF8A1F]/20 text-[11px] text-[var(--text-main)] hover:text-[#FF8A1F] border border-[var(--border-app)] transition-colors"
+                    >
+                      X (Twitter)
+                    </a>
+                  )}
+                  {social.instagram && (
+                    <a
+                      href={social.instagram}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2 py-0.5 rounded-md bg-[var(--bg-surface-secondary)] hover:bg-[#FF8A1F]/20 text-[11px] text-[var(--text-main)] hover:text-[#FF8A1F] border border-[var(--border-app)] transition-colors"
+                    >
+                      Instagram
+                    </a>
+                  )}
+                  {social.website && (
+                    <a
+                      href={social.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2 py-0.5 rounded-md bg-[var(--bg-surface-secondary)] hover:bg-[#FF8A1F]/20 text-[11px] text-[var(--text-main)] hover:text-[#FF8A1F] border border-[var(--border-app)] transition-colors flex items-center gap-1"
+                    >
+                      <Globe className="w-3 h-3" />
+                      Web
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Quick Contact Info */}
-          <div className="flex flex-col sm:flex-row md:flex-col gap-2.5 w-full md:w-auto shrink-0 bg-[var(--bg-surface-secondary)] p-4 rounded-xl border border-[var(--border-app)] text-xs">
-            {dealer.phone && (
-              <div className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-[#FF8A1F] shrink-0" />
-                <span className="font-mono font-bold text-[var(--text-main)]">{dealer.phone}</span>
-              </div>
-            )}
-            {(dealer.sanmail_email || dealer.email) && (
-              <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-[#FF8A1F] shrink-0" />
-                <span className="text-[var(--text-muted)] truncate max-w-[200px]">
-                  {dealer.sanmail_email || dealer.email}
-                </span>
-              </div>
-            )}
+          {/* Quick Contact Info & Follow Actions */}
+          <div className="flex flex-col sm:flex-row md:flex-col gap-3 w-full md:w-auto shrink-0">
+            <CorporateStoreFollow dealerId={dealer.id} initialFollowerCount={followerCount} />
+
+            <div className="bg-[var(--bg-surface-secondary)] p-4 rounded-xl border border-[var(--border-app)] text-xs space-y-2">
+              {dealer.phone && (
+                <div className="flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-[#FF8A1F] shrink-0" />
+                  <span className="font-mono font-bold text-[var(--text-main)]">{dealer.phone}</span>
+                </div>
+              )}
+              {(dealer.sanmail_email || dealer.email) && (
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-[#FF8A1F] shrink-0" />
+                  <span className="text-[var(--text-muted)] truncate max-w-[200px]">
+                    {dealer.sanmail_email || dealer.email}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

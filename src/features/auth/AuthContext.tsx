@@ -28,6 +28,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const MOCK_CHARACTER_ACCOUNTS: Record<string, User> = {
+  // Admin Account (Mavis in seed.sql)
   '44444444-4444-4444-4444-444444444441': {
     id: '22222222-2222-2222-2222-222222222222',
     provider: 'GTAWORLD',
@@ -35,14 +36,6 @@ const MOCK_CHARACTER_ACCOUNTS: Record<string, User> = {
     status: 'ACTIVE',
     created_at: '2026-09-01T10:00:00Z',
     updated_at: '2026-09-01T10:00:00Z',
-  },
-  '44444444-4444-4444-4444-444444444442': {
-    id: '22222222-2222-2222-2222-222222222222',
-    provider: 'GTAWORLD',
-    role: 'ADMIN',
-    status: 'ACTIVE',
-    created_at: '2026-09-10T12:00:00Z',
-    updated_at: '2026-09-10T12:00:00Z',
   },
   'char-mavis-01': {
     id: '22222222-2222-2222-2222-222222222222',
@@ -52,6 +45,15 @@ const MOCK_CHARACTER_ACCOUNTS: Record<string, User> = {
     created_at: '2026-09-01T10:00:00Z',
     updated_at: '2026-09-01T10:00:00Z',
   },
+  // Character on same admin account
+  '44444444-4444-4444-4444-444444444442': {
+    id: '22222222-2222-2222-2222-222222222222',
+    provider: 'GTAWORLD',
+    role: 'ADMIN',
+    status: 'ACTIVE',
+    created_at: '2026-09-10T12:00:00Z',
+    updated_at: '2026-09-10T12:00:00Z',
+  },
   'char-zade-02': {
     id: '22222222-2222-2222-2222-222222222222',
     provider: 'GTAWORLD',
@@ -60,37 +62,54 @@ const MOCK_CHARACTER_ACCOUNTS: Record<string, User> = {
     created_at: '2026-09-10T12:00:00Z',
     updated_at: '2026-09-10T12:00:00Z',
   },
+  // Standard User Account (Ravi Blumon & standard users - strictly USER role)
   '44444444-4444-4444-4444-444444444443': {
-    id: '22222222-2222-2222-2222-222222222222',
+    id: '33333333-3333-3333-3333-333333333333',
     provider: 'GTAWORLD',
-    role: 'ADMIN',
+    role: 'USER',
     status: 'ACTIVE',
     created_at: '2026-09-15T10:00:00Z',
     updated_at: '2026-09-15T10:00:00Z',
   },
   'b0de6077-d32b-42dc-909f-d12719749f96': {
-    id: '22222222-2222-2222-2222-222222222222',
+    id: '33333333-3333-3333-3333-333333333333',
     provider: 'GTAWORLD',
-    role: 'ADMIN',
+    role: 'USER',
     status: 'ACTIVE',
     created_at: '2026-09-15T10:00:00Z',
     updated_at: '2026-09-15T10:00:00Z',
   },
   'char-ravi-03': {
-    id: '22222222-2222-2222-2222-222222222222',
+    id: '33333333-3333-3333-3333-333333333333',
     provider: 'GTAWORLD',
-    role: 'ADMIN',
+    role: 'USER',
     status: 'ACTIVE',
     created_at: '2026-09-15T10:00:00Z',
     updated_at: '2026-09-15T10:00:00Z',
   },
 };
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
-  const [user, setUser] = useState<User | null>(null);
-  const [currentProfile, setCurrentProfile] = useState<CharacterProfile | null>(null);
-  const [characterProfiles, setCharacterProfiles] = useState<Record<string, CharacterProfile>>({});
+export interface AuthProviderProps {
+  children: React.ReactNode;
+  initialUser?: User | null;
+  initialProfile?: CharacterProfile | null;
+  initialStatus?: AuthStatus;
+}
+
+export function AuthProvider({
+  children,
+  initialUser = null,
+  initialProfile = null,
+  initialStatus,
+}: AuthProviderProps) {
+  const [authStatus, setAuthStatus] = useState<AuthStatus>(
+    initialProfile ? 'authenticated' : (initialStatus || 'loading')
+  );
+  const [user, setUser] = useState<User | null>(initialUser);
+  const [currentProfile, setCurrentProfile] = useState<CharacterProfile | null>(initialProfile);
+  const [characterProfiles, setCharacterProfiles] = useState<Record<string, CharacterProfile>>(
+    initialProfile ? { [initialProfile.id]: initialProfile } : {}
+  );
   const [characters, setCharacters] = useState<GtaWorldCharacter[]>(MOCK_CHARACTERS);
 
   const saveState = useCallback(
@@ -170,6 +189,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     async function initSession() {
+      // If initialProfile was provided from server bootstrap, do not double-fetch
+      if (initialProfile && isMounted) {
+        try {
+          const charRes = await fetch('/api/user/characters');
+          if (charRes.ok && isMounted) {
+            const charData = await charRes.json();
+            if (charData?.success && Array.isArray(charData.characters) && charData.characters.length > 0) {
+              setCharacters(charData.characters);
+            }
+          }
+        } catch {
+          // Ignore
+        }
+        return;
+      }
+
       try {
         const res = await fetch('/api/user/profile');
         if (!isMounted) return;

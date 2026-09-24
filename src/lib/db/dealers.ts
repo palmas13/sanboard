@@ -1,5 +1,6 @@
 import { db } from './store';
-import { DealerProfile, DealerStatus, Listing } from '@/types';
+import { DealerProfile, DealerStatus, Listing, CorporateApplication, CorporateProfile, CharacterProfile, CorporateFollower } from '@/types';
+import { getDealerRepository, getListingRepository, getNotificationRepository } from './repositories';
 
 export function ensureDealers() {
   if (!db.dealers) {
@@ -17,21 +18,32 @@ export function ensureDealers() {
         sanmail_email: 'apex.motors@sanmail.com',
         purpose: 'San Andreas genelinde kurumsal otomobil galerisi ve emlak ofisi işletmek.',
         status: 'APPROVED',
+        subscription_status: 'ACTIVE',
+        subscription_expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+        boost_credits: 3,
+        public_id: 1,
+        social_media: {
+          facebrowser: 'https://facebrowser.gtaw/apexmotors',
+        },
         created_at: '2026-09-02T10:00:00Z',
         updated_at: '2026-09-02T10:00:00Z',
       },
     ];
   }
+  if (!db.applications) {
+    db.applications = [];
+  }
+  if (!db.followers) {
+    db.followers = [];
+  }
 }
-
-import { getDealerRepository, getListingRepository } from './repositories';
 
 export async function getDealerByProfileId(profileId: string): Promise<DealerProfile | null> {
   if (process.env.DATA_STORE === 'supabase') {
     return getDealerRepository().getDealerByProfileId(profileId) as any;
   }
   ensureDealers();
-  return db.dealers.find((d) => d.profile_id === profileId) || null;
+  return db.dealers.find((d) => d.profile_id === profileId || d.owner_profile_id === profileId) || null;
 }
 
 export async function getDealerById(dealerId: string): Promise<DealerProfile | null> {
@@ -50,58 +62,297 @@ export async function getDealerBySlug(slug: string): Promise<DealerProfile | nul
   return db.dealers.find((d) => d.slug === slug) || null;
 }
 
+export async function getApplicationByProfileId(profileId: string): Promise<CorporateApplication | null> {
+  if (process.env.DATA_STORE === 'supabase') {
+    const repo = getDealerRepository();
+    if (typeof repo.getApplicationByProfileId === 'function') {
+      return repo.getApplicationByProfileId(profileId);
+    }
+  }
+  ensureDealers();
+  const apps = (db.applications || [])
+    .filter((a) => a.applicant_profile_id === profileId)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  return apps[0] || null;
+}
+
+export async function getAllApplications(): Promise<CorporateApplication[]> {
+  if (process.env.DATA_STORE === 'supabase') {
+    const repo = getDealerRepository();
+    if (typeof repo.getAllApplications === 'function') {
+      return repo.getAllApplications();
+    }
+  }
+  ensureDealers();
+  return [...(db.applications || [])].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+}
+
 export async function applyForDealer(params: {
   profileId: string;
   companyName: string;
   purpose: string;
-}): Promise<{ success: boolean; dealer?: DealerProfile; error?: string }> {
+}): Promise<{ success: boolean; application?: CorporateApplication; error?: string }> {
+  if (process.env.DATA_STORE === 'supabase') {
+    return getDealerRepository().createApplication(params);
+  }
   ensureDealers();
   const profile = db.profiles.find((p) => p.id === params.profileId);
   if (!profile) return { success: false, error: 'Profil bulunamadı.' };
 
-  const existing = db.dealers.find((d) => d.profile_id === params.profileId);
-  if (existing) {
-    if (existing.status === 'PENDING') {
-      return { success: false, error: 'Zaten beklemede olan bir kurumsal başvurunuz var.' };
-    }
-    if (existing.status === 'APPROVED') {
-      return { success: false, error: 'Zaten onaylanmış bir kurumsal hesabınız bulunmaktadır.' };
+  const existingStore = db.dealers.find(
+    (d) => (d.profile_id === params.profileId || d.owner_profile_id === params.profileId) && d.status === 'APPROVED'
+  );
+  if (existingStore) {
+    return { success: false, error: 'Zaten onaylanmış bir kurumsal hesabınız bulunmaktadır.' };
+  }
+
+  const existingPending = (db.applications || []).find(
+    (a) => a.applicant_profile_id === params.profileId && a.status === 'PENDING'
+  );
+  if (existingPending) {
+    return { success: false, error: 'Zaten beklemede olan bir kurumsal başvurunuz bulunmaktadır.' };
+  }
+
+  const newApp: CorporateApplication = {
+    id: `app-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    applicant_profile_id: params.profileId,
+    company_name: params.companyName.trim(),
+    purpose: params.purpose.trim(),
+    status: 'PENDING',
+    created_at: new Date().toISOString(),
+  };
+
+  db.applications.push(newApp);
+  return { success: true, application: newApp };
+}
+
+export async function reviewApplication(
+  applicationId: string,
+  status: 'APPROVED' | 'REJECTED',
+  rejectionReason?: string,
+  reviewerUserId?: string
+): Promise<{ success: boolean; error?: string }> {
+  if (process.env.DATA_STORE === 'supabase') {
+    const repo = getDealerRepository();
+    if (typeof repo.reviewApplication === 'function') {
+      return repo.reviewApplication(applicationId, status, rejectionReason, reviewerUserId);
     }
   }
 
-  const id = `dealer-${Date.now()}`;
-  const slug = params.companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  ensureDealers();
+  const app = (db.applications || []).find((a) => a.id === applicationId);
+  if (!app) return { success: false, error: 'Başvuru bulunamadı.' };
 
-  const newDealer: DealerProfile = {
-    id,
-    profile_id: params.profileId,
-    company_name: params.companyName.trim(),
-    slug,
-    purpose: params.purpose.trim(),
-    description: `${params.companyName.trim()} resmi Sanboard kurumsal satış vitrinidir.`,
-    logo_url: profile.avatar_url || 'https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=300',
-    banner_url: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=1600',
-    address: 'Los Santos, San Andreas',
-    phone: profile.phone,
-    sanmail_email: profile.sanmail_email,
-    status: 'PENDING',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+  app.status = status;
+  app.reviewed_by = reviewerUserId;
+  app.reviewed_at = new Date().toISOString();
+
+  const profile = db.profiles.find((p) => p.id === app.applicant_profile_id);
+  const targetUserId = profile?.user_id;
+
+  if (status === 'APPROVED') {
+    let store = db.dealers.find((d) => d.profile_id === app.applicant_profile_id);
+    if (!store) {
+      store = {
+        id: `dealer-${Date.now()}`,
+        profile_id: app.applicant_profile_id,
+        owner_profile_id: app.applicant_profile_id,
+        company_name: app.company_name,
+        slug: app.company_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+        description: app.purpose,
+        logo_url: profile?.avatar_url || '',
+        banner_url: '',
+        address: 'Los Santos, San Andreas',
+        phone: profile?.phone,
+        sanmail_email: profile?.sanmail_email,
+        status: 'APPROVED',
+        subscription_status: 'INACTIVE', // Requires activation/package purchase
+        boost_credits: 3,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      db.dealers.push(store);
+    } else {
+      store.status = 'APPROVED';
+      store.subscription_status = store.subscription_status || 'INACTIVE';
+      store.boost_credits = store.boost_credits ?? 3;
+    }
+
+    if (profile) {
+      profile.is_dealer = true;
+      profile.dealer_id = store.id;
+    }
+
+    if (targetUserId) {
+      await getNotificationRepository().createNotification({
+        user_id: targetUserId,
+        type: 'CORPORATE_APPLICATION_APPROVED',
+        title: 'Kurumsal Profiliniz Onaylandı',
+        message: `"${app.company_name}" adına yaptığınız kurumsal satış başvurusu onaylanmıştır. Kurumsal panelden üyeliğinizi aktif ederek avantajlardan yararlanabilirsiniz.`,
+        entity_type: 'application',
+        entity_id: app.id,
+      });
+    }
+  } else if (status === 'REJECTED') {
+    app.rejection_reason = rejectionReason || 'Fiziksel işletme bilgileri doğrulanamadı.';
+    if (targetUserId) {
+      await getNotificationRepository().createNotification({
+        user_id: targetUserId,
+        type: 'CORPORATE_APPLICATION_REJECTED',
+        title: 'Kurumsal Başvurunuz Reddedildi',
+        message: `Kurumsal hesap başvurunuz reddedildi. Neden: ${app.rejection_reason}`,
+        entity_type: 'application',
+        entity_id: app.id,
+      });
+    }
+  }
+
+  return { success: true };
+}
+
+export async function activateSubscription(dealerId: string): Promise<{ success: boolean; dealer?: CorporateProfile; error?: string }> {
+  if (process.env.DATA_STORE === 'supabase') {
+    const repo = getDealerRepository();
+    if (typeof repo.activateSubscription === 'function') {
+      return repo.activateSubscription(dealerId);
+    }
+  }
+
+  ensureDealers();
+  const dealer = db.dealers.find((d) => d.id === dealerId);
+  if (!dealer) return { success: false, error: 'Kurumsal mağaza bulunamadı.' };
+
+  dealer.subscription_status = 'ACTIVE';
+  dealer.subscription_expires_at = new Date(Date.now() + 30 * 86400000).toISOString();
+  dealer.boost_credits = 3;
+  dealer.updated_at = new Date().toISOString();
+
+  return { success: true, dealer };
+}
+
+export async function boostListing(
+  dealerId: string,
+  listingId: string
+): Promise<{ success: boolean; error?: string; remainingBoosts?: number; featured_until?: string }> {
+  if (process.env.DATA_STORE === 'supabase') {
+    const repo = getDealerRepository();
+    if (typeof repo.boostListing === 'function') {
+      return repo.boostListing(dealerId, listingId);
+    }
+  }
+
+  ensureDealers();
+  const dealer = db.dealers.find((d) => d.id === dealerId);
+  if (!dealer) return { success: false, error: 'Kurumsal mağaza bulunamadı.' };
+  if (dealer.subscription_status !== 'ACTIVE') {
+    return { success: false, error: 'Kurumsal üyeliğiniz aktif değil. Öne çıkarma hakkı kullanamazsınız.' };
+  }
+  if (!dealer.boost_credits || dealer.boost_credits <= 0) {
+    return { success: false, error: 'Bu abonelik dönemi için öne çıkarma hakkınız tükenmiştir.' };
+  }
+
+  const listing = db.listings.find((l) => l.id === listingId);
+  if (!listing) return { success: false, error: 'İlan bulunamadı.' };
+  if (listing.status !== 'ACTIVE') {
+    return { success: false, error: 'Yalnızca aktif yayındaki ilanlar öne çıkarılabilir.' };
+  }
+
+  const now = new Date();
+  if (listing.is_featured && listing.featured_until && new Date(listing.featured_until) > now) {
+    return { success: false, error: 'Bu ilan zaten aktif olarak öne çıkarılmış durumdadır.' };
+  }
+
+  dealer.boost_credits -= 1;
+  listing.is_featured = true;
+  const boostEnd = new Date(now.getTime() + 24 * 3600 * 1000).toISOString();
+  listing.featured_until = boostEnd;
+
+  return {
+    success: true,
+    remainingBoosts: dealer.boost_credits,
+    featured_until: boostEnd,
   };
+}
 
-  db.dealers.push(newDealer);
-  return { success: true, dealer: newDealer };
+export async function toggleFollow(
+  followerProfileId: string,
+  corporateProfileId: string
+): Promise<{ isFollowing: boolean; count: number; followerCount?: number }> {
+  if (process.env.DATA_STORE === 'supabase') {
+    const repo = getDealerRepository();
+    if (typeof repo.toggleFollow === 'function') {
+      return repo.toggleFollow(followerProfileId, corporateProfileId);
+    }
+  }
+
+  ensureDealers();
+  const idx = db.followers.findIndex(
+    (f) => f.follower_profile_id === followerProfileId && f.corporate_profile_id === corporateProfileId
+  );
+
+  let isFollowing = false;
+  if (idx >= 0) {
+    db.followers.splice(idx, 1);
+    isFollowing = false;
+  } else {
+    db.followers.push({
+      id: `flw-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      follower_profile_id: followerProfileId,
+      corporate_profile_id: corporateProfileId,
+      created_at: new Date().toISOString(),
+    });
+    isFollowing = true;
+  }
+
+  const count = db.followers.filter((f) => f.corporate_profile_id === corporateProfileId).length;
+  return { isFollowing, count, followerCount: count };
+}
+
+export async function getFollowers(corporateProfileId: string): Promise<CharacterProfile[]> {
+  if (process.env.DATA_STORE === 'supabase') {
+    const repo = getDealerRepository();
+    if (typeof repo.getFollowers === 'function') {
+      return repo.getFollowers(corporateProfileId);
+    }
+  }
+
+  ensureDealers();
+  const followerIds = db.followers
+    .filter((f) => f.corporate_profile_id === corporateProfileId)
+    .map((f) => f.follower_profile_id);
+
+  return db.profiles.filter((p) => followerIds.includes(p.id));
+}
+
+export async function isFollowing(followerProfileId: string, corporateProfileId: string): Promise<boolean> {
+  if (process.env.DATA_STORE === 'supabase') {
+    const repo = getDealerRepository();
+    if (typeof repo.isFollowing === 'function') {
+      return repo.isFollowing(followerProfileId, corporateProfileId);
+    }
+  }
+
+  ensureDealers();
+  return db.followers.some(
+    (f) => f.follower_profile_id === followerProfileId && f.corporate_profile_id === corporateProfileId
+  );
 }
 
 export async function updateDealerProfile(
   dealerId: string,
   profileId: string,
-  data: Partial<Pick<DealerProfile, 'company_name' | 'description' | 'logo_url' | 'banner_url' | 'address' | 'phone' | 'sanmail_email'>>
+  data: Partial<Pick<DealerProfile, 'company_name' | 'description' | 'logo_url' | 'banner_url' | 'address' | 'phone' | 'sanmail_email' | 'social_media'>>
 ): Promise<{ success: boolean; dealer?: DealerProfile; error?: string }> {
+  if (process.env.DATA_STORE === 'supabase') {
+    return getDealerRepository().updateDealerProfile(dealerId, data);
+  }
+  ensureDealers();
   const dealer = db.dealers.find((d) => d.id === dealerId);
   if (!dealer) return { success: false, error: 'Kurumsal profil bulunamadı.' };
 
-  if (dealer.profile_id !== profileId) {
+  if (dealer.profile_id !== profileId && dealer.owner_profile_id !== profileId) {
     return { success: false, error: 'Bu kurumsal profili düzenleme yetkiniz yok.' };
   }
 
@@ -112,6 +363,7 @@ export async function updateDealerProfile(
   if (data.address) dealer.address = data.address.trim();
   if (data.phone) dealer.phone = data.phone.trim();
   if (data.sanmail_email) dealer.sanmail_email = data.sanmail_email.trim();
+  if (data.social_media) dealer.social_media = data.social_media;
   dealer.updated_at = new Date().toISOString();
 
   return { success: true, dealer };
@@ -120,8 +372,8 @@ export async function updateDealerProfile(
 export async function getAllDealers(): Promise<DealerProfile[]> {
   if (process.env.DATA_STORE === 'supabase') {
     const repo = getDealerRepository();
-    if (typeof (repo as any).getAllDealers === 'function') {
-      return (repo as any).getAllDealers();
+    if (typeof repo.getAllDealers === 'function') {
+      return repo.getAllDealers();
     }
   }
   ensureDealers();
@@ -132,107 +384,21 @@ export async function getAllDealers(): Promise<DealerProfile[]> {
 
 export async function updateDealerStatus(
   dealerId: string,
-  status: DealerStatus
+  status: DealerStatus,
+  rejectionReason?: string
 ): Promise<boolean> {
-  if (process.env.DATA_STORE === 'supabase') {
-    const { getSupabaseAdminClient } = await import('./supabase-client');
-    const client = getSupabaseAdminClient();
-    if (!client) return false;
-
-    // Check if dealerId is a corporate_application
-    const { data: app } = await client.from('corporate_applications').select('*').eq('id', dealerId).maybeSingle();
-    if (app) {
-      await client.from('corporate_applications').update({ status }).eq('id', dealerId);
-
-      const { data: profile } = await client
-        .from('character_profiles')
-        .select('id, user_id, full_name')
-        .or(`id.eq.${app.applicant_profile_id},external_character_id.eq.${app.applicant_profile_id}`)
-        .maybeSingle();
-
-      const targetUserId = profile?.user_id;
-      const targetProfileId = profile?.id || app.applicant_profile_id;
-
-      if (status === 'APPROVED') {
-        // Create or update corporate profile
-        const { data: newStore } = await client
-          .from('corporate_profiles')
-          .insert({
-            owner_profile_id: targetProfileId,
-            company_name: app.company_name,
-            slug: app.company_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
-            description: app.purpose,
-            status: 'APPROVED',
-          })
-          .select()
-          .single();
-
-        if (newStore) {
-          await client.from('character_profiles').update({ is_dealer: true, dealer_id: newStore.id }).eq('id', targetProfileId);
-        }
-
-        if (targetUserId) {
-          const { getNotificationRepository } = await import('./repositories');
-          await getNotificationRepository().createNotification({
-            user_id: targetUserId,
-            type: 'SYSTEM',
-            title: 'Kurumsal Profiliniz Onaylandı',
-            message: `"${app.company_name}" adına yaptığınız kurumsal satış başvurusu onaylanmıştır. Artık kurumsal mağazanızı yönetebilirsiniz.`,
-            entity_type: 'application',
-            entity_id: app.id,
-          });
-        }
-      } else if (status === 'REJECTED') {
-        if (targetUserId) {
-          const { getNotificationRepository } = await import('./repositories');
-          await getNotificationRepository().createNotification({
-            user_id: targetUserId,
-            type: 'SYSTEM',
-            title: 'Kurumsal Başvurunuz Reddedildi',
-            message: `"${app.company_name}" adına yaptığınız kurumsal satış başvurusu reddedilmiştir.`,
-            entity_type: 'application',
-            entity_id: app.id,
-          });
-        }
-      }
-      return true;
-    }
-
-    // Check corporate_profiles
-    const { data: store } = await client.from('corporate_profiles').select('*').eq('id', dealerId).maybeSingle();
-    if (store) {
-      await client.from('corporate_profiles').update({ status, updated_at: new Date().toISOString() }).eq('id', dealerId);
-      if (store.owner_profile_id) {
-        await client.from('character_profiles').update({
-          is_dealer: status === 'APPROVED',
-          dealer_id: status === 'APPROVED' ? dealerId : null,
-        }).eq('id', store.owner_profile_id);
-      }
-      return true;
-    }
-
-    return false;
+  if (status === 'APPROVED' || status === 'REJECTED') {
+    const res = await reviewApplication(dealerId, status, rejectionReason);
+    if (res.success) return true;
   }
 
+  // Fallback to updating dealer directly
   ensureDealers();
   const dealer = db.dealers.find((d) => d.id === dealerId);
   if (!dealer) return false;
 
   dealer.status = status;
   dealer.updated_at = new Date().toISOString();
-
-  // If approved, update character profile
-  const profile = db.profiles.find((p) => p.id === dealer.profile_id);
-  if (profile) {
-    if (status === 'APPROVED') {
-      profile.is_dealer = true;
-      profile.dealer_id = dealerId;
-    } else if (status === 'REJECTED') {
-      profile.is_dealer = false;
-      profile.dealer_id = undefined;
-    }
-  }
-
   return true;
 }
 
@@ -240,13 +406,18 @@ export async function getDealerListings(profileId: string): Promise<{ vehicles: 
   if (process.env.DATA_STORE === 'supabase') {
     const all = await getListingRepository().getUserListings(profileId);
     return {
-      vehicles: all.filter((l) => l.category === 'vehicle' && l.status === 'ACTIVE'),
-      properties: all.filter((l) => l.category === 'property' && l.status === 'ACTIVE'),
+      vehicles: all.filter((l) => l.category === 'vehicle' && l.status === 'ACTIVE' && l.seller_type === 'CORPORATE'),
+      properties: all.filter((l) => l.category === 'property' && l.status === 'ACTIVE' && l.seller_type === 'CORPORATE'),
     };
   }
   const now = new Date();
   const all = db.listings.filter(
-    (l) => l.seller_profile_id === profileId && l.status === 'ACTIVE' && l.expires_at && new Date(l.expires_at) > now
+    (l) =>
+      l.seller_profile_id === profileId &&
+      l.seller_type === 'CORPORATE' &&
+      l.status === 'ACTIVE' &&
+      l.expires_at &&
+      new Date(l.expires_at) > now
   );
 
   return {

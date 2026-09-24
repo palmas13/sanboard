@@ -94,6 +94,10 @@ export class SupabaseListingRepository implements IListingRepository {
         price,
         location,
         published_at,
+        is_featured,
+        featured_until,
+        seller_type,
+        corporate_profile_id,
         listing_images (storage_path, is_cover, sort_order)
       `)
       .eq('status', 'ACTIVE')
@@ -118,7 +122,45 @@ export class SupabaseListingRepository implements IListingRepository {
       query = query.order('published_at', { ascending: false });
     }
 
-    const { data, error } = await query;
+    let { data, error } = await query;
+
+    // Defensive fallback if is_featured column is not yet present on remote DB before migration execution
+    if (error && (error.message?.includes('is_featured') || error.message?.includes('seller_type'))) {
+      let fallbackQuery = client
+        .from('listings')
+        .select(`
+          id,
+          listing_number,
+          category,
+          subcategory,
+          title,
+          price,
+          location,
+          published_at,
+          listing_images (storage_path, is_cover, sort_order)
+        `)
+        .eq('status', 'ACTIVE')
+        .gt('expires_at', new Date().toISOString());
+
+      if (params?.category) fallbackQuery = fallbackQuery.eq('category', params.category);
+      if (params?.subcategory && params.subcategory !== 'all') fallbackQuery = fallbackQuery.eq('subcategory', params.subcategory);
+      if (params?.minPrice !== undefined) fallbackQuery = fallbackQuery.gte('price', params.minPrice);
+      if (params?.maxPrice !== undefined) fallbackQuery = fallbackQuery.lte('price', params.maxPrice);
+      if (params?.query) fallbackQuery = fallbackQuery.ilike('title', `%${params.query}%`);
+      if (params?.location && params.location !== 'all') fallbackQuery = fallbackQuery.ilike('location', `%${params.location}%`);
+
+      if (params?.sort === 'price_asc') {
+        fallbackQuery = fallbackQuery.order('price', { ascending: true });
+      } else if (params?.sort === 'price_desc') {
+        fallbackQuery = fallbackQuery.order('price', { ascending: false });
+      } else {
+        fallbackQuery = fallbackQuery.order('published_at', { ascending: false });
+      }
+
+      const retryRes = await fallbackQuery;
+      data = retryRes.data as any;
+      error = retryRes.error;
+    }
 
     if (error) {
       throw new Error(`Supabase error fetching public listings: ${error.message}`);
@@ -159,9 +201,15 @@ export class SupabaseListingRepository implements IListingRepository {
       }
     }
 
+    const nowTime = new Date().getTime();
     const listings: PublicListingSummary[] = rows.map((item: any) => {
       const cover = item.listing_images?.find((img: any) => img.is_cover)?.storage_path || item.listing_images?.[0]?.storage_path;
       const prevPrice = priceHistoryMap[item.id];
+      const isFeatured = Boolean(
+        item.is_featured &&
+        (!item.featured_until || new Date(item.featured_until).getTime() > nowTime)
+      );
+
       return {
         id: item.id,
         listing_number: item.listing_number,
@@ -175,7 +223,19 @@ export class SupabaseListingRepository implements IListingRepository {
         cover_image: cover,
         favorite_count: favCountMap[item.id] || 0,
         is_locked: true,
+        is_featured: isFeatured,
+        featured_until: item.featured_until,
+        seller_type: item.seller_type,
+        corporate_profile_id: item.corporate_profile_id,
       };
+    });
+
+    // Boosted listings appear first before normal listings
+    listings.sort((a, b) => {
+      if (Boolean(a.is_featured) !== Boolean(b.is_featured)) {
+        return a.is_featured ? -1 : 1;
+      }
+      return 0;
     });
 
     return listings;
@@ -310,13 +370,11 @@ export class SupabaseListingRepository implements IListingRepository {
 
     const listingNumber = `#SB-${Math.floor(100000 + Math.random() * 900000)}`;
     const now = new Date();
-    const expires = new Date(now.getTime() + 7 * 24 * 3600 * 1000);
-
-    // VEHICLE listings MUST have location = null; PROPERTY listings must have valid location
-    const finalLocation = input.category === 'vehicle' ? null : (input.location?.trim() || null);
-
     const sellerType = input.seller_type || (input.corporate_profile_id ? 'CORPORATE' : 'INDIVIDUAL');
     const corporateProfileId = input.corporate_profile_id || null;
+    const durationDays = sellerType === 'CORPORATE' ? 14 : 7;
+    const expires = new Date(now.getTime() + durationDays * 24 * 3600 * 1000);
+    const finalLocation = input.category === 'vehicle' ? null : (input.location?.trim() || null);
 
     const insertPayload: any = {
       listing_number: listingNumber,
@@ -542,20 +600,19 @@ export class SupabaseListingRepository implements IListingRepository {
           new_price: newPrice,
         });
 
-        // Price Change Notification: Triggered whenever newPrice !== oldPrice, exclude seller
-        if (newPrice !== oldPrice) {
+        // Price Drop Notification: strictly triggered when newPrice < oldPrice, excluding seller
+        if (newPrice < oldPrice) {
           const { data: favs } = await client.from('favorites').select('user_id').eq('listing_id', id);
           const sellerUserId = existing.seller?.user_id;
 
           if (favs && favs.length > 0) {
             const userIds = [...new Set(favs.map((f: any) => f.user_id).filter((uid: string) => uid && uid !== sellerUserId))];
-            const isDrop = newPrice < oldPrice;
             for (const uid of userIds) {
               await client.from('notifications').insert({
                 user_id: uid,
-                type: isDrop ? 'LISTING_PRICE_DROP' : 'LISTING_PRICE_CHANGE',
-                title: isDrop ? 'Favori İlanınızın Fiyatı Düştü' : 'Favori İlanınızın Fiyatı Değişti',
-                message: `${existing.title} ilanının fiyatı $${oldPrice.toLocaleString('en-US')} → $${newPrice.toLocaleString('en-US')} olarak güncellendi.`,
+                type: 'LISTING_PRICE_DROP',
+                title: 'Favori İlanınızın Fiyatı Düştü',
+                message: `${existing.title} ilanının fiyatı $${oldPrice.toLocaleString('en-US')} yerine $${newPrice.toLocaleString('en-US')} olarak güncellendi.`,
                 entity_type: 'listing',
                 entity_id: id,
                 metadata: { listingId: id, oldPrice, newPrice },

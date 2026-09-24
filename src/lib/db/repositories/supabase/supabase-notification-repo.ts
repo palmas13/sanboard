@@ -21,7 +21,7 @@ export class SupabaseNotificationRepository implements INotificationRepository {
   }
 
   async getUserNotifications(userId: string): Promise<Notification[]> {
-    const client = this.getClient();
+    const client = this.getAdminClient();
     const safeUserId = resolveUserId(userId);
     if (!isUuid(safeUserId)) return [];
 
@@ -49,7 +49,7 @@ export class SupabaseNotificationRepository implements INotificationRepository {
   }
 
   async getUnreadCount(userId: string): Promise<number> {
-    const client = this.getClient();
+    const client = this.getAdminClient();
     const safeUserId = resolveUserId(userId);
     if (!isUuid(safeUserId)) return 0;
 

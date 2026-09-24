@@ -3,10 +3,19 @@ import {
   getDealerById,
   getDealerBySlug,
   getDealerByProfileId,
+  getAllDealers,
   applyForDealer,
+  getApplicationByProfileId,
+  getAllApplications,
+  reviewApplication,
+  activateSubscription,
+  boostListing,
+  toggleFollow,
+  getFollowers,
+  isFollowing,
   updateDealerProfile,
 } from '../../dealers';
-import { CorporateProfile } from '@/types';
+import { CorporateApplication, CorporateProfile, CharacterProfile } from '@/types';
 
 export class MemoryDealerRepository implements IDealerRepository {
   async getDealerById(id: string): Promise<CorporateProfile | null> {
@@ -21,21 +30,62 @@ export class MemoryDealerRepository implements IDealerRepository {
     return getDealerByProfileId(profileId);
   }
 
+  async getAllDealers(): Promise<CorporateProfile[]> {
+    return getAllDealers();
+  }
+
+  async getApplicationByProfileId(profileId: string): Promise<CorporateApplication | null> {
+    return getApplicationByProfileId(profileId);
+  }
+
+  async getAllApplications(): Promise<CorporateApplication[]> {
+    return getAllApplications();
+  }
+
   async createApplication(params: { profileId: string; companyName: string; purpose: string }) {
     const res = await applyForDealer(params);
-    return {
-      success: res.success,
-      application: res.dealer as any,
-      error: res.error,
-    };
+    return res;
+  }
+
+  async reviewApplication(
+    applicationId: string,
+    status: 'APPROVED' | 'REJECTED',
+    rejectionReason?: string,
+    reviewerUserId?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    return reviewApplication(applicationId, status, rejectionReason, reviewerUserId);
+  }
+
+  async activateSubscription(dealerId: string): Promise<{ success: boolean; dealer?: CorporateProfile; error?: string }> {
+    return activateSubscription(dealerId);
+  }
+
+  async boostListing(
+    dealerId: string,
+    listingId: string
+  ): Promise<{ success: boolean; error?: string; remainingBoosts?: number; featured_until?: string }> {
+    return boostListing(dealerId, listingId);
+  }
+
+  async toggleFollow(
+    followerProfileId: string,
+    corporateProfileId: string
+  ): Promise<{ isFollowing: boolean; count: number; followerCount?: number }> {
+    return toggleFollow(followerProfileId, corporateProfileId);
+  }
+
+  async getFollowers(corporateProfileId: string): Promise<CharacterProfile[]> {
+    return getFollowers(corporateProfileId);
+  }
+
+  async isFollowing(followerProfileId: string, corporateProfileId: string): Promise<boolean> {
+    return isFollowing(followerProfileId, corporateProfileId);
   }
 
   async updateDealerProfile(id: string, data: Partial<CorporateProfile>) {
-    // Memory implementation
     const dealer = await getDealerById(id);
     if (!dealer) return { success: false, error: 'Kurumsal profil bulunamadı.' };
 
-    const res = await updateDealerProfile(id, dealer.profile_id, data);
-    return res;
+    return updateDealerProfile(id, dealer.profile_id, data);
   }
 }

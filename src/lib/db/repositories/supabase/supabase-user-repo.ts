@@ -140,6 +140,36 @@ export class SupabaseUserRepository implements IUserRepository {
       newAvatarKey = incomingAvatar.trim();
     }
 
+    if (data.sanmail_email && data.sanmail_email.trim()) {
+      const emailLower = data.sanmail_email.trim().toLowerCase();
+      const { data: existingSanmail } = await client
+        .from('character_profiles')
+        .select('id')
+        .ilike('sanmail_email', emailLower)
+        .neq('id', safeId)
+        .maybeSingle();
+
+      if (existingSanmail) {
+        if (isNewUpload && newAvatarKey) await deleteMediaSafely(newAvatarKey, 'AVATAR', 'AVATAR_UPLOAD_ROLLBACK');
+        return { success: false, error: 'Bu SanMail adresi başka bir karakter tarafından kullanılmaktadır.' };
+      }
+    }
+
+    if (data.phone && data.phone.trim()) {
+      const phoneClean = data.phone.trim();
+      const { data: existingPhone } = await client
+        .from('character_profiles')
+        .select('id')
+        .eq('phone', phoneClean)
+        .neq('id', safeId)
+        .maybeSingle();
+
+      if (existingPhone) {
+        if (isNewUpload && newAvatarKey) await deleteMediaSafely(newAvatarKey, 'AVATAR', 'AVATAR_UPLOAD_ROLLBACK');
+        return { success: false, error: 'Bu telefon numarası başka bir karakter tarafından kullanılmaktadır.' };
+      }
+    }
+
     // 3. Prepare payload for Supabase update
     const updatePayload: Record<string, any> = {
       updated_at: new Date().toISOString(),
@@ -243,6 +273,32 @@ export class SupabaseUserRepository implements IUserRepository {
 
       if (!matched.avatar_path && matched.avatar_url) matched.avatar_path = matched.avatar_url;
       return { success: true, profile: matched as CharacterProfile };
+    }
+
+    if (data.sanmailEmail && data.sanmailEmail.trim()) {
+      const emailLower = data.sanmailEmail.trim().toLowerCase();
+      const { data: existingSanmail } = await client
+        .from('character_profiles')
+        .select('id')
+        .ilike('sanmail_email', emailLower)
+        .maybeSingle();
+
+      if (existingSanmail) {
+        return { success: false, error: 'Bu SanMail adresi başka bir karakter tarafından kullanılmaktadır.' };
+      }
+    }
+
+    if (data.phone && data.phone.trim()) {
+      const phoneClean = data.phone.trim();
+      const { data: existingPhone } = await client
+        .from('character_profiles')
+        .select('id')
+        .eq('phone', phoneClean)
+        .maybeSingle();
+
+      if (existingPhone) {
+        return { success: false, error: 'Bu telefon numarası başka bir karakter tarafından kullanılmaktadır.' };
+      }
     }
 
     // 2. Insert new character profile

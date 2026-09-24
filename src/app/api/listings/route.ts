@@ -88,6 +88,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
+    // Corporate Follower Notification (Section 18)
+    if (result.listing && result.listing.seller_type === 'CORPORATE' && result.listing.corporate_profile_id) {
+      try {
+        const dealerRepo = getDealerRepository();
+        const [dealer, followers] = await Promise.all([
+          dealerRepo.getDealerById(result.listing.corporate_profile_id),
+          dealerRepo.getFollowers ? dealerRepo.getFollowers(result.listing.corporate_profile_id) : Promise.resolve([]),
+        ]);
+
+        if (dealer && followers.length > 0) {
+          const notifRepo = (await import('@/lib/db/repositories')).getNotificationRepository();
+          const followerUserIds = Array.from(
+            new Set(
+              followers
+                .filter((f) => f.user_id && f.id !== trustedProfileId)
+                .map((f) => f.user_id)
+            )
+          );
+
+          await Promise.all(
+            followerUserIds.map((uId) =>
+              notifRepo.createNotification({
+                user_id: uId,
+                type: 'NEW_CORPORATE_LISTING',
+                title: `${dealer.company_name} yeni bir ilan yayınladı`,
+                message: `Takip ettiğiniz ${dealer.company_name} yeni bir ilan yayınladı: "${result.listing!.title}"`,
+                entity_type: 'listing',
+                entity_id: result.listing!.id,
+              })
+            )
+          );
+        }
+      } catch (notifErr) {
+        console.error('Failed to dispatch corporate follower notifications:', notifErr);
+      }
+    }
+
     try {
       revalidatePath('/');
       revalidatePath('/arac');
