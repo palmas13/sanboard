@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { CharacterProfile, DealerProfile } from '@/types';
 import { Phone, Mail, Copy, Check, ExternalLink, ShieldCheck, Crown, Building2 } from 'lucide-react';
+import { resolveAvatarUrl, resolveMediaUrl } from '@/lib/media/url';
 
 interface SellerCardProps {
   seller?: CharacterProfile;
@@ -31,8 +32,8 @@ export function SellerCard({ seller, dealer }: SellerCardProps) {
     : seller?.full_name || 'İlan Sahibi';
 
   const displayAvatar = isCorporate
-    ? dealer?.logo_url || 'https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=300'
-    : seller?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
+    ? resolveMediaUrl(dealer?.logo_url) || 'https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=300'
+    : resolveAvatarUrl(seller?.avatar_path || seller?.avatar_url);
 
   const displayPhone = isCorporate
     ? dealer?.phone || seller?.phone || '555-0192'

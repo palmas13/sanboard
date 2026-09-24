@@ -29,7 +29,7 @@ export default function IlanDuzenlePage({
 }) {
   const { id } = use(params);
   const router = useRouter();
-  const { currentProfile, isAuthenticated } = useAuth();
+  const { user, currentProfile, isAuthenticated } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -186,6 +186,7 @@ export default function IlanDuzenlePage({
     try {
       const payload: any = {
         profileId: currentProfile.id,
+        userId: user?.id,
         title: title.trim(),
         description: description.trim(),
         price: Number(price),

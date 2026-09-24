@@ -8,16 +8,16 @@ import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
 
 export default function HesabimFavorilerimPage() {
-  const { currentProfile } = useAuth();
+  const { user, currentProfile } = useAuth();
   const [favorites, setFavorites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!currentProfile) return;
+    if (!currentProfile && !user) return;
 
     async function fetchFavorites() {
       try {
-        const res = await fetch(`/api/user/favorites?profileId=${currentProfile?.id}`);
+        const res = await fetch('/api/user/favorites');
         const data = await res.json();
         if (Array.isArray(data)) {
           setFavorites(data);
@@ -30,7 +30,7 @@ export default function HesabimFavorilerimPage() {
     }
 
     fetchFavorites();
-  }, [currentProfile]);
+  }, [user, currentProfile]);
 
   return (
     <div className="space-y-6">
@@ -89,6 +89,11 @@ export default function HesabimFavorilerimPage() {
                           initialCount={listing.favorite_count}
                           initialIsFavorited={true}
                           size="sm"
+                          onToggle={(isFav) => {
+                            if (!isFav) {
+                              setFavorites((prev) => prev.filter((f) => f.id !== listing.id));
+                            }
+                          }}
                         />
                       </div>
                     )}
@@ -96,8 +101,15 @@ export default function HesabimFavorilerimPage() {
 
                   {/* Body */}
                   <div className="p-4 space-y-2">
-                    <div className="text-lg font-black text-[#FF8A1F]">
-                      {formatCurrency(listing.price)}
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      {listing.previous_price && listing.previous_price !== listing.price && (
+                        <span className="text-xs font-semibold text-[var(--text-muted)] line-through">
+                          {formatCurrency(listing.previous_price)}
+                        </span>
+                      )}
+                      <span className="text-lg font-black text-[#FF8A1F]">
+                        {formatCurrency(listing.price)}
+                      </span>
                     </div>
                     <h3 className="text-sm font-semibold text-[var(--text-main)] line-clamp-2">
                       {listing.title}

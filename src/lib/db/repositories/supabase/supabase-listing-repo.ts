@@ -22,6 +22,63 @@ export class SupabaseListingRepository implements IListingRepository {
     return this.getClient();
   }
 
+  /**
+   * Resolves account user ID either from given userId or by looking up character profile in Supabase.
+   */
+  private async resolveAccountUserId(userId?: string, profileId?: string): Promise<string | null> {
+    if (userId) {
+      const mapped = resolveUserId(userId);
+      if (isUuid(mapped)) return mapped;
+    }
+
+    if (profileId) {
+      const safeProfileId = resolveProfileId(profileId);
+      if (isUuid(safeProfileId)) {
+        const client = this.getAdminClient();
+        const { data: prof } = await client
+          .from('character_profiles')
+          .select('user_id')
+          .eq('id', safeProfileId)
+          .maybeSingle();
+
+        if (prof?.user_id && isUuid(prof.user_id)) {
+          return prof.user_id;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Resolves character profile ID either from given profileId or by finding a profile for userId.
+   */
+  private async resolveCharacterProfileId(profileId?: string, userId?: string): Promise<string | null> {
+    if (profileId) {
+      const safeProfileId = resolveProfileId(profileId);
+      if (isUuid(safeProfileId)) return safeProfileId;
+    }
+
+    if (userId) {
+      const safeUserId = resolveUserId(userId);
+      if (isUuid(safeUserId)) {
+        const client = this.getAdminClient();
+        const { data: prof } = await client
+          .from('character_profiles')
+          .select('id')
+          .eq('user_id', safeUserId)
+          .limit(1)
+          .maybeSingle();
+
+        if (prof?.id && isUuid(prof.id)) {
+          return prof.id;
+        }
+      }
+    }
+
+    return null;
+  }
+
   async getPublicListings(params?: ListingFilterParams): Promise<PublicListingSummary[]> {
     const client = this.getClient();
 
@@ -48,15 +105,62 @@ export class SupabaseListingRepository implements IListingRepository {
     if (params?.query) {
       query = query.ilike('title', `%${params.query}%`);
     }
+    if (params?.location && params.location !== 'all') {
+      query = query.ilike('location', `%${params.location}%`);
+    }
 
-    const { data, error } = await query.order('published_at', { ascending: false });
+    if (params?.sort === 'price_asc') {
+      query = query.order('price', { ascending: true });
+    } else if (params?.sort === 'price_desc') {
+      query = query.order('price', { ascending: false });
+    } else {
+      query = query.order('published_at', { ascending: false });
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       throw new Error(`Supabase error fetching public listings: ${error.message}`);
     }
 
-    const listings: PublicListingSummary[] = (data || []).map((item: any) => {
+    const rows = data || [];
+    const listingIds = rows.map((r: any) => r.id);
+
+    // Batch query favorite counts and price histories
+    const priceHistoryMap: Record<string, number> = {};
+    const favCountMap: Record<string, number> = {};
+
+    if (listingIds.length > 0) {
+      const [histRes, favRes] = await Promise.all([
+        client
+          .from('listing_price_history')
+          .select('listing_id, old_price, changed_at')
+          .in('listing_id', listingIds)
+          .order('changed_at', { ascending: false }),
+        client
+          .from('favorites')
+          .select('listing_id')
+          .in('listing_id', listingIds),
+      ]);
+
+      if (histRes.data) {
+        for (const h of histRes.data) {
+          if (!priceHistoryMap[h.listing_id]) {
+            priceHistoryMap[h.listing_id] = h.old_price;
+          }
+        }
+      }
+
+      if (favRes.data) {
+        for (const f of favRes.data) {
+          favCountMap[f.listing_id] = (favCountMap[f.listing_id] || 0) + 1;
+        }
+      }
+    }
+
+    const listings: PublicListingSummary[] = rows.map((item: any) => {
       const cover = item.listing_images?.find((img: any) => img.is_cover)?.storage_path || item.listing_images?.[0]?.storage_path;
+      const prevPrice = priceHistoryMap[item.id];
       return {
         id: item.id,
         listing_number: item.listing_number,
@@ -64,10 +168,11 @@ export class SupabaseListingRepository implements IListingRepository {
         subcategory: item.subcategory,
         title: item.title,
         price: item.price,
-        location: item.location,
+        previous_price: prevPrice && prevPrice !== item.price ? prevPrice : undefined,
+        location: item.category === 'vehicle' ? null : item.location,
         published_at: item.published_at,
         cover_image: cover,
-        favorite_count: 0,
+        favorite_count: favCountMap[item.id] || 0,
         is_locked: true,
       };
     });
@@ -75,7 +180,15 @@ export class SupabaseListingRepository implements IListingRepository {
     return listings;
   }
 
-  async getListingById(id: string, viewerProfileId?: string): Promise<{ listing: MemberListingDetail | PublicListingSummary | null; isLocked: boolean; isOwner: boolean }> {
+  async getListingById(
+    id: string,
+    viewerProfileId?: string,
+    viewerUserId?: string
+  ): Promise<{ listing: MemberListingDetail | PublicListingSummary | null; isLocked: boolean; isOwner: boolean }> {
+    if (!isUuid(id)) {
+      return { listing: null, isLocked: false, isOwner: false };
+    }
+
     const client = this.getClient();
 
     const { data: listing, error } = await client
@@ -99,10 +212,38 @@ export class SupabaseListingRepository implements IListingRepository {
       return { listing: null, isLocked: false, isOwner: false };
     }
 
-    const isOwner = Boolean(viewerProfileId && listing.seller_profile_id === viewerProfileId);
+    // Resolve viewer identity
+    const safeViewerProfileId = viewerProfileId ? resolveProfileId(viewerProfileId) : null;
+    const safeViewerUserId = await this.resolveAccountUserId(viewerUserId, viewerProfileId);
+
+    const isOwner = Boolean(
+      (safeViewerProfileId && listing.seller_profile_id === safeViewerProfileId) ||
+      (safeViewerUserId && listing.seller?.user_id === safeViewerUserId)
+    );
+
+    // Fetch favorite count and user favorite status
+    const [favCountRes, userFavRes, histRes] = await Promise.all([
+      client.from('favorites').select('*', { count: 'exact', head: true }).eq('listing_id', id),
+      safeViewerUserId
+        ? client.from('favorites').select('id').eq('listing_id', id).eq('user_id', safeViewerUserId).maybeSingle()
+        : Promise.resolve({ data: null }),
+      client
+        .from('listing_price_history')
+        .select('old_price')
+        .eq('listing_id', id)
+        .order('changed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    const favoriteCount = favCountRes.count || 0;
+    const isFavorited = Boolean(userFavRes.data);
+    const previousPrice = histRes.data?.old_price && histRes.data.old_price !== listing.price
+      ? histRes.data.old_price
+      : undefined;
 
     // If unauthenticated viewer, return sanitized public summary
-    if (!viewerProfileId) {
+    if (!viewerProfileId && !viewerUserId) {
       const cover = listing.listing_images?.find((i: any) => i.is_cover)?.storage_path || listing.listing_images?.[0]?.storage_path;
       return {
         listing: {
@@ -112,10 +253,11 @@ export class SupabaseListingRepository implements IListingRepository {
           subcategory: listing.subcategory,
           title: listing.title,
           price: listing.price,
-          location: listing.location,
+          previous_price: previousPrice,
+          location: listing.category === 'vehicle' ? null : listing.location,
           published_at: listing.published_at,
           cover_image: cover,
-          favorite_count: 0,
+          favorite_count: favoriteCount,
           is_locked: true,
         },
         isLocked: true,
@@ -126,7 +268,11 @@ export class SupabaseListingRepository implements IListingRepository {
     return {
       listing: {
         ...listing,
+        location: listing.category === 'vehicle' ? null : listing.location,
+        previous_price: previousPrice,
         images: listing.listing_images || [],
+        favorite_count: favoriteCount,
+        is_favorited: isFavorited,
       },
       isLocked: false,
       isOwner,
@@ -135,12 +281,13 @@ export class SupabaseListingRepository implements IListingRepository {
 
   async createListing(input: CreateListingInput, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }> {
     const client = this.getAdminClient();
+    const safeProfileId = resolveProfileId(profileId);
 
     // 1. Check and consume 1 available credit
     const { data: availableCredit, error: creditErr } = await client
       .from('listing_credits')
       .select('id')
-      .eq('profile_id', profileId)
+      .eq('profile_id', safeProfileId)
       .eq('status', 'AVAILABLE')
       .limit(1)
       .maybeSingle();
@@ -157,23 +304,49 @@ export class SupabaseListingRepository implements IListingRepository {
     const now = new Date();
     const expires = new Date(now.getTime() + 7 * 24 * 3600 * 1000);
 
-    const { data: newListing, error: insertError } = await client
+    // VEHICLE listings MUST have location = null; PROPERTY listings must have valid location
+    const finalLocation = input.category === 'vehicle' ? null : (input.location?.trim() || null);
+
+    let { data: newListing, error: insertError } = await client
       .from('listings')
       .insert({
         listing_number: listingNumber,
-        seller_profile_id: profileId,
+        seller_profile_id: safeProfileId,
         category: input.category,
         subcategory: input.subcategory,
         title: input.title,
         description: input.description,
         price: input.price,
-        location: input.location || '',
+        location: finalLocation,
         status: 'ACTIVE',
         published_at: now.toISOString(),
         expires_at: expires.toISOString(),
       })
       .select()
       .single();
+
+    // Defensive fallback: if database still has NOT NULL on location (pending migration execution)
+    if (insertError && insertError.code === '23502' && insertError.message?.includes('location') && input.category === 'vehicle') {
+      const retry = await client
+        .from('listings')
+        .insert({
+          listing_number: listingNumber,
+          seller_profile_id: safeProfileId,
+          category: input.category,
+          subcategory: input.subcategory,
+          title: input.title,
+          description: input.description,
+          price: input.price,
+          location: '',
+          status: 'ACTIVE',
+          published_at: now.toISOString(),
+          expires_at: expires.toISOString(),
+        })
+        .select()
+        .single();
+      newListing = retry.data;
+      insertError = retry.error;
+    }
 
     if (insertError || !newListing) {
       return { success: false, error: insertError?.message || 'İlan oluşturulamadı.' };
@@ -231,15 +404,15 @@ export class SupabaseListingRepository implements IListingRepository {
         const img = input.images[i];
         let finalPath = img.storage_path;
 
-        // If client submitted base64 data url, upload to R2
         if (finalPath.startsWith('data:image/')) {
           const matches = finalPath.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
           if (matches) {
             const mime = matches[1];
             const buffer = Buffer.from(matches[2], 'base64');
-            const uploadRes = await uploadListingImage(buffer, `listing-${Date.now()}-${i}.jpg`, mime);
+            const uploadRes = await uploadListingImage(buffer, newListing.id, mime);
             if (uploadRes.success) {
               finalPath = uploadRes.url;
+              img.size_bytes = uploadRes.sizeBytes;
             } else {
               return { success: false, error: `R2 görsel yükleme hatası: ${uploadRes.error}` };
             }
@@ -272,12 +445,23 @@ export class SupabaseListingRepository implements IListingRepository {
     return { success: true, listing: newListing };
   }
 
-  async updateListing(id: string, input: Partial<CreateListingInput>, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }> {
+  async updateListing(
+    id: string,
+    input: Partial<CreateListingInput>,
+    profileId: string,
+    userId?: string,
+    role?: string
+  ): Promise<{ success: boolean; listing?: Listing; error?: string }> {
+    if (!isUuid(id)) {
+      return { success: false, error: 'Geçersiz ilan ID formatı.' };
+    }
     const client = this.getAdminClient();
+    const safeProfileId = resolveProfileId(profileId);
+    const safeUserId = await this.resolveAccountUserId(userId, profileId);
 
     const { data: existing, error: fetchErr } = await client
       .from('listings')
-      .select('*')
+      .select('*, seller:character_profiles(user_id)')
       .eq('id', id)
       .single();
 
@@ -285,7 +469,12 @@ export class SupabaseListingRepository implements IListingRepository {
       return { success: false, error: 'İlan bulunamadı.' };
     }
 
-    if (existing.seller_profile_id !== profileId) {
+    // Ownership check: Admin or Profile Owner or Account Owner
+    const isAdmin = role === 'ADMIN';
+    const isProfileOwner = existing.seller_profile_id === safeProfileId;
+    const isAccountOwner = Boolean(safeUserId && existing.seller?.user_id === safeUserId);
+
+    if (!isAdmin && !isProfileOwner && !isAccountOwner) {
       return { success: false, error: 'Bu ilanı düzenleme yetkiniz yok.' };
     }
 
@@ -293,52 +482,96 @@ export class SupabaseListingRepository implements IListingRepository {
       return { success: false, error: 'Satılmış veya yayından kaldırılmış ilanlar düzenlenemez.' };
     }
 
-    // Price Drop Detection
+    // Price Drop Detection & Atomic Update
     const oldPrice = existing.price;
     const newPrice = input.price !== undefined ? input.price : oldPrice;
 
-    if (newPrice < oldPrice) {
-      // Record price history
-      await client.from('listing_price_history').insert({
-        listing_id: id,
-        old_price: oldPrice,
-        new_price: newPrice,
-      });
+    let rpcExecuted = false;
+    // Attempt atomic update via PostgreSQL RPC if available
+    if (newPrice !== oldPrice || input.title || input.description) {
+      try {
+        const { data: rpcData, error: rpcErr } = await client.rpc('update_listing_price', {
+          p_listing_id: id,
+          p_new_price: newPrice,
+          p_editor_user_id: safeUserId || null,
+          p_editor_profile_id: safeProfileId || null,
+          p_title: input.title || null,
+          p_description: input.description || null,
+        });
 
-      // Find favorited users to notify (excluding seller)
-      const { data: favs } = await client.from('favorites').select('user_id').eq('listing_id', id);
-      const { data: sellerProf } = await client.from('character_profiles').select('user_id').eq('id', profileId).single();
-      const sellerUserId = sellerProf?.user_id;
+        if (!rpcErr && rpcData) {
+          if (!rpcData.success) {
+            return { success: false, error: rpcData.error || 'İlan güncellenemedi.' };
+          }
+          rpcExecuted = true;
+        }
+      } catch {
+        // Fallback to sequential execution if RPC is not deployed yet
+      }
+    }
 
-      if (favs && favs.length > 0) {
-        const userIds = [...new Set(favs.map((f: any) => f.user_id).filter((uid: string) => uid && uid !== sellerUserId))];
-        for (const uid of userIds) {
-          await client.from('notifications').insert({
-            user_id: uid,
-            type: 'LISTING_PRICE_DROP',
-            title: 'Favori İlanınızın Fiyatı Düştü',
-            message: `${existing.title} ilanının fiyatı $${oldPrice.toLocaleString('en-US')} → $${newPrice.toLocaleString('en-US')} olarak güncellendi.`,
-            entity_type: 'listing',
-            entity_id: id,
-            metadata: { listingId: id, oldPrice, newPrice },
-          });
+    if (!rpcExecuted) {
+      if (newPrice !== oldPrice) {
+        // Record price history
+        await client.from('listing_price_history').insert({
+          listing_id: id,
+          old_price: oldPrice,
+          new_price: newPrice,
+        });
+
+        // Price Drop Notification: ONLY if newPrice < oldPrice, exclude seller
+        if (newPrice < oldPrice) {
+          const { data: favs } = await client.from('favorites').select('user_id').eq('listing_id', id);
+          const sellerUserId = existing.seller?.user_id;
+
+          if (favs && favs.length > 0) {
+            const userIds = [...new Set(favs.map((f: any) => f.user_id).filter((uid: string) => uid && uid !== sellerUserId))];
+            for (const uid of userIds) {
+              await client.from('notifications').insert({
+                user_id: uid,
+                type: 'LISTING_PRICE_DROP',
+                title: 'Favori İlanınızın Fiyatı Düştü',
+                message: `${existing.title} ilanının fiyatı $${oldPrice.toLocaleString('en-US')} → $${newPrice.toLocaleString('en-US')} olarak güncellendi.`,
+                entity_type: 'listing',
+                entity_id: id,
+                metadata: { listingId: id, oldPrice, newPrice },
+              });
+            }
+          }
         }
       }
     }
 
-    // Update main listing table (without extending published_at / expires_at)
+    // Update main listing table
     const updateData: any = { updated_at: new Date().toISOString() };
     if (input.title) updateData.title = input.title;
     if (input.description) updateData.description = input.description;
     if (input.price !== undefined) updateData.price = input.price;
-    if (input.location !== undefined) updateData.location = input.location;
 
-    const { data: updated, error: updateErr } = await client
+    if (existing.category === 'vehicle') {
+      updateData.location = null;
+    } else if (input.location !== undefined) {
+      updateData.location = input.location ? input.location.trim() : null;
+    }
+
+    let { data: updated, error: updateErr } = await client
       .from('listings')
       .update(updateData)
       .eq('id', id)
       .select()
       .single();
+
+    if (updateErr && updateErr.code === '23502' && updateErr.message?.includes('location') && existing.category === 'vehicle') {
+      delete updateData.location;
+      const retry = await client
+        .from('listings')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+      updated = retry.data;
+      updateErr = retry.error;
+    }
 
     if (updateErr) {
       return { success: false, error: `İlan güncellenemedi: ${updateErr.message}` };
@@ -378,8 +611,11 @@ export class SupabaseListingRepository implements IListingRepository {
           const matches = finalPath.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
           if (matches) {
             const buffer = Buffer.from(matches[2], 'base64');
-            const uploadRes = await uploadListingImage(buffer, `listing-${id}-${i}.jpg`, matches[1]);
-            if (uploadRes.success) finalPath = uploadRes.url;
+            const uploadRes = await uploadListingImage(buffer, id, matches[1]);
+            if (uploadRes.success) {
+              finalPath = uploadRes.url;
+              input.images[i].size_bytes = uploadRes.sizeBytes;
+            }
           }
         }
 
@@ -397,7 +633,11 @@ export class SupabaseListingRepository implements IListingRepository {
   }
 
   async markListingAsSold(id: string, profileId: string): Promise<{ success: boolean; error?: string }> {
+    if (!isUuid(id)) {
+      return { success: false, error: 'Geçersiz ilan ID formatı.' };
+    }
     const client = this.getAdminClient();
+    const safeProfileId = resolveProfileId(profileId);
 
     const { data: listing, error: fetchErr } = await client
       .from('listings')
@@ -406,7 +646,7 @@ export class SupabaseListingRepository implements IListingRepository {
       .single();
 
     if (fetchErr || !listing) return { success: false, error: 'İlan bulunamadı.' };
-    if (listing.seller_profile_id !== profileId) return { success: false, error: 'Bu işlem için yetkiniz yok.' };
+    if (listing.seller_profile_id !== safeProfileId) return { success: false, error: 'Bu işlem için yetkiniz yok.' };
 
     const { error: updateErr } = await client
       .from('listings')
@@ -422,7 +662,7 @@ export class SupabaseListingRepository implements IListingRepository {
     // Audit log
     await client.from('sold_listing_audit').insert({
       original_listing_id: id,
-      seller_profile_id: profileId,
+      seller_profile_id: safeProfileId,
       sold_at: new Date().toISOString(),
     });
 
@@ -449,61 +689,119 @@ export class SupabaseListingRepository implements IListingRepository {
       throw new Error(`Supabase error fetching user listings: ${error.message}`);
     }
 
-    return (data || []).map((item: any) => ({
+    const rows = data || [];
+    const ids = rows.map((r: any) => r.id);
+
+    const priceHistoryMap: Record<string, number> = {};
+    if (ids.length > 0) {
+      const { data: histories } = await client
+        .from('listing_price_history')
+        .select('listing_id, old_price, changed_at')
+        .in('listing_id', ids)
+        .order('changed_at', { ascending: false });
+
+      if (histories) {
+        for (const h of histories) {
+          if (!priceHistoryMap[h.listing_id]) priceHistoryMap[h.listing_id] = h.old_price;
+        }
+      }
+    }
+
+    return rows.map((item: any) => ({
       ...item,
+      location: item.category === 'vehicle' ? null : item.location,
+      previous_price: priceHistoryMap[item.id] && priceHistoryMap[item.id] !== item.price ? priceHistoryMap[item.id] : undefined,
       images: item.listing_images || [],
     }));
   }
 
-  async toggleFavorite(profileId: string, listingId: string, userId?: string): Promise<{ isFavorited: boolean; count: number }> {
+  async toggleFavorite(arg1: string, arg2: string, legacyUserId?: string): Promise<{ isFavorited: boolean; count: number }> {
     const client = this.getAdminClient();
 
-    const safeProfileId = resolveProfileId(profileId);
-    const safeUserId = userId ? resolveUserId(userId) : undefined;
-    const lookupField = (safeUserId && isUuid(safeUserId)) ? 'user_id' : 'profile_id';
-    const lookupVal = (lookupField === 'user_id' ? safeUserId : safeProfileId);
+    // Support both toggleFavorite(listingId, userId) and legacy toggleFavorite(profileId, listingId, userId)
+    let listingId = arg1;
+    let rawUserId = arg2;
 
-    if (!isUuid(lookupVal)) {
+    if (legacyUserId) {
+      listingId = arg2;
+      rawUserId = legacyUserId;
+    }
+
+    const safeUserId = await this.resolveAccountUserId(rawUserId);
+
+    if (!safeUserId || !isUuid(safeUserId) || !isUuid(listingId)) {
       return { isFavorited: false, count: 0 };
     }
 
+    // Check by account user_id and listing_id
     const { data: existing } = await client
       .from('favorites')
       .select('id')
-      .eq(lookupField, lookupVal)
+      .eq('user_id', safeUserId)
       .eq('listing_id', listingId)
       .maybeSingle();
 
     if (existing) {
+      // Remove favorite
       await client.from('favorites').delete().eq('id', existing.id);
       const { count } = await client.from('favorites').select('*', { count: 'exact', head: true }).eq('listing_id', listingId);
       return { isFavorited: false, count: count || 0 };
     } else {
-      await client.from('favorites').insert({
-        profile_id: isUuid(safeProfileId) ? safeProfileId : undefined,
-        user_id: (safeUserId && isUuid(safeUserId)) ? safeUserId : undefined,
+      // Add favorite (strictly user_id and listing_id; no client profile required)
+      const { error: insErr } = await client.from('favorites').insert({
+        user_id: safeUserId,
         listing_id: listingId,
       });
+
+      // Defensive fallback if profile_id constraint is still active in DB before migration run
+      if (insErr && insErr.message?.includes('profile_id')) {
+        const safeProfileId = await this.resolveCharacterProfileId(undefined, safeUserId);
+        await client.from('favorites').insert({
+          user_id: safeUserId,
+          profile_id: safeProfileId || undefined,
+          listing_id: listingId,
+        });
+      }
+
       const { count } = await client.from('favorites').select('*', { count: 'exact', head: true }).eq('listing_id', listingId);
       return { isFavorited: true, count: count || 1 };
     }
   }
 
-  async getUserFavorites(profileId: string, userId?: string): Promise<(Listing & { isExpired: boolean })[]> {
-    const client = this.getClient();
+  async removeFavorite(listingId: string, userId: string): Promise<{ success: boolean; count: number }> {
+    const client = this.getAdminClient();
+    const safeUserId = await this.resolveAccountUserId(userId);
 
-    const safeProfileId = resolveProfileId(profileId);
-    const safeUserId = userId ? resolveUserId(userId) : undefined;
-    const lookupField = (safeUserId && isUuid(safeUserId)) ? 'user_id' : 'profile_id';
-    const lookupVal = (lookupField === 'user_id' ? safeUserId : safeProfileId);
+    if (!safeUserId || !isUuid(safeUserId) || !isUuid(listingId)) {
+      return { success: false, count: 0 };
+    }
 
-    if (!isUuid(lookupVal)) {
+    await client
+      .from('favorites')
+      .delete()
+      .eq('user_id', safeUserId)
+      .eq('listing_id', listingId);
+
+    const { count } = await client.from('favorites').select('*', { count: 'exact', head: true }).eq('listing_id', listingId);
+    return { success: true, count: count || 0 };
+  }
+
+  async getUserFavorites(arg1: string, legacyUserId?: string): Promise<(Listing & { isExpired: boolean })[]> {
+    const client = this.getAdminClient();
+
+    // Support both getUserFavorites(userId) and legacy getUserFavorites(profileId, userId)
+    const rawUserId = legacyUserId || arg1;
+    const safeUserId = await this.resolveAccountUserId(rawUserId);
+
+    if (!safeUserId || !isUuid(safeUserId)) {
       return [];
     }
 
+    // Query strictly by user_id
     const { data, error } = await client
       .from('favorites')
       .select(`
+        listing_id,
         listings (
           *,
           vehicle_details (*),
@@ -511,19 +809,37 @@ export class SupabaseListingRepository implements IListingRepository {
           listing_images (*)
         )
       `)
-      .eq(lookupField, lookupVal);
+      .eq('user_id', safeUserId);
 
     if (error) {
       throw new Error(`Supabase error fetching favorites: ${error.message}`);
     }
 
+    const rows = (data || []).filter((item: any) => item.listings).map((item: any) => item.listings);
+    const ids = rows.map((r: any) => r.id);
+
+    const priceHistoryMap: Record<string, number> = {};
+    if (ids.length > 0) {
+      const { data: histories } = await client
+        .from('listing_price_history')
+        .select('listing_id, old_price, changed_at')
+        .in('listing_id', ids)
+        .order('changed_at', { ascending: false });
+
+      if (histories) {
+        for (const h of histories) {
+          if (!priceHistoryMap[h.listing_id]) priceHistoryMap[h.listing_id] = h.old_price;
+        }
+      }
+    }
+
     const now = new Date();
-    return (data || [])
-      .filter((item: any) => item.listings)
-      .map((item: any) => ({
-        ...item.listings,
-        images: item.listings.listing_images || [],
-        isExpired: item.listings.expires_at ? new Date(item.listings.expires_at) < now : false,
-      }));
+    return rows.map((listing: any) => ({
+      ...listing,
+      location: listing.category === 'vehicle' ? null : listing.location,
+      previous_price: priceHistoryMap[listing.id] && priceHistoryMap[listing.id] !== listing.price ? priceHistoryMap[listing.id] : undefined,
+      images: listing.listing_images || [],
+      isExpired: listing.expires_at ? new Date(listing.expires_at) < now : false,
+    }));
   }
 }

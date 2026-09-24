@@ -27,17 +27,18 @@ export class MockStorageProvider implements StorageProvider {
     const timestamp = Date.now();
     const sanitizedName = options.fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
     const folder = options.folder || options.category;
-    const key = `${folder}/${timestamp}-${sanitizedName}`;
+    const key = options.key || `${folder}/${timestamp}-${sanitizedName}`;
 
     // For mock development, create a valid Base64 data URL so images render immediately in browser
     const base64 = Buffer.from(fileBuffer).toString('base64');
-    const dataUrl = `data:${options.contentType || 'image/jpeg'};base64,${base64}`;
+    const dataUrl = `data:${options.contentType || 'image/webp'};base64,${base64}`;
 
     return {
       success: true,
       url: dataUrl,
       key,
       sizeBytes: fileBuffer.byteLength,
+      mimeType: options.contentType || 'image/webp',
     };
   }
 

@@ -41,6 +41,9 @@ export async function GET(
   }
 }
 
+import { revalidatePath } from 'next/cache';
+import { getServerSession } from '@/lib/auth/session';
+
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -48,21 +51,36 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await req.json();
-    const profileId = body.profileId || body.characterId || req.cookies.get('sanboard_profile_id')?.value;
-    const { profileId: _, characterId: __, ...input } = body;
+    const session = await getServerSession(req);
+    const profileId = session?.profileId || body.profileId || body.sellerProfileId || body.characterId;
+    const userId = session?.userId || body.userId;
+    const role = session?.role;
+    const { profileId: _, sellerProfileId: ____, characterId: __, userId: ___, ...input } = body;
 
-    if (!profileId) {
+    if (!profileId && !userId) {
       return NextResponse.json(
-        { error: 'profileId parametresi zorunludur.' },
-        { status: 400 }
+        { error: 'Yetkisiz erişim. Lütfen giriş yapın.' },
+        { status: 401 }
       );
     }
 
     const repo = getListingRepository();
-    const result = await repo.updateListing(id, input, profileId);
+    const result = await repo.updateListing(id, input, profileId, userId, role);
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
+      const isForbidden = result.error?.includes('yetkiniz yok');
+      return NextResponse.json({ error: result.error }, { status: isForbidden ? 403 : 400 });
+    }
+
+    // Invalidate Next.js cache so homepage, category, and detail pages update instantly
+    try {
+      revalidatePath('/');
+      revalidatePath('/arac');
+      revalidatePath('/mulk');
+      revalidatePath(`/ilan/${id}`);
+      revalidatePath('/hesabim/ilanlarim');
+    } catch {
+      // Ignore cache revalidation errors if outside request context
     }
 
     return NextResponse.json({ success: true, listing: result.listing });

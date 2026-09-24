@@ -1,8 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { CharacterProfile, User } from '@/types';
 import { MOCK_CHARACTERS } from '@/lib/integrations/gtaworld/mock-provider';
+import { resolveMediaUrl } from '@/lib/media/url';
 
 interface AuthContextType {
   user: User | null;
@@ -14,11 +15,10 @@ interface AuthContextType {
   logout: () => void;
   selectCharacter: (characterId: string) => CharacterProfile | null;
   updateCurrentProfile: (data: Partial<CharacterProfile>) => void;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const STORAGE_KEY_AUTH = 'sanboard-auth-state';
 
 const MOCK_CHARACTER_ACCOUNTS: Record<string, User> = {
   '44444444-4444-4444-4444-444444444441': {
@@ -58,46 +58,94 @@ const MOCK_CHARACTER_ACCOUNTS: Record<string, User> = {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [currentProfile, setCurrentProfile] = useState<CharacterProfile | null>(null);
-  const [characters, setCharacters] = useState(MOCK_CHARACTERS);
+  const [characters] = useState(MOCK_CHARACTERS);
 
-  useEffect(() => {
-    // Load persisted auth from localStorage on mount
+  const saveState = useCallback(
+    (newUser: User | null, newProfile: CharacterProfile | null) => {
+      // Keep state exclusively in React memory — NO localStorage for profile/user data
+      setUser(newUser);
+      setCurrentProfile(newProfile);
+
+      if (newUser && newProfile) {
+        // Synchronize cryptographically signed server session
+        fetch('/api/auth/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            characterId: newProfile.id,
+            profileId: newProfile.id,
+            userId: newUser.id,
+            role: newUser.role,
+          }),
+        }).catch(() => {});
+
+        // Lightweight routing cookies (for middleware & SSR redirects)
+        document.cookie = `sanboard_profile_id=${newProfile.id}; path=/; max-age=86400; SameSite=Lax`;
+        document.cookie = `sanboard_user_id=${newUser.id}; path=/; max-age=86400; SameSite=Lax`;
+        document.cookie = `sanboard_role=${newUser.role}; path=/; max-age=86400; SameSite=Lax`;
+      } else {
+        fetch('/api/auth/session', { method: 'DELETE' }).catch(() => {});
+        document.cookie = `sanboard_profile_id=; path=/; max-age=0; SameSite=Lax`;
+        document.cookie = `sanboard_user_id=; path=/; max-age=0; SameSite=Lax`;
+        document.cookie = `sanboard_role=; path=/; max-age=0; SameSite=Lax`;
+      }
+    },
+    []
+  );
+
+  const refreshProfile = useCallback(async () => {
+    if (!currentProfile?.id) return;
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_AUTH);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setUser(parsed.user);
-        setCurrentProfile(parsed.currentProfile);
+      const res = await fetch(`/api/user/profile?profileId=${currentProfile.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.profile) {
+          saveState(user, data.profile);
+        }
       }
     } catch {
-      // Ignore parse error
+      // Ignore network errors on background refresh
     }
-  }, []);
+  }, [currentProfile, user, saveState]);
 
-  const saveState = (newUser: User | null, newProfile: CharacterProfile | null) => {
-    setUser(newUser);
-    setCurrentProfile(newProfile);
-    if (newUser && newProfile) {
-      localStorage.setItem(
-        STORAGE_KEY_AUTH,
-        JSON.stringify({ user: newUser, currentProfile: newProfile })
-      );
-      // Set cookies for server actions & SSR route guards
-      document.cookie = `sanboard_profile_id=${newProfile.id}; path=/; max-age=86400; SameSite=Lax`;
-      document.cookie = `sanboard_user_id=${newUser.id}; path=/; max-age=86400; SameSite=Lax`;
-      document.cookie = `sanboard_role=${newUser.role}; path=/; max-age=86400; SameSite=Lax`;
-    } else {
-      localStorage.removeItem(STORAGE_KEY_AUTH);
-      document.cookie = `sanboard_profile_id=; path=/; max-age=0; SameSite=Lax`;
-      document.cookie = `sanboard_user_id=; path=/; max-age=0; SameSite=Lax`;
-      document.cookie = `sanboard_role=; path=/; max-age=0; SameSite=Lax`;
+  useEffect(() => {
+    // Purge legacy localStorage auth cache if present
+    try {
+      localStorage.removeItem('sanboard-auth-state');
+    } catch {
+      // Ignore
     }
-  };
+
+    // Single source of truth: Hydrate session directly from Supabase /api/user/profile
+    fetch('/api/user/profile')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.success && data.profile) {
+          const profile = data.profile as CharacterProfile;
+          const linkedUser: User =
+            MOCK_CHARACTER_ACCOUNTS[profile.id] ||
+            MOCK_CHARACTER_ACCOUNTS[profile.user_id] || {
+              id: profile.user_id || `usr-${profile.id}`,
+              provider: 'GTAWORLD',
+              role: 'USER',
+              status: 'ACTIVE',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+          setUser(linkedUser);
+          setCurrentProfile(profile);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const login = () => {
     // Mock login defaults to admin session
-    const mockUser = MOCK_CHARACTER_ACCOUNTS['char-mavis-01'];
+    const mockUser =
+      MOCK_CHARACTER_ACCOUNTS['44444444-4444-4444-4444-444444444441'] ||
+      MOCK_CHARACTER_ACCOUNTS['char-mavis-01'];
     setUser(mockUser);
+    selectCharacter('44444444-4444-4444-4444-444444444441');
   };
 
   const logout = () => {
@@ -120,18 +168,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     if (char.hasProfile) {
+      const existingAvatar =
+        (currentProfile?.id === char.id
+          ? currentProfile.avatar_path || currentProfile.avatar_url
+          : null) || null;
+
       const profile: CharacterProfile = {
         id: char.id,
         user_id: linkedUser.id,
         external_character_id: char.id,
         full_name: char.fullName,
-        avatar_url: char.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=250&auto=format&fit=crop&q=80',
-        sanmail_email: char.sanmailEmail || `${char.fullName.toLowerCase().replace(' ', '.')}@sanmail.com`,
+        avatar_path: existingAvatar || '',
+        avatar_url: existingAvatar ? resolveMediaUrl(existingAvatar) : '',
+        sanmail_email:
+          char.sanmailEmail || `${char.fullName.toLowerCase().replace(' ', '.')}@sanmail.com`,
         phone: char.phone || '555-0100',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
+
       saveState(linkedUser, profile);
+
+      // Hydrate authoritative profile directly from Supabase
+      fetch(`/api/user/profile?profileId=${char.id}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.success && data.profile) {
+            saveState(linkedUser, data.profile);
+          }
+        })
+        .catch(() => {});
+
       return profile;
     }
 
@@ -140,7 +207,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const updateCurrentProfile = (data: Partial<CharacterProfile>) => {
     if (!currentProfile) return;
-    const updated = { ...currentProfile, ...data, updated_at: new Date().toISOString() };
+    const updated = {
+      ...currentProfile,
+      ...data,
+      updated_at: new Date().toISOString(),
+    };
+    if (updated.avatar_path && !updated.avatar_url) {
+      updated.avatar_url = resolveMediaUrl(updated.avatar_path);
+    }
     saveState(user, updated);
   };
 
@@ -156,6 +230,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         selectCharacter,
         updateCurrentProfile,
+        refreshProfile,
       }}
     >
       {children}

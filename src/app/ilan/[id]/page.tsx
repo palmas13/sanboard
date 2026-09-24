@@ -8,33 +8,33 @@ import {
   Lock,
   LogIn,
   Heart,
-  Car,
-  Home,
   ArrowRight,
-  ShieldAlert,
 } from 'lucide-react';
-import { getListingById } from '@/lib/db/listings';
+import { getListingRepository } from '@/lib/db/repositories';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { ListingGallery } from '@/components/listings/ListingGallery';
 import { SellerCard } from '@/components/listings/SellerCard';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { ReportModal } from '@/components/listings/ReportModal';
-import { MemberListingDetail, PublicListingSummary } from '@/types';
+import { MemberListingDetail } from '@/types';
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function ListingDetailPage({ params }: PageProps) {
   const { id } = await params;
 
-  // Retrieve current user profile ID from cookies if present
+  // Retrieve current user profile ID and user ID from cookies if present
   const cookieStore = await cookies();
   const profileIdCookie = cookieStore.get('sanboard_profile_id')?.value;
+  const userIdCookie = cookieStore.get('sanboard_user_id')?.value;
 
-  const { listing, isLocked, isOwner } = await getListingById(id, profileIdCookie);
+  const repo = getListingRepository();
+  const { listing, isLocked, isOwner } = await repo.getListingById(id, profileIdCookie, userIdCookie);
 
   if (!listing) {
     notFound();
@@ -104,8 +104,15 @@ export default async function ListingDetailPage({ params }: PageProps) {
             <span className="text-[11px] text-[var(--text-dim)] uppercase tracking-wider font-bold hidden md:block">
               Fiyat
             </span>
-            <div className="text-3xl sm:text-[34px] font-black text-[#FF8A1F] tracking-tight">
-              {formatCurrency(listing.price)}
+            <div className="flex items-baseline gap-2 flex-wrap md:justify-end">
+              {listing.previous_price && listing.previous_price !== listing.price && (
+                <span className="text-base sm:text-lg font-semibold text-[var(--text-muted)] line-through">
+                  {formatCurrency(listing.previous_price)}
+                </span>
+              )}
+              <div className="text-3xl sm:text-[34px] font-black text-[#FF8A1F] tracking-tight">
+                {formatCurrency(listing.price)}
+              </div>
             </div>
           </div>
         </div>

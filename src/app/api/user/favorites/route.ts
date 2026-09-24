@@ -1,21 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getListingRepository } from '@/lib/db/repositories';
+import { getServerSession } from '@/lib/auth/session';
 
+// Get current authenticated user's favorites (GET)
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const profileId = searchParams.get('profileId') || req.cookies.get('sanboard_profile_id')?.value;
-    const userId = searchParams.get('userId') || req.cookies.get('sanboard_user_id')?.value || undefined;
+    // SERVER-SIDE ONLY: extract authenticated account user_id from verified session token
+    // Reject plain unverified query params or raw cookies to prevent user spoofing
+    const session = await getServerSession(req);
+    const sessionUserId = session?.userId;
 
-    if (!profileId) {
+    if (!sessionUserId) {
       return NextResponse.json(
-        { error: 'profileId gereklidir.' },
-        { status: 400 }
+        { error: 'Yetkisiz erişim. Lütfen giriş yapın.' },
+        { status: 401 }
       );
     }
 
     const repo = getListingRepository();
-    const favorites = await repo.getUserFavorites(profileId, userId);
+    const favorites = await repo.getUserFavorites(sessionUserId);
     return NextResponse.json(favorites);
   } catch (error: any) {
     return NextResponse.json(

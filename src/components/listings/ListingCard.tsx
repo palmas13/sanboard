@@ -52,8 +52,15 @@ export function ListingCard({ listing, className = '' }: ListingCardProps) {
         {/* Content Section */}
         <div className="p-4 flex flex-col flex-1">
           {/* Price */}
-          <div className="text-xl font-extrabold text-[#FF8A1F] tracking-tight">
-            {formatCurrency(listing.price)}
+          <div className="flex items-baseline gap-2 flex-wrap">
+            {listing.previous_price && listing.previous_price !== listing.price && (
+              <span className="text-xs font-semibold text-[var(--text-muted)] line-through">
+                {formatCurrency(listing.previous_price)}
+              </span>
+            )}
+            <span className="text-xl font-extrabold text-[#FF8A1F] tracking-tight">
+              {formatCurrency(listing.price)}
+            </span>
           </div>
 
           {/* Title */}

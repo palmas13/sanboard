@@ -5,12 +5,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
 import { ChevronRight, UserPlus, CheckCircle2 } from 'lucide-react';
 import { SanboardLogo } from '@/components/common/SanboardLogo';
+import { resolveAvatarUrl } from '@/lib/media/url';
 
 function KarakterSecContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/';
-  const { characters, selectCharacter } = useAuth();
+  const { characters, selectCharacter, currentProfile } = useAuth();
 
   const handleSelect = (characterId: string, hasProfile: boolean) => {
     if (hasProfile) {
@@ -44,6 +45,11 @@ function KarakterSecContent() {
               .map((n) => n[0])
               .join('');
 
+            const charAvatar =
+              (currentProfile?.id === char.id && (currentProfile.avatar_path || currentProfile.avatar_url)
+                ? resolveAvatarUrl(currentProfile.avatar_path || currentProfile.avatar_url)
+                : null) || resolveAvatarUrl(char.avatarUrl);
+
             return (
               <button
                 key={char.id}
@@ -52,9 +58,9 @@ function KarakterSecContent() {
                 className="w-full surface-card surface-card-hover p-4 rounded-xl flex items-center justify-between gap-4 text-left transition-all border border-[var(--border-app)] hover:border-[#FF8A1F] cursor-pointer group"
               >
                 <div className="flex items-center gap-3.5">
-                  {char.avatarUrl ? (
+                  {charAvatar ? (
                     <img
-                      src={char.avatarUrl}
+                      src={charAvatar}
                       alt={char.fullName}
                       className="w-12 h-12 rounded-full object-cover border border-[var(--border-app)] group-hover:border-[#FF8A1F] transition-colors"
                     />

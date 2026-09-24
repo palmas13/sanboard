@@ -5,6 +5,7 @@ export interface StorageUploadOptions {
   contentType: string;
   category: StorageCategory;
   folder?: string;
+  key?: string;
   maxSizeBytes?: number;
 }
 
@@ -13,6 +14,9 @@ export interface StorageUploadResult {
   url: string;
   key: string;
   sizeBytes: number;
+  width?: number;
+  height?: number;
+  mimeType?: string;
   error?: string;
 }
 

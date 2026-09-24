@@ -13,34 +13,24 @@ import { getAllDealers, updateDealerStatus } from '@/lib/db/dealers';
 import { getAllTicketsForAdmin, updateTicketStatus, addTicketMessage } from '@/lib/db/tickets';
 import { db } from '@/lib/db/store';
 
-function checkAdminAccess(req: NextRequest): boolean {
-  // Check cookie or header or profileId/userId in db
-  const roleCookie = req.cookies.get('sanboard_role')?.value;
-  if (roleCookie === 'ADMIN') return true;
+import { getServerSession } from '@/lib/auth/session';
 
-  const roleHeader = req.headers.get('x-sanboard-role');
-  if (roleHeader === 'ADMIN') return true;
+async function checkAdminAccess(req: NextRequest): Promise<boolean> {
+  // Authenticate strictly via cryptographically signed session
+  const session = await getServerSession(req);
+  if (session && session.role === 'ADMIN') return true;
 
-  const userId = req.cookies.get('sanboard_user_id')?.value;
-  if (userId) {
-    const user = db.users.find((u) => u.id === userId);
-    if (user && user.role === 'ADMIN') return true;
-  }
-
-  const profileId = req.cookies.get('sanboard_profile_id')?.value;
-  if (profileId) {
-    const profile = db.profiles.find((p) => p.id === profileId);
-    if (profile) {
-      const user = db.users.find((u) => u.id === profile.user_id);
-      if (user && user.role === 'ADMIN') return true;
-    }
+  // Internal secret header for backend service calls
+  const secretHeader = req.headers.get('x-sanboard-secret');
+  if (secretHeader && process.env.SUPABASE_SECRET_KEY && secretHeader === process.env.SUPABASE_SECRET_KEY) {
+    return true;
   }
 
   return false;
 }
 
 export async function GET(req: NextRequest) {
-  if (!checkAdminAccess(req)) {
+  if (!(await checkAdminAccess(req))) {
     return NextResponse.json(
       { error: 'Yetkisiz erişim. Bu alana yalnızca Sanboard yöneticileri erişebilir.' },
       { status: 403 }
@@ -78,7 +68,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!checkAdminAccess(req)) {
+  if (!(await checkAdminAccess(req))) {
     return NextResponse.json(
       { error: 'Yetkisiz erişim. Bu alana yalnızca Sanboard yöneticileri erişebilir.' },
       { status: 403 }

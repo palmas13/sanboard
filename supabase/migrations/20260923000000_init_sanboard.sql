@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS listings (
     title VARCHAR(60) NOT NULL,
     description VARCHAR(100) NOT NULL,
     price INTEGER NOT NULL CHECK (price > 0),
-    location TEXT NOT NULL,
+    location TEXT,
     status TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'ACTIVE', 'EXPIRED', 'SOLD', 'REMOVED')),
     published_at TIMESTAMPTZ,
     expires_at TIMESTAMPTZ,
@@ -156,7 +156,7 @@ CREATE TABLE IF NOT EXISTS listing_images (
 -- 12. FAVORITES
 CREATE TABLE IF NOT EXISTS favorites (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    profile_id UUID NOT NULL REFERENCES character_profiles(id) ON DELETE CASCADE,
+    profile_id UUID REFERENCES character_profiles(id) ON DELETE CASCADE,
     listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(profile_id, listing_id)

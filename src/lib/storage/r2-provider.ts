@@ -79,10 +79,9 @@ export class CloudflareR2StorageProvider implements StorageProvider {
         };
       }
 
-      const timestamp = Date.now();
       const sanitizedName = options.fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
       const folder = options.folder || options.category || 'uploads';
-      const key = `${folder}/${timestamp}-${sanitizedName}`;
+      const key = options.key || `${folder}/${Date.now()}-${sanitizedName}`;
 
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
@@ -103,6 +102,7 @@ export class CloudflareR2StorageProvider implements StorageProvider {
         url,
         key,
         sizeBytes: fileBuffer.byteLength,
+        mimeType: options.contentType,
       };
     } catch (err: any) {
       return {
@@ -115,7 +115,16 @@ export class CloudflareR2StorageProvider implements StorageProvider {
     }
   }
 
-  async delete(key: string): Promise<StorageDeleteResult> {
+  async delete(keyOrUrl: string): Promise<StorageDeleteResult> {
+    if (!keyOrUrl || typeof keyOrUrl !== 'string') {
+      return { success: true };
+    }
+
+    // Ignore external URLs that are not stored in our R2 bucket
+    if (keyOrUrl.includes('images.unsplash.com') || keyOrUrl.startsWith('data:')) {
+      return { success: true };
+    }
+
     if (!this.isAvailable() || !this.client) {
       return {
         success: false,
@@ -124,9 +133,21 @@ export class CloudflareR2StorageProvider implements StorageProvider {
     }
 
     try {
+      // Extract clean key if a full URL was provided
+      let cleanKey = keyOrUrl;
+      if (cleanKey.startsWith('http://') || cleanKey.startsWith('https://')) {
+        try {
+          const parsed = new URL(cleanKey);
+          cleanKey = parsed.pathname;
+        } catch {
+          // Keep as is
+        }
+      }
+      cleanKey = cleanKey.replace(/^\/+/, '');
+
       const command = new DeleteObjectCommand({
         Bucket: this.bucketName,
-        Key: key,
+        Key: cleanKey,
       });
 
       await this.client.send(command);

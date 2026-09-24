@@ -196,7 +196,6 @@ export default function YeniIlanOlusturPage() {
       title: title.trim(),
       description: description.trim(),
       price: Number(price),
-      location: category === 'property' ? location.trim() : '',
       images,
     };
 
@@ -212,6 +211,7 @@ export default function YeniIlanOlusturPage() {
       payload.subwoofer = subwoofer;
       payload.trade_available = tradeAvailable;
     } else {
+      payload.location = location.trim();
       payload.floor = Number(floor);
       payload.room_count = roomCount;
       payload.furnished = furnished;

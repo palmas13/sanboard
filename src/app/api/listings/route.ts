@@ -38,6 +38,8 @@ export async function GET(req: NextRequest) {
   }
 }
 
+import { revalidatePath } from 'next/cache';
+
 // Create new listing consuming 1 credit
 export async function POST(req: NextRequest) {
   try {
@@ -65,6 +67,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
+    try {
+      revalidatePath('/');
+      revalidatePath('/arac');
+      revalidatePath('/mulk');
+    } catch {}
+
     return NextResponse.json(result);
   } catch (error: any) {
     return NextResponse.json(
@@ -78,7 +86,9 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, sellerProfileId, ...listingData } = body;
+    const { id, sellerProfileId, userId: explicitUserId, ...listingData } = body;
+    const userId = explicitUserId || req.cookies.get('sanboard_user_id')?.value;
+    const role = req.cookies.get('sanboard_role')?.value;
 
     if (!id || !sellerProfileId) {
       return NextResponse.json(
@@ -94,11 +104,20 @@ export async function PUT(req: NextRequest) {
     }
 
     const repo = getListingRepository();
-    const result = await repo.updateListing(id, parsed.data, sellerProfileId);
+    const result = await repo.updateListing(id, parsed.data, sellerProfileId, userId, role);
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
+      const isForbidden = result.error?.includes('yetkiniz yok');
+      return NextResponse.json({ error: result.error }, { status: isForbidden ? 403 : 400 });
     }
+
+    try {
+      revalidatePath('/');
+      revalidatePath('/arac');
+      revalidatePath('/mulk');
+      revalidatePath(`/ilan/${id}`);
+      revalidatePath('/hesabim/ilanlarim');
+    } catch {}
 
     return NextResponse.json(result);
   } catch (error: any) {

@@ -22,6 +22,7 @@ import { SanboardLogo } from '../common/SanboardLogo';
 import { ThemeToggle } from '../common/ThemeToggle';
 import { NotificationDropdown } from '../notifications/NotificationDropdown';
 import { useAuth } from '@/features/auth/AuthContext';
+import { resolveAvatarUrl } from '@/lib/media/url';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -106,7 +107,7 @@ export function Navbar() {
                 aria-expanded={dropdownOpen}
               >
                 <img
-                  src={currentProfile.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                  src={resolveAvatarUrl(currentProfile.avatar_path || currentProfile.avatar_url)}
                   alt={currentProfile.full_name}
                   className="w-7 h-7 rounded-full object-cover border border-[var(--border-app)]"
                 />

@@ -24,6 +24,12 @@ export class MemoryUserRepository implements IUserRepository {
     const profile = db.profiles.find((p) => p.id === id);
     if (!profile) return { success: false, error: 'Profil bulunamadı.' };
 
+    if (data.avatar_path && !data.avatar_url) {
+      data.avatar_url = data.avatar_path;
+    } else if (data.avatar_url && !data.avatar_path) {
+      data.avatar_path = data.avatar_url;
+    }
+
     Object.assign(profile, data, { updated_at: new Date().toISOString() });
     return { success: true, profile };
   }

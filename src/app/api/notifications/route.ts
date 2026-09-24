@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getNotificationRepository } from '@/lib/db/repositories';
+import { getServerSession } from '@/lib/auth/session';
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId') || req.cookies.get('sanboard_user_id')?.value;
+    const session = await getServerSession(req);
+    const userId = session?.userId || req.nextUrl.searchParams.get('userId');
 
     if (!userId) {
       return NextResponse.json(
-        { error: 'userId parametresi zorunludur.' },
-        { status: 400 }
+        { error: 'Yetkisiz erişim. Lütfen giriş yapın.' },
+        { status: 401 }
       );
     }
 
@@ -35,13 +36,14 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const action = body.action;
-    const userId = body.userId || req.cookies.get('sanboard_user_id')?.value;
+    const session = await getServerSession(req);
+    const userId = session?.userId || body.userId;
     const notificationId = body.notificationId;
 
     if (!userId) {
       return NextResponse.json(
-        { error: 'userId parametresi zorunludur.' },
-        { status: 400 }
+        { error: 'Yetkisiz erişim. Lütfen giriş yapın.' },
+        { status: 401 }
       );
     }
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { getPublicListings } from '@/lib/db/listings';
+import { getListingRepository } from '@/lib/db/repositories';
 import { ListingCard } from '@/components/listings/ListingCard';
 import { FilterSidebar } from '@/components/listings/FilterSidebar';
 import { MobileFilterDrawer } from '@/components/listings/MobileFilterDrawer';
@@ -10,6 +10,7 @@ interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
+export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function PropertyListingsPage({ searchParams }: PageProps) {
@@ -26,7 +27,8 @@ export default async function PropertyListingsPage({ searchParams }: PageProps) 
   const buildingType = typeof resolvedParams.buildingType === 'string' ? (resolvedParams.buildingType as any) : undefined;
   const sort = typeof resolvedParams.sort === 'string' ? (resolvedParams.sort as any) : 'newest';
 
-  const listings = await getPublicListings({
+  const repo = getListingRepository();
+  const listings = await repo.getPublicListings({
     category: 'property',
     subcategory,
     query,

@@ -1,4 +1,8 @@
 -- Sanboard Seed Data for Local Development & Testing
+-- CRITICAL RULES:
+-- 1. This file is ONLY for manual local development / initial bootstrap.
+-- 2. It must NEVER run automatically on app startup, npm run build, Vercel deployment, or runtime.
+-- 3. All inserts MUST use ON CONFLICT (id) DO NOTHING so existing profiles (avatar_path, phone, sanmail_email) are never overwritten.
 
 -- 1. Default Package
 INSERT INTO packages (id, code, name, price, duration_days, active)

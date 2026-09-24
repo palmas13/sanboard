@@ -1,21 +1,31 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
-import { User, Camera, Save, CheckCircle2, AlertCircle, Loader2, UploadCloud } from 'lucide-react';
+import { User, Camera, Save, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/format';
+import { resolveAvatarUrl } from '@/lib/media/url';
 
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024; // 2 MB
 
 export default function HesabimProfilPage() {
-  const { currentProfile, updateCurrentProfile } = useAuth();
+  const { currentProfile, updateCurrentProfile, refreshProfile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [avatarUrl, setAvatarUrl] = useState(currentProfile?.avatar_url || '');
+  const [avatarUrl, setAvatarUrl] = useState(
+    currentProfile?.avatar_path || currentProfile?.avatar_url || ''
+  );
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+
+  // Sync state when profile is hydrated from server
+  useEffect(() => {
+    if (currentProfile && !avatarFile) {
+      setAvatarUrl(currentProfile.avatar_path || currentProfile.avatar_url || '');
+    }
+  }, [currentProfile?.avatar_path, currentProfile?.avatar_url, avatarFile]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError('');
@@ -64,9 +74,19 @@ export default function HesabimProfilPage() {
         }),
       });
 
-      if (!res.ok) throw new Error('Profil güncellenemedi.');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Profil güncellenemedi.');
+      }
 
-      updateCurrentProfile({ avatar_url: avatarUrl });
+      // Update auth context state with the server-persisted profile data
+      if (data.profile) {
+        updateCurrentProfile(data.profile);
+        setAvatarUrl(data.profile.avatar_path || data.profile.avatar_url);
+        setAvatarFile(null);
+      }
+
+      await refreshProfile();
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
@@ -75,6 +95,8 @@ export default function HesabimProfilPage() {
       setSubmitting(false);
     }
   };
+
+  const displayAvatar = avatarFile ? avatarUrl : resolveAvatarUrl(avatarUrl);
 
   return (
     <div className="surface-card p-6 sm:p-8 rounded-2xl border border-[var(--border-app)] space-y-6">
@@ -100,7 +122,7 @@ export default function HesabimProfilPage() {
       )}
 
       <form onSubmit={handleSave} className="space-y-6 max-w-xl">
-        {/* AVATAR UPLOAD SECTION (NO URL INPUT) */}
+        {/* AVATAR UPLOAD SECTION */}
         <div className="p-6 rounded-2xl bg-[var(--bg-surface-secondary)]/50 border border-[var(--border-app)] flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
           {/* Circular avatar with hover camera overlay */}
           <div
@@ -109,7 +131,7 @@ export default function HesabimProfilPage() {
             title="Fotoğrafı Değiştir"
           >
             <img
-              src={avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=250'}
+              src={displayAvatar}
               alt="Karakter Avatarı"
               className="w-full h-full object-cover"
             />
@@ -129,7 +151,7 @@ export default function HesabimProfilPage() {
                 Maksimum <strong className="text-[var(--text-main)]">2 MB</strong> dosya boyutu
               </p>
               <p className="text-[11px] text-[var(--text-dim)]">
-                Desteklenen formatlar: JPG, JPEG, PNG, WEBP
+                Desteklenen formatlar: JPG, JPEG, PNG, WEBP (Otomatik WebP optimizasyonu)
               </p>
             </div>
 
@@ -137,7 +159,7 @@ export default function HesabimProfilPage() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="btn-secondary text-xs py-2 px-3.5 inline-flex items-center gap-1.5 shadow-sm"
+                className="btn-secondary text-xs py-2 px-3.5 inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
               >
                 <Camera className="w-3.5 h-3.5 text-[#FF8A1F]" />
                 <span>Fotoğraf Seç</span>
@@ -155,7 +177,7 @@ export default function HesabimProfilPage() {
           </div>
         </div>
 
-        {/* Karakter Adı (Read-only as per GTA World specification) */}
+        {/* Karakter Adı */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-[var(--text-muted)] flex items-center gap-1.5">
             <User className="w-3.5 h-3.5 text-[var(--text-dim)]" />

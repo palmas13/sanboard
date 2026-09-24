@@ -16,7 +16,7 @@ export class MemoryListingRepository implements IListingRepository {
     return getPublicListings(params);
   }
 
-  async getListingById(id: string, viewerProfileId?: string) {
+  async getListingById(id: string, viewerProfileId?: string, _viewerUserId?: string) {
     return getListingById(id, viewerProfileId);
   }
 
@@ -24,8 +24,8 @@ export class MemoryListingRepository implements IListingRepository {
     return createListingWithCredit(input as any, profileId);
   }
 
-  async updateListing(id: string, input: Partial<CreateListingInput>, profileId: string) {
-    return updateListing(id, input as any, profileId);
+  async updateListing(id: string, input: Partial<CreateListingInput>, profileId: string, userId?: string, role?: string) {
+    return updateListing(id, input as any, profileId, userId, role);
   }
 
   async markListingAsSold(id: string, profileId: string) {
@@ -36,11 +36,20 @@ export class MemoryListingRepository implements IListingRepository {
     return getUserListings(profileId);
   }
 
-  async toggleFavorite(profileId: string, listingId: string, userId?: string) {
-    return toggleFavorite(profileId, listingId, userId);
+  async toggleFavorite(listingId: string, userId: string) {
+    return toggleFavorite(userId, listingId, userId);
   }
 
-  async getUserFavorites(profileId: string, userId?: string) {
-    return getUserFavorites(profileId, userId);
+  async removeFavorite(listingId: string, userId: string) {
+    const res = await toggleFavorite(userId, listingId, userId);
+    if (res.isFavorited) {
+      const secondRes = await toggleFavorite(userId, listingId, userId);
+      return { success: true, count: secondRes.count };
+    }
+    return { success: true, count: res.count };
+  }
+
+  async getUserFavorites(userId: string) {
+    return getUserFavorites(undefined, userId);
   }
 }

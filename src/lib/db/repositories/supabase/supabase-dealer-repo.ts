@@ -76,7 +76,7 @@ export class SupabaseDealerRepository implements IDealerRepository {
       const matches = finalLogoUrl.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
       if (matches) {
         const buffer = Buffer.from(matches[2], 'base64');
-        const uploadRes = await uploadCorporateLogo(buffer, `logo-${id}-${Date.now()}.jpg`, matches[1]);
+        const uploadRes = await uploadCorporateLogo(buffer, id, matches[1]);
         if (uploadRes.success) finalLogoUrl = uploadRes.url;
         else return { success: false, error: `R2 logo yükleme hatası: ${uploadRes.error}` };
       }
@@ -87,7 +87,7 @@ export class SupabaseDealerRepository implements IDealerRepository {
       const matches = finalBannerUrl.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
       if (matches) {
         const buffer = Buffer.from(matches[2], 'base64');
-        const uploadRes = await uploadCorporateBanner(buffer, `banner-${id}-${Date.now()}.jpg`, matches[1]);
+        const uploadRes = await uploadCorporateBanner(buffer, id, matches[1]);
         if (uploadRes.success) finalBannerUrl = uploadRes.url;
         else return { success: false, error: `R2 banner yükleme hatası: ${uploadRes.error}` };
       }

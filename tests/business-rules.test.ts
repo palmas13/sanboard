@@ -224,4 +224,58 @@ describe('Sanboard Business Rules & Validation Tests', () => {
     const res2 = await toggleFavorite(profileId, listingId);
     assert.strictEqual(res2.isFavorited, false);
   });
+
+  test('Vehicle listing schema succeeds WITHOUT location', () => {
+    const vehicleInput = {
+      category: 'vehicle' as const,
+      subcategory: 'Otomobil' as const,
+      title: '2024 Vapid Dominator GT',
+      description: 'Temiz araç',
+      price: 85000,
+      brand: 'Vapid',
+      model: 'Dominator GT',
+      plate: '62LS901',
+      mileage: 1500,
+      engine_upgrade: 3,
+      transmission_upgrade: 2,
+      brake_upgrade: 2,
+      turbo: true,
+      subwoofer: false,
+      trade_available: true,
+      images: [
+        { storage_path: 'https://example.com/dom1.jpg', is_cover: true, size_bytes: 500000, sort_order: 0 },
+      ],
+    };
+
+    const result = vehicleListingSchema.safeParse(vehicleInput);
+    assert.strictEqual(result.success, true, 'Vehicle listing without location should succeed');
+  });
+
+  test('Property listing schema FAILS without location and SUCCEEDS with valid location', () => {
+    const invalidProperty = {
+      category: 'property' as const,
+      subcategory: 'Ev / Daire' as const,
+      title: 'Rockford Hills Lüks Daire',
+      description: 'Manzaralı',
+      price: 450000,
+      floor: 4,
+      room_count: '3+1' as const,
+      furnished: true,
+      building_type: 'Normal' as const,
+      balcony: true,
+      images: [
+        { storage_path: 'https://example.com/prop1.jpg', is_cover: true, size_bytes: 500000, sort_order: 0 },
+      ],
+    };
+
+    const failResult = propertyListingSchema.safeParse(invalidProperty);
+    assert.strictEqual(failResult.success, false, 'Property listing without location should fail');
+
+    const validProperty = {
+      ...invalidProperty,
+      location: 'Rockford Hills',
+    };
+    const passResult = propertyListingSchema.safeParse(validProperty);
+    assert.strictEqual(passResult.success, true, 'Property listing with valid location should pass');
+  });
 });

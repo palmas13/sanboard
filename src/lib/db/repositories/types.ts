@@ -20,7 +20,7 @@ export interface CreateListingInput {
   title: string;
   description: string;
   price: number;
-  location?: string;
+  location?: string | null;
   images: Array<{
     storage_path: string;
     is_cover?: boolean;
@@ -55,13 +55,14 @@ export interface CreateListingInput {
 
 export interface IListingRepository {
   getPublicListings(params?: ListingFilterParams): Promise<PublicListingSummary[]>;
-  getListingById(id: string, viewerProfileId?: string): Promise<{ listing: MemberListingDetail | PublicListingSummary | null; isLocked: boolean; isOwner: boolean }>;
+  getListingById(id: string, viewerProfileId?: string, viewerUserId?: string): Promise<{ listing: MemberListingDetail | PublicListingSummary | null; isLocked: boolean; isOwner: boolean }>;
   createListing(input: CreateListingInput, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
-  updateListing(id: string, input: Partial<CreateListingInput>, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
+  updateListing(id: string, input: Partial<CreateListingInput>, profileId: string, userId?: string, role?: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   markListingAsSold(id: string, profileId: string): Promise<{ success: boolean; error?: string }>;
   getUserListings(profileId: string): Promise<Listing[]>;
-  toggleFavorite(profileId: string, listingId: string, userId?: string): Promise<{ isFavorited: boolean; count: number }>;
-  getUserFavorites(profileId: string, userId?: string): Promise<(Listing & { isExpired: boolean })[]>;
+  toggleFavorite(listingId: string, userId: string): Promise<{ isFavorited: boolean; count: number }>;
+  removeFavorite(listingId: string, userId: string): Promise<{ success: boolean; count: number }>;
+  getUserFavorites(userId: string): Promise<(Listing & { isExpired: boolean })[]>;
 }
 
 export interface INotificationRepository {

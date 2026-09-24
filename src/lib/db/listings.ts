@@ -9,6 +9,7 @@ import {
 } from '@/types';
 import { generateListingNumber } from '../utils/format';
 import { createNotification } from './notifications';
+import { SupabaseListingRepository } from './repositories/supabase/supabase-listing-repo';
 
 export interface ListingFilterParams {
   category?: ListingCategory;
@@ -58,11 +59,26 @@ export function sanitizeListingForPublic(listing: Listing): PublicListingSummary
   };
 }
 
+let supabaseListingRepoInstance: SupabaseListingRepository | null = null;
+function getSupabaseRepo(): SupabaseListingRepository {
+  if (!supabaseListingRepoInstance) {
+    supabaseListingRepoInstance = new SupabaseListingRepository();
+  }
+  return supabaseListingRepoInstance;
+}
+
+function isSupabaseConfiguredMode(): boolean {
+  return process.env.DATA_STORE === 'supabase';
+}
+
 /**
  * Public search/listing query.
  * CRITICAL RULE: ONLY returns ACTIVE and expires_at > NOW().
  */
 export async function getPublicListings(filters: ListingFilterParams = {}): Promise<PublicListingSummary[]> {
+  if (isSupabaseConfiguredMode()) {
+    return getSupabaseRepo().getPublicListings(filters);
+  }
   const now = new Date();
 
   // 1. Strict status & expiration filter
@@ -88,7 +104,7 @@ export async function getPublicListings(filters: ListingFilterParams = {}): Prom
     const q = filters.query.toLowerCase().trim();
     result = result.filter((l) => {
       const matchTitle = l.title.toLowerCase().includes(q);
-      const matchLoc = l.location.toLowerCase().includes(q);
+      const matchLoc = l.location ? l.location.toLowerCase().includes(q) : false;
       const matchModel = l.vehicle_details?.model.toLowerCase().includes(q);
       return matchTitle || matchLoc || Boolean(matchModel);
     });
@@ -105,7 +121,7 @@ export async function getPublicListings(filters: ListingFilterParams = {}): Prom
   // 6. Location filter
   if (filters.location && filters.location !== 'all') {
     result = result.filter((l) =>
-      l.location.toLowerCase().includes(filters.location!.toLowerCase())
+      Boolean(l.location && l.location.toLowerCase().includes(filters.location!.toLowerCase()))
     );
   }
 
@@ -186,6 +202,9 @@ export async function getListingById(
   id: string,
   viewerProfileId?: string
 ): Promise<{ listing: PublicListingSummary | MemberListingDetail | null; isLocked: boolean; isOwner: boolean }> {
+  if (isSupabaseConfiguredMode()) {
+    return getSupabaseRepo().getListingById(id, viewerProfileId);
+  }
   const listing = db.listings.find((l) => l.id === id);
   if (!listing) {
     return { listing: null, isLocked: false, isOwner: false };
@@ -268,6 +287,9 @@ export async function createListingWithCredit(
   input: any,
   sellerProfileId: string
 ): Promise<{ success: boolean; listing?: Listing; error?: string }> {
+  if (isSupabaseConfiguredMode()) {
+    return getSupabaseRepo().createListing(input, sellerProfileId);
+  }
   // 1. Find available credit
   const credit = db.credits.find(
     (c) => c.profile_id === sellerProfileId && c.status === 'AVAILABLE'
@@ -298,7 +320,7 @@ export async function createListingWithCredit(
     title: input.title,
     description: input.description,
     price: Number(input.price),
-    location: input.location,
+    location: input.category === 'vehicle' ? null : (input.location || null),
     status: 'ACTIVE',
     published_at: now.toISOString(),
     expires_at: expiresAt.toISOString(),
@@ -346,8 +368,13 @@ export async function createListingWithCredit(
 export async function updateListing(
   id: string,
   input: any,
-  sellerProfileId: string
+  sellerProfileId: string,
+  userId?: string,
+  role?: string
 ): Promise<{ success: boolean; listing?: Listing; error?: string }> {
+  if (isSupabaseConfiguredMode()) {
+    return getSupabaseRepo().updateListing(id, input, sellerProfileId, userId, role);
+  }
   const listing = db.listings.find((l) => l.id === id);
   if (!listing) {
     return { success: false, error: 'İlan bulunamadı.' };
@@ -461,6 +488,9 @@ export async function markListingAsSold(
   id: string,
   sellerProfileId: string
 ): Promise<{ success: boolean; error?: string }> {
+  if (isSupabaseConfiguredMode()) {
+    return getSupabaseRepo().markListingAsSold(id, sellerProfileId);
+  }
   const listing = db.listings.find((l) => l.id === id);
   if (!listing) return { success: false, error: 'İlan bulunamadı.' };
 
@@ -490,6 +520,9 @@ export async function markListingAsSold(
  * Get listings owned by a user (Active & Expired).
  */
 export async function getUserListings(sellerProfileId: string): Promise<Listing[]> {
+  if (isSupabaseConfiguredMode()) {
+    return getSupabaseRepo().getUserListings(sellerProfileId);
+  }
   const listings = db.listings.filter((l) => l.seller_profile_id === sellerProfileId);
   const now = new Date();
 
@@ -512,6 +545,9 @@ export async function toggleFavorite(
   listingId: string,
   userIdParam?: string
 ): Promise<{ isFavorited: boolean; count: number }> {
+  if (isSupabaseConfiguredMode()) {
+    return getSupabaseRepo().toggleFavorite(profileId, listingId, userIdParam);
+  }
   const profile = db.profiles.find((p) => p.id === profileId);
   const userId = userIdParam || profile?.user_id || profileId;
 
@@ -547,11 +583,14 @@ export async function toggleFavorite(
  * Get user's favorited listings by profile or account user_id.
  */
 export async function getUserFavorites(
-  profileId: string,
+  profileId?: string,
   userIdParam?: string
 ): Promise<(Listing & { isExpired: boolean })[]> {
-  const profile = db.profiles.find((p) => p.id === profileId);
-  const userId = userIdParam || profile?.user_id || profileId;
+  const profile = profileId ? db.profiles.find((p) => p.id === profileId) : undefined;
+  const userId = userIdParam || profile?.user_id || profileId || '';
+  if (isSupabaseConfiguredMode()) {
+    return getSupabaseRepo().getUserFavorites(userId);
+  }
 
   const favListingIds = db.favorites
     .filter((f) => (f.user_id ? f.user_id === userId : f.profile_id === profileId))

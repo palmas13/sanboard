@@ -44,6 +44,7 @@ export interface CharacterProfile {
   external_character_id?: string;
   full_name: string;
   avatar_url: string;
+  avatar_path?: string;
   sanmail_email: string;
   phone: string;
   is_dealer?: boolean;
@@ -97,7 +98,8 @@ export interface Listing {
   title: string; // max 60
   description: string; // max 100
   price: number;
-  location: string;
+  previous_price?: number;
+  location: string | null;
   status: ListingStatus;
   published_at?: string;
   expires_at?: string;
@@ -123,7 +125,8 @@ export interface PublicListingSummary {
   subcategory: string;
   title: string;
   price: number;
-  location: string;
+  previous_price?: number;
+  location: string | null;
   published_at?: string;
   cover_image?: string;
   favorite_count: number;

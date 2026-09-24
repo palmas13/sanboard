@@ -7,17 +7,19 @@ import {
   Sparkles,
   PlusCircle,
 } from 'lucide-react';
-import { getPublicListings } from '@/lib/db/listings';
+import { getListingRepository } from '@/lib/db/repositories';
 import { ListingCard } from '@/components/listings/ListingCard';
 import { PopularShowcase } from '@/components/home/PopularShowcase';
 
+export const dynamic = 'force-dynamic';
 export const revalidate = 0; // Fresh listing feed
 
 export default async function HomePage() {
+  const repo = getListingRepository();
   const [vehicleListings, propertyListings, popularListings] = await Promise.all([
-    getPublicListings({ category: 'vehicle', sort: 'newest' }),
-    getPublicListings({ category: 'property', sort: 'newest' }),
-    getPublicListings({ sort: 'popular' }),
+    repo.getPublicListings({ category: 'vehicle', sort: 'newest' }),
+    repo.getPublicListings({ category: 'property', sort: 'newest' }),
+    repo.getPublicListings({ sort: 'popular' }),
   ]);
 
   const latestVehicles = vehicleListings.slice(0, 6);

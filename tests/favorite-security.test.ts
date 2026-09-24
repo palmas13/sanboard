@@ -1,0 +1,320 @@
+import { test, describe, beforeEach } from 'node:test';
+import assert from 'node:assert/strict';
+import { NextRequest } from 'next/server';
+import { POST as toggleFavoritePost, DELETE as deleteFavorite, GET as getFavoriteStatus } from '@/app/api/favorites/route';
+import { GET as getUserFavoritesGet } from '@/app/api/user/favorites/route';
+import { PUT as updateListingPut } from '@/app/api/user/listings/[id]/route';
+import { GET as adminGet } from '@/app/api/admin/route';
+import { db } from '@/lib/db/store';
+import { createSessionToken, verifySessionToken } from '@/lib/auth/session';
+
+describe('Sanboard Favorite & Session Security Hardening Tests', () => {
+  const zadeUserId = '33333333-3333-3333-3333-333333333333';
+  const mavisUserId = '22222222-2222-2222-2222-222222222222';
+  const testListingId = db.listings[0]?.id || 'lst-veh-01';
+
+  beforeEach(() => {
+    // Reset favorites in mock store for clean isolated test runs
+    db.favorites = [];
+  });
+
+  // Helper to create a NextRequest with signed session cookie or raw cookie
+  function createAuthedRequest(
+    url: string,
+    method: string,
+    sessionUser?: { userId: string; role: 'USER' | 'ADMIN'; profileId?: string } | null,
+    body?: any,
+    rawCookieHeader?: string
+  ) {
+    const headers = new Headers();
+    if (sessionUser) {
+      const token = createSessionToken(sessionUser);
+      headers.set('cookie', `sanboard_session=${token}`);
+    } else if (rawCookieHeader) {
+      headers.set('cookie', rawCookieHeader);
+    }
+
+    if (body) {
+      headers.set('content-type', 'application/json');
+    }
+
+    return new NextRequest(url, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  // =========================================================================
+  // 1. FAVORITE API IDENTITY TESTS
+  // =========================================================================
+
+  test('TEST 1: Zade cannot favorite on behalf of Mavis by injecting Mavis user ID into request body', async () => {
+    // Zade has valid signed session for Zade, but attempts to spoof Mavis in request body
+    const spoofReq = createAuthedRequest(
+      'http://localhost:3000/api/favorites',
+      'POST',
+      { userId: zadeUserId, role: 'USER' },
+      {
+        listingId: testListingId,
+        userId: mavisUserId, // Spoofed victim in body
+      }
+    );
+
+    const res = await toggleFavoritePost(spoofReq);
+    assert.strictEqual(res.status, 200);
+
+    // Verify favorite in store belongs to Zade (session), NOT Mavis
+    const mavisFavs = db.favorites.filter((f) => f.user_id === mavisUserId && f.listing_id === testListingId);
+    assert.strictEqual(mavisFavs.length, 0, 'Mavis must NOT have any favorite row created');
+
+    const zadeFavs = db.favorites.filter((f) => f.user_id === zadeUserId && f.listing_id === testListingId);
+    assert.strictEqual(zadeFavs.length, 1, 'Favorite must belong strictly to authenticated session (Zade)');
+  });
+
+  test('TEST 2: Zade cannot delete Mavis favorite row using spoofed account ID in body or query', async () => {
+    // Setup: Mavis has favorited the listing
+    db.favorites.push({
+      id: 'fav-mavis-row',
+      user_id: mavisUserId,
+      profile_id: '44444444-4444-4444-4444-444444444441',
+      listing_id: testListingId,
+      created_at: new Date().toISOString(),
+    });
+
+    // Zade is logged in with valid session, attempts to delete Mavis's favorite
+    const deleteReq = createAuthedRequest(
+      'http://localhost:3000/api/favorites?userId=' + mavisUserId,
+      'DELETE',
+      { userId: zadeUserId, role: 'USER' },
+      {
+        listingId: testListingId,
+        userId: mavisUserId, // Attacker specifies Mavis ID
+      }
+    );
+
+    const res = await deleteFavorite(deleteReq);
+    assert.strictEqual(res.status, 200);
+
+    // Mavis's favorite must remain intact
+    const mavisFavs = db.favorites.filter((f) => f.user_id === mavisUserId && f.listing_id === testListingId);
+    assert.strictEqual(mavisFavs.length, 1, 'Mavis favorite row must not be deleted by Zade');
+  });
+
+  test('TEST 3: Client sending ONLY { listingId } without any userId succeeds for authenticated session', async () => {
+    const cleanReq = createAuthedRequest(
+      'http://localhost:3000/api/favorites',
+      'POST',
+      { userId: zadeUserId, role: 'USER' },
+      { listingId: testListingId } // No userId, no profileId
+    );
+
+    const res = await toggleFavoritePost(cleanReq);
+    assert.strictEqual(res.status, 200);
+
+    const data = await res.json();
+    assert.strictEqual(data.isFavorited, true);
+    assert.strictEqual(data.count, 1);
+
+    const favRow = db.favorites.find((f) => f.listing_id === testListingId);
+    assert.ok(favRow);
+    assert.strictEqual(favRow.user_id, zadeUserId);
+  });
+
+  test('TEST 4: Zade switching characters under the same account shares the identical favorites list', async () => {
+    // Zade adds favorite under his account
+    db.favorites.push({
+      id: 'fav-zade-1',
+      user_id: zadeUserId,
+      profile_id: 'char-profile-a',
+      listing_id: testListingId,
+      created_at: new Date().toISOString(),
+    });
+
+    // Requesting favorites using server session cookie (different character profile, same account user_id)
+    const req = createAuthedRequest(
+      'http://localhost:3000/api/user/favorites',
+      'GET',
+      { userId: zadeUserId, role: 'USER', profileId: 'char-profile-b' }
+    );
+
+    const res = await getUserFavoritesGet(req);
+    assert.strictEqual(res.status, 200);
+
+    const favList = await res.json();
+    assert.ok(Array.isArray(favList));
+    assert.strictEqual(favList.length, 1);
+    assert.strictEqual(favList[0].id, testListingId);
+  });
+
+  test('TEST 5: Duplicate favorite for the same (user_id, listing_id) never creates two rows', async () => {
+    // First toggle: Adds favorite
+    const req1 = createAuthedRequest(
+      'http://localhost:3000/api/favorites',
+      'POST',
+      { userId: zadeUserId, role: 'USER' },
+      { listingId: testListingId }
+    );
+    const res1 = await toggleFavoritePost(req1);
+    const data1 = await res1.json();
+    assert.strictEqual(data1.isFavorited, true);
+    assert.strictEqual(db.favorites.filter((f) => f.user_id === zadeUserId && f.listing_id === testListingId).length, 1);
+
+    // Second toggle: Removes favorite (toggles off)
+    const req2 = createAuthedRequest(
+      'http://localhost:3000/api/favorites',
+      'POST',
+      { userId: zadeUserId, role: 'USER' },
+      { listingId: testListingId }
+    );
+    const res2 = await toggleFavoritePost(req2);
+    const data2 = await res2.json();
+    assert.strictEqual(data2.isFavorited, false);
+    assert.strictEqual(db.favorites.filter((f) => f.user_id === zadeUserId && f.listing_id === testListingId).length, 0);
+
+    // Third toggle: Re-adds, count is 1 (never duplicate)
+    const req3 = createAuthedRequest(
+      'http://localhost:3000/api/favorites',
+      'POST',
+      { userId: zadeUserId, role: 'USER' },
+      { listingId: testListingId }
+    );
+    const res3 = await toggleFavoritePost(req3);
+    const data3 = await res3.json();
+    assert.strictEqual(data3.isFavorited, true);
+    assert.strictEqual(db.favorites.filter((f) => f.user_id === zadeUserId && f.listing_id === testListingId).length, 1);
+  });
+
+  // =========================================================================
+  // 2. SESSION SPOOFING & CRYPTOGRAPHIC VERIFICATION TESTS
+  // =========================================================================
+
+  test('SESSION SPOOF 1: Attacker setting raw UUID cookie (sanboard_user_id=Mavis) without signed session is rejected (401)', async () => {
+    // Attacker alters document.cookie to victim UUID in browser
+    const rawSpoofReq = createAuthedRequest(
+      'http://localhost:3000/api/favorites',
+      'POST',
+      null,
+      { listingId: testListingId },
+      `sanboard_user_id=${mavisUserId}; sanboard_role=ADMIN` // Raw un-signed cookie
+    );
+
+    const res = await toggleFavoritePost(rawSpoofReq);
+    assert.strictEqual(res.status, 401, 'Raw UUID cookie without HMAC signature must be rejected with 401');
+  });
+
+  test('SESSION SPOOF 2: Tampered HMAC signature in sanboard_session is detected and rejected (401)', async () => {
+    // Generate valid token for Zade, then alter the signature
+    const validToken = createSessionToken({ userId: zadeUserId, role: 'USER' });
+    const [payloadB64] = validToken.split('.');
+    const tamperedToken = `${payloadB64}.tampered_fake_signature_xyz123`;
+
+    const tamperedReq = createAuthedRequest(
+      'http://localhost:3000/api/favorites',
+      'POST',
+      null,
+      { listingId: testListingId },
+      `sanboard_session=${tamperedToken}`
+    );
+
+    const res = await toggleFavoritePost(tamperedReq);
+    assert.strictEqual(res.status, 401, 'Tampered token must be rejected with 401');
+  });
+
+  test('SESSION SPOOF 3: Validly signed session is accepted and authorizes user', async () => {
+    const validReq = createAuthedRequest(
+      'http://localhost:3000/api/favorites',
+      'POST',
+      { userId: zadeUserId, role: 'USER' },
+      { listingId: testListingId }
+    );
+
+    const res = await toggleFavoritePost(validReq);
+    assert.strictEqual(res.status, 200);
+  });
+
+  // =========================================================================
+  // 3. AUTHORIZATION & ADMIN ACCESS TESTS
+  // =========================================================================
+
+  test('AUTH TEST 1: Client setting p_is_admin=true or sanboard_role=ADMIN without signed admin session is denied', async () => {
+    // User Zade sets fake role cookie and sends p_is_admin in body
+    const spoofAdminReq = createAuthedRequest(
+      'http://localhost:3000/api/admin',
+      'GET',
+      null, // No valid admin session
+      null,
+      `sanboard_user_id=${zadeUserId}; sanboard_role=ADMIN`
+    );
+
+    const res = await adminGet(spoofAdminReq);
+    assert.strictEqual(res.status, 403, 'Fake role cookie must be denied access to admin API (403)');
+  });
+
+  test('AUTH TEST 2: Zade cannot edit Mavis listing via PUT /api/user/listings/[id]', async () => {
+    // Mavis owns listing lst-veh-01 (or db.listings[0])
+    const mavisListing = db.listings[0];
+    assert.ok(mavisListing);
+
+    const zadeEditReq = createAuthedRequest(
+      `http://localhost:3000/api/user/listings/${mavisListing.id}`,
+      'PUT',
+      { userId: zadeUserId, role: 'USER', profileId: 'char-zade-02' },
+      {
+        price: 99999,
+        title: 'Hacked by Zade',
+        p_is_admin: true, // Attempt to elevate privilege
+      }
+    );
+
+    const res = await updateListingPut(zadeEditReq, {
+      params: Promise.resolve({ id: mavisListing.id }),
+    });
+
+    assert.strictEqual(res.status, 403, 'Zade editing Mavis listing must return 403 Forbidden');
+  });
+
+  test('AUTH TEST 3: Admin with validly signed admin session can access admin dashboard', async () => {
+    const adminReq = createAuthedRequest(
+      'http://localhost:3000/api/admin',
+      'GET',
+      { userId: mavisUserId, role: 'ADMIN', profileId: 'char-mavis-01' }
+    );
+
+    const res = await adminGet(adminReq);
+    assert.strictEqual(res.status, 200);
+  });
+
+  test('SESSION SECRET 1: Strictly requires 32+ byte secret in production and throws explicit error when missing', () => {
+    const origSecret = process.env.SANBOARD_SESSION_SECRET;
+    const origStore = process.env.DATA_STORE;
+    const origNodeEnv = process.env.NODE_ENV;
+
+    try {
+      delete process.env.SANBOARD_SESSION_SECRET;
+      delete process.env.SESSION_SECRET;
+      process.env.DATA_STORE = 'supabase';
+
+      assert.throws(() => {
+        createSessionToken({ userId: 'u1', role: 'USER' });
+      }, /SANBOARD_SESSION_SECRET is missing/);
+
+      // Short secret < 32 bytes must be rejected
+      process.env.SANBOARD_SESSION_SECRET = 'too-short-secret';
+      assert.throws(() => {
+        createSessionToken({ userId: 'u1', role: 'USER' });
+      }, /SANBOARD_SESSION_SECRET is too short/);
+
+      // Valid 32+ bytes secret must succeed
+      process.env.SANBOARD_SESSION_SECRET = 'valid-production-secret-must-be-at-least-32-bytes-long';
+      const token = createSessionToken({ userId: 'u1', role: 'USER' });
+      assert.ok(token);
+      const verified = verifySessionToken(token);
+      assert.strictEqual(verified?.userId, 'u1');
+    } finally {
+      process.env.SANBOARD_SESSION_SECRET = origSecret;
+      process.env.DATA_STORE = origStore;
+      (process.env as any).NODE_ENV = origNodeEnv;
+    }
+  });
+});

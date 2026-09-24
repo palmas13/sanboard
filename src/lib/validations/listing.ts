@@ -32,7 +32,7 @@ export const imageSchema = z.object({
   size_bytes: z.number().max(2 * 1024 * 1024, 'Her fotoğraf maksimum 2 MB olabilir'),
 });
 
-export const baseListingSchema = z.object({
+export const baseListingFields = {
   title: z
     .string()
     .trim()
@@ -46,11 +46,6 @@ export const baseListingSchema = z.object({
     .number({ message: 'Geçerli bir fiyat giriniz' })
     .positive('Fiyat 0\'dan büyük olmalıdır')
     .max(1_000_000_000, 'Fiyat çok yüksek'),
-  location: z
-    .string()
-    .trim()
-    .min(2, 'Konum en az 2 karakter olmalıdır')
-    .max(80, 'Konum en fazla 80 karakter olabilir'),
   images: z
     .array(imageSchema)
     .min(1, 'En az 1 fotoğraf yüklenmelidir')
@@ -59,13 +54,20 @@ export const baseListingSchema = z.object({
       (imgs) => imgs.filter((img) => img.is_cover).length === 1,
       'Tam olarak bir vitrin fotoğrafı seçilmelidir'
     ),
+};
+
+export const baseListingSchema = z.object({
+  ...baseListingFields,
+  location: z.string().trim().min(2, 'Konum en az 2 karakter olmalıdır').max(80, 'Konum en fazla 80 karakter olabilir').optional().nullable(),
 });
 
-export const vehicleListingSchema = baseListingSchema.extend({
+export const vehicleListingSchema = z.object({
+  ...baseListingFields,
   category: z.literal('vehicle'),
   subcategory: z.enum(vehicleCategories, {
     message: 'Geçerli bir araç kategorisi seçiniz',
   }),
+  location: z.null().or(z.undefined()).optional(),
   brand: z.string().trim().min(1, 'Araç markası zorunludur'),
   model: z.string().trim().min(1, 'Araç modeli zorunludur'),
   plate: z.string().trim().min(2, 'Plaka bilgisi zorunludur'),
@@ -81,11 +83,17 @@ export const vehicleListingSchema = baseListingSchema.extend({
   trade_available: z.boolean().default(false),
 });
 
-export const propertyListingSchema = baseListingSchema.extend({
+export const propertyListingSchema = z.object({
+  ...baseListingFields,
   category: z.literal('property'),
   subcategory: z.enum(propertyTypes, {
     message: 'Geçerli bir mülk türü seçiniz',
   }),
+  location: z
+    .string()
+    .trim()
+    .min(2, 'Konum en az 2 karakter olmalıdır')
+    .max(80, 'Konum en fazla 80 karakter olabilir'),
   floor: z.number({ message: 'Kat bilgisi sayı olmalıdır' }).int(),
   room_count: z.enum(roomCounts, {
     message: 'Geçerli bir oda sayısı seçiniz',

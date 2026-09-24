@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
+import { resolveAvatarUrl } from '@/lib/media/url';
 import {
   LayoutDashboard,
   ListPlus,
@@ -63,7 +64,7 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
       <div className="surface-card p-6 rounded-2xl border border-[var(--border-app)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <img
-            src={currentProfile.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
+            src={resolveAvatarUrl(currentProfile.avatar_path || currentProfile.avatar_url)}
             alt={currentProfile.full_name}
             className="w-14 h-14 rounded-full object-cover border-2 border-[#FF8A1F] shadow-sm shrink-0"
           />

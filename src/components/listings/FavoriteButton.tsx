@@ -11,6 +11,7 @@ interface FavoriteButtonProps {
   initialIsFavorited?: boolean;
   size?: 'sm' | 'md';
   showCount?: boolean;
+  onToggle?: (isFavorited: boolean, count: number) => void;
 }
 
 export function FavoriteButton({
@@ -19,12 +20,19 @@ export function FavoriteButton({
   initialIsFavorited = false,
   size = 'md',
   showCount = true,
+  onToggle,
 }: FavoriteButtonProps) {
   const { currentProfile, isAuthenticated } = useAuth();
   const router = useRouter();
   const [isFavorited, setIsFavorited] = useState(initialIsFavorited);
   const [count, setCount] = useState(initialCount);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Sync state if props change (e.g. page navigation or refresh)
+  React.useEffect(() => {
+    setIsFavorited(initialIsFavorited);
+    setCount(initialCount);
+  }, [initialIsFavorited, initialCount]);
 
   const handleToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -40,24 +48,30 @@ export function FavoriteButton({
     // Optimistic toggle
     const prevFavorited = isFavorited;
     const prevCount = count;
-    setIsFavorited(!prevFavorited);
-    setCount(prevFavorited ? count - 1 : count + 1);
+    const optimisticFavorited = !prevFavorited;
+    const optimisticCount = prevFavorited ? Math.max(0, count - 1) : count + 1;
+
+    setIsFavorited(optimisticFavorited);
+    setCount(optimisticCount);
     setIsLoading(true);
 
     try {
       const res = await fetch('/api/favorites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          listingId,
-          profileId: currentProfile.id,
-        }),
+        body: JSON.stringify({ listingId }),
       });
+
+      if (res.status === 401) {
+        router.push(`/giris?redirect=/ilan/${listingId}`);
+        return;
+      }
 
       if (!res.ok) throw new Error();
       const data = await res.json();
       setIsFavorited(data.isFavorited);
       setCount(data.count);
+      onToggle?.(data.isFavorited, data.count);
     } catch {
       // Revert on error
       setIsFavorited(prevFavorited);
