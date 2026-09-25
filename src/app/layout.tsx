@@ -21,7 +21,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'Sanboard – Los Santos\'un İlan Platformu',
   description:
-    'GTA World Los Santos araç ve mülk ilan platformu. En güncel otomobil, SUV, motosiklet ve gayrimenkul ilanları.',
+    'GTA World Los Santos araç ve mülk ilan platformu.',
   keywords: ['GTA World', 'Sanboard', 'Los Santos', 'Araç İlanları', 'Mülk İlanları'],
 };
 
