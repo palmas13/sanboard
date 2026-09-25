@@ -15,6 +15,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'dealerId ve listingId zorunludur.' }, { status: 400 });
     }
 
+    const activeProfileId = session.profileId || req.cookies.get('sanboard_profile_id')?.value;
+    if (!activeProfileId) {
+      return NextResponse.json({ error: 'Aktif karakter profili bulunamadı.' }, { status: 401 });
+    }
+
     const dealerRepo = getDealerRepository();
     const dealer = await dealerRepo.getDealerById(dealerId);
 
@@ -22,20 +27,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Kurumsal mağaza bulunamadı.' }, { status: 404 });
     }
 
-    // Verify ownership
-    const userRepo = getUserRepository();
-    const userProfiles = await userRepo.getProfilesByUserId(session.userId);
-    const ownsStore = userProfiles.some(
-      (p) => p.id === dealer.profile_id || p.id === dealer.owner_profile_id
-    );
-
-    if (!ownsStore && session.role !== 'ADMIN') {
+    // Verify character ownership (Section 10)
+    const isOwner = dealer.owner_profile_id === activeProfileId || dealer.profile_id === activeProfileId;
+    if (!isOwner) {
       return NextResponse.json({ error: 'Bu mağazanın öne çıkarma haklarını yönetme yetkiniz yok.' }, { status: 403 });
+    }
+
+    if (dealer.moderation_status && dealer.moderation_status !== 'ACTIVE') {
+      return NextResponse.json({ error: 'Kurumsal mağazanız askıya alınmış veya pasif durumdadır.' }, { status: 403 });
     }
 
     if (dealer.subscription_status !== 'ACTIVE') {
       return NextResponse.json(
         { error: 'Kurumsal üyeliğiniz aktif değil veya süresi dolmuş. Öne çıkarma hakkı kullanamazsınız.' },
+        { status: 400 }
+      );
+    }
+
+    if (!dealer.boost_credits || dealer.boost_credits <= 0) {
+      return NextResponse.json(
+        { error: 'Bu abonelik dönemi için öne çıkarma hakkınız tükenmiştir.' },
         { status: 400 }
       );
     }

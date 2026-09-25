@@ -14,6 +14,9 @@ import {
   getFollowers,
   isFollowing,
   updateDealerProfile,
+  suspendCorporateStore,
+  reactivateCorporateStore,
+  deleteCorporateStore,
 } from '../../dealers';
 import { CorporateApplication, CorporateProfile, CharacterProfile } from '@/types';
 
@@ -87,5 +90,17 @@ export class MemoryDealerRepository implements IDealerRepository {
     if (!dealer) return { success: false, error: 'Kurumsal profil bulunamadı.' };
 
     return updateDealerProfile(id, dealer.profile_id, data);
+  }
+
+  async suspendStore(dealerId: string, reason: string, adminProfileId: string) {
+    return suspendCorporateStore(dealerId, reason, adminProfileId);
+  }
+
+  async reactivateStore(dealerId: string, adminProfileId: string) {
+    return reactivateCorporateStore(dealerId, adminProfileId);
+  }
+
+  async deleteStore(dealerId: string, reason: string, adminProfileId: string) {
+    return deleteCorporateStore(dealerId, reason, adminProfileId);
   }
 }

@@ -3,6 +3,7 @@ import { DealerProfile, DealerStatus, Listing, CorporateApplication, CorporatePr
 import { getDealerRepository, getListingRepository, getNotificationRepository } from './repositories';
 import { normalizePhone } from '../utils/format';
 import { normalizeSocialMedia } from '../dealers/social';
+import { recordAuditEvent } from '../audit';
 
 export function ensureDealers() {
   if (!db.dealers) {
@@ -21,6 +22,7 @@ export function ensureDealers() {
         purpose: 'San Andreas genelinde kurumsal otomobil galerisi ve emlak ofisi işletmek.',
         status: 'APPROVED',
         subscription_status: 'ACTIVE',
+        moderation_status: 'ACTIVE',
         subscription_expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
         boost_credits: 3,
         public_id: 1,
@@ -104,7 +106,10 @@ export async function applyForDealer(params: {
   if (!profile) return { success: false, error: 'Profil bulunamadı.' };
 
   const existingStore = db.dealers.find(
-    (d) => (d.profile_id === params.profileId || d.owner_profile_id === params.profileId) && d.status === 'APPROVED'
+    (d) =>
+      (d.profile_id === params.profileId || d.owner_profile_id === params.profileId) &&
+      d.status === 'APPROVED' &&
+      d.moderation_status !== 'DELETED'
   );
   if (existingStore) {
     return { success: false, error: 'Zaten onaylanmış bir kurumsal hesabınız bulunmaktadır.' };
@@ -171,6 +176,7 @@ export async function reviewApplication(
         sanmail_email: profile?.sanmail_email,
         status: 'APPROVED',
         subscription_status: 'INACTIVE', // Requires activation/package purchase
+        moderation_status: 'ACTIVE',
         boost_credits: 3,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -179,6 +185,7 @@ export async function reviewApplication(
     } else {
       store.status = 'APPROVED';
       store.subscription_status = store.subscription_status || 'INACTIVE';
+      store.moderation_status = 'ACTIVE';
       store.boost_credits = store.boost_credits ?? 3;
     }
 
@@ -250,6 +257,9 @@ export async function boostListing(
   ensureDealers();
   const dealer = db.dealers.find((d) => d.id === dealerId);
   if (!dealer) return { success: false, error: 'Kurumsal mağaza bulunamadı.' };
+  if (dealer.moderation_status && dealer.moderation_status !== 'ACTIVE') {
+    return { success: false, error: 'Kurumsal mağazanız askıya alınmış veya pasif durumdadır.' };
+  }
   if (dealer.subscription_status !== 'ACTIVE') {
     return { success: false, error: 'Kurumsal üyeliğiniz aktif değil. Öne çıkarma hakkı kullanamazsınız.' };
   }
@@ -261,6 +271,11 @@ export async function boostListing(
   if (!listing) return { success: false, error: 'İlan bulunamadı.' };
   if (listing.status !== 'ACTIVE') {
     return { success: false, error: 'Yalnızca aktif yayındaki ilanlar öne çıkarılabilir.' };
+  }
+
+  // STRICT: Corporate boost can ONLY boost corporate listings belonging to this store (Requirement 10 & 11)
+  if (listing.seller_type !== 'CORPORATE' || listing.corporate_profile_id !== dealer.id) {
+    return { success: false, error: 'Bireysel ilanlar kurumsal öne çıkarma hakları ile öne çıkarılamaz.' };
   }
 
   const now = new Date();
@@ -454,4 +469,171 @@ export async function getDealerListings(profileId: string): Promise<{ vehicles: 
     vehicles: all.filter((l) => l.category === 'vehicle'),
     properties: all.filter((l) => l.category === 'property'),
   };
+}
+
+export async function suspendCorporateStore(
+  dealerId: string,
+  reason: string,
+  adminProfileId: string
+): Promise<{ success: boolean; error?: string }> {
+  if (process.env.DATA_STORE === 'supabase') {
+    const repo = getDealerRepository();
+    if (typeof repo.suspendStore === 'function') {
+      return repo.suspendStore(dealerId, reason, adminProfileId);
+    }
+  }
+
+  ensureDealers();
+  const dealer = db.dealers.find((d) => d.id === dealerId);
+  if (!dealer) return { success: false, error: 'Kurumsal mağaza bulunamadı.' };
+
+  dealer.moderation_status = 'SUSPENDED';
+  dealer.suspended_at = new Date().toISOString();
+  dealer.suspended_by_profile_id = adminProfileId;
+  dealer.suspension_reason = reason;
+  dealer.updated_at = new Date().toISOString();
+
+  // Character-scoped notification to corporate store owner (Section 18)
+  const ownerId = dealer.owner_profile_id || dealer.profile_id;
+  if (ownerId) {
+    const profile = db.profiles.find((p) => p.id === ownerId);
+    await getNotificationRepository().createNotification({
+      recipient_profile_id: ownerId,
+      user_id: profile?.user_id,
+      type: 'CORPORATE_STORE_SUSPENDED',
+      title: 'Kurumsal Mağazanız Askıya Alındı',
+      message: `Kurumsal mağazanız yönetim tarafından askıya alındı. Neden: ${reason}`,
+      entity_type: 'application',
+      entity_id: dealer.id,
+    });
+  }
+
+  // Admin audit log (Section 19)
+  await recordAuditEvent({
+    eventType: 'CORPORATE_STORE_SUSPENDED',
+    profileId: adminProfileId,
+    metadata: {
+      targetCorporateProfileId: dealer.id,
+      companyName: dealer.company_name,
+      reason,
+      suspendedBy: adminProfileId,
+    },
+  });
+
+  return { success: true };
+}
+
+export async function reactivateCorporateStore(
+  dealerId: string,
+  adminProfileId: string
+): Promise<{ success: boolean; error?: string }> {
+  if (process.env.DATA_STORE === 'supabase') {
+    const repo = getDealerRepository();
+    if (typeof repo.reactivateStore === 'function') {
+      return repo.reactivateStore(dealerId, adminProfileId);
+    }
+  }
+
+  ensureDealers();
+  const dealer = db.dealers.find((d) => d.id === dealerId);
+  if (!dealer) return { success: false, error: 'Kurumsal mağaza bulunamadı.' };
+
+  // Section 15 & 22: Only modifies moderation_status! Does NOT alter subscription_status
+  dealer.moderation_status = 'ACTIVE';
+  dealer.updated_at = new Date().toISOString();
+
+  // Character-scoped notification to corporate store owner (Section 18)
+  const ownerId = dealer.owner_profile_id || dealer.profile_id;
+  if (ownerId) {
+    const profile = db.profiles.find((p) => p.id === ownerId);
+    await getNotificationRepository().createNotification({
+      recipient_profile_id: ownerId,
+      user_id: profile?.user_id,
+      type: 'CORPORATE_STORE_REACTIVATED',
+      title: 'Kurumsal Mağazanız Yeniden Aktif',
+      message: 'Kurumsal mağazanızın askısı kaldırıldı.',
+      entity_type: 'application',
+      entity_id: dealer.id,
+    });
+  }
+
+  // Admin audit log (Section 19)
+  await recordAuditEvent({
+    eventType: 'CORPORATE_STORE_REACTIVATED',
+    profileId: adminProfileId,
+    metadata: {
+      targetCorporateProfileId: dealer.id,
+      companyName: dealer.company_name,
+      reactivatedBy: adminProfileId,
+    },
+  });
+
+  return { success: true };
+}
+
+export async function deleteCorporateStore(
+  dealerId: string,
+  reason: string,
+  adminProfileId: string
+): Promise<{ success: boolean; error?: string }> {
+  if (process.env.DATA_STORE === 'supabase') {
+    const repo = getDealerRepository();
+    if (typeof repo.deleteStore === 'function') {
+      return repo.deleteStore(dealerId, reason, adminProfileId);
+    }
+  }
+
+  ensureDealers();
+  const dealer = db.dealers.find((d) => d.id === dealerId);
+  if (!dealer) return { success: false, error: 'Kurumsal mağaza bulunamadı.' };
+
+  // Soft delete (Section 16)
+  dealer.moderation_status = 'DELETED';
+  dealer.deleted_at = new Date().toISOString();
+  dealer.deleted_by_profile_id = adminProfileId;
+  dealer.deletion_reason = reason;
+  dealer.updated_at = new Date().toISOString();
+
+  // Active corporate listings transition to REMOVED with existing safe media cleanup
+  const { removeListing } = await import('./listings');
+  const storeListings = db.listings.filter(
+    (l) =>
+      l.corporate_profile_id === dealer.id ||
+      (l.seller_profile_id === (dealer.owner_profile_id || dealer.profile_id) && l.seller_type === 'CORPORATE')
+  );
+
+  for (const list of storeListings) {
+    if (list.status === 'ACTIVE') {
+      await removeListing(list.id, 'SYSTEM_ADMIN');
+    }
+  }
+
+  // Character-scoped notification to corporate store owner (Section 18)
+  const ownerId = dealer.owner_profile_id || dealer.profile_id;
+  if (ownerId) {
+    const profile = db.profiles.find((p) => p.id === ownerId);
+    await getNotificationRepository().createNotification({
+      recipient_profile_id: ownerId,
+      user_id: profile?.user_id,
+      type: 'CORPORATE_STORE_DELETED',
+      title: 'Kurumsal Mağazanız Kaldırıldı',
+      message: `Kurumsal mağazanız yönetim tarafından kaldırıldı. Neden: ${reason}`,
+      entity_type: 'application',
+      entity_id: dealer.id,
+    });
+  }
+
+  // Admin audit log (Section 19)
+  await recordAuditEvent({
+    eventType: 'CORPORATE_STORE_DELETED',
+    profileId: adminProfileId,
+    metadata: {
+      targetCorporateProfileId: dealer.id,
+      companyName: dealer.company_name,
+      reason,
+      deletedBy: adminProfileId,
+    },
+  });
+
+  return { success: true };
 }

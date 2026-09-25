@@ -67,7 +67,12 @@ export default async function PremiumStoreVitrinPage({ params }: PageProps) {
     dealer = all;
   }
 
-  if (!dealer || dealer.status !== 'APPROVED' || dealer.subscription_status === 'INACTIVE') {
+  if (
+    !dealer ||
+    dealer.status !== 'APPROVED' ||
+    dealer.subscription_status === 'INACTIVE' ||
+    dealer.moderation_status === 'DELETED'
+  ) {
     notFound();
   }
 
@@ -100,10 +105,13 @@ export default async function PremiumStoreVitrinPage({ params }: PageProps) {
     }
   }
 
+  const isSuspended = dealer.moderation_status === 'SUSPENDED';
+
   const listingRepo = getListingRepository();
   const allListings = await listingRepo.getCorporateListings(dealer.id);
-  const vehicles = allListings.filter((l) => l.category === 'vehicle' && l.status === 'ACTIVE');
-  const properties = allListings.filter((l) => l.category === 'property' && l.status === 'ACTIVE');
+  // While suspended, corporate listings are removed from public marketplace visibility (Section 14)
+  const vehicles = isSuspended ? [] : allListings.filter((l) => l.category === 'vehicle' && l.status === 'ACTIVE');
+  const properties = isSuspended ? [] : allListings.filter((l) => l.category === 'property' && l.status === 'ACTIVE');
 
   const mapToSummary = (l: any) => ({
     id: l.id,

@@ -56,19 +56,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Corporate Seller Authorization Check
+    // Corporate Seller Authorization Check (Section 6 & 7)
     const wantsCorporate = corporate === true || isCorporate === true || listingData.seller_type === 'CORPORATE';
     if (wantsCorporate) {
-      const dealerRepo = getDealerRepository();
-      const dealer = await dealerRepo.getDealerByProfileId(trustedProfileId);
-      if (!dealer || dealer.status !== 'APPROVED') {
+      const { resolveCorporateEligibility } = await import('@/lib/dealers/eligibility');
+      const eligibility = await resolveCorporateEligibility(trustedProfileId);
+      if (!eligibility.eligible || !eligibility.dealer) {
         return NextResponse.json(
-          { error: 'Onaylı kurumsal mağazanız bulunmamaktadır. Kurumsal ilan yayınlayamazsınız.' },
+          {
+            error: eligibility.message || 'Kurumsal ilan yayınlama şartlarını sağlamıyorsunuz.',
+            reason: eligibility.reason,
+          },
           { status: 403 }
         );
       }
       listingData.seller_type = 'CORPORATE';
-      listingData.corporate_profile_id = dealer.id;
+      listingData.corporate_profile_id = eligibility.dealer.id;
     } else {
       listingData.seller_type = 'INDIVIDUAL';
       listingData.corporate_profile_id = null;

@@ -9,11 +9,31 @@ import {
   updatePackagePrice,
   updateReportStatus,
 } from '@/lib/db/admin';
-import { getAllDealers, updateDealerStatus } from '@/lib/db/dealers';
+import {
+  getAllDealers,
+  updateDealerStatus,
+  getAllApplications,
+  reviewApplication,
+  suspendCorporateStore,
+  reactivateCorporateStore,
+  deleteCorporateStore,
+} from '@/lib/db/dealers';
 import { getAllTicketsForAdmin, updateTicketStatus, addTicketMessage } from '@/lib/db/tickets';
 import { db } from '@/lib/db/store';
 
 import { getServerSession } from '@/lib/auth/session';
+
+async function getAdminActorProfileId(req: NextRequest): Promise<string> {
+  const session = await getServerSession(req);
+  let activeProfileId = session?.profileId || req.cookies.get('sanboard_profile_id')?.value;
+  if (!activeProfileId && session?.userId) {
+    const { getUserRepository } = await import('@/lib/db/repositories');
+    const userRepo = getUserRepository();
+    const profs = await userRepo.getProfilesByUserId(session.userId);
+    activeProfileId = profs[0]?.id;
+  }
+  return activeProfileId || 'SYSTEM_ADMIN';
+}
 
 async function checkAdminAccess(req: NextRequest): Promise<boolean> {
   // Internal secret header for backend service calls
@@ -93,14 +113,94 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const [stats, listings, users, reports, dealers, tickets] = await Promise.all([
+    const [stats, listings, users, reports, rawDealers, rawApplications, tickets] = await Promise.all([
       getAdminStats(),
       getAllListingsForAdmin(),
       getAllUsersForAdmin(),
       getReportsForAdmin(),
       getAllDealers(),
+      getAllApplications(),
       getAllTicketsForAdmin(),
     ]);
+
+    // Section 12 & 24: PENDING applications only for application review
+    const pendingApps = (rawApplications || []).filter((a) => a.status === 'PENDING');
+    const enrichedApplications = await Promise.all(
+      pendingApps.map(async (app: any) => {
+        let applicantName = 'Bilinmeyen';
+        if (process.env.DATA_STORE === 'supabase') {
+          try {
+            const { getSupabaseAdminClient } = await import('@/lib/db/supabase-client');
+            const client = getSupabaseAdminClient();
+            if (client) {
+              const { data: p } = await client
+                .from('character_profiles')
+                .select('full_name')
+                .eq('id', app.applicant_profile_id)
+                .maybeSingle();
+              if (p?.full_name) applicantName = p.full_name;
+            }
+          } catch {}
+        } else {
+          const p = db.profiles.find((x) => x.id === app.applicant_profile_id);
+          if (p) applicantName = p.full_name;
+        }
+        return {
+          ...app,
+          applicant_name: applicantName,
+        };
+      })
+    );
+
+    // Section 12 & 23: Existing corporate stores enriched with status chips & counts
+    const enrichedDealers = await Promise.all(
+      (rawDealers || []).map(async (d: any) => {
+        const ownerId = d.owner_profile_id || d.profile_id;
+        let ownerName = 'Bilinmeyen Karakter';
+        let activeListingCount = 0;
+        let followerCount = d.follower_count || 0;
+
+        if (process.env.DATA_STORE === 'supabase') {
+          try {
+            const { getSupabaseAdminClient } = await import('@/lib/db/supabase-client');
+            const client = getSupabaseAdminClient();
+            if (client) {
+              const [ownerRes, listingsRes, followerRes] = await Promise.all([
+                client.from('character_profiles').select('full_name').eq('id', ownerId).maybeSingle(),
+                client
+                  .from('listings')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('corporate_profile_id', d.id)
+                  .eq('status', 'ACTIVE'),
+                client
+                  .from('corporate_followers')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('corporate_profile_id', d.id),
+              ]);
+              if (ownerRes.data?.full_name) ownerName = ownerRes.data.full_name;
+              if (listingsRes.count !== null && listingsRes.count !== undefined) activeListingCount = listingsRes.count;
+              if (followerRes.count !== null && followerRes.count !== undefined) followerCount = followerRes.count;
+            }
+          } catch {}
+        } else {
+          const char = db.profiles.find((p) => p.id === ownerId);
+          if (char) ownerName = char.full_name;
+          activeListingCount = (db.listings || []).filter(
+            (l) => l.corporate_profile_id === d.id && l.status === 'ACTIVE'
+          ).length;
+          followerCount = (db.followers || []).filter((f) => f.corporate_profile_id === d.id).length;
+        }
+
+        return {
+          ...d,
+          moderation_status: d.moderation_status || 'ACTIVE',
+          subscription_status: d.subscription_status || 'INACTIVE',
+          owner_character_name: ownerName,
+          active_listing_count: activeListingCount,
+          follower_count: followerCount,
+        };
+      })
+    );
 
     let payments = db.payments;
     let packagePrice = 2000;
@@ -125,7 +225,8 @@ export async function GET(req: NextRequest) {
       listings,
       users,
       reports,
-      dealers,
+      dealers: enrichedDealers,
+      applications: enrichedApplications,
       tickets,
       payments,
       packagePrice,
@@ -148,6 +249,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { action, payload } = await req.json();
+    const adminActorProfileId = await getAdminActorProfileId(req);
 
     switch (action) {
       case 'delist': {
@@ -181,6 +283,66 @@ export async function POST(req: NextRequest) {
           payload.status
         );
         return NextResponse.json({ success });
+      }
+
+      // Application Review: Approve
+      case 'approveApplication': {
+        const result = await reviewApplication(
+          payload.applicationId,
+          'APPROVED',
+          undefined,
+          adminActorProfileId
+        );
+        return NextResponse.json(result);
+      }
+
+      // Application Review: Reject (requires reason)
+      case 'rejectApplication': {
+        if (!payload.rejectionReason?.trim()) {
+          return NextResponse.json({ error: 'Red gerekçesi zorunludur.' }, { status: 400 });
+        }
+        const result = await reviewApplication(
+          payload.applicationId,
+          'REJECTED',
+          payload.rejectionReason,
+          adminActorProfileId
+        );
+        return NextResponse.json(result);
+      }
+
+      // Store Moderation: Suspend (Section 14)
+      case 'suspendStore': {
+        if (!payload.reason?.trim()) {
+          return NextResponse.json({ error: 'Askıya alma nedeni zorunludur.' }, { status: 400 });
+        }
+        const result = await suspendCorporateStore(
+          payload.dealerId,
+          payload.reason,
+          adminActorProfileId
+        );
+        return NextResponse.json(result);
+      }
+
+      // Store Moderation: Reactivate (Section 15)
+      case 'reactivateStore': {
+        const result = await reactivateCorporateStore(
+          payload.dealerId,
+          adminActorProfileId
+        );
+        return NextResponse.json(result);
+      }
+
+      // Store Moderation: Delete (Section 16 - soft delete)
+      case 'deleteStore': {
+        if (!payload.reason?.trim()) {
+          return NextResponse.json({ error: 'Silme gerekçesi zorunludur.' }, { status: 400 });
+        }
+        const result = await deleteCorporateStore(
+          payload.dealerId,
+          payload.reason,
+          adminActorProfileId
+        );
+        return NextResponse.json(result);
       }
 
       case 'updateDealer': {

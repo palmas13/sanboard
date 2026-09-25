@@ -133,6 +133,9 @@ export interface IDealerRepository {
   getFollowers?(corporateProfileId: string): Promise<CharacterProfile[]>;
   isFollowing?(followerProfileId: string, corporateProfileId: string): Promise<boolean>;
   updateDealerProfile(id: string, data: Partial<CorporateProfile>): Promise<{ success: boolean; dealer?: CorporateProfile; error?: string }>;
+  suspendStore?(dealerId: string, reason: string, adminProfileId: string): Promise<{ success: boolean; error?: string }>;
+  reactivateStore?(dealerId: string, adminProfileId: string): Promise<{ success: boolean; error?: string }>;
+  deleteStore?(dealerId: string, reason: string, adminProfileId: string): Promise<{ success: boolean; error?: string }>;
 }
 
 export interface IPaymentRepository {

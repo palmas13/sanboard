@@ -192,6 +192,7 @@ export interface ListingCredit {
   payment_id: string;
   package_id: string;
   credit_type?: SellerType;
+  corporate_profile_id?: string | null;
   amount?: number;
   status: CreditStatus;
   used_listing_id?: string;
@@ -215,6 +216,8 @@ export interface ListingPriceHistory {
   changed_at: string;
 }
 
+export type CorporateModerationStatus = 'ACTIVE' | 'SUSPENDED' | 'DELETED';
+
 export type NotificationType =
   | 'LISTING_PRICE_DROP'
   | 'LISTING_PRICE_CHANGE'
@@ -225,7 +228,10 @@ export type NotificationType =
   | 'CORPORATE_APPLICATION_REJECTED'
   | 'NEW_CORPORATE_LISTING'
   | 'NEW_FOLLOWER'
-  | 'CORPORATE_SUBSCRIPTION_EXPIRING';
+  | 'CORPORATE_SUBSCRIPTION_EXPIRING'
+  | 'CORPORATE_STORE_SUSPENDED'
+  | 'CORPORATE_STORE_REACTIVATED'
+  | 'CORPORATE_STORE_DELETED';
 
 export interface Notification {
   id: string;
@@ -303,6 +309,13 @@ export interface DealerProfile {
   social_media?: CorporateSocialMedia[] | CorporateSocialMedia | { [key: string]: any } | null;
   follower_count?: number;
   is_following?: boolean;
+  moderation_status?: CorporateModerationStatus;
+  suspended_at?: string | null;
+  suspended_by_profile_id?: string | null;
+  suspension_reason?: string | null;
+  deleted_at?: string | null;
+  deleted_by_profile_id?: string | null;
+  deletion_reason?: string | null;
   created_at: string;
   updated_at: string;
 }

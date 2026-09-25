@@ -50,7 +50,9 @@ export default async function PublicUserProfilePage({ params }: PageProps) {
 
   const listingRepo = getListingRepository();
   const allListings = await listingRepo.getUserListings(profile.id);
-  const activeListings = allListings.filter((l) => l.status === 'ACTIVE' && l.seller_type !== 'CORPORATE');
+  const activeListings = allListings.filter(
+    (l) => l.status === 'ACTIVE' && l.seller_type !== 'CORPORATE' && !l.corporate_profile_id
+  );
   const vehicles = activeListings.filter((l) => l.category === 'vehicle');
   const properties = activeListings.filter((l) => l.category === 'property');
 

@@ -21,17 +21,20 @@ export async function POST(req: NextRequest) {
 
     let chargeProfileId = activeProfileId;
 
-    // Corporate package validation & ownership resolution (Section 26)
+    // Corporate package validation & eligibility resolution (Section 1 & 4)
     if (requestedPackage === 'CORPORATE_14_DAY') {
-      const dealerRepo = getDealerRepository();
-      const dealer = await dealerRepo.getDealerByProfileId(activeProfileId);
-      if (!dealer || dealer.status !== 'APPROVED') {
+      const { resolveCorporateEligibility } = await import('@/lib/dealers/eligibility');
+      const eligibility = await resolveCorporateEligibility(activeProfileId);
+      if (!eligibility.eligible || !eligibility.dealer) {
         return NextResponse.json(
-          { error: 'Kurumsal ilan kredisi ($1.750) satın almak için onaylı bir kurumsal mağazaya sahip olmalısınız.' },
+          {
+            error: eligibility.message || 'Kurumsal ilan kredisi ($1.750) satın alma şartlarını sağlamıyorsunuz.',
+            reason: eligibility.reason,
+          },
           { status: 403 }
         );
       }
-      chargeProfileId = dealer.owner_profile_id || activeProfileId;
+      chargeProfileId = eligibility.dealer.owner_profile_id || activeProfileId;
     }
 
     // Backend determines price from packageCode strictly via payment repository

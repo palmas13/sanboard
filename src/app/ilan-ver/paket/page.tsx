@@ -54,37 +54,27 @@ export default function IlanPaketSecPage() {
     setError('');
 
     try {
-      // Eligibility verification for Corporate Listing (Section 9)
-      const res = await fetch(`/api/dealers/profile?profileId=${currentProfile.id}`);
+      // 1. Authoritative Server-Side Eligibility Verification (Section 1 & 3)
+      const res = await fetch(`/api/dealers/eligibility?profileId=${currentProfile.id}`);
       const data = await res.json();
 
-      // Case A: No application/profile
-      if (!res.ok || !data.dealer) {
-        router.push('/hesabim/kurumsal');
+      if (!res.ok || !data.eligible) {
+        const reason = data.reason || 'NO_STORE';
+        if (reason === 'STORE_SUSPENDED') {
+          setError(data.message || 'Kurumsal mağazanız askıya alınmıştır. Kurumsal ilan satın alamazsınız.');
+          setLoadingPkg(null);
+          setTimeout(() => {
+            router.push('/hesabim/kurumsal?state=SUSPENDED');
+          }, 1500);
+          return;
+        }
+
+        // All non-eligible reasons redirect to corporate management view with appropriate state
+        router.push(`/hesabim/kurumsal?state=${reason}`);
         return;
       }
 
-      const dealer = data.dealer;
-
-      // Case B: Application is PENDING or REJECTED
-      if (dealer.status === 'PENDING' || dealer.status === 'REJECTED') {
-        router.push('/hesabim/kurumsal');
-        return;
-      }
-
-      // Case C: Application APPROVED but subscription INACTIVE
-      if (dealer.status === 'APPROVED' && (!dealer.subscription_status || dealer.subscription_status === 'INACTIVE')) {
-        router.push('/hesabim/kurumsal');
-        return;
-      }
-
-      // Case D: Subscription EXPIRED
-      if (dealer.subscription_status === 'EXPIRED') {
-        router.push('/hesabim/kurumsal');
-        return;
-      }
-
-      // Case E: Corporate profile ACTIVE -> Allow purchase flow
+      // 2. Only when eligible (ACTIVE) -> continue to CORPORATE $1,750 listing checkout
       const checkoutRes = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

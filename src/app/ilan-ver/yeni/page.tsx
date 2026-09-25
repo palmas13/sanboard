@@ -84,33 +84,37 @@ export default function YeniIlanOlusturPage() {
 
   // Auth guard & Credit check
   useEffect(() => {
+    let corpParam = false;
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get('corporate') === 'true') {
         setIsCorporate(true);
+        corpParam = true;
       }
     }
-  }, []);
 
-  useEffect(() => {
     if (isLoading) return;
     if (!isAuthenticated || !currentProfile) {
       router.push('/giris?redirect=/ilan-ver/yeni');
       return;
     }
 
-    // Verify user actually has an available credit
+    // Verify user actually has an available credit for the chosen mode (INDIVIDUAL vs CORPORATE)
     fetch(`/api/credits?profileId=${currentProfile.id}`)
       .then((res) => res.json())
       .then((data) => {
-        if (!data.availableCredits || data.availableCredits <= 0) {
+        const hasNeededCredit = corpParam
+          ? (data.corporateCredits !== undefined ? data.corporateCredits > 0 : data.availableCredits > 0)
+          : (data.individualCredits !== undefined ? data.individualCredits > 0 : data.availableCredits > 0);
+
+        if (!hasNeededCredit) {
           router.replace('/ilan-ver/paket');
         }
       })
       .catch(() => {
         router.replace('/ilan-ver/paket');
       });
-  }, [isAuthenticated, currentProfile, router]);
+  }, [isLoading, isAuthenticated, currentProfile, router]);
 
   const handleNextFromCategory = () => {
     if (category === 'vehicle') {

@@ -101,6 +101,17 @@ export async function getPublicListings(filters: ListingFilterParams = {}): Prom
     return expiry > now;
   });
 
+  // Filter out corporate listings from suspended or deleted stores (Section 14 & 16)
+  result = result.filter((l) => {
+    if (l.seller_type === 'CORPORATE' && l.corporate_profile_id) {
+      const store = (db.dealers || []).find((d) => d.id === l.corporate_profile_id);
+      if (store && (store.moderation_status === 'SUSPENDED' || store.moderation_status === 'DELETED')) {
+        return false;
+      }
+    }
+    return true;
+  });
+
   // 2. Category filter
   if (filters.category) {
     result = result.filter((l) => l.category === filters.category);
@@ -233,6 +244,14 @@ export async function getListingById(
   // Check if expired and viewer is not the owner
   const isExpired = listing.expires_at ? new Date(listing.expires_at) <= new Date() : false;
   const isOwner = Boolean(viewerProfileId && listing.seller_profile_id === viewerProfileId);
+
+  // Check store moderation state for corporate listings
+  if (listing.seller_type === 'CORPORATE' && listing.corporate_profile_id) {
+    const store = (db.dealers || []).find((d) => d.id === listing.corporate_profile_id);
+    if (store && (store.moderation_status === 'SUSPENDED' || store.moderation_status === 'DELETED') && !isOwner) {
+      return { listing: null, isLocked: false, isOwner: false };
+    }
+  }
 
   // If expired or sold and not owner, it should not be accessible
   if ((isExpired || listing.status === 'SOLD') && !isOwner) {
@@ -629,7 +648,10 @@ export async function getUserListings(sellerProfileId: string): Promise<Listing[
   if (isSupabaseConfiguredMode()) {
     return getSupabaseRepo().getUserListings(sellerProfileId);
   }
-  const listings = db.listings.filter((l) => l.seller_profile_id === sellerProfileId && !l.corporate_profile_id);
+  // Strict separation: Only individual listings owned by the character (Section 8 & 9)
+  const listings = db.listings.filter(
+    (l) => l.seller_profile_id === sellerProfileId && l.seller_type === 'INDIVIDUAL' && !l.corporate_profile_id
+  );
   const now = new Date();
 
   return listings.map((l) => {
@@ -650,7 +672,10 @@ export async function getCorporateListings(corporateProfileId: string): Promise<
   if (isSupabaseConfiguredMode()) {
     return getSupabaseRepo().getCorporateListings(corporateProfileId);
   }
-  const listings = db.listings.filter((l) => l.corporate_profile_id === corporateProfileId);
+  // Strict separation: Only corporate listings belonging to this store (Section 8)
+  const listings = db.listings.filter(
+    (l) => l.corporate_profile_id === corporateProfileId && l.seller_type === 'CORPORATE'
+  );
   const now = new Date();
 
   return listings.map((l) => {

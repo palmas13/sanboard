@@ -102,12 +102,19 @@ export async function completePaymentOrder(
   // Issue 1 available listing credit to profile
   const pkg = db.packages.find((p) => p.id === payment.package_id);
   const creditType = pkg?.code === 'CORPORATE_14_DAY' || pkg?.seller_type === 'CORPORATE' || payment.amount === 1750 ? 'CORPORATE' : 'INDIVIDUAL';
+  let corporateProfileId: string | null = null;
+  if (creditType === 'CORPORATE') {
+    const dealer = (db.dealers || []).find((d) => d.owner_profile_id === payment.profile_id || d.profile_id === payment.profile_id);
+    corporateProfileId = dealer?.id || null;
+  }
+
   const credit: ListingCredit = {
     id: `crd-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
     profile_id: payment.profile_id,
     payment_id: payment.id,
     package_id: payment.package_id,
     credit_type: creditType,
+    corporate_profile_id: corporateProfileId,
     amount: payment.amount,
     status: 'AVAILABLE',
     created_at: new Date().toISOString(),

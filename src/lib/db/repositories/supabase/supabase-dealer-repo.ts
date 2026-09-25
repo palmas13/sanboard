@@ -71,31 +71,17 @@ export class SupabaseDealerRepository implements IDealerRepository {
 
   async getAllDealers(): Promise<CorporateProfile[]> {
     const client = this.getAdminClient();
-    const [storesRes, appsRes] = await Promise.all([
-      client.from('corporate_profiles').select('*').order('created_at', { ascending: false }),
-      client.from('corporate_applications').select('*').eq('status', 'PENDING').order('created_at', { ascending: false }),
-    ]);
+    const { data: storesRes, error } = await client
+      .from('corporate_profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-    const stores = (storesRes.data || []).map((s: any) => ({
+    if (error) return [];
+    return (storesRes || []).map((s: any) => ({
       ...s,
       profile_id: s.owner_profile_id,
       sanmail_email: s.email,
-    }));
-
-    const pendingApps = (appsRes.data || []).map((a: any) => ({
-      id: a.id,
-      profile_id: a.applicant_profile_id,
-      company_name: a.company_name,
-      purpose: a.purpose,
-      status: a.status,
-      created_at: a.created_at,
-      updated_at: a.created_at,
-      logo_url: '',
-      banner_url: '',
-      description: a.purpose,
-    }));
-
-    return [...pendingApps, ...stores] as CorporateProfile[];
+    })) as CorporateProfile[];
   }
 
   async createApplication(params: { profileId: string; companyName: string; purpose: string }): Promise<{ success: boolean; application?: CorporateApplication; error?: string }> {
@@ -311,6 +297,7 @@ export class SupabaseDealerRepository implements IDealerRepository {
         .from('corporate_profiles')
         .select('id')
         .eq('owner_profile_id', targetProfileId)
+        .neq('moderation_status', 'DELETED')
         .maybeSingle();
 
       if (existingOwnerStore) {
@@ -332,6 +319,7 @@ export class SupabaseDealerRepository implements IDealerRepository {
           description: app.purpose,
           status: 'APPROVED',
           subscription_status: 'INACTIVE',
+          moderation_status: 'ACTIVE',
           boost_credits: 3,
         })
         .select()
@@ -412,6 +400,9 @@ export class SupabaseDealerRepository implements IDealerRepository {
 
     const dealer = await this.getDealerById(dealerId);
     if (!dealer) return { success: false, error: 'Kurumsal mağaza bulunamadı.' };
+    if (dealer.moderation_status && dealer.moderation_status !== 'ACTIVE') {
+      return { success: false, error: 'Kurumsal mağazanız askıya alınmış veya pasif durumdadır.' };
+    }
     if (dealer.subscription_status !== 'ACTIVE') {
       return { success: false, error: 'Kurumsal üyeliğiniz aktif değil. Öne çıkarma hakkı kullanamazsınız.' };
     }
@@ -421,13 +412,18 @@ export class SupabaseDealerRepository implements IDealerRepository {
 
     const { data: listing, error: listErr } = await client
       .from('listings')
-      .select('id, status, is_featured, featured_until')
+      .select('id, status, is_featured, featured_until, seller_type, corporate_profile_id')
       .eq('id', listingId)
       .maybeSingle();
 
     if (listErr || !listing) return { success: false, error: 'İlan bulunamadı.' };
     if (listing.status !== 'ACTIVE') {
       return { success: false, error: 'Yalnızca aktif yayındaki ilanlar öne çıkarılabilir.' };
+    }
+
+    // STRICT: Corporate boost can ONLY boost corporate listings belonging to this store (Requirement 10 & 11)
+    if (listing.seller_type !== 'CORPORATE' || listing.corporate_profile_id !== dealerId) {
+      return { success: false, error: 'Bireysel ilanlar kurumsal öne çıkarma hakları ile öne çıkarılamaz.' };
     }
 
     const now = new Date();
@@ -530,5 +526,169 @@ export class SupabaseDealerRepository implements IDealerRepository {
       .maybeSingle();
 
     return Boolean(data);
+  }
+
+  async suspendStore(
+    dealerId: string,
+    reason: string,
+    adminProfileId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const client = this.getAdminClient();
+    const dealer = await this.getDealerById(dealerId);
+    if (!dealer) return { success: false, error: 'Kurumsal mağaza bulunamadı.' };
+
+    const { error } = await client
+      .from('corporate_profiles')
+      .update({
+        moderation_status: 'SUSPENDED',
+        suspended_at: new Date().toISOString(),
+        suspended_by_profile_id: adminProfileId,
+        suspension_reason: reason,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', dealerId);
+
+    if (error) return { success: false, error: error.message };
+
+    // Character-scoped notification to corporate store owner (Section 18)
+    const ownerId = dealer.owner_profile_id || dealer.profile_id;
+    if (ownerId) {
+      const { getNotificationRepository } = await import('../index');
+      await getNotificationRepository().createNotification({
+        recipient_profile_id: ownerId,
+        type: 'CORPORATE_STORE_SUSPENDED',
+        title: 'Kurumsal Mağazanız Askıya Alındı',
+        message: `Kurumsal mağazanız yönetim tarafından askıya alındı. Neden: ${reason}`,
+        entity_type: 'application',
+        entity_id: dealerId,
+      });
+    }
+
+    // Admin audit log (Section 19)
+    const { recordAuditEvent } = await import('@/lib/audit');
+    await recordAuditEvent({
+      eventType: 'CORPORATE_STORE_SUSPENDED',
+      profileId: adminProfileId,
+      metadata: {
+        targetCorporateProfileId: dealer.id,
+        companyName: dealer.company_name,
+        reason,
+        suspendedBy: adminProfileId,
+      },
+    });
+
+    return { success: true };
+  }
+
+  async reactivateStore(
+    dealerId: string,
+    adminProfileId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const client = this.getAdminClient();
+    const dealer = await this.getDealerById(dealerId);
+    if (!dealer) return { success: false, error: 'Kurumsal mağaza bulunamadı.' };
+
+    // Section 15 & 22: Only modifies moderation_status! Does NOT alter subscription_status
+    const { error } = await client
+      .from('corporate_profiles')
+      .update({
+        moderation_status: 'ACTIVE',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', dealerId);
+
+    if (error) return { success: false, error: error.message };
+
+    // Character-scoped notification to corporate store owner (Section 18)
+    const ownerId = dealer.owner_profile_id || dealer.profile_id;
+    if (ownerId) {
+      const { getNotificationRepository } = await import('../index');
+      await getNotificationRepository().createNotification({
+        recipient_profile_id: ownerId,
+        type: 'CORPORATE_STORE_REACTIVATED',
+        title: 'Kurumsal Mağazanız Yeniden Aktif',
+        message: 'Kurumsal mağazanızın askısı kaldırıldı.',
+        entity_type: 'application',
+        entity_id: dealerId,
+      });
+    }
+
+    // Admin audit log (Section 19)
+    const { recordAuditEvent } = await import('@/lib/audit');
+    await recordAuditEvent({
+      eventType: 'CORPORATE_STORE_REACTIVATED',
+      profileId: adminProfileId,
+      metadata: {
+        targetCorporateProfileId: dealer.id,
+        companyName: dealer.company_name,
+        reactivatedBy: adminProfileId,
+      },
+    });
+
+    return { success: true };
+  }
+
+  async deleteStore(
+    dealerId: string,
+    reason: string,
+    adminProfileId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const client = this.getAdminClient();
+    const dealer = await this.getDealerById(dealerId);
+    if (!dealer) return { success: false, error: 'Kurumsal mağaza bulunamadı.' };
+
+    // Soft delete (Section 16)
+    const { error } = await client
+      .from('corporate_profiles')
+      .update({
+        moderation_status: 'DELETED',
+        deleted_at: new Date().toISOString(),
+        deleted_by_profile_id: adminProfileId,
+        deletion_reason: reason,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', dealerId);
+
+    if (error) return { success: false, error: error.message };
+
+    // Active corporate listings transition to REMOVED with existing safe media cleanup
+    const { getListingRepository } = await import('../index');
+    const listingRepo = getListingRepository();
+    const corporateListings = await listingRepo.getCorporateListings(dealerId);
+
+    for (const list of corporateListings) {
+      if (list.status === 'ACTIVE' && typeof listingRepo.removeListing === 'function') {
+        await listingRepo.removeListing(list.id, 'SYSTEM_ADMIN');
+      }
+    }
+
+    // Character-scoped notification to corporate store owner (Section 18)
+    const ownerId = dealer.owner_profile_id || dealer.profile_id;
+    if (ownerId) {
+      const { getNotificationRepository } = await import('../index');
+      await getNotificationRepository().createNotification({
+        recipient_profile_id: ownerId,
+        type: 'CORPORATE_STORE_DELETED',
+        title: 'Kurumsal Mağazanız Kaldırıldı',
+        message: `Kurumsal mağazanız yönetim tarafından kaldırıldı. Neden: ${reason}`,
+        entity_type: 'application',
+        entity_id: dealerId,
+      });
+    }
+
+    // Admin audit log (Section 19)
+    const { recordAuditEvent } = await import('@/lib/audit');
+    await recordAuditEvent({
+      eventType: 'CORPORATE_STORE_DELETED',
+      profileId: adminProfileId,
+      metadata: {
+        targetCorporateProfileId: dealer.id,
+        companyName: dealer.company_name,
+        reason,
+        deletedBy: adminProfileId,
+      },
+    });
+
+    return { success: true };
   }
 }

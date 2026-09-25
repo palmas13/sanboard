@@ -98,6 +98,7 @@ export class SupabaseListingRepository implements IListingRepository {
         featured_until,
         seller_type,
         corporate_profile_id,
+        corporate:corporate_profiles (*),
         listing_images (storage_path, is_cover, sort_order)
       `)
       .eq('status', 'ACTIVE')
@@ -124,8 +125,8 @@ export class SupabaseListingRepository implements IListingRepository {
 
     let { data, error } = await query;
 
-    // Defensive fallback if is_featured column is not yet present on remote DB before migration execution
-    if (error && (error.message?.includes('is_featured') || error.message?.includes('seller_type'))) {
+    // Defensive fallback if columns from pending migrations are not yet present on remote DB before migration execution
+    if (error && (error.message?.includes('is_featured') || error.message?.includes('seller_type') || error.message?.includes('moderation_status'))) {
       let fallbackQuery = client
         .from('listings')
         .select(`
@@ -201,8 +202,18 @@ export class SupabaseListingRepository implements IListingRepository {
       }
     }
 
-    const nowTime = new Date().getTime();
-    const listings: PublicListingSummary[] = rows.map((item: any) => {
+    const filteredRows = (rows || []).filter((item: any) => {
+      // Exclude listings from suspended or deleted corporate stores (Section 14 & 16)
+      if (item.seller_type === 'CORPORATE' && item.corporate) {
+        if (item.corporate.moderation_status === 'SUSPENDED' || item.corporate.moderation_status === 'DELETED') {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    const nowTime = Date.now();
+    const listings = filteredRows.map((item: any) => {
       const cover = item.listing_images?.find((img: any) => img.is_cover)?.storage_path || item.listing_images?.[0]?.storage_path;
       const prevPrice = priceHistoryMap[item.id];
       const isFeatured = Boolean(
@@ -222,7 +233,7 @@ export class SupabaseListingRepository implements IListingRepository {
         published_at: item.published_at,
         cover_image: cover,
         favorite_count: favCountMap[item.id] || 0,
-        is_locked: true,
+        is_locked: true as const,
         is_featured: isFeatured,
         featured_until: item.featured_until,
         seller_type: item.seller_type,
@@ -903,6 +914,7 @@ export class SupabaseListingRepository implements IListingRepository {
         listing_images (*)
       `)
       .eq('seller_profile_id', safeProfileId)
+      .eq('seller_type', 'INDIVIDUAL')
       .is('corporate_profile_id', null)
       .order('created_at', { ascending: false });
 
@@ -951,9 +963,9 @@ export class SupabaseListingRepository implements IListingRepository {
       .order('created_at', { ascending: false });
 
     if (isUuid(safeCorporateId)) {
-      query = query.eq('corporate_profile_id', safeCorporateId);
+      query = query.eq('seller_type', 'CORPORATE').eq('corporate_profile_id', safeCorporateId);
     } else {
-      query = query.or(`corporate_profile_id.eq.${corporateProfileId}`);
+      query = query.eq('seller_type', 'CORPORATE').or(`corporate_profile_id.eq.${corporateProfileId}`);
     }
 
     const { data, error } = await query;

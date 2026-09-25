@@ -144,6 +144,15 @@ export class SupabasePaymentRepository implements IPaymentRepository {
       .maybeSingle();
 
     const creditType = pkgData?.code === 'CORPORATE_14_DAY' || pkgData?.seller_type === 'CORPORATE' || payment.amount === 1750 ? 'CORPORATE' : 'INDIVIDUAL';
+    let corporateProfileId: string | null = null;
+    if (creditType === 'CORPORATE') {
+      const { data: dealerData } = await client
+        .from('corporate_profiles')
+        .select('id')
+        .or(`owner_profile_id.eq.${payment.profile_id},profile_id.eq.${payment.profile_id}`)
+        .maybeSingle();
+      corporateProfileId = dealerData?.id || null;
+    }
 
     // Create listing credit
     const { data: newCredit, error: creditErr } = await client
@@ -153,6 +162,7 @@ export class SupabasePaymentRepository implements IPaymentRepository {
         payment_id: payment.id,
         package_id: payment.package_id,
         credit_type: creditType,
+        corporate_profile_id: corporateProfileId,
         amount: payment.amount,
         status: 'AVAILABLE',
       })

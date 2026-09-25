@@ -10,7 +10,10 @@ export type AuditEventType =
   | 'PAYMENT_SUCCESS'
   | 'CREDIT_PURCHASED'
   | 'LISTING_PUBLISHED'
-  | 'PROFILE_CREATED';
+  | 'PROFILE_CREATED'
+  | 'CORPORATE_STORE_SUSPENDED'
+  | 'CORPORATE_STORE_REACTIVATED'
+  | 'CORPORATE_STORE_DELETED';
 
 export interface AuditEventPayload {
   eventType: AuditEventType;

@@ -28,8 +28,9 @@ import {
   X,
   Check,
   User as UserIcon,
+  Clock,
 } from 'lucide-react';
-import { formatCurrency, formatDateTime } from '@/lib/utils/format';
+import { formatCurrency, formatDateTime, formatDate } from '@/lib/utils/format';
 import { resolveMediaUrl } from '@/lib/media/url';
 
 export default function AdminPage() {
@@ -57,10 +58,21 @@ export default function AdminPage() {
   const [adminReplyMessage, setAdminReplyMessage] = useState('');
   const [ticketReplying, setTicketReplying] = useState(false);
 
+  // Corporate management state (Section 12 & 23 & 24)
+  const [corporateSubTab, setCorporateSubTab] = useState<'dealers' | 'applications'>('dealers');
+  const [showDeletedStores, setShowDeletedStores] = useState(false);
+
   // Corporate application rejection modal state
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
-  const [rejectTargetDealer, setRejectTargetDealer] = useState<any | null>(null);
+  const [rejectTargetApp, setRejectTargetApp] = useState<any | null>(null);
   const [rejectionReasonInput, setRejectionReasonInput] = useState('Fiziksel işletme bilgileri doğrulanamadığı için başvurunuz reddedildi.');
+
+  // Corporate store management modal state
+  const [selectedStore, setSelectedStore] = useState<any | null>(null);
+  const [storeManageModalOpen, setStoreManageModalOpen] = useState(false);
+  const [suspendModalOpen, setSuspendModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [storeReasonInput, setStoreReasonInput] = useState('');
 
   const fetchData = async () => {
     setLoading(true);
@@ -183,15 +195,16 @@ export default function AdminPage() {
     }
   };
 
-  const handleDealerAction = async (dealerId: string, status: 'APPROVED' | 'REJECTED', reason?: string) => {
+  // Application Review Handlers (Section 12 & 24)
+  const handleApproveApplication = async (applicationId: string) => {
     setActionLoading(true);
     try {
       await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'updateDealer',
-          payload: { dealerId, status, rejectionReason: reason },
+          action: 'approveApplication',
+          payload: { applicationId },
         }),
       });
       await fetchData();
@@ -200,12 +213,97 @@ export default function AdminPage() {
     }
   };
 
-  const handleConfirmReject = async (e: React.FormEvent) => {
+  const handleConfirmRejectApplication = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rejectTargetDealer) return;
-    await handleDealerAction(rejectTargetDealer.id, 'REJECTED', rejectionReasonInput);
-    setRejectModalOpen(false);
-    setRejectTargetDealer(null);
+    if (!rejectTargetApp) return;
+    setActionLoading(true);
+    try {
+      await fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'rejectApplication',
+          payload: {
+            applicationId: rejectTargetApp.id,
+            rejectionReason: rejectionReasonInput,
+          },
+        }),
+      });
+      setRejectModalOpen(false);
+      setRejectTargetApp(null);
+      await fetchData();
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Store Moderation Handlers (Section 13-16 & 23)
+  const handleConfirmSuspendStore = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStore || !storeReasonInput.trim()) return;
+    setActionLoading(true);
+    try {
+      await fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'suspendStore',
+          payload: {
+            dealerId: selectedStore.id,
+            reason: storeReasonInput.trim(),
+          },
+        }),
+      });
+      setSuspendModalOpen(false);
+      setStoreManageModalOpen(false);
+      setStoreReasonInput('');
+      await fetchData();
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReactivateStore = async (dealerId: string) => {
+    setActionLoading(true);
+    try {
+      await fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'reactivateStore',
+          payload: { dealerId },
+        }),
+      });
+      setStoreManageModalOpen(false);
+      await fetchData();
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleConfirmDeleteStore = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStore || !storeReasonInput.trim()) return;
+    setActionLoading(true);
+    try {
+      await fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'deleteStore',
+          payload: {
+            dealerId: selectedStore.id,
+            reason: storeReasonInput.trim(),
+          },
+        }),
+      });
+      setDeleteModalOpen(false);
+      setStoreManageModalOpen(false);
+      setStoreReasonInput('');
+      await fetchData();
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const openTicketDetail = async (ticket: any) => {
@@ -284,7 +382,7 @@ export default function AdminPage() {
     );
   });
 
-  const pendingDealersCount = (data?.dealers || []).filter((d: any) => d.status === 'PENDING').length;
+  const pendingAppsCount = (data?.applications || []).length;
   const openTicketsCount = (data?.tickets || []).filter((t: any) => t.status === 'OPEN').length;
 
   const filteredTickets = (data?.tickets || []).filter((t: any) => {
@@ -387,7 +485,7 @@ export default function AdminPage() {
           ) : fetchError ? (
             <span className="text-xs text-[var(--color-danger)] font-medium block mt-2">Yüklenemedi</span>
           ) : (
-            <p className="text-2xl font-black text-[#FF8A1F] mt-2">{pendingDealersCount}</p>
+            <p className="text-2xl font-black text-[#FF8A1F] mt-2">{pendingAppsCount}</p>
           )}
         </div>
       </div>
@@ -443,7 +541,7 @@ export default function AdminPage() {
           }`}
         >
           <Building2 className="w-4 h-4" />
-          <span>Kurumsal Başvurular {pendingDealersCount > 0 && `(${pendingDealersCount})`}</span>
+          <span>Kurumsal Yönetim {pendingAppsCount > 0 && `(${pendingAppsCount})`}</span>
         </button>
 
         <button
@@ -560,157 +658,272 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* TAB CONTENT 2: KURUMSAL BAŞVURULAR (DEALERS) */}
+      {/* TAB CONTENT 2: KURUMSAL YÖNETİM (DEALERS & APPLICATIONS) */}
       {activeTab === 'dealers' && (
-        <div className="surface-card rounded-2xl border border-[var(--border-app)] p-6 space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="surface-card rounded-2xl border border-[var(--border-app)] p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-[var(--border-app)]">
             <div>
               <h3 className="font-bold text-base text-[var(--text-main)] flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-[#FF8A1F]" />
-                <span>Kurumsal Satıcı Başvuruları & Galeriler</span>
+                <span>Kurumsal İşletmeler & Mağaza Yönetimi</span>
               </h3>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                Kullanıcıların kurumsal galeri/mağaza başvurularını inceleyin ve onaylayarak Premium Satıcı rozeti atayın.
+                Başvuruları inceleyin ve onaylı kurumsal mağazaların moderasyon durumunu (aktif/askıda/silindi) yönetin.
               </p>
+            </div>
+
+            {/* Sub-tabs: ONAY BEKLEYENLER vs KURUMSAL SATICILAR (Section 12) */}
+            <div className="flex items-center gap-2 p-1 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] shrink-0">
+              <button
+                type="button"
+                onClick={() => setCorporateSubTab('dealers')}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  corporateSubTab === 'dealers'
+                    ? 'bg-[#FF8A1F] text-black shadow-sm'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                }`}
+              >
+                <Crown className="w-3.5 h-3.5" />
+                <span>Kurumsal Satıcılar ({data?.dealers?.length || 0})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCorporateSubTab('applications')}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  corporateSubTab === 'applications'
+                    ? 'bg-[#FF8A1F] text-black shadow-sm'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>Onay Bekleyenler ({data?.applications?.length || 0})</span>
+              </button>
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-[var(--border-app)]">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[var(--bg-surface-secondary)] border-b border-[var(--border-app)] text-[var(--text-muted)] uppercase tracking-wider font-semibold">
-                <tr>
-                  <th className="py-3 px-4">Şirket / Galeri</th>
-                  <th className="py-3 px-4">Profil ID</th>
-                  <th className="py-3 px-4">Açma Amacı & Faaliyet</th>
-                  <th className="py-3 px-4">İletişim</th>
-                  <th className="py-3 px-4">Tarih</th>
-                  <th className="py-3 px-4">Durum</th>
-                  <th className="py-3 px-4 text-right">İşlemler</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border-app)]">
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-xs text-[var(--text-muted)]">
-                      <div className="flex items-center justify-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin text-[#FF8A1F]" />
-                        <span>Kurumsal mağaza başvuruları yükleniyor...</span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (data?.dealers || []).length > 0 ? (
-                  (data?.dealers || []).map((d: any) => (
-                    <tr key={d.id} className="hover:bg-[var(--bg-surface-secondary)]/30 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-3">
-                          {d.logo_path || d.logo_url ? (
-                            <img
-                              src={resolveMediaUrl(d.logo_path || d.logo_url)}
-                              alt={d.company_name}
-                              className="w-9 h-9 rounded-lg object-cover border border-[var(--border-app)] shrink-0"
-                            />
-                          ) : (
-                            <div className="w-9 h-9 rounded-lg bg-[var(--brand-orange-subtle)] border border-[#FF8A1F]/30 text-[#FF8A1F] flex items-center justify-center font-bold text-xs shrink-0">
-                              {d.company_name?.charAt(0) || 'K'}
-                            </div>
-                          )}
-                          <div>
-                            <p className="font-bold text-[var(--text-main)]">{d.company_name}</p>
-                            <p className="text-[10px] text-[var(--text-dim)] font-mono">{d.public_id ? `#${d.public_id}` : d.id}</p>
+          {/* SUB-VIEW A: ONAY BEKLEYENLER (Section 12A & 24) */}
+          {corporateSubTab === 'applications' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
+                <span>İnceleme bekleyen <strong>{(data?.applications || []).length}</strong> başvuru bulunuyor.</span>
+              </div>
+              <div className="overflow-x-auto rounded-xl border border-[var(--border-app)]">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[var(--bg-surface-secondary)] border-b border-[var(--border-app)] text-[var(--text-muted)] uppercase tracking-wider font-semibold">
+                    <tr>
+                      <th className="py-3 px-4">Talep Edilen Şirket</th>
+                      <th className="py-3 px-4">Başvuran Karakter</th>
+                      <th className="py-3 px-4">Faaliyet Amacı</th>
+                      <th className="py-3 px-4">Başvuru Tarihi</th>
+                      <th className="py-3 px-4 text-right">İşlemler</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border-app)]">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-xs text-[var(--text-muted)]">
+                          <div className="flex items-center justify-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin text-[#FF8A1F]" />
+                            <span>Başvurular yükleniyor...</span>
                           </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-[var(--text-dim)]">{d.profile_id}</td>
-                      <td className="py-3 px-4 text-[var(--text-main)] max-w-xs">
-                        <p className="line-clamp-2">{d.purpose || d.description}</p>
-                      </td>
-                      <td className="py-3 px-4 text-[var(--text-dim)]">
-                        <p className="font-mono text-[var(--text-main)]">{d.phone || '-'}</p>
-                        <p className="truncate max-w-[140px]">{d.sanmail_email || '-'}</p>
-                      </td>
-                      <td className="py-3 px-4 text-[var(--text-dim)] whitespace-nowrap">
-                        {formatDateTime(d.created_at)}
-                      </td>
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold inline-flex items-center gap-1 ${
-                            d.status === 'APPROVED'
-                              ? 'bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border border-[#FF8A1F]/30'
-                              : d.status === 'PENDING'
-                              ? 'bg-[var(--color-warning-subtle)] text-[var(--color-warning)]'
-                              : 'bg-[var(--color-danger-subtle)] text-[var(--color-danger)]'
-                          }`}
-                        >
-                          {d.status === 'APPROVED' && <Crown className="w-3 h-3 fill-current" />}
-                          {d.status === 'APPROVED' ? 'PREMIUM SATICI' : d.status === 'PENDING' ? 'BEKLEMEDE' : 'REDDEDİLDİ'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {d.status === 'PENDING' ? (
-                            <>
+                        </td>
+                      </tr>
+                    ) : (data?.applications || []).length > 0 ? (
+                      (data?.applications || []).map((app: any) => (
+                        <tr key={app.id} className="hover:bg-[var(--bg-surface-secondary)]/30 transition-colors">
+                          <td className="py-3 px-4 font-bold text-[var(--text-main)]">
+                            {app.company_name}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-semibold text-[var(--text-main)]">{app.applicant_name || 'Bilinmeyen'}</div>
+                            <div className="font-mono text-[10px] text-[var(--text-dim)]">{app.applicant_profile_id}</div>
+                          </td>
+                          <td className="py-3 px-4 text-[var(--text-main)] max-w-sm">
+                            <p className="line-clamp-2">{app.purpose}</p>
+                          </td>
+                          <td className="py-3 px-4 text-[var(--text-dim)] whitespace-nowrap">
+                            {formatDateTime(app.created_at)}
+                          </td>
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
                               <button
                                 type="button"
-                                onClick={() => handleDealerAction(d.id, 'APPROVED')}
-                                className="btn-primary text-[11px] py-1 px-2.5 flex items-center gap-1 shadow-sm"
+                                onClick={() => handleApproveApplication(app.id)}
+                                disabled={actionLoading}
+                                className="btn-primary text-[11px] py-1 px-3 flex items-center gap-1 shadow-sm"
                               >
                                 <Check className="w-3 h-3" />
-                                <span>Onayla (Premium Yap)</span>
+                                <span>Onayla</span>
                               </button>
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setRejectTargetDealer(d);
+                                  setRejectTargetApp(app);
                                   setRejectionReasonInput('Fiziksel işletme bilgileri doğrulanamadığı için başvurunuz reddedildi.');
                                   setRejectModalOpen(true);
                                 }}
-                                className="btn-secondary text-[11px] py-1 px-2.5 text-red-400 hover:text-red-300"
+                                disabled={actionLoading}
+                                className="btn-secondary text-[11px] py-1 px-3 text-red-400 hover:text-red-300"
                               >
                                 Reddet
                               </button>
-                            </>
-                          ) : d.status === 'APPROVED' ? (
-                            <>
-                              <Link
-                                href={`/premium/${d.public_id || d.id}`}
-                                target="_blank"
-                                className="btn-secondary text-[11px] py-1 px-2.5 flex items-center gap-1"
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                                <span>Vitrini Gör</span>
-                              </Link>
-                              <button
-                                type="button"
-                                onClick={() => handleDealerAction(d.id, 'REJECTED')}
-                                className="btn-danger text-[11px] py-1 px-2"
-                                title="Kurumsal Üyeliği İptal Et"
-                              >
-                                Askıya Al
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleDealerAction(d.id, 'APPROVED')}
-                              className="btn-secondary text-[11px] py-1 px-2.5 text-[#FF8A1F]"
-                            >
-                              Yeniden Onayla
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-xs text-[var(--text-muted)]">
+                          Onay bekleyen kurumsal başvuru bulunmamaktadır.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* SUB-VIEW B: KURUMSAL SATICILAR (Section 12B & 23) */}
+          {corporateSubTab === 'dealers' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
+                <span>
+                  Toplam <strong>{(data?.dealers || []).filter((d: any) => showDeletedStores || d.moderation_status !== 'DELETED').length}</strong> kurumsal mağaza listeleniyor.
+                </span>
+                <label className="flex items-center gap-2 cursor-pointer hover:text-[var(--text-main)] font-semibold select-none">
+                  <input
+                    type="checkbox"
+                    checked={showDeletedStores}
+                    onChange={(e) => setShowDeletedStores(e.target.checked)}
+                    className="rounded border-[var(--border-app)] text-[#FF8A1F] focus:ring-[#FF8A1F]"
+                  />
+                  <span>Silinen Mağazaları Göster</span>
+                </label>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-[var(--border-app)]">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[var(--bg-surface-secondary)] border-b border-[var(--border-app)] text-[var(--text-muted)] uppercase tracking-wider font-semibold">
+                    <tr>
+                      <th className="py-3 px-4">Şirket / Galeri</th>
+                      <th className="py-3 px-4">Sahip Karakter</th>
+                      <th className="py-3 px-4">Moderasyon</th>
+                      <th className="py-3 px-4">Abonelik</th>
+                      <th className="py-3 px-4">Abonelik Bitiş</th>
+                      <th className="py-3 px-4">Aktif İlan</th>
+                      <th className="py-3 px-4">Takipçi</th>
+                      <th className="py-3 px-4 text-right">İşlem</th>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-xs text-[var(--text-muted)]">
-                      Henüz kurumsal başvuru bulunmuyor.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border-app)]">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={8} className="py-8 text-center text-xs text-[var(--text-muted)]">
+                          <div className="flex items-center justify-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin text-[#FF8A1F]" />
+                            <span>Kurumsal mağazalar yükleniyor...</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (data?.dealers || []).filter((d: any) => showDeletedStores || d.moderation_status !== 'DELETED').length > 0 ? (
+                      (data?.dealers || [])
+                        .filter((d: any) => showDeletedStores || d.moderation_status !== 'DELETED')
+                        .map((d: any) => {
+                          const isSuspended = d.moderation_status === 'SUSPENDED';
+                          const isDeleted = d.moderation_status === 'DELETED';
+                          const isSubActive = d.subscription_status === 'ACTIVE';
+
+                          return (
+                            <tr key={d.id} className="hover:bg-[var(--bg-surface-secondary)]/30 transition-colors">
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-3">
+                                  {d.logo_path || d.logo_url ? (
+                                    <img
+                                      src={resolveMediaUrl(d.logo_path || d.logo_url)}
+                                      alt={d.company_name}
+                                      className="w-9 h-9 rounded-lg object-cover border border-[var(--border-app)] shrink-0"
+                                    />
+                                  ) : (
+                                    <div className="w-9 h-9 rounded-lg bg-[var(--brand-orange-subtle)] border border-[#FF8A1F]/30 text-[#FF8A1F] flex items-center justify-center font-bold text-xs shrink-0">
+                                      {d.company_name?.charAt(0) || 'K'}
+                                    </div>
+                                  )}
+                                  <div>
+                                    <p className="font-bold text-[var(--text-main)] flex items-center gap-1.5">
+                                      <span>{d.company_name}</span>
+                                      {isSubActive && <Crown className="w-3 h-3 text-[#FF8A1F] fill-current" />}
+                                    </p>
+                                    <p className="text-[10px] text-[var(--text-dim)] font-mono">{d.public_id ? `#${d.public_id}` : d.id}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="font-semibold text-[var(--text-main)]">{d.owner_character_name || 'Bilinmeyen'}</div>
+                                <div className="font-mono text-[10px] text-[var(--text-dim)]">{d.owner_profile_id || d.profile_id}</div>
+                              </td>
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold inline-block ${
+                                    isDeleted
+                                      ? 'bg-[var(--color-danger-subtle)] text-[var(--color-danger)] border border-[var(--color-danger)]/30'
+                                      : isSuspended
+                                      ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                                      : 'bg-[var(--color-success-subtle)] text-[var(--color-success)] border border-[var(--color-success)]/30'
+                                  }`}
+                                >
+                                  {isDeleted ? 'SİLİNDİ' : isSuspended ? 'ASKIDA' : 'AKTİF'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold inline-block ${
+                                    isSubActive
+                                      ? 'bg-[#FF8A1F]/15 text-[#FF8A1F] border border-[#FF8A1F]/30'
+                                      : d.subscription_status === 'EXPIRED'
+                                      ? 'bg-amber-500/15 text-amber-400'
+                                      : 'bg-[var(--bg-surface-secondary)] text-[var(--text-muted)]'
+                                  }`}
+                                >
+                                  {isSubActive ? 'AKTİF' : d.subscription_status === 'EXPIRED' ? 'DOLDU' : 'PASİF'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-[var(--text-dim)] whitespace-nowrap">
+                                {d.subscription_expires_at ? formatDate(d.subscription_expires_at) : '—'}
+                              </td>
+                              <td className="py-3 px-4 font-bold text-[var(--text-main)]">
+                                {d.active_listing_count ?? 0}
+                              </td>
+                              <td className="py-3 px-4 text-[var(--text-main)]">
+                                {d.follower_count ?? 0}
+                              </td>
+                              <td className="py-3 px-4 text-right whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedStore(d);
+                                    setStoreManageModalOpen(true);
+                                  }}
+                                  className="btn-secondary text-[11px] py-1 px-3 font-bold hover:border-[#FF8A1F]/50 transition-colors"
+                                >
+                                  Yönet
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                    ) : (
+                      <tr>
+                        <td colSpan={8} className="py-8 text-center text-xs text-[var(--text-muted)]">
+                          Kayıtlı kurumsal mağaza bulunmamaktadır.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1213,8 +1426,8 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Corporate Application Rejection Modal */}
-      {rejectModalOpen && rejectTargetDealer && (
+      {/* Corporate Application Rejection Modal (Section 12A) */}
+      {rejectModalOpen && rejectTargetApp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
           <div className="surface-card w-full max-w-md rounded-2xl border border-[var(--border-app)] shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-app)]">
@@ -1232,12 +1445,12 @@ export default function AdminPage() {
             </div>
 
             <p className="text-xs text-[var(--text-muted)]">
-              <strong>{rejectTargetDealer.company_name}</strong> adlı başvuruyu reddetmek üzeresiniz. Başvuru sahibine görüntülenecek ve bildirim olarak iletilecek reddedilme nedenini giriniz:
+              <strong>{rejectTargetApp.company_name}</strong> adlı başvuruyu reddetmek üzeresiniz. Başvuru sahibine görüntülenecek ve bildirim olarak iletilecek reddedilme gerekçesini giriniz:
             </p>
 
-            <form onSubmit={handleConfirmReject} className="space-y-4">
+            <form onSubmit={handleConfirmRejectApplication} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-[var(--text-muted)]">Reddedilme Nedeni</label>
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Reddedilme Gerekçesi</label>
                 <textarea
                   rows={3}
                   value={rejectionReasonInput}
@@ -1263,6 +1476,294 @@ export default function AdminPage() {
                 >
                   {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                   <span>Reddet ve Bildir</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Corporate Store Management Modal (Section 12B & 23) */}
+      {storeManageModalOpen && selectedStore && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
+          <div className="surface-card w-full max-w-lg rounded-2xl border border-[var(--border-app)] shadow-2xl p-6 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-app)]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg bg-[var(--brand-orange-subtle)] border border-[#FF8A1F]/30 text-[#FF8A1F] flex items-center justify-center font-bold text-xs shrink-0">
+                  {selectedStore.company_name?.charAt(0) || 'K'}
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-[var(--text-main)]">{selectedStore.company_name}</h3>
+                  <p className="text-[10px] text-[var(--text-dim)] font-mono">{selectedStore.public_id ? `#${selectedStore.public_id}` : selectedStore.id}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStoreManageModalOpen(false)}
+                className="p-1 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-main)]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Store Information Grid */}
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-3 rounded-xl bg-[var(--bg-surface-secondary)]/50 border border-[var(--border-app)] space-y-1">
+                <span className="text-[10px] text-[var(--text-dim)] uppercase font-semibold">Sahip Karakter</span>
+                <p className="font-bold text-[var(--text-main)]">{selectedStore.owner_character_name || 'Bilinmeyen'}</p>
+                <p className="text-[10px] font-mono text-[var(--text-dim)] truncate">{selectedStore.owner_profile_id || selectedStore.profile_id}</p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[var(--bg-surface-secondary)]/50 border border-[var(--border-app)] space-y-1">
+                <span className="text-[10px] text-[var(--text-dim)] uppercase font-semibold">Moderasyon Durumu</span>
+                <div>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold inline-block ${
+                      selectedStore.moderation_status === 'DELETED'
+                        ? 'bg-[var(--color-danger-subtle)] text-[var(--color-danger)]'
+                        : selectedStore.moderation_status === 'SUSPENDED'
+                        ? 'bg-amber-500/15 text-amber-400'
+                        : 'bg-[var(--color-success-subtle)] text-[var(--color-success)]'
+                    }`}
+                  >
+                    {selectedStore.moderation_status === 'DELETED' ? 'SİLİNDİ' : selectedStore.moderation_status === 'SUSPENDED' ? 'ASKIDA' : 'AKTİF'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[var(--bg-surface-secondary)]/50 border border-[var(--border-app)] space-y-1">
+                <span className="text-[10px] text-[var(--text-dim)] uppercase font-semibold">Abonelik Durumu</span>
+                <p className="font-bold text-[var(--text-main)]">
+                  {selectedStore.subscription_status === 'ACTIVE' ? 'Aktif Üye' : selectedStore.subscription_status === 'EXPIRED' ? 'Süresi Doldu' : 'Pasif'}
+                </p>
+                <p className="text-[10px] text-[var(--text-dim)]">
+                  Bitiş: {selectedStore.subscription_expires_at ? formatDate(selectedStore.subscription_expires_at) : '—'}
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[var(--bg-surface-secondary)]/50 border border-[var(--border-app)] space-y-1">
+                <span className="text-[10px] text-[var(--text-dim)] uppercase font-semibold">Portföy & Haklar</span>
+                <p className="font-bold text-[var(--text-main)]">{selectedStore.active_listing_count ?? 0} Aktif İlan</p>
+                <p className="text-[10px] text-[var(--text-dim)]">{selectedStore.boost_credits ?? 0} Öne Çıkarma Hakkı</p>
+              </div>
+            </div>
+
+            {/* Suspended Reason banner if store is currently suspended */}
+            {selectedStore.moderation_status === 'SUSPENDED' && (
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs space-y-1">
+                <div className="font-bold flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span>Mağaza Şu Anda Askıdadır</span>
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  <strong>Neden:</strong> {selectedStore.suspension_reason || 'Belirtilmedi'}
+                </p>
+                {selectedStore.suspended_at && (
+                  <p className="text-[10px] text-[var(--text-dim)]">
+                    Tarih: {formatDateTime(selectedStore.suspended_at)}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Deleted Reason banner if store is soft-deleted */}
+            {selectedStore.moderation_status === 'DELETED' && (
+              <div className="p-3.5 rounded-xl bg-[var(--color-danger-subtle)] border border-[var(--color-danger)]/30 text-[var(--color-danger)] text-xs space-y-1">
+                <div className="font-bold flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span>Bu Mağaza Silinmiştir (Soft Delete)</span>
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  <strong>Neden:</strong> {selectedStore.deletion_reason || 'Belirtilmedi'}
+                </p>
+                {selectedStore.deleted_at && (
+                  <p className="text-[10px] text-[var(--text-dim)]">
+                    Tarih: {formatDateTime(selectedStore.deleted_at)}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Management Actions */}
+            <div className="pt-2 border-t border-[var(--border-app)] flex flex-wrap items-center justify-between gap-2">
+              <Link
+                href={`/premium/${selectedStore.public_id || selectedStore.id}`}
+                target="_blank"
+                className="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Vitrini Gör</span>
+              </Link>
+
+              <div className="flex items-center gap-2">
+                {selectedStore.moderation_status === 'ACTIVE' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStoreReasonInput('');
+                        setSuspendModalOpen(true);
+                      }}
+                      className="btn-secondary text-xs py-2 px-3 text-amber-400 hover:text-amber-300"
+                    >
+                      Askıya Al
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStoreReasonInput('');
+                        setDeleteModalOpen(true);
+                      }}
+                      className="btn-danger text-xs py-2 px-3"
+                    >
+                      Mağazayı Sil
+                    </button>
+                  </>
+                )}
+
+                {selectedStore.moderation_status === 'SUSPENDED' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleReactivateStore(selectedStore.id)}
+                      disabled={actionLoading}
+                      className="btn-primary text-xs py-2 px-3 flex items-center gap-1.5"
+                      title="Askıdan çıkarır. Ödenmemiş aboneliği otomatik aktif etmez."
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Askıdan Çıkar</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStoreReasonInput('');
+                        setDeleteModalOpen(true);
+                      }}
+                      className="btn-danger text-xs py-2 px-3"
+                    >
+                      Mağazayı Sil
+                    </button>
+                  </>
+                )}
+
+                {selectedStore.moderation_status === 'DELETED' && (
+                  <span className="text-[11px] text-[var(--text-dim)] italic">
+                    Silinmiş kayıt (Salt Okunur)
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Suspend Store Confirmation Modal (Section 14) */}
+      {suspendModalOpen && selectedStore && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
+          <div className="surface-card w-full max-w-md rounded-2xl border border-[var(--border-app)] shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-app)]">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-400" />
+                <h3 className="font-bold text-sm text-[var(--text-main)]">Kurumsal Mağazayı Askıya Al</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSuspendModalOpen(false)}
+                className="p-1 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-main)]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[var(--text-muted)]">
+              <strong>{selectedStore.company_name}</strong> mağazasını askıya almak üzeresiniz. Askı süresince mağaza yeni ilan yayınlayamaz, vitrini ve aktif ilanları halka açık aramalarda gizlenir.
+            </p>
+
+            <form onSubmit={handleConfirmSuspendStore} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Askıya Alma Nedeni (Zorunlu)</label>
+                <textarea
+                  rows={3}
+                  value={storeReasonInput}
+                  onChange={(e) => setStoreReasonInput(e.target.value)}
+                  required
+                  placeholder="Örn: Topluluk kurallarına aykırı ilan girişi sebebiyle incelenmek üzere askıya alınmıştır."
+                  className="form-input text-xs resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSuspendModalOpen(false)}
+                  className="btn-secondary text-xs py-2 px-4"
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading || !storeReasonInput.trim()}
+                  className="btn-primary text-xs py-2 px-4 flex items-center gap-1.5 cursor-pointer bg-amber-500 hover:bg-amber-600 text-black font-bold shadow-md"
+                >
+                  {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                  <span>Askıya Al ve Bildir</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Store Confirmation Modal (Section 16) */}
+      {deleteModalOpen && selectedStore && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
+          <div className="surface-card w-full max-w-md rounded-2xl border border-[var(--border-app)] shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-app)]">
+              <div className="flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-red-400" />
+                <h3 className="font-bold text-sm text-[var(--text-main)]">Kurumsal Mağazayı Sil (Soft Delete)</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteModalOpen(false)}
+                className="p-1 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-main)]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[var(--text-muted)]">
+              <strong>{selectedStore.company_name}</strong> mağazasını silmek üzeresiniz. Mağazaya ait tüm aktif kurumsal ilanlar <strong>REMOVED</strong> durumuna alınır ve görsel medyaları güvenli temizlik döngüsüne iletilir. Denetim kaydı korunur.
+            </p>
+
+            <form onSubmit={handleConfirmDeleteStore} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Silme Gerekçesi (Zorunlu)</label>
+                <textarea
+                  rows={3}
+                  value={storeReasonInput}
+                  onChange={(e) => setStoreReasonInput(e.target.value)}
+                  required
+                  placeholder="Örn: İşletmenin faaliyetine son vermesi veya ağır kural ihlali sebebiyle mağaza kapatılmıştır."
+                  className="form-input text-xs resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteModalOpen(false)}
+                  className="btn-secondary text-xs py-2 px-4"
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading || !storeReasonInput.trim()}
+                  className="btn-danger text-xs py-2 px-4 flex items-center gap-1.5 cursor-pointer shadow-md"
+                >
+                  {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                  <span>Güvenli Sil ve Bildir</span>
                 </button>
               </div>
             </form>
