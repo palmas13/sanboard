@@ -121,8 +121,8 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
     assert.strictEqual(favRow.user_id, zadeUserId);
   });
 
-  test('TEST 4: Zade switching characters under the same account shares the identical favorites list', async () => {
-    // Zade adds favorite under his account
+  test('TEST 4: Character switch isolates favorites (char-profile-b does not inherit char-profile-a favorites)', async () => {
+    // Character A adds favorite
     db.favorites.push({
       id: 'fav-zade-1',
       user_id: zadeUserId,
@@ -131,20 +131,30 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
       created_at: new Date().toISOString(),
     });
 
-    // Requesting favorites using server session cookie (different character profile, same account user_id)
-    const req = createAuthedRequest(
+    // Requesting favorites for Character B under the same account -> isolated (0 favorites)
+    const reqB = createAuthedRequest(
       'http://localhost:3000/api/user/favorites',
       'GET',
       { userId: zadeUserId, role: 'USER', profileId: 'char-profile-b' }
     );
 
-    const res = await getUserFavoritesGet(req);
-    assert.strictEqual(res.status, 200);
+    const resB = await getUserFavoritesGet(reqB);
+    assert.strictEqual(resB.status, 200);
 
-    const favList = await res.json();
-    assert.ok(Array.isArray(favList));
-    assert.strictEqual(favList.length, 1);
-    assert.strictEqual(favList[0].id, testListingId);
+    const favListB = await resB.json();
+    assert.ok(Array.isArray(favListB));
+    assert.strictEqual(favListB.length, 0, 'Character B must not inherit Character A favorites');
+
+    // Requesting favorites for Character A -> has 1 favorite
+    const reqA = createAuthedRequest(
+      'http://localhost:3000/api/user/favorites',
+      'GET',
+      { userId: zadeUserId, role: 'USER', profileId: 'char-profile-a' }
+    );
+    const resA = await getUserFavoritesGet(reqA);
+    const favListA = await resA.json();
+    assert.strictEqual(favListA.length, 1);
+    assert.strictEqual(favListA[0].id, testListingId);
   });
 
   test('TEST 5: Duplicate favorite for the same (user_id, listing_id) never creates two rows', async () => {

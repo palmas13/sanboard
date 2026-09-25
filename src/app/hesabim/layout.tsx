@@ -20,6 +20,7 @@ import {
   Shield,
   ArrowRight,
 } from 'lucide-react';
+import { getCorporateSidebarLabel } from '@/lib/dealers/status';
 
 export default function HesabimLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -27,12 +28,34 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
   const { currentProfile, isAuthenticated, isLoading, isAdmin, logout } = useAuth();
 
   const [headerImgError, setHeaderImgError] = useState(false);
+  const [dealerInfo, setDealerInfo] = useState<{
+    status?: string;
+    subscription_status?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push(`/giris?redirect=${encodeURIComponent(pathname)}`);
     }
   }, [isLoading, isAuthenticated, router, pathname]);
+
+  useEffect(() => {
+    if (!currentProfile?.id) return;
+    let isCancelled = false;
+
+    fetch(`/api/dealers/profile?profileId=${currentProfile.id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isCancelled && data?.dealer) {
+          setDealerInfo(data.dealer);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentProfile?.id]);
 
   if (isLoading || !currentProfile) {
     return (
@@ -46,6 +69,20 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
   const avatarSrc = currentProfile.avatar_path || currentProfile.avatar_url;
   const resolvedAvatar = avatarSrc ? resolveAvatarUrl(avatarSrc) : '';
 
+  const hasApprovedCorporate = Boolean(
+    dealerInfo?.status === 'APPROVED' ||
+    currentProfile.is_dealer ||
+    currentProfile.dealer_id
+  );
+
+  const corporateLabel = getCorporateSidebarLabel({
+    hasApprovedStore: hasApprovedCorporate,
+    subscriptionStatus: (dealerInfo?.subscription_status as any) || (currentProfile.is_dealer ? 'ACTIVE' : null),
+    isDealer: Boolean(currentProfile.is_dealer || currentProfile.dealer_id),
+  });
+
+  const isCorporateIdentity = corporateLabel === 'Kurumsal Profil';
+
   const menuItems = [
     { href: '/hesabim', label: 'Genel Bakış', icon: LayoutDashboard },
     { href: '/hesabim/profil', label: 'Profilim', icon: User },
@@ -56,9 +93,9 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
     { href: '/hesabim/destek', label: 'Destek', icon: LifeBuoy },
     {
       href: '/hesabim/kurumsal',
-      label: currentProfile.is_dealer ? 'Mağazam' : 'Kurumsal Başvuru',
-      icon: currentProfile.is_dealer ? Crown : Building2,
-      badge: currentProfile.is_dealer ? 'PRO' : undefined,
+      label: corporateLabel,
+      icon: isCorporateIdentity ? Crown : Building2,
+      badge: isCorporateIdentity ? 'PRO' : undefined,
     },
     ...(isAdmin
       ? [{ href: '/yonetim', label: 'Admin Panel', icon: Shield, badge: 'ADMİN' }]

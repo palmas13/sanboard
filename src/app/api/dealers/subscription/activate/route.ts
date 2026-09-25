@@ -21,15 +21,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Kurumsal mağaza bulunamadı.' }, { status: 404 });
     }
 
-    // Verify ownership: user's profile must own the dealer store, or user is ADMIN
-    const userRepo = getUserRepository();
-    const userProfiles = await userRepo.getProfilesByUserId(session.userId);
-    const ownsStore = userProfiles.some(
-      (p) => p.id === dealer.profile_id || p.id === dealer.owner_profile_id
-    );
+    // Verify ownership: active character profile must strictly own the dealer store (Section 28)
+    const activeProfileId = session.profileId;
+    if (!activeProfileId) {
+      return NextResponse.json({ error: 'Abonelik işlemi için aktif bir karakter seçilmelidir.' }, { status: 400 });
+    }
 
-    if (!ownsStore && session.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Bu mağazanın aboneliğini yönetme yetkiniz yok.' }, { status: 403 });
+    const dealerOwnerId = dealer.owner_profile_id || dealer.profile_id;
+    if (dealerOwnerId !== activeProfileId && session.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Bu mağazanın aboneliğini yalnızca mağaza sahibi karakter aktif edebilir.' }, { status: 403 });
     }
 
     if (dealer.status !== 'APPROVED') {

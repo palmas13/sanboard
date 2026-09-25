@@ -91,3 +91,50 @@ export async function PUT(
     );
   }
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const session = await getServerSession(req);
+    const profileId = session?.profileId;
+
+    if (!session?.userId || !profileId) {
+      return NextResponse.json(
+        { error: 'Yetkisiz erişim. Lütfen giriş yapın ve aktif karakter seçin.' },
+        { status: 401 }
+      );
+    }
+
+    const repo = getListingRepository();
+    if (!repo.removeListing) {
+      return NextResponse.json(
+        { error: 'İlan silme fonksiyonu desteklenmiyor.' },
+        { status: 500 }
+      );
+    }
+
+    const result = await repo.removeListing(id, profileId);
+    if (!result.success) {
+      const isForbidden = result.error?.includes('yetkiniz yok');
+      return NextResponse.json({ error: result.error }, { status: isForbidden ? 403 : 400 });
+    }
+
+    try {
+      revalidatePath('/');
+      revalidatePath('/arac');
+      revalidatePath('/mulk');
+      revalidatePath(`/ilan/${id}`);
+      revalidatePath('/hesabim/ilanlarim');
+    } catch {}
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error?.message || 'İlan silinemedi.' },
+      { status: 500 }
+    );
+  }
+}

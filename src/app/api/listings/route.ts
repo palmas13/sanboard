@@ -99,18 +99,14 @@ export async function POST(req: NextRequest) {
 
         if (dealer && followers.length > 0) {
           const notifRepo = (await import('@/lib/db/repositories')).getNotificationRepository();
-          const followerUserIds = Array.from(
-            new Set(
-              followers
-                .filter((f) => f.user_id && f.id !== trustedProfileId)
-                .map((f) => f.user_id)
-            )
-          );
+          // Directly notify follower character profiles strictly (Section 17)
+          const validFollowers = followers.filter((f) => f.id !== trustedProfileId);
 
           await Promise.all(
-            followerUserIds.map((uId) =>
+            validFollowers.map((f) =>
               notifRepo.createNotification({
-                user_id: uId,
+                recipient_profile_id: f.id,
+                user_id: f.user_id,
                 type: 'NEW_CORPORATE_LISTING',
                 title: `${dealer.company_name} yeni bir ilan yayınladı`,
                 message: `Takip ettiğiniz ${dealer.company_name} yeni bir ilan yayınladı: "${result.listing!.title}"`,

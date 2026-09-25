@@ -18,7 +18,7 @@ import { Notification } from '@/types';
 
 export function NotificationDropdown() {
   const router = useRouter();
-  const { user, isAuthenticated } = useAuth();
+  const { user, currentProfile, isAuthenticated } = useAuth();
 
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -27,7 +27,7 @@ export function NotificationDropdown() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const fetchNotifications = async () => {
-    if (!user) return;
+    if (!currentProfile?.id) return;
     try {
       const res = await fetch('/api/notifications');
       if (!res.ok) return;
@@ -40,13 +40,16 @@ export function NotificationDropdown() {
   };
 
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (isAuthenticated && currentProfile?.id) {
       fetchNotifications();
       // Polling or refresh interval
       const interval = setInterval(fetchNotifications, 20000);
       return () => clearInterval(interval);
+    } else {
+      setNotifications([]);
+      setUnreadCount(0);
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, currentProfile?.id]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

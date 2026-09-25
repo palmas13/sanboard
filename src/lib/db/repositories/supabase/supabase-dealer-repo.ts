@@ -2,6 +2,16 @@ import { IDealerRepository } from '../types';
 import { getSupabaseClient, getSupabaseAdminClient } from '../../supabase-client';
 import { CorporateApplication, CorporateProfile, CharacterProfile } from '@/types';
 import { uploadCorporateLogo, uploadCorporateBanner, getStorageProvider } from '@/lib/storage';
+import { normalizePhone } from '@/lib/utils/format';
+import { normalizeSocialMedia } from '@/lib/dealers/social';
+
+function mapCorporateProfile(data: any): CorporateProfile | null {
+  if (!data) return null;
+  return {
+    ...data,
+    social_media: normalizeSocialMedia(data.social_media),
+  };
+}
 
 export class SupabaseDealerRepository implements IDealerRepository {
   private getClient() {
@@ -26,7 +36,7 @@ export class SupabaseDealerRepository implements IDealerRepository {
     if (error) {
       throw new Error(`Supabase error fetching corporate profile: ${error.message}`);
     }
-    return data as CorporateProfile | null;
+    return mapCorporateProfile(data);
   }
 
   async getDealerByPublicId(publicId: number): Promise<CorporateProfile | null> {
@@ -38,7 +48,7 @@ export class SupabaseDealerRepository implements IDealerRepository {
       }
       throw new Error(`Supabase error fetching corporate profile by public_id: ${error.message}`);
     }
-    return data as CorporateProfile | null;
+    return mapCorporateProfile(data);
   }
 
   async getDealerBySlug(slug: string): Promise<CorporateProfile | null> {
@@ -47,7 +57,7 @@ export class SupabaseDealerRepository implements IDealerRepository {
     if (error) {
       throw new Error(`Supabase error fetching corporate profile by slug: ${error.message}`);
     }
-    return data as CorporateProfile | null;
+    return mapCorporateProfile(data);
   }
 
   async getDealerByProfileId(profileId: string): Promise<CorporateProfile | null> {
@@ -56,7 +66,7 @@ export class SupabaseDealerRepository implements IDealerRepository {
     if (error) {
       throw new Error(`Supabase error fetching corporate profile by owner: ${error.message}`);
     }
-    return data as CorporateProfile | null;
+    return mapCorporateProfile(data);
   }
 
   async getAllDealers(): Promise<CorporateProfile[]> {
@@ -180,9 +190,12 @@ export class SupabaseDealerRepository implements IDealerRepository {
     if (data.company_name !== undefined) updatePayload.company_name = data.company_name;
     if (data.description !== undefined) updatePayload.description = data.description;
     if (data.address !== undefined) updatePayload.address = data.address;
-    if (data.phone !== undefined) updatePayload.phone = data.phone;
+    if (data.phone !== undefined) updatePayload.phone = normalizePhone(data.phone);
     if (data.sanmail_email !== undefined) updatePayload.email = data.sanmail_email;
     if (data.email !== undefined) updatePayload.email = data.email;
+    if (data.social_media !== undefined) {
+      updatePayload.social_media = normalizeSocialMedia(data.social_media);
+    }
 
     if (newLogoKey !== null) {
       updatePayload.logo_path = newLogoKey;
@@ -232,7 +245,7 @@ export class SupabaseDealerRepository implements IDealerRepository {
       await storage.delete(oldBannerKey);
     }
 
-    return { success: true, dealer: resData as CorporateProfile };
+    return { success: true, dealer: mapCorporateProfile(resData)! };
   }
 
   async getApplicationByProfileId(profileId: string): Promise<CorporateApplication | null> {
@@ -294,6 +307,16 @@ export class SupabaseDealerRepository implements IDealerRepository {
     const targetProfileId = profile?.id || app.applicant_profile_id;
 
     if (status === 'APPROVED') {
+      const { data: existingOwnerStore } = await client
+        .from('corporate_profiles')
+        .select('id')
+        .eq('owner_profile_id', targetProfileId)
+        .maybeSingle();
+
+      if (existingOwnerStore) {
+        return { success: false, error: 'Bu karakterin zaten onaylanmış bir kurumsal mağazası bulunmaktadır.' };
+      }
+
       await client
         .from('corporate_applications')
         .update({ status: 'APPROVED', reviewed_by: reviewerUserId, reviewed_at: new Date().toISOString() })
@@ -321,17 +344,16 @@ export class SupabaseDealerRepository implements IDealerRepository {
           .eq('id', targetProfileId);
       }
 
-      if (targetUserId) {
-        const { getNotificationRepository } = await import('../index');
-        await getNotificationRepository().createNotification({
-          user_id: targetUserId,
-          type: 'CORPORATE_APPLICATION_APPROVED',
-          title: 'Kurumsal Profiliniz Onaylandı',
-          message: `"${app.company_name}" adına yaptığınız kurumsal satış başvurusu onaylanmıştır. Kurumsal panelden üyeliğinizi aktif ederek avantajlardan yararlanabilirsiniz.`,
-          entity_type: 'application',
-          entity_id: app.id,
-        });
-      }
+      const { getNotificationRepository } = await import('../index');
+      await getNotificationRepository().createNotification({
+        recipient_profile_id: targetProfileId,
+        user_id: targetUserId || undefined,
+        type: 'CORPORATE_APPLICATION_APPROVED',
+        title: 'Kurumsal Profiliniz Onaylandı',
+        message: `"${app.company_name}" adına yaptığınız kurumsal satış başvurusu onaylanmıştır. Kurumsal panelden üyeliğinizi aktif ederek avantajlardan yararlanabilirsiniz.`,
+        entity_type: 'application',
+        entity_id: app.id,
+      });
     } else if (status === 'REJECTED') {
       const reason = rejectionReason || 'Fiziksel işletme bilgileri doğrulanamadığı için başvurunuz reddedildi.';
       await client
@@ -344,17 +366,16 @@ export class SupabaseDealerRepository implements IDealerRepository {
         })
         .eq('id', applicationId);
 
-      if (targetUserId) {
-        const { getNotificationRepository } = await import('../index');
-        await getNotificationRepository().createNotification({
-          user_id: targetUserId,
-          type: 'CORPORATE_APPLICATION_REJECTED',
-          title: 'Kurumsal Başvurunuz Reddedildi',
-          message: `Kurumsal hesap başvurunuz reddedildi. Neden: ${reason}`,
-          entity_type: 'application',
-          entity_id: app.id,
-        });
-      }
+      const { getNotificationRepository } = await import('../index');
+      await getNotificationRepository().createNotification({
+        recipient_profile_id: targetProfileId,
+        user_id: targetUserId || undefined,
+        type: 'CORPORATE_APPLICATION_REJECTED',
+        title: 'Kurumsal Başvurunuz Reddedildi',
+        message: `Kurumsal hesap başvurunuz reddedildi. Neden: ${reason}`,
+        entity_type: 'application',
+        entity_id: app.id,
+      });
     }
 
     return { success: true };
@@ -431,6 +452,17 @@ export class SupabaseDealerRepository implements IDealerRepository {
   ): Promise<{ isFollowing: boolean; count: number; followerCount?: number }> {
     const client = this.getAdminClient();
 
+    const { data: dealer } = await client
+      .from('corporate_profiles')
+      .select('owner_profile_id')
+      .eq('id', corporateProfileId)
+      .maybeSingle();
+
+    if (!dealer) throw new Error('Kurumsal mağaza bulunamadı.');
+    if (dealer.owner_profile_id === followerProfileId) {
+      throw new Error('Kendi mağazanızı takip edemezsiniz.');
+    }
+
     const { data: existing } = await client
       .from('corporate_followers')
       .select('id')
@@ -448,6 +480,25 @@ export class SupabaseDealerRepository implements IDealerRepository {
         corporate_profile_id: corporateProfileId,
       });
       isFollowing = true;
+
+      // Notify corporate store owner character on NEW follow (Section 16)
+      if (dealer.owner_profile_id) {
+        const { data: follower } = await client
+          .from('character_profiles')
+          .select('full_name, user_id')
+          .eq('id', followerProfileId)
+          .maybeSingle();
+
+        const { getNotificationRepository } = await import('../index');
+        await getNotificationRepository().createNotification({
+          recipient_profile_id: dealer.owner_profile_id,
+          type: 'NEW_FOLLOWER',
+          title: 'Yeni Takipçi',
+          message: `${follower?.full_name || 'Bir kullanıcı'} mağazanızı takip etmeye başladı.`,
+          entity_type: 'application',
+          entity_id: corporateProfileId,
+        });
+      }
     }
 
     const { count } = await client

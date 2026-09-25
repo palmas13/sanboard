@@ -82,6 +82,7 @@ describe('Sanboard – Individual vs Corporate System & Lifecycle', () => {
         id: 'cred-1',
         profile_id: 'char-mavis-01',
         package_id: 'pkg-1',
+        credit_type: 'INDIVIDUAL',
         status: 'AVAILABLE',
         created_at: new Date().toISOString(),
       } as any,
@@ -89,6 +90,7 @@ describe('Sanboard – Individual vs Corporate System & Lifecycle', () => {
         id: 'cred-2',
         profile_id: 'char-mavis-01',
         package_id: 'pkg-2',
+        credit_type: 'CORPORATE',
         status: 'AVAILABLE',
         created_at: new Date().toISOString(),
       } as any,
@@ -328,8 +330,14 @@ describe('Sanboard – Individual vs Corporate System & Lifecycle', () => {
     it('tracks followers at character level and supports multiple characters under one account', async () => {
       const storeId = 'dealer-apex-01';
 
-      // Character 1 follows store
-      const follow1 = await toggleFollow('char-mavis-01', storeId);
+      // Character cannot follow own store (Section 16)
+      await assert.rejects(
+        () => toggleFollow('char-mavis-01', storeId),
+        /Kendi mağazanızı takip edemezsiniz/
+      );
+
+      // Character 1 (John Doe) follows store
+      const follow1 = await toggleFollow('char-john-01', storeId);
       assert.strictEqual(follow1.isFollowing, true);
       assert.strictEqual(follow1.count, 1);
 
@@ -340,11 +348,11 @@ describe('Sanboard – Individual vs Corporate System & Lifecycle', () => {
 
       const followersList = await getFollowers(storeId);
       assert.strictEqual(followersList.length, 2);
-      assert.strictEqual(followersList[0].full_name, 'Mavis Pierce');
-      assert.strictEqual(followersList[1].full_name, 'Mavis SecondChar');
+      assert.ok(followersList.some((f) => f.full_name === 'John Doe'));
+      assert.ok(followersList.some((f) => f.full_name === 'Mavis SecondChar'));
 
       // Character 1 unfollows
-      const unfollow1 = await toggleFollow('char-mavis-01', storeId);
+      const unfollow1 = await toggleFollow('char-john-01', storeId);
       assert.strictEqual(unfollow1.isFollowing, false);
       assert.strictEqual(unfollow1.count, 1);
 

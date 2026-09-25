@@ -41,20 +41,25 @@ export class MemoryListingRepository implements IListingRepository {
     return fetchCorporate(corporateProfileId);
   }
 
-  async toggleFavorite(listingId: string, userId: string) {
-    return toggleFavorite(userId, listingId, userId);
+  async toggleFavorite(listingId: string, profileId: string) {
+    return toggleFavorite(profileId, listingId);
   }
 
-  async removeFavorite(listingId: string, userId: string) {
-    const res = await toggleFavorite(userId, listingId, userId);
+  async removeFavorite(listingId: string, profileId: string) {
+    const res = await toggleFavorite(profileId, listingId);
     if (res.isFavorited) {
-      const secondRes = await toggleFavorite(userId, listingId, userId);
+      const secondRes = await toggleFavorite(profileId, listingId);
       return { success: true, count: secondRes.count };
     }
     return { success: true, count: res.count };
   }
 
-  async getUserFavorites(userId: string) {
-    return getUserFavorites(undefined, userId);
+  async getUserFavorites(profileId: string) {
+    return getUserFavorites(profileId);
+  }
+
+  async removeListing(id: string, profileId: string) {
+    const { removeListing } = await import('../../listings');
+    return removeListing(id, profileId);
   }
 }

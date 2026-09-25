@@ -77,33 +77,37 @@ describe('Price Display Logic (Section 18, 19, 20)', () => {
   });
 });
 
-describe('Account-Based Favorites & Character Switch Isolation', () => {
-  it('should persist favorite to user_id across different characters under same account', async () => {
-    const accountUserId = 'usr-account-test-1';
+describe('Character-Scoped Favorites & Sibling Isolation', () => {
+  it('should isolate favorites to character profile and support sibling characters independently', async () => {
     const characterZade = 'char-zade-test';
     const characterMavis = 'char-mavis-test';
     const listingId = db.listings[0]?.id || 'listing-veh-01';
+    db.favorites = db.favorites.filter((f) => f.listing_id !== listingId);
 
     // 1. Favorite as Zade
-    const addRes = await toggleFavorite(characterZade, listingId, accountUserId);
+    const addRes = await toggleFavorite(characterZade, listingId);
     assert.strictEqual(addRes.isFavorited, true);
 
-    // 2. Query favorites for account (simulating character switch to Mavis)
-    const mavisFavs = await getUserFavorites(accountUserId);
-    assert.ok(mavisFavs.some((l) => l.id === listingId), 'Listing should remain favorited after character switch');
+    // 2. Query favorites for Mavis (sibling character should NOT have Zade's favorite)
+    const mavisFavs = await getUserFavorites(characterMavis);
+    assert.strictEqual(mavisFavs.some((l) => l.id === listingId), false, 'Sibling character must NOT see other character favorites');
 
-    // 3. Different account should NOT have this favorite
-    const otherAccountUserId = 'usr-account-test-2';
-    const otherFavs = await getUserFavorites(otherAccountUserId);
-    assert.strictEqual(otherFavs.some((l) => l.id === listingId), false, 'Different account must be isolated');
+    // 3. Query favorites for Zade
+    const zadeFavs = await getUserFavorites(characterZade);
+    assert.ok(zadeFavs.some((l) => l.id === listingId), 'Zade must see his own favorite');
 
-    // 4. Unfavorite as Mavis
-    const removeRes = await toggleFavorite(characterMavis, listingId, accountUserId);
+    // 4. Mavis also favorites the listing (count becomes 2)
+    const mavisAdd = await toggleFavorite(characterMavis, listingId);
+    assert.strictEqual(mavisAdd.isFavorited, true);
+    assert.strictEqual(mavisAdd.count, 2);
+
+    // 5. Mavis removes favorite -> Zade favorite remains intact
+    const removeRes = await toggleFavorite(characterMavis, listingId);
     assert.strictEqual(removeRes.isFavorited, false);
+    assert.strictEqual(removeRes.count, 1);
 
-    // Verify un-favorited state
-    const afterUnfav = await getUserFavorites(accountUserId);
-    assert.strictEqual(afterUnfav.some((l) => l.id === listingId), false);
+    const afterUnfav = await getUserFavorites(characterZade);
+    assert.ok(afterUnfav.some((l) => l.id === listingId), 'Zade favorite must remain after Mavis unfavorites');
   });
 });
 

@@ -114,24 +114,9 @@ export async function getAllListingsForAdmin(): Promise<Listing[]> {
 }
 
 export async function adminDelistListing(listingId: string): Promise<boolean> {
-  if (process.env.DATA_STORE === 'supabase') {
-    const client = getSupabaseAdminClient();
-    if (client) {
-      const { error } = await client
-        .from('listings')
-        .update({ status: 'REMOVED', updated_at: new Date().toISOString() })
-        .eq('id', listingId);
-
-      return !error;
-    }
-  }
-
-  const listing = db.listings.find((l) => l.id === listingId);
-  if (!listing) return false;
-
-  listing.status = 'REMOVED';
-  listing.updated_at = new Date().toISOString();
-  return true;
+  const { removeListing } = await import('./listings');
+  const result = await removeListing(listingId, 'SYSTEM_ADMIN');
+  return result.success;
 }
 
 export async function getAllUsersForAdmin(): Promise<{ user: User; profileCount: number }[]> {

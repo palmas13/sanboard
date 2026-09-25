@@ -105,7 +105,7 @@ export default function HesabimOverviewPage() {
                 Kurumsal Mağaza Yönetimi
               </h3>
               <p className="text-xs text-[var(--text-muted)]">
-                Kurumsal mağazanıza ait envanter, başvuru ve mağaza istatistikleri ayrı olarak <strong className="text-[#FF8A1F]">Mağazam</strong> menüsü altında yer almaktadır.
+                Kurumsal mağazanıza ait envanter, başvuru ve mağaza istatistikleri ayrı olarak <strong className="text-[#FF8A1F]">Kurumsal Profil</strong> menüsü altında yer almaktadır.
               </p>
             </div>
           </div>

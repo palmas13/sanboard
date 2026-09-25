@@ -9,24 +9,25 @@ import {
 import { NotificationType } from '@/types';
 
 export class MemoryNotificationRepository implements INotificationRepository {
-  async getUserNotifications(userId: string) {
-    return getUserNotifications(userId);
+  async getUserNotifications(profileIdOrUserId: string) {
+    return getUserNotifications(profileIdOrUserId);
   }
 
-  async getUnreadCount(userId: string) {
-    return getUnreadNotificationCount(userId);
+  async getUnreadCount(profileIdOrUserId: string) {
+    return getUnreadNotificationCount(profileIdOrUserId);
   }
 
-  async markAsRead(userId: string, notificationId: string) {
-    return markNotificationAsRead(userId, notificationId);
+  async markAsRead(profileIdOrUserId: string, notificationId: string) {
+    return markNotificationAsRead(profileIdOrUserId, notificationId);
   }
 
-  async markAllAsRead(userId: string) {
-    return markAllNotificationsAsRead(userId);
+  async markAllAsRead(profileIdOrUserId: string) {
+    return markAllNotificationsAsRead(profileIdOrUserId);
   }
 
   async createNotification(params: {
-    user_id: string;
+    recipient_profile_id?: string;
+    user_id?: string;
     type: NotificationType;
     title: string;
     message: string;

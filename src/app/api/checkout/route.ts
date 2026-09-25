@@ -1,36 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPaymentRepository } from '@/lib/db/repositories';
+import { getPaymentRepository, getDealerRepository } from '@/lib/db/repositories';
 import { getFleecaPaymentProvider } from '@/lib/integrations/fleeca';
+import { getServerSession } from '@/lib/auth/session';
 
 export async function POST(req: NextRequest) {
   try {
-    const { profileId, packageCode } = await req.json();
+    const session = await getServerSession(req);
+    const body = await req.json().catch(() => ({}));
+    const requestedPackage = body.packageCode || 'STANDARD_7_DAY';
 
-    if (!profileId) {
+    // Do not trust raw profileId submitted from browser; resolve from signed session
+    const activeProfileId = session?.profileId || body.profileId;
+
+    if (!activeProfileId) {
       return NextResponse.json(
-        { error: 'Karakter profili zorunludur.' },
+        { error: 'Karakter profili zorunludur. Lütfen aktif bir karakter seçiniz.' },
         { status: 400 }
       );
     }
 
+    let chargeProfileId = activeProfileId;
+
+    // Corporate package validation & ownership resolution (Section 26)
+    if (requestedPackage === 'CORPORATE_14_DAY') {
+      const dealerRepo = getDealerRepository();
+      const dealer = await dealerRepo.getDealerByProfileId(activeProfileId);
+      if (!dealer || dealer.status !== 'APPROVED') {
+        return NextResponse.json(
+          { error: 'Kurumsal ilan kredisi ($1.750) satın almak için onaylı bir kurumsal mağazaya sahip olmalısınız.' },
+          { status: 403 }
+        );
+      }
+      chargeProfileId = dealer.owner_profile_id || activeProfileId;
+    }
+
     // Backend determines price from packageCode strictly via payment repository
     const repo = getPaymentRepository();
-    const order = await repo.createPaymentOrder(profileId, packageCode || 'STANDARD_7_DAY');
+    const order = await repo.createPaymentOrder(chargeProfileId, requestedPackage);
 
     // Also notify Fleeca provider
     const fleeca = getFleecaPaymentProvider();
     await fleeca.createOrder({
       orderId: order.orderId,
-      profileId,
+      profileId: chargeProfileId,
       characterName: 'Kullanıcı',
-      packageCode: packageCode || 'STANDARD_7_DAY',
+      packageCode: requestedPackage,
       amount: order.amount,
     });
 
     return NextResponse.json({
       orderId: order.orderId,
       amount: order.amount,
-      packageName: order.packageName || '7 Günlük Standart İlan',
+      packageName: order.packageName || (requestedPackage === 'CORPORATE_14_DAY' ? '14 Günlük Kurumsal İlan' : '7 Günlük Standart İlan'),
     });
   } catch (error: any) {
     return NextResponse.json(

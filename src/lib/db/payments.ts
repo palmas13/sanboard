@@ -100,11 +100,15 @@ export async function completePaymentOrder(
   payment.external_payment_id = externalPaymentId;
 
   // Issue 1 available listing credit to profile
+  const pkg = db.packages.find((p) => p.id === payment.package_id);
+  const creditType = pkg?.code === 'CORPORATE_14_DAY' || pkg?.seller_type === 'CORPORATE' || payment.amount === 1750 ? 'CORPORATE' : 'INDIVIDUAL';
   const credit: ListingCredit = {
     id: `crd-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
     profile_id: payment.profile_id,
     payment_id: payment.id,
     package_id: payment.package_id,
+    credit_type: creditType,
+    amount: payment.amount,
     status: 'AVAILABLE',
     created_at: new Date().toISOString(),
   };

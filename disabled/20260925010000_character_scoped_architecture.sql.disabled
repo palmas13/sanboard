@@ -1,0 +1,222 @@
+-- ============================================================================
+-- SANBOARD POST-AUDIT ARCHITECTURAL CORRECTION PASS
+-- File: 20260925010000_character_scoped_architecture.sql
+-- Covers: Character-scoped roles, character-scoped favorites & notifications,
+--         corporate store owner uniqueness, phone normalization, corporate billing
+-- ============================================================================
+
+-- 1. CHARACTER-SCOPED ROLE (Section 2 & 3)
+-- Sanboard admin authority belongs to CHARACTER PROFILE, not account.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+          AND table_name = 'character_profiles' 
+          AND column_name = 'role'
+    ) THEN
+        ALTER TABLE public.character_profiles 
+        ADD COLUMN role VARCHAR(16) NOT NULL DEFAULT 'USER'
+        CHECK (role IN ('USER', 'ADMIN'));
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_character_profiles_role 
+ON public.character_profiles(role);
+
+-- Note on Ambiguous Account Migration (Section 3):
+-- Default role for all characters is 'USER'.
+-- If an account had role 'ADMIN' with multiple characters, do NOT promote all characters.
+-- Run specific promotional SQL for the designated character:
+-- UPDATE public.character_profiles SET role = 'ADMIN' WHERE id = '<character_profile_id>';
+
+
+-- 2. FAVORITES — CHARACTER OWNERSHIP (Section 6 & 7)
+-- Canonical ownership: favorites.profile_id -> character_profiles.id
+-- Canonical uniqueness: UNIQUE(profile_id, listing_id)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+          AND table_name = 'favorites' 
+          AND column_name = 'profile_id'
+    ) THEN
+        ALTER TABLE public.favorites 
+        ADD COLUMN profile_id UUID REFERENCES public.character_profiles(id) ON DELETE CASCADE;
+    END IF;
+END $$;
+
+-- Drop legacy account-scoped uniqueness constraint if exists
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'uq_favorites_user_listing'
+    ) THEN
+        ALTER TABLE public.favorites DROP CONSTRAINT uq_favorites_user_listing;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE indexname = 'idx_favorites_user_listing'
+    ) THEN
+        DROP INDEX public.idx_favorites_user_listing;
+    END IF;
+END $$;
+
+-- Enforce character-level uniqueness on non-null profile_id
+CREATE UNIQUE INDEX IF NOT EXISTS uq_favorites_profile_listing 
+ON public.favorites(profile_id, listing_id) 
+WHERE profile_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_favorites_profile_id 
+ON public.favorites(profile_id);
+
+
+-- 3. NOTIFICATIONS — CHARACTER OWNERSHIP (Section 10 & 11)
+-- Canonical recipient: recipient_profile_id -> character_profiles.id
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+          AND table_name = 'notifications' 
+          AND column_name = 'recipient_profile_id'
+    ) THEN
+        ALTER TABLE public.notifications 
+        ADD COLUMN recipient_profile_id UUID REFERENCES public.character_profiles(id) ON DELETE CASCADE;
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient_profile_id 
+ON public.notifications(recipient_profile_id);
+
+
+-- 4. ONE STORE PER CHARACTER UNIQUE RULE (Section 15)
+-- Check for duplicates before creating unique constraint
+DO $$
+DECLARE
+    dup_count INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO dup_count
+    FROM (
+        SELECT owner_profile_id
+        FROM public.corporate_profiles
+        WHERE owner_profile_id IS NOT NULL
+        GROUP BY owner_profile_id
+        HAVING COUNT(*) > 1
+    ) sub;
+
+    IF dup_count > 0 THEN
+        RAISE EXCEPTION 'MIGRATION ABORTED: Duplicate corporate_profiles.owner_profile_id found (% records). Resolve manually before applying unique constraint.', dup_count;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'uq_corporate_profiles_owner_profile_id'
+    ) THEN
+        ALTER TABLE public.corporate_profiles
+        ADD CONSTRAINT uq_corporate_profiles_owner_profile_id UNIQUE (owner_profile_id);
+    END IF;
+END $$;
+
+
+-- 5. PHONE NORMALIZATION & DATABASE PROTECTION (Section 20 & 21)
+-- Normalize existing phone records to digits-only. Preflight check for collision.
+DO $$
+DECLARE
+    phone_dup_count INTEGER;
+BEGIN
+    -- Check if normalization produces collisions across distinct profiles
+    SELECT COUNT(*) INTO phone_dup_count
+    FROM (
+        SELECT regexp_replace(phone, '\D', '', 'g') AS clean_phone
+        FROM public.character_profiles
+        WHERE phone IS NOT NULL AND phone != ''
+        GROUP BY regexp_replace(phone, '\D', '', 'g')
+        HAVING COUNT(DISTINCT id) > 1
+    ) collisions;
+
+    IF phone_dup_count > 0 THEN
+        RAISE EXCEPTION 'MIGRATION ABORTED: Phone normalization causes collisions (% conflicts). Resolve manually.', phone_dup_count;
+    END IF;
+
+    -- Safely normalize existing phone values to digits-only
+    UPDATE public.character_profiles
+    SET phone = regexp_replace(phone, '\D', '', 'g')
+    WHERE phone IS NOT NULL AND phone != '' AND phone ~ '\D';
+
+    -- Add DB CHECK constraint ensuring phone is digits-only
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'chk_character_profiles_phone_digits'
+    ) THEN
+        ALTER TABLE public.character_profiles
+        ADD CONSTRAINT chk_character_profiles_phone_digits
+        CHECK (phone IS NULL OR phone = '' OR phone ~ '^[0-9]+$');
+    END IF;
+END $$;
+
+
+-- 6. CORPORATE LISTING BILLING & CREDIT SEPARATION (Section 23, 24, 25)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+          AND table_name = 'listing_credits' 
+          AND column_name = 'credit_type'
+    ) THEN
+        ALTER TABLE public.listing_credits 
+        ADD COLUMN credit_type VARCHAR(32) NOT NULL DEFAULT 'INDIVIDUAL'
+        CHECK (credit_type IN ('INDIVIDUAL', 'CORPORATE'));
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+          AND table_name = 'listing_credits' 
+          AND column_name = 'amount'
+    ) THEN
+        ALTER TABLE public.listing_credits 
+        ADD COLUMN amount INTEGER NOT NULL DEFAULT 2000;
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_listing_credits_type_status 
+ON public.listing_credits(profile_id, credit_type, status);
+
+-- Ensure Packages exist in packages table:
+-- INDIVIDUAL: $2,000, 7 days
+-- CORPORATE: $1,750, 14 days
+INSERT INTO public.packages (id, code, name, price, duration_days, seller_type, active, created_at, updated_at)
+VALUES 
+    (
+        'a0000000-0000-0000-0000-000000000001',
+        'STANDARD_7_DAY',
+        '7 Günlük Bireysel İlan',
+        2000,
+        7,
+        'INDIVIDUAL',
+        true,
+        NOW(),
+        NOW()
+    )
+ON CONFLICT (id) DO UPDATE 
+SET price = 2000, duration_days = 7, seller_type = 'INDIVIDUAL';
+
+INSERT INTO public.packages (id, code, name, price, duration_days, seller_type, active, created_at, updated_at)
+VALUES 
+    (
+        'a0000000-0000-0000-0000-000000000002',
+        'CORPORATE_14_DAY',
+        '14 Günlük Kurumsal İlan',
+        1750,
+        14,
+        'CORPORATE',
+        true,
+        NOW(),
+        NOW()
+    )
+ON CONFLICT (id) DO UPDATE 
+SET price = 1750, duration_days = 14, seller_type = 'CORPORATE';

@@ -3,24 +3,25 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
-import { Check, ShieldCheck, ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import { Check, ShieldCheck, ArrowRight, Loader2, Sparkles, Building2, User, Crown } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/format';
 
 export default function IlanPaketSecPage() {
   const router = useRouter();
   const { currentProfile, isAuthenticated } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const [loadingPkg, setLoadingPkg] = useState<'individual' | 'corporate' | null>(null);
   const [error, setError] = useState('');
 
-  const packagePrice = 2000;
+  const individualPrice = 2000;
+  const corporatePrice = 1750;
 
-  const handleSelectPackage = async () => {
+  const handleSelectIndividual = async () => {
     if (!isAuthenticated || !currentProfile) {
       router.push('/giris?redirect=/ilan-ver/paket');
       return;
     }
 
-    setLoading(true);
+    setLoadingPkg('individual');
     setError('');
 
     try {
@@ -39,22 +40,82 @@ export default function IlanPaketSecPage() {
       router.push(`/odeme/${data.orderId}`);
     } catch (err: any) {
       setError(err.message || 'Ödeme sayfası başlatılamadı.');
-      setLoading(false);
+      setLoadingPkg(null);
+    }
+  };
+
+  const handleSelectCorporate = async () => {
+    if (!isAuthenticated || !currentProfile) {
+      router.push('/giris?redirect=/ilan-ver/paket');
+      return;
+    }
+
+    setLoadingPkg('corporate');
+    setError('');
+
+    try {
+      // Eligibility verification for Corporate Listing (Section 9)
+      const res = await fetch(`/api/dealers/profile?profileId=${currentProfile.id}`);
+      const data = await res.json();
+
+      // Case A: No application/profile
+      if (!res.ok || !data.dealer) {
+        router.push('/hesabim/kurumsal');
+        return;
+      }
+
+      const dealer = data.dealer;
+
+      // Case B: Application is PENDING or REJECTED
+      if (dealer.status === 'PENDING' || dealer.status === 'REJECTED') {
+        router.push('/hesabim/kurumsal');
+        return;
+      }
+
+      // Case C: Application APPROVED but subscription INACTIVE
+      if (dealer.status === 'APPROVED' && (!dealer.subscription_status || dealer.subscription_status === 'INACTIVE')) {
+        router.push('/hesabim/kurumsal');
+        return;
+      }
+
+      // Case D: Subscription EXPIRED
+      if (dealer.subscription_status === 'EXPIRED') {
+        router.push('/hesabim/kurumsal');
+        return;
+      }
+
+      // Case E: Corporate profile ACTIVE -> Allow purchase flow
+      const checkoutRes = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId: currentProfile.id,
+          packageCode: 'CORPORATE_14_DAY',
+        }),
+      });
+
+      const checkoutData = await checkoutRes.json();
+      if (!checkoutRes.ok) throw new Error(checkoutData.error || 'Kurumsal sipariş oluşturulamadı.');
+
+      router.push(`/odeme/${checkoutData.orderId}`);
+    } catch (err: any) {
+      setError(err.message || 'Kurumsal ödeme başlatılamadı.');
+      setLoadingPkg(null);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-10">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-10">
       <div className="text-center space-y-3">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] text-xs font-semibold">
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Şeffaf & Sabit Fiyatlandırma</span>
+          <span>Şeffaf & Avantajlı Fiyatlandırma</span>
         </div>
         <h1 className="text-3xl sm:text-4xl font-extrabold text-[var(--text-main)]">
-          İlan Paketini Seç
+          İlan Türünü ve Paketini Seç
         </h1>
-        <p className="text-sm text-[var(--text-muted)] max-w-lg mx-auto">
-          San Andreas genelinde binlerce oyuncuya ulaşmak için standart ilan paketini satın al ve anında ilanını yayınla.
+        <p className="text-sm text-[var(--text-muted)] max-w-xl mx-auto">
+          İlanınızı bireysel olarak yayınlayabilir veya kurumsal mağazanızın avantajlı tarifesiyle öne çıkarabilirsiniz.
         </p>
       </div>
 
@@ -64,91 +125,194 @@ export default function IlanPaketSecPage() {
         </div>
       )}
 
-      {/* Package Card */}
-      <div className="max-w-md mx-auto surface-card rounded-2xl border-2 border-[#FF8A1F] p-8 shadow-2xl relative space-y-6">
-        <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-[#FF8A1F] text-white text-xs font-extrabold shadow-md tracking-wider">
-          STANDART YAYIN
-        </div>
+      {/* Package Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+        {/* CARD 1: Bireysel / Standart İlan */}
+        <div className="surface-card rounded-2xl border border-[var(--border-app)] hover:border-[#FF8A1F]/50 p-6 sm:p-8 shadow-xl relative flex flex-col justify-between space-y-6 transition-all">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between gap-3">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-surface-secondary)] text-[var(--text-main)] text-xs font-bold border border-[var(--border-app)]">
+                <User className="w-3.5 h-3.5 text-[#FF8A1F]" />
+                <span>BİREYSEL İLAN</span>
+              </span>
+              <span className="text-[11px] font-semibold text-[var(--text-muted)]">Standart Tarife</span>
+            </div>
 
-        <div className="text-center space-y-2 pt-2 border-b border-[var(--border-app)] pb-6">
-          <h3 className="text-xl font-bold text-[var(--text-main)]">
-            7 Günlük Standart İlan
-          </h3>
-          <div className="flex items-baseline justify-center gap-1">
-            <span className="text-4xl font-black text-[#FF8A1F] tracking-tight">
-              {formatCurrency(packagePrice)}
-            </span>
-            <span className="text-xs text-[var(--text-muted)]">/ 7 gün</span>
+            <div className="space-y-2 border-b border-[var(--border-app)] pb-5">
+              <h3 className="text-xl font-bold text-[var(--text-main)]">
+                7 Günlük Standart İlan
+              </h3>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-4xl font-black text-[#FF8A1F] tracking-tight">
+                  {formatCurrency(individualPrice)}
+                </span>
+                <span className="text-xs text-[var(--text-muted)] font-semibold">/ 7 gün</span>
+              </div>
+              <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                Karakterinizin kişisel kimliği altında yayınlanır. GTA World Fleeca hesabınızdan tahsil edilir.
+              </p>
+            </div>
+
+            <ul className="space-y-3 text-xs sm:text-sm text-[var(--text-main)]">
+              <li className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center shrink-0">
+                  <Check className="w-3.5 h-3.5" />
+                </div>
+                <span>1 adet Araç veya Mülk İlanı</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center shrink-0">
+                  <Check className="w-3.5 h-3.5" />
+                </div>
+                <span>Kesintisiz 7 Gün Aktif Yayın</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center shrink-0">
+                  <Check className="w-3.5 h-3.5" />
+                </div>
+                <span>Satıcı: <strong>Aktif Karakter (Bireysel)</strong></span>
+              </li>
+              <li className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center shrink-0">
+                  <Check className="w-3.5 h-3.5" />
+                </div>
+                <span>Hesabım → İlanlarım Üzerinden Yönetim</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center shrink-0">
+                  <Check className="w-3.5 h-3.5" />
+                </div>
+                <span>Arama ve Kategori Sayfalarında Listelenme</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center shrink-0">
+                  <Check className="w-3.5 h-3.5" />
+                </div>
+                <span>Favorilere Eklenebilme & Sayaç</span>
+              </li>
+            </ul>
           </div>
-          <p className="text-xs text-[var(--text-muted)]">
-            GTA World oyun içi Fleeca hesabınızdan tahsil edilir.
-          </p>
+
+          <div className="space-y-3 pt-4 border-t border-[var(--border-app)]">
+            <button
+              type="button"
+              onClick={handleSelectIndividual}
+              disabled={Boolean(loadingPkg)}
+              className="w-full btn-secondary py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-md cursor-pointer hover:border-[#FF8A1F]"
+            >
+              {loadingPkg === 'individual' ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Ödeme Başlatılıyor...</span>
+                </>
+              ) : (
+                <>
+                  <span>Bireysel İlan Yayınla ({formatCurrency(individualPrice)})</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+            <div className="flex items-center justify-center gap-1.5 text-[11px] text-[var(--text-dim)]">
+              <ShieldCheck className="w-3.5 h-3.5 text-[var(--color-success)]" />
+              <span>Ödeme sonrası anında ilan oluşturmaya başlarsınız.</span>
+            </div>
+          </div>
         </div>
 
-        {/* Feature List */}
-        <ul className="space-y-3.5 text-sm text-[var(--text-main)]">
-          <li className="flex items-center gap-3">
-            <div className="w-5 h-5 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center shrink-0">
-              <Check className="w-3.5 h-3.5" />
-            </div>
-            <span>1 adet Araç veya Mülk İlanı</span>
-          </li>
-          <li className="flex items-center gap-3">
-            <div className="w-5 h-5 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center shrink-0">
-              <Check className="w-3.5 h-3.5" />
-            </div>
-            <span>Kesintisiz 7 Gün Aktif Yayın</span>
-          </li>
-          <li className="flex items-center gap-3">
-            <div className="w-5 h-5 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center shrink-0">
-              <Check className="w-3.5 h-3.5" />
-            </div>
-            <span>Maksimum 3 Fotoğraf & Vitrin Seçimi</span>
-          </li>
-          <li className="flex items-center gap-3">
-            <div className="w-5 h-5 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center shrink-0">
-              <Check className="w-3.5 h-3.5" />
-            </div>
-            <span>Arama ve Kategori Sayfalarında Listelenme</span>
-          </li>
-          <li className="flex items-center gap-3">
-            <div className="w-5 h-5 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center shrink-0">
-              <Check className="w-3.5 h-3.5" />
-            </div>
-            <span>Favorilere Eklenebilme & Sayaç</span>
-          </li>
-          <li className="flex items-center gap-3">
-            <div className="w-5 h-5 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center shrink-0">
-              <Check className="w-3.5 h-3.5" />
-            </div>
-            <span>Yayın Süresi Boyunca Ücretsiz Düzenleme</span>
-          </li>
-        </ul>
+        {/* CARD 2: Kurumsal İlan */}
+        <div className="surface-card rounded-2xl border-2 border-[#FF8A1F] p-6 sm:p-8 shadow-2xl relative flex flex-col justify-between space-y-6 bg-gradient-to-b from-[var(--bg-surface)] via-[var(--brand-orange-subtle)]/5 to-[var(--bg-surface)]">
+          <div className="absolute -top-3.5 right-6 px-3.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-[#FF8A1F] text-white text-[11px] font-black shadow-md tracking-wider uppercase">
+            ÖZEL FİYAT & 14 GÜN
+          </div>
 
-        <div className="pt-2">
-          <button
-            type="button"
-            onClick={handleSelectPackage}
-            disabled={loading}
-            className="w-full btn-primary py-3.5 text-sm font-bold flex items-center justify-center gap-2 shadow-lg"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Ödeme Başlatılıyor...</span>
-              </>
-            ) : (
-              <>
-                <span>Paketi Satın Al</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
-        </div>
+          <div className="space-y-6">
+            <div className="flex items-center justify-between gap-3">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] text-xs font-bold border border-[#FF8A1F]/30">
+                <Crown className="w-3.5 h-3.5 fill-current" />
+                <span>KURUMSAL İLAN</span>
+              </span>
+              <span className="text-[11px] font-bold text-amber-400">2 Kat Süre / İndirimli</span>
+            </div>
 
-        <div className="flex items-center justify-center gap-2 text-[11px] text-[var(--text-dim)] pt-2 border-t border-[var(--border-app)]">
-          <ShieldCheck className="w-3.5 h-3.5 text-[var(--color-success)]" />
-          <span>Ödeme başarılı olduktan sonra ilan hakkınız hesabınıza tanımlanır.</span>
+            <div className="space-y-2 border-b border-[var(--border-app)] pb-5">
+              <h3 className="text-xl font-bold text-[var(--text-main)] flex items-center gap-2">
+                <span>14 Günlük Kurumsal İlan</span>
+              </h3>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-4xl font-black text-[#FF8A1F] tracking-tight">
+                  {formatCurrency(corporatePrice)}
+                </span>
+                <span className="text-xs text-[var(--text-muted)] font-semibold">/ 14 gün</span>
+              </div>
+              <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                İşletmenizin kurumsal kimliği ve güvencesiyle mağazanız altında yayınlanır.
+              </p>
+            </div>
+
+            <ul className="space-y-3 text-xs sm:text-sm text-[var(--text-main)]">
+              <li className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center shrink-0">
+                  <Check className="w-3.5 h-3.5" />
+                </div>
+                <span>1 adet Araç veya Mülk İlanı</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center shrink-0">
+                  <Check className="w-3.5 h-3.5" />
+                </div>
+                <span><strong>Kesintisiz 14 Gün Aktif Yayın</strong> (2 Kat Süre)</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center shrink-0">
+                  <Check className="w-3.5 h-3.5" />
+                </div>
+                <span>Satıcı: <strong>Kurumsal Mağaza (Şirket İsmi)</strong></span>
+              </li>
+              <li className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center shrink-0">
+                  <Check className="w-3.5 h-3.5" />
+                </div>
+                <span>Kurumsal Mağaza Vitrininde Otomatik Listelenme</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center shrink-0">
+                  <Check className="w-3.5 h-3.5" />
+                </div>
+                <span>Mağazanızı Takip Edenlere <strong>Anlık Bildirim</strong></span>
+              </li>
+              <li className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center shrink-0">
+                  <Check className="w-3.5 h-3.5" />
+                </div>
+                <span>Doğrulanmış Kurumsal Üye Rozeti</span>
+              </li>
+            </ul>
+          </div>
+
+          <div className="space-y-3 pt-4 border-t border-[var(--border-app)]">
+            <button
+              type="button"
+              onClick={handleSelectCorporate}
+              disabled={Boolean(loadingPkg)}
+              className="w-full btn-primary py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+            >
+              {loadingPkg === 'corporate' ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Mağaza Durumu Doğrulanıyor...</span>
+                </>
+              ) : (
+                <>
+                  <span>Kurumsal İlan Satın Al ({formatCurrency(corporatePrice)})</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+            <div className="flex items-center justify-center gap-1.5 text-[11px] text-[var(--text-dim)]">
+              <Building2 className="w-3.5 h-3.5 text-[#FF8A1F]" />
+              <span>Yalnızca aktif kurumsal üyeliği bulunan karakterler yararlanabilir.</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

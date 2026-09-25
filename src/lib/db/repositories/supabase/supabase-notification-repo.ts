@@ -1,7 +1,7 @@
 import { INotificationRepository } from '../types';
 import { getSupabaseClient, getSupabaseAdminClient } from '../../supabase-client';
 import { Notification, NotificationType } from '@/types';
-import { resolveUserId, isUuid } from '../../id-mapper';
+import { resolveUserId, resolveProfileId, isUuid } from '../../id-mapper';
 
 export class SupabaseNotificationRepository implements INotificationRepository {
   private getClient() {
@@ -20,15 +20,15 @@ export class SupabaseNotificationRepository implements INotificationRepository {
     return this.getClient();
   }
 
-  async getUserNotifications(userId: string): Promise<Notification[]> {
+  async getUserNotifications(profileId: string): Promise<Notification[]> {
     const client = this.getAdminClient();
-    const safeUserId = resolveUserId(userId);
-    if (!isUuid(safeUserId)) return [];
+    const safeId = resolveProfileId(profileId);
+    if (!isUuid(safeId)) return [];
 
     const { data, error } = await client
       .from('notifications')
       .select('*')
-      .eq('user_id', safeUserId)
+      .eq('recipient_profile_id', safeId)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -48,15 +48,15 @@ export class SupabaseNotificationRepository implements INotificationRepository {
     return mapped as Notification[];
   }
 
-  async getUnreadCount(userId: string): Promise<number> {
+  async getUnreadCount(profileId: string): Promise<number> {
     const client = this.getAdminClient();
-    const safeUserId = resolveUserId(userId);
-    if (!isUuid(safeUserId)) return 0;
+    const safeId = resolveProfileId(profileId);
+    if (!isUuid(safeId)) return 0;
 
     const { count, error } = await client
       .from('notifications')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', safeUserId)
+      .eq('recipient_profile_id', safeId)
       .is('read_at', null);
 
     if (error) {
@@ -66,15 +66,15 @@ export class SupabaseNotificationRepository implements INotificationRepository {
     return count || 0;
   }
 
-  async markAsRead(userId: string, notificationId: string): Promise<{ success: boolean; notification?: Notification; error?: string }> {
+  async markAsRead(profileId: string, notificationId: string): Promise<{ success: boolean; notification?: Notification; error?: string }> {
     const client = this.getAdminClient();
-    const safeUserId = resolveUserId(userId);
+    const safeId = resolveProfileId(profileId);
 
     const { data, error } = await client
       .from('notifications')
       .update({ read_at: new Date().toISOString() })
       .eq('id', notificationId)
-      .eq('user_id', safeUserId)
+      .eq('recipient_profile_id', safeId)
       .select()
       .single();
 
@@ -95,14 +95,14 @@ export class SupabaseNotificationRepository implements INotificationRepository {
     return { success: true, notification: notif as Notification };
   }
 
-  async markAllAsRead(userId: string): Promise<{ success: boolean; count: number }> {
+  async markAllAsRead(profileId: string): Promise<{ success: boolean; count: number }> {
     const client = this.getAdminClient();
-    const safeUserId = resolveUserId(userId);
+    const safeId = resolveProfileId(profileId);
 
     const { data, error } = await client
       .from('notifications')
       .update({ read_at: new Date().toISOString() })
-      .eq('user_id', safeUserId)
+      .eq('recipient_profile_id', safeId)
       .is('read_at', null)
       .select('id');
 
@@ -114,7 +114,8 @@ export class SupabaseNotificationRepository implements INotificationRepository {
   }
 
   async createNotification(params: {
-    user_id: string;
+    recipient_profile_id?: string;
+    user_id?: string;
     type: NotificationType;
     title: string;
     message: string;
@@ -124,17 +125,28 @@ export class SupabaseNotificationRepository implements INotificationRepository {
   }): Promise<Notification> {
     const client = this.getAdminClient();
 
+    const insertPayload: any = {
+      type: params.type,
+      title: params.title,
+      message: params.message,
+      entity_type: params.entity_type,
+      entity_id: params.entity_id,
+      metadata: params.metadata,
+      created_at: new Date().toISOString(),
+    };
+
+    if (params.recipient_profile_id) {
+      const safeRecipient = resolveProfileId(params.recipient_profile_id);
+      if (isUuid(safeRecipient)) insertPayload.recipient_profile_id = safeRecipient;
+    }
+    if (params.user_id) {
+      const safeUid = resolveUserId(params.user_id);
+      if (isUuid(safeUid)) insertPayload.user_id = safeUid;
+    }
+
     const { data, error } = await client
       .from('notifications')
-      .insert({
-        user_id: params.user_id,
-        type: params.type,
-        title: params.title,
-        message: params.message,
-        entity_type: params.entity_type,
-        entity_id: params.entity_id,
-        metadata: params.metadata,
-      })
+      .insert(insertPayload)
       .select()
       .single();
 

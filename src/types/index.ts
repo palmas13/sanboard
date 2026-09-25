@@ -47,6 +47,7 @@ export interface CharacterProfile {
   avatar_path?: string;
   sanmail_email: string;
   phone: string;
+  role?: UserRole;
   is_dealer?: boolean;
   dealer_id?: string;
   public_id?: number;
@@ -165,6 +166,7 @@ export interface ListingPackage {
   price: number; // 2000
   duration_days: number; // 7
   active: boolean;
+  seller_type?: SellerType;
 }
 
 export type PaymentStatus = 'SUCCESS' | 'PENDING' | 'FAILED';
@@ -189,6 +191,8 @@ export interface ListingCredit {
   profile_id: string;
   payment_id: string;
   package_id: string;
+  credit_type?: SellerType;
+  amount?: number;
   status: CreditStatus;
   used_listing_id?: string;
   created_at: string;
@@ -219,11 +223,14 @@ export type NotificationType =
   | 'LISTING_EXPIRES_SOON'
   | 'CORPORATE_APPLICATION_APPROVED'
   | 'CORPORATE_APPLICATION_REJECTED'
-  | 'NEW_CORPORATE_LISTING';
+  | 'NEW_CORPORATE_LISTING'
+  | 'NEW_FOLLOWER'
+  | 'CORPORATE_SUBSCRIPTION_EXPIRING';
 
 export interface Notification {
   id: string;
-  user_id: string;
+  recipient_profile_id?: string;
+  user_id?: string;
   type: NotificationType;
   title: string;
   message: string;
@@ -265,6 +272,11 @@ export interface SoldListingAudit {
 export type DealerStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 export type CorporateSubscriptionStatus = 'INACTIVE' | 'ACTIVE' | 'EXPIRED';
 
+export interface CorporateSocialMedia {
+  name: string;
+  url: string;
+}
+
 export interface DealerProfile {
   id: string;
   profile_id: string;
@@ -288,12 +300,7 @@ export interface DealerProfile {
   subscription_status?: CorporateSubscriptionStatus;
   subscription_expires_at?: string | null;
   boost_credits?: number;
-  social_media?: {
-    twitter?: string;
-    instagram?: string;
-    discord?: string;
-    facebrowser?: string;
-  };
+  social_media?: CorporateSocialMedia[] | CorporateSocialMedia | { [key: string]: any } | null;
   follower_count?: number;
   is_following?: boolean;
   created_at: string;

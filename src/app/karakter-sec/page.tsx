@@ -54,86 +54,106 @@ function KarakterSecContent() {
           </p>
         </div>
 
-        {/* Character Rows */}
-        <div className="space-y-3 pt-2">
-          {characters.map((char) => {
-            const initials = char.fullName
-              .split(' ')
-              .map((n) => n[0])
-              .join('');
-
-            // Resolve avatar strictly from real Supabase profile (NO mock/static avatar flash)
-            const profile =
-              characterProfiles[char.id] ||
-              Object.values(characterProfiles).find(
-                (p) => p.external_character_id === char.id || p.full_name?.toLowerCase() === char.fullName.toLowerCase()
-              ) ||
-              (currentProfile?.external_character_id === char.id || currentProfile?.full_name?.toLowerCase() === char.fullName.toLowerCase()
-                ? currentProfile
-                : null);
-
-            const effectiveHasProfile = Boolean(char.hasProfile || profile);
-            const targetId = profile?.id || char.id;
-            const avatarPath = profile?.avatar_path || profile?.avatar_url || (char.hasProfile ? char.avatarUrl : null);
-            const charAvatar = avatarPath ? resolveAvatarUrl(avatarPath) : null;
-            const isSwitching = switchingId === targetId || switchingId === char.id;
-            const hasImgError = imgErrors[char.id];
-
-            return (
-              <button
-                key={char.id}
-                type="button"
-                disabled={Boolean(switchingId)}
-                onClick={() => handleSelect(targetId, effectiveHasProfile)}
-                className={`w-full surface-card surface-card-hover p-4 rounded-xl flex items-center justify-between gap-4 text-left transition-all border ${
-                  isSwitching
-                    ? 'border-[#FF8A1F] bg-[var(--brand-orange-subtle)]/20 cursor-wait'
-                    : 'border-[var(--border-app)] hover:border-[#FF8A1F] cursor-pointer'
-                } group`}
+        {/* Loading Skeleton */}
+        {characters.length === 0 ? (
+          <div className="space-y-3 pt-2">
+            {[1, 2].map((i) => (
+              <div
+                key={i}
+                className="w-full surface-card p-4 rounded-xl flex items-center justify-between gap-4 border border-[var(--border-app)] animate-pulse"
               >
                 <div className="flex items-center gap-3.5">
-                  {charAvatar && !hasImgError ? (
-                    <img
-                      src={charAvatar}
-                      alt={char.fullName}
-                      onError={() => setImgErrors((prev) => ({ ...prev, [char.id]: true }))}
-                      className="w-12 h-12 rounded-full object-cover border border-[var(--border-app)] group-hover:border-[#FF8A1F] transition-colors"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] font-bold flex items-center justify-center text-sm border border-[rgba(255,138,31,0.3)]">
-                      {initials}
-                    </div>
-                  )}
-
-                  <div>
-                    <h3 className="font-bold text-base text-[var(--text-main)] group-hover:text-[#FF8A1F] transition-colors">
-                      {char.fullName}
-                    </h3>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      {effectiveHasProfile ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-[var(--color-success)] font-medium">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Profil mevcut</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs text-[#FF8A1F] font-medium">
-                          <UserPlus className="w-3.5 h-3.5" />
-                          <span>Profil oluşturulacak</span>
-                        </span>
-                      )}
-                    </div>
+                  <div className="w-12 h-12 rounded-full bg-[var(--surface-elevated)]" />
+                  <div className="space-y-2">
+                    <div className="h-4 w-32 bg-[var(--surface-elevated)] rounded" />
+                    <div className="h-3 w-20 bg-[var(--surface-elevated)] rounded" />
                   </div>
                 </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* Character Rows */
+          <div className="space-y-3 pt-2">
+            {characters.map((char) => {
+              const initials = char.fullName
+                .split(' ')
+                .map((n) => n[0])
+                .join('');
 
-                {isSwitching ? (
-                  <Loader2 className="w-5 h-5 text-[#FF8A1F] animate-spin" />
-                ) : (
-                  <ChevronRight className="w-5 h-5 text-[var(--text-dim)] group-hover:text-[#FF8A1F] group-hover:translate-x-1 transition-all" />
-                )}
-              </button>
-            );
-          })}
-        </div>
+              // Resolve avatar strictly by stable IDs (char.id matches profile.id or external_character_id)
+              const profile =
+                characterProfiles[char.id] ||
+                Object.values(characterProfiles).find(
+                  (p) => p.id === char.id || p.external_character_id === char.id
+                ) ||
+                (currentProfile?.id === char.id || currentProfile?.external_character_id === char.id
+                  ? currentProfile
+                  : null);
+
+              const effectiveHasProfile = Boolean(char.hasProfile || profile);
+              const targetId = profile?.id || char.id;
+              const avatarPath = profile?.avatar_path || profile?.avatar_url || (char.hasProfile ? char.avatarUrl : null);
+              const charAvatar = avatarPath ? resolveAvatarUrl(avatarPath) : null;
+              const isSwitching = switchingId === targetId || switchingId === char.id;
+              const hasImgError = imgErrors[char.id];
+
+              return (
+                <button
+                  key={char.id}
+                  type="button"
+                  disabled={Boolean(switchingId)}
+                  onClick={() => handleSelect(targetId, effectiveHasProfile)}
+                  className={`w-full surface-card surface-card-hover p-4 rounded-xl flex items-center justify-between gap-4 text-left transition-all border ${
+                    isSwitching
+                      ? 'border-[#FF8A1F] bg-[var(--brand-orange-subtle)]/20 cursor-wait'
+                      : 'border-[var(--border-app)] hover:border-[#FF8A1F] cursor-pointer'
+                  } group`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    {charAvatar && !hasImgError ? (
+                      <img
+                        src={charAvatar}
+                        alt={char.fullName}
+                        onError={() => setImgErrors((prev) => ({ ...prev, [char.id]: true }))}
+                        className="w-12 h-12 rounded-full object-cover border border-[var(--border-app)] group-hover:border-[#FF8A1F] transition-colors"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] font-bold flex items-center justify-center text-sm border border-[rgba(255,138,31,0.3)]">
+                        {initials}
+                      </div>
+                    )}
+
+                    <div>
+                      <h3 className="font-bold text-base text-[var(--text-main)] group-hover:text-[#FF8A1F] transition-colors">
+                        {char.fullName}
+                      </h3>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        {effectiveHasProfile ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-[var(--color-success)] font-medium">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Profil mevcut</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs text-[#FF8A1F] font-medium">
+                            <UserPlus className="w-3.5 h-3.5" />
+                            <span>Profil oluşturulacak</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {isSwitching ? (
+                    <Loader2 className="w-5 h-5 text-[#FF8A1F] animate-spin" />
+                  ) : (
+                    <ChevronRight className="w-5 h-5 text-[var(--text-dim)] group-hover:text-[#FF8A1F] group-hover:translate-x-1 transition-all" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <p className="text-center text-xs text-[var(--text-dim)] pt-2 border-t border-[var(--border-app)]">
           Bir GTA World hesabı birden fazla karaktere sahip olabilir. Her karakterin Sanboard profili bağımsızdır.

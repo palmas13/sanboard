@@ -67,20 +67,22 @@ export interface IListingRepository {
   createListing(input: CreateListingInput, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   updateListing(id: string, input: Partial<CreateListingInput>, profileId: string, userId?: string, role?: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   markListingAsSold(id: string, profileId: string): Promise<{ success: boolean; error?: string }>;
+  removeListing?(id: string, profileId: string): Promise<{ success: boolean; error?: string }>;
   getUserListings(profileId: string): Promise<Listing[]>;
   getCorporateListings(corporateProfileId: string): Promise<Listing[]>;
-  toggleFavorite(listingId: string, userId: string): Promise<{ isFavorited: boolean; count: number }>;
-  removeFavorite(listingId: string, userId: string): Promise<{ success: boolean; count: number }>;
-  getUserFavorites(userId: string): Promise<(Listing & { isExpired: boolean })[]>;
+  toggleFavorite(listingId: string, profileId: string): Promise<{ isFavorited: boolean; count: number }>;
+  removeFavorite(listingId: string, profileId: string): Promise<{ success: boolean; count: number }>;
+  getUserFavorites(profileId: string): Promise<(Listing & { isExpired: boolean })[]>;
 }
 
 export interface INotificationRepository {
-  getUserNotifications(userId: string): Promise<Notification[]>;
-  getUnreadCount(userId: string): Promise<number>;
-  markAsRead(userId: string, notificationId: string): Promise<{ success: boolean; notification?: Notification; error?: string }>;
-  markAllAsRead(userId: string): Promise<{ success: boolean; count: number }>;
+  getUserNotifications(profileIdOrUserId: string): Promise<Notification[]>;
+  getUnreadCount(profileIdOrUserId: string): Promise<number>;
+  markAsRead(profileIdOrUserId: string, notificationId: string): Promise<{ success: boolean; notification?: Notification; error?: string }>;
+  markAllAsRead(profileIdOrUserId: string): Promise<{ success: boolean; count: number }>;
   createNotification(params: {
-    user_id: string;
+    recipient_profile_id?: string;
+    user_id?: string;
     type: NotificationType;
     title: string;
     message: string;

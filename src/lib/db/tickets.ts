@@ -142,17 +142,16 @@ export async function addTicketMessage(params: {
   if (params.senderRole === 'ADMIN') {
     ticket.status = 'ANSWERED';
     const creatorProfile = db.profiles.find((p) => p.id === ticket.profile_id);
-    if (creatorProfile?.user_id) {
-      createNotification({
-        user_id: creatorProfile.user_id,
-        type: 'SUPPORT_REPLY',
-        title: 'Destek Talebiniz Yanıtlandı',
-        message: 'Destek talebinize yetkili tarafından yanıt verildi.',
-        entity_type: 'ticket',
-        entity_id: ticket.id,
-        metadata: { ticketId: ticket.id, subject: ticket.subject },
-      });
-    }
+    createNotification({
+      recipient_profile_id: ticket.profile_id,
+      user_id: creatorProfile?.user_id,
+      type: 'SUPPORT_REPLY',
+      title: 'Destek Talebiniz Yanıtlandı',
+      message: 'Destek talebinize yetkili tarafından yanıt verildi.',
+      entity_type: 'ticket',
+      entity_id: ticket.id,
+      metadata: { ticketId: ticket.id, subject: ticket.subject },
+    });
   } else if (ticket.status === 'ANSWERED') {
     ticket.status = 'OPEN';
   }

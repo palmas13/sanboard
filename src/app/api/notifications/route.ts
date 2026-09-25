@@ -5,28 +5,19 @@ import { getServerSession } from '@/lib/auth/session';
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(req);
-    const userId = session?.userId;
+    const activeProfileId = session?.profileId || req.cookies.get('sanboard_profile_id')?.value;
 
-    if (!userId) {
+    if (!activeProfileId) {
       return NextResponse.json(
-        { error: 'Yetkisiz erişim. Lütfen giriş yapın.' },
+        { error: 'Aktif karakter profili seçilmedi. Lütfen giriş yapın veya karakter seçin.' },
         { status: 401 }
-      );
-    }
-
-    // Security: Only allow fetching the authenticated session user's notifications
-    const queryUserId = req.nextUrl.searchParams.get('userId');
-    if (queryUserId && queryUserId !== userId && session?.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Başka bir kullanıcının bildirimlerine erişim yetkiniz yok.' },
-        { status: 403 }
       );
     }
 
     const repo = getNotificationRepository();
     const [notifications, unreadCount] = await Promise.all([
-      repo.getUserNotifications(userId),
-      repo.getUnreadCount(userId),
+      repo.getUserNotifications(activeProfileId),
+      repo.getUnreadCount(activeProfileId),
     ]);
 
     return NextResponse.json({
@@ -44,11 +35,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(req);
-    const userId = session?.userId;
+    const activeProfileId = session?.profileId || req.cookies.get('sanboard_profile_id')?.value;
 
-    if (!userId) {
+    if (!activeProfileId) {
       return NextResponse.json(
-        { error: 'Yetkisiz erişim. Lütfen giriş yapın.' },
+        { error: 'Aktif karakter profili seçilmedi. Lütfen giriş yapın veya karakter seçin.' },
         { status: 401 }
       );
     }
@@ -67,17 +58,17 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const res = await repo.markAsRead(userId, notificationId);
+      const res = await repo.markAsRead(activeProfileId, notificationId);
       if (!res.success) {
         return NextResponse.json({ error: res.error }, { status: 403 });
       }
 
-      const unreadCount = await repo.getUnreadCount(userId);
+      const unreadCount = await repo.getUnreadCount(activeProfileId);
       return NextResponse.json({ success: true, notification: res.notification, unreadCount });
     }
 
     if (action === 'markAllRead' || action === 'mark_all_read') {
-      const res = await repo.markAllAsRead(userId);
+      const res = await repo.markAllAsRead(activeProfileId);
       return NextResponse.json({ success: true, count: res.count, unreadCount: 0 });
     }
 

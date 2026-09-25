@@ -27,10 +27,10 @@ export const MOCK_CHARACTERS: GtaWorldCharacter[] = [
   {
     id: '44444444-4444-4444-4444-444444444443',
     fullName: 'Ravi Blumon',
-    hasProfile: false,
-    avatarUrl: '',
-    sanmailEmail: '',
-    phone: '',
+    hasProfile: true,
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=250&auto=format&fit=crop&q=80',
+    sanmailEmail: 'ravi.blumon@sanmail.com',
+    phone: '555-7722',
   },
 ];
 

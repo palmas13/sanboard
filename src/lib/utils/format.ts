@@ -120,3 +120,14 @@ export function sanitizeText(text: string): string {
 export function generateListingNumber(seq: number): string {
   return `#SB-${(100000 + (seq % 900000)).toString()}`;
 }
+
+/**
+ * Normalizes phone numbers strictly to digits-only.
+ * Strips all spaces, hyphens, plus signs, and parentheses.
+ * e.g. "12-345", "12 345", "(12345)" => "12345"
+ */
+export function normalizePhone(phone?: string | null): string {
+  if (!phone) return '';
+  return phone.replace(/\D/g, '');
+}
+

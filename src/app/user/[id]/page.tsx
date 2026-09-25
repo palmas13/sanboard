@@ -107,11 +107,6 @@ export default async function PublicUserProfilePage({ params }: PageProps) {
                 <User className="w-3.5 h-3.5" />
                 <span>Bireysel Satıcı</span>
               </span>
-              {profile.public_id && (
-                <span className="text-xs font-mono text-[var(--text-dim)] px-2 py-0.5 rounded bg-[var(--bg-surface-secondary)] border border-[var(--border-app)]">
-                  #{profile.public_id}
-                </span>
-              )}
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-main)] tracking-tight">

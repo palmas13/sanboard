@@ -45,25 +45,32 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const { resolveStoreUserId, resolveUserId, resolveProfileId, resolveStoreProfileId } = await import('@/lib/db/id-mapper');
+  const safeStoreUserId = resolveStoreUserId(userId);
+  const safeSupabaseUserId = resolveUserId(userId);
+
   if (dbProfiles.length === 0) {
-    dbProfiles = db.profiles.filter((p) => p.user_id === userId);
+    dbProfiles = db.profiles.filter(
+      (p) => p.user_id === userId || p.user_id === safeStoreUserId || p.user_id === safeSupabaseUserId
+    );
   }
 
   if (isMock) {
-    // Merge mock character list with persisted profiles
+    // Merge mock character list with persisted profiles strictly by stable identity
     const merged = MOCK_CHARACTERS.map((char) => {
-      // Find matching DB profile by external_character_id or full_name or id
       const matched = dbProfiles.find(
         (p) =>
           p.id === char.id ||
           p.external_character_id === char.id ||
-          p.full_name?.toLowerCase() === char.fullName.toLowerCase()
+          resolveProfileId(p.id) === char.id ||
+          resolveStoreProfileId(p.id) === char.id
       );
 
       if (matched) {
         return {
           ...char,
           id: matched.id,
+          externalCharacterId: matched.external_character_id || char.id,
           fullName: matched.full_name,
           hasProfile: true,
           avatarUrl: matched.avatar_path || matched.avatar_url || '',
@@ -75,22 +82,24 @@ export async function GET(req: NextRequest) {
 
       return {
         ...char,
-        hasProfile: false,
-        avatarUrl: '',
-        sanmailEmail: '',
-        phone: '',
+        hasProfile: Boolean(char.hasProfile),
+        avatarUrl: char.avatarUrl || '',
+        sanmailEmail: char.sanmailEmail || '',
+        phone: char.phone || '',
       };
     });
 
     return NextResponse.json({
       success: true,
       characters: merged,
+      profiles: dbProfiles,
       isMock: true,
     });
   }
 
   const characters: GtaWorldCharacter[] = dbProfiles.map((p) => ({
     id: p.id,
+    externalCharacterId: p.external_character_id || p.id,
     fullName: p.full_name,
     hasProfile: true,
     avatarUrl: p.avatar_path || p.avatar_url || '',
@@ -102,6 +111,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     success: true,
     characters,
+    profiles: dbProfiles,
     isMock: false,
   });
 }

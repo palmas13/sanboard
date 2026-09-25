@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Heart } from 'lucide-react';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -11,8 +11,12 @@ interface FavoriteButtonProps {
   initialIsFavorited?: boolean;
   size?: 'sm' | 'md';
   showCount?: boolean;
+  proofText?: boolean;
   onToggle?: (isFavorited: boolean, count: number) => void;
 }
+
+// Module-level character-scoped cache to prevent 0.5s stale-prop flicker (Sections 31-33)
+const favoriteStateCache = new Map<string, { isFavorited: boolean; count: number; timestamp: number }>();
 
 export function FavoriteButton({
   listingId,
@@ -20,19 +24,37 @@ export function FavoriteButton({
   initialIsFavorited = false,
   size = 'md',
   showCount = true,
+  proofText = false,
   onToggle,
 }: FavoriteButtonProps) {
-  const { isAuthenticated, authStatus } = useAuth();
+  const { currentProfile, isAuthenticated, authStatus } = useAuth();
   const router = useRouter();
-  const [isFavorited, setIsFavorited] = useState(initialIsFavorited);
-  const [count, setCount] = useState(initialCount);
+
+  const profileKey = currentProfile?.id || 'anon';
+  const cacheKey = `${profileKey}:${listingId}`;
+
+  const cached = favoriteStateCache.get(cacheKey) || favoriteStateCache.get(`anon:${listingId}`);
+  const isCacheRecent = cached && Date.now() - cached.timestamp < 60000;
+
+  const [isFavorited, setIsFavorited] = useState(isCacheRecent ? cached.isFavorited : initialIsFavorited);
+  const [count, setCount] = useState(isCacheRecent ? cached.count : initialCount);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Sync state if props change (e.g. page navigation or refresh)
-  React.useEffect(() => {
+  // Sync state if props change, respecting recent client mutations
+  useEffect(() => {
+    const entry = favoriteStateCache.get(cacheKey) || favoriteStateCache.get(`anon:${listingId}`);
+    if (entry && Date.now() - entry.timestamp < 60000) {
+      setIsFavorited(entry.isFavorited);
+      setCount(entry.count);
+      if (profileKey !== 'anon') {
+        favoriteStateCache.set(cacheKey, entry);
+      }
+      return;
+    }
+
     setIsFavorited(initialIsFavorited);
     setCount(initialCount);
-  }, [initialIsFavorited, initialCount]);
+  }, [initialIsFavorited, initialCount, cacheKey, listingId, profileKey]);
 
   const handleToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -57,6 +79,14 @@ export function FavoriteButton({
 
     setIsFavorited(optimisticFavorited);
     setCount(optimisticCount);
+    const optimisticEntry = {
+      isFavorited: optimisticFavorited,
+      count: optimisticCount,
+      timestamp: Date.now(),
+    };
+    favoriteStateCache.set(cacheKey, optimisticEntry);
+    favoriteStateCache.set(`anon:${listingId}`, optimisticEntry);
+    onToggle?.(optimisticFavorited, optimisticCount);
     setIsLoading(true);
 
     try {
@@ -70,25 +100,50 @@ export function FavoriteButton({
         // Conclusively unauthenticated from server: revert and redirect to login
         setIsFavorited(prevFavorited);
         setCount(prevCount);
+        favoriteStateCache.delete(cacheKey);
+        favoriteStateCache.delete(`anon:${listingId}`);
         router.push(`/giris?redirect=/ilan/${listingId}`);
         return;
       }
 
       if (!res.ok) {
-        // 403 business error, 409 duplicate, 500 server error: revert WITHOUT redirecting
+        // Business error or duplicate: revert WITHOUT redirecting
         setIsFavorited(prevFavorited);
         setCount(prevCount);
+        const revertEntry = {
+          isFavorited: prevFavorited,
+          count: prevCount,
+          timestamp: Date.now(),
+        };
+        favoriteStateCache.set(cacheKey, revertEntry);
+        favoriteStateCache.set(`anon:${listingId}`, revertEntry);
+        onToggle?.(prevFavorited, prevCount);
         return;
       }
 
       const data = await res.json();
+      const confirmedEntry = {
+        isFavorited: data.isFavorited,
+        count: data.count,
+        timestamp: Date.now(),
+      };
       setIsFavorited(data.isFavorited);
       setCount(data.count);
+      favoriteStateCache.set(cacheKey, confirmedEntry);
+      favoriteStateCache.set(`anon:${listingId}`, confirmedEntry);
       onToggle?.(data.isFavorited, data.count);
     } catch {
       // Network or fetch exception: revert WITHOUT redirecting
       setIsFavorited(prevFavorited);
       setCount(prevCount);
+      const revertEntry = {
+        isFavorited: prevFavorited,
+        count: prevCount,
+        timestamp: Date.now(),
+      };
+      favoriteStateCache.set(cacheKey, revertEntry);
+      favoriteStateCache.set(`anon:${listingId}`, revertEntry);
+      onToggle?.(prevFavorited, prevCount);
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +154,7 @@ export function FavoriteButton({
     md: 'w-5 h-5',
   };
 
-  return (
+  const buttonElement = (
     <button
       type="button"
       onClick={handleToggle}
@@ -118,4 +173,20 @@ export function FavoriteButton({
       {showCount && <span>{count}</span>}
     </button>
   );
+
+  if (proofText) {
+    return (
+      <div className="flex items-center justify-between gap-3 w-full">
+        <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+          <Heart className="w-4 h-4 text-[#FF8A1F] fill-[#FF8A1F]/20 shrink-0" />
+          <span>
+            <strong className="text-[var(--text-main)]">{count} kişi</strong> bu ilanı favori listesine ekledi.
+          </span>
+        </div>
+        {buttonElement}
+      </div>
+    );
+  }
+
+  return buttonElement;
 }

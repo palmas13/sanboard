@@ -136,6 +136,15 @@ export class SupabasePaymentRepository implements IPaymentRepository {
       return { success: false, error: updateErr.message };
     }
 
+    // Query package to determine credit_type
+    const { data: pkgData } = await client
+      .from('packages')
+      .select('code, seller_type')
+      .eq('id', payment.package_id)
+      .maybeSingle();
+
+    const creditType = pkgData?.code === 'CORPORATE_14_DAY' || pkgData?.seller_type === 'CORPORATE' || payment.amount === 1750 ? 'CORPORATE' : 'INDIVIDUAL';
+
     // Create listing credit
     const { data: newCredit, error: creditErr } = await client
       .from('listing_credits')
@@ -143,6 +152,8 @@ export class SupabasePaymentRepository implements IPaymentRepository {
         profile_id: payment.profile_id,
         payment_id: payment.id,
         package_id: payment.package_id,
+        credit_type: creditType,
+        amount: payment.amount,
         status: 'AVAILABLE',
       })
       .select()

@@ -3,6 +3,7 @@ import { getSupabaseClient, getSupabaseAdminClient } from '../../supabase-client
 import { CharacterProfile, User } from '@/types';
 import { uploadProfileAvatar } from '@/lib/storage';
 import { deleteMediaSafely } from '@/lib/storage/lifecycle';
+import { normalizePhone } from '@/lib/utils/format';
 import { resolveUserId, resolveProfileId, isUuid } from '../../id-mapper';
 
 export class SupabaseUserRepository implements IUserRepository {
@@ -155,29 +156,31 @@ export class SupabaseUserRepository implements IUserRepository {
       }
     }
 
-    if (data.phone && data.phone.trim()) {
-      const phoneClean = data.phone.trim();
-      const { data: existingPhone } = await client
-        .from('character_profiles')
-        .select('id')
-        .eq('phone', phoneClean)
-        .neq('id', safeId)
-        .maybeSingle();
-
-      if (existingPhone) {
-        if (isNewUpload && newAvatarKey) await deleteMediaSafely(newAvatarKey, 'AVATAR', 'AVATAR_UPLOAD_ROLLBACK');
-        return { success: false, error: 'Bu telefon numarası başka bir karakter tarafından kullanılmaktadır.' };
-      }
-    }
-
     // 3. Prepare payload for Supabase update
     const updatePayload: Record<string, any> = {
       updated_at: new Date().toISOString(),
     };
 
     if (data.sanmail_email !== undefined) updatePayload.sanmail_email = data.sanmail_email;
-    if (data.phone !== undefined) updatePayload.phone = data.phone;
     if (data.full_name !== undefined) updatePayload.full_name = data.full_name;
+
+    if (data.phone !== undefined) {
+      const normalizedPhone = normalizePhone(data.phone);
+      if (normalizedPhone) {
+        const { data: existingPhone } = await client
+          .from('character_profiles')
+          .select('id')
+          .eq('phone', normalizedPhone)
+          .neq('id', safeId)
+          .maybeSingle();
+
+        if (existingPhone) {
+          if (isNewUpload && newAvatarKey) await deleteMediaSafely(newAvatarKey, 'AVATAR', 'AVATAR_UPLOAD_ROLLBACK');
+          return { success: false, error: 'Bu telefon numarası başka bir karakter tarafından kullanılmaktadır.' };
+        }
+      }
+      updatePayload.phone = normalizedPhone || '';
+    }
 
     if (newAvatarKey !== null) {
       updatePayload.avatar_path = newAvatarKey;
@@ -288,12 +291,12 @@ export class SupabaseUserRepository implements IUserRepository {
       }
     }
 
-    if (data.phone && data.phone.trim()) {
-      const phoneClean = data.phone.trim();
+    const normalizedPhone = normalizePhone(data.phone);
+    if (normalizedPhone) {
       const { data: existingPhone } = await client
         .from('character_profiles')
         .select('id')
-        .eq('phone', phoneClean)
+        .eq('phone', normalizedPhone)
         .maybeSingle();
 
       if (existingPhone) {
@@ -309,7 +312,8 @@ export class SupabaseUserRepository implements IUserRepository {
       avatar_path: null,
       avatar_url: null,
       sanmail_email: data.sanmailEmail?.trim() || null,
-      phone: data.phone?.trim() || null,
+      phone: normalizedPhone || null,
+      role: 'USER',
       is_dealer: false,
     };
 

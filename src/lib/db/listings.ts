@@ -10,6 +10,9 @@ import {
 import { generateListingNumber } from '../utils/format';
 import { createNotification } from './notifications';
 import { SupabaseListingRepository } from './repositories/supabase/supabase-listing-repo';
+import { deleteMediaSafely } from '../storage/lifecycle';
+import { extractMediaKey } from '../media/url';
+import { resolveUserId } from './id-mapper';
 
 export interface ListingFilterParams {
   category?: ListingCategory;
@@ -308,25 +311,44 @@ export async function createListingWithCredit(
   if (isSupabaseConfiguredMode()) {
     return getSupabaseRepo().createListing(input, sellerProfileId);
   }
-  // 1. Find available credit
-  const credit = db.credits.find(
-    (c) => c.profile_id === sellerProfileId && c.status === 'AVAILABLE'
-  );
+  const now = new Date();
+  const sellerProfile = db.profiles.find((p) => p.id === sellerProfileId);
+  const isCorporateRequest = input.seller_type === 'CORPORATE';
+  let corporateProfileId: string | undefined = undefined;
+
+  if (isCorporateRequest) {
+    const dealer = (db.dealers || []).find(
+      (d) => (d.owner_profile_id === sellerProfileId || d.profile_id === sellerProfileId) && d.status === 'APPROVED'
+    );
+    if (!dealer) {
+      return {
+        success: false,
+        error: 'Kurumsal ilan vermek için onaylı bir kurumsal mağazaya sahip olmalısınız.',
+      };
+    }
+    corporateProfileId = dealer.id;
+  }
+
+  const sellerType = corporateProfileId ? 'CORPORATE' : 'INDIVIDUAL';
+  const durationDays = sellerType === 'CORPORATE' ? 14 : 7;
+  const expiresAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+
+  // 1. Find available credit strictly matching the seller_type
+  const credit = db.credits.find((c) => {
+    if (c.profile_id !== sellerProfileId || c.status !== 'AVAILABLE') return false;
+    if (sellerType === 'CORPORATE') {
+      return c.credit_type === 'CORPORATE' || c.amount === 1750;
+    } else {
+      return (c.credit_type === 'INDIVIDUAL' || (!c.credit_type && c.amount !== 1750));
+    }
+  });
 
   if (!credit) {
     return {
       success: false,
-      error: 'İlan yayınlamak için aktif bir ilan hakkınız (krediniz) bulunmuyor. Lütfen önce ilan paketi satın alınız.',
+      error: `${sellerType === 'CORPORATE' ? 'Kurumsal ($1.750)' : 'Bireysel ($2.000)'} ilan yayınlamak için uygun bir ilan hakkınız (krediniz) bulunmuyor.`,
     };
   }
-
-  const now = new Date();
-  const sellerProfile = db.profiles.find((p) => p.id === sellerProfileId);
-  const isCorporateRequest = input.seller_type === 'CORPORATE';
-  const corporateProfileId = isCorporateRequest && sellerProfile?.is_dealer ? (input.corporate_profile_id || sellerProfile.dealer_id) : undefined;
-  const sellerType = corporateProfileId ? 'CORPORATE' : 'INDIVIDUAL';
-  const durationDays = sellerType === 'CORPORATE' ? 14 : 7;
-  const expiresAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
   const newId = `lst-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   const listingNumber = generateListingNumber(db.listings.length + 1);
 
@@ -479,38 +501,34 @@ export async function updateListing(
       changed_at: new Date().toISOString(),
     });
 
-    // 2. Identify seller user_id so we do NOT notify seller
-    const sellerProfile = db.profiles.find((p) => p.id === listing.seller_profile_id);
-    const sellerUserId = sellerProfile?.user_id;
-
-    // 3. Find all distinct users who favorited this listing
-    const notifiedUserIds = new Set<string>();
-    db.favorites
-      .filter((f) => f.listing_id === id)
-      .forEach((f) => {
-        const uid = f.user_id || db.profiles.find((p) => p.id === f.profile_id)?.user_id;
-        if (uid && uid !== sellerUserId) {
-          notifiedUserIds.add(uid);
-        }
-      });
-
-    // 4. Create notifications for favorited users
+    // 2. Identify favorited character profiles strictly (Section 13)
     const isDrop = newPrice < oldPrice;
-    notifiedUserIds.forEach((uid) => {
-      createNotification({
-        user_id: uid,
-        type: isDrop ? 'LISTING_PRICE_DROP' : 'LISTING_PRICE_CHANGE',
-        title: isDrop ? 'Favori İlanınızın Fiyatı Düştü' : 'Favori İlanınızın Fiyatı Değişti',
-        message: `${listing.title} ilanının fiyatı $${oldPrice.toLocaleString('en-US')} → $${newPrice.toLocaleString('en-US')} olarak güncellendi.`,
-        entity_type: 'listing',
-        entity_id: listing.id,
-        metadata: {
-          listingId: listing.id,
-          oldPrice,
-          newPrice,
-        },
+    if (isDrop) {
+      const favoritedProfiles = Array.from(
+        new Set(
+          db.favorites
+            .filter((f) => f.listing_id === id && f.profile_id && f.profile_id !== listing.seller_profile_id)
+            .map((f) => f.profile_id)
+        )
+      );
+
+      favoritedProfiles.forEach((pid) => {
+        createNotification({
+          recipient_profile_id: pid,
+          user_id: db.profiles.find((p) => p.id === pid)?.user_id || pid,
+          type: 'LISTING_PRICE_DROP',
+          title: 'Favori İlanınızın Fiyatı Düştü',
+          message: `${listing.title} isimli ilanın fiyatı düştü.`,
+          entity_type: 'listing',
+          entity_id: listing.id,
+          metadata: {
+            listingId: listing.id,
+            oldPrice,
+            newPrice,
+          },
+        });
       });
-    });
+    }
   }
 
   return { success: true, listing };
@@ -535,6 +553,7 @@ export async function markListingAsSold(
   }
 
   listing.status = 'SOLD';
+  const mediaKeys = [...(listing.images || [])];
   listing.images = []; // Purge images from listing
   listing.updated_at = new Date().toISOString();
 
@@ -548,6 +567,57 @@ export async function markListingAsSold(
     seller_profile_id: sellerProfileId,
     sold_at: new Date().toISOString(),
   });
+
+  // Clean up media through lifecycle with retry queue
+  for (const imgItem of mediaKeys) {
+    try {
+      const imgUrl = (imgItem as any)?.storage_path || (typeof imgItem === 'string' ? imgItem : '');
+      const key = extractMediaKey(imgUrl);
+      if (key) {
+        await deleteMediaSafely(key, listing.category === 'vehicle' ? 'VEHICLE_IMAGE' : 'PROPERTY_IMAGE', 'LISTING_SOLD');
+      }
+    } catch {}
+  }
+
+  return { success: true };
+}
+
+/**
+ * Remove listing (User delete or Admin delist).
+ * Parity with SOLD media lifecycle cleanup.
+ */
+export async function removeListing(
+  id: string,
+  requesterProfileId: string
+): Promise<{ success: boolean; error?: string }> {
+  if (isSupabaseConfiguredMode()) {
+    return getSupabaseRepo().removeListing ? getSupabaseRepo().removeListing!(id, requesterProfileId) : { success: false, error: 'İşlem desteklenmiyor.' };
+  }
+  const listing = db.listings.find((l) => l.id === id);
+  if (!listing) return { success: false, error: 'İlan bulunamadı.' };
+
+  if (requesterProfileId !== 'SYSTEM_ADMIN' && listing.seller_profile_id !== requesterProfileId) {
+    return { success: false, error: 'Bu işlem için yetkiniz yok.' };
+  }
+
+  listing.status = 'REMOVED';
+  const mediaKeys = [...(listing.images || [])];
+  listing.images = [];
+  listing.updated_at = new Date().toISOString();
+
+  // Clean up favorites
+  db.favorites = db.favorites.filter((f) => f.listing_id !== id);
+
+  // Clean up media through lifecycle with retry queue (REMOVED flow parity)
+  for (const imgItem of mediaKeys) {
+    try {
+      const imgUrl = (imgItem as any)?.storage_path || (typeof imgItem === 'string' ? imgItem : '');
+      const key = extractMediaKey(imgUrl);
+      if (key) {
+        await deleteMediaSafely(key, listing.category === 'vehicle' ? 'VEHICLE_IMAGE' : 'PROPERTY_IMAGE', 'LISTING_REMOVED');
+      }
+    } catch {}
+  }
 
   return { success: true };
 }
@@ -595,7 +665,7 @@ export async function getCorporateListings(corporateProfileId: string): Promise<
 }
 
 /**
- * Toggle favorite on a listing with account-level idempotence and unique constraint.
+ * Toggle favorite on a listing with character-level ownership and self-abuse checks.
  */
 export async function toggleFavorite(
   profileId: string,
@@ -603,31 +673,44 @@ export async function toggleFavorite(
   userIdParam?: string
 ): Promise<{ isFavorited: boolean; count: number }> {
   if (isSupabaseConfiguredMode()) {
-    return getSupabaseRepo().toggleFavorite(profileId, listingId, userIdParam);
+    return getSupabaseRepo().toggleFavorite(listingId, profileId);
   }
-  const profile = db.profiles.find((p) => p.id === profileId);
-  const userId = userIdParam || profile?.user_id || profileId;
+  const listing = db.listings.find((l) => l.id === listingId);
+  if (!listing) {
+    throw new Error('İlan bulunamadı.');
+  }
+
+  // Self-abuse checks (Section 9)
+  // 1. Individual listing owner cannot favorite own listing
+  if (listing.seller_profile_id === profileId) {
+    throw new Error('Kendi ilanınızı favorilere ekleyemezsiniz.');
+  }
+  // 2. Corporate store owner cannot favorite own corporate listing
+  if (listing.seller_type === 'CORPORATE' || listing.corporate_profile_id) {
+    const dealer = (db.dealers || []).find(
+      (d) => d.id === listing.corporate_profile_id || d.profile_id === listing.seller_profile_id || d.owner_profile_id === listing.seller_profile_id
+    );
+    if (dealer && (dealer.owner_profile_id === profileId || dealer.profile_id === profileId)) {
+      throw new Error('Sahibi olduğunuz mağazanın ilanını favorilere ekleyemezsiniz.');
+    }
+  }
 
   const existingIdx = db.favorites.findIndex(
-    (f) => (f.user_id ? f.user_id === userId : f.profile_id === profileId) && f.listing_id === listingId
+    (f) => f.profile_id === profileId && f.listing_id === listingId
   );
 
   if (existingIdx >= 0) {
     db.favorites.splice(existingIdx, 1);
   } else {
-    // Prevent duplicate insert if somehow already present
-    const alreadyExists = db.favorites.some(
-      (f) => (f.user_id ? f.user_id === userId : f.profile_id === profileId) && f.listing_id === listingId
-    );
-    if (!alreadyExists) {
-      db.favorites.push({
-        id: `fav-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        user_id: userId,
-        profile_id: profileId,
-        listing_id: listingId,
-        created_at: new Date().toISOString(),
-      });
-    }
+    const profile = db.profiles.find((p) => p.id === profileId);
+    const resolvedUser = userIdParam || resolveUserId(profile?.user_id) || profile?.user_id;
+    db.favorites.push({
+      id: `fav-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      user_id: resolvedUser,
+      profile_id: profileId,
+      listing_id: listingId,
+      created_at: new Date().toISOString(),
+    });
   }
 
   const count = db.favorites.filter((f) => f.listing_id === listingId).length;
@@ -637,20 +720,21 @@ export async function toggleFavorite(
 }
 
 /**
- * Get user's favorited listings by profile or account user_id.
+ * Get user's favorited listings strictly by character profile_id.
  */
 export async function getUserFavorites(
   profileId?: string,
   userIdParam?: string
 ): Promise<(Listing & { isExpired: boolean })[]> {
-  const profile = profileId ? db.profiles.find((p) => p.id === profileId) : undefined;
-  const userId = userIdParam || profile?.user_id || profileId || '';
+  const safeProfileId = profileId || userIdParam;
+  if (!safeProfileId) return [];
+
   if (isSupabaseConfiguredMode()) {
-    return getSupabaseRepo().getUserFavorites(userId);
+    return getSupabaseRepo().getUserFavorites(safeProfileId);
   }
 
   const favListingIds = db.favorites
-    .filter((f) => (f.user_id ? f.user_id === userId : f.profile_id === profileId))
+    .filter((f) => f.profile_id === safeProfileId)
     .map((f) => f.listing_id);
 
   const now = new Date();

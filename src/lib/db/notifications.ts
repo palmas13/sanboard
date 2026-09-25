@@ -8,12 +8,12 @@ function ensureNotifications() {
 }
 
 /**
- * Get all notifications for a specific user, sorted newest first.
+ * Get all notifications for a specific character profile, sorted newest first.
  */
-export async function getUserNotifications(userId: string): Promise<Notification[]> {
+export async function getUserNotifications(profileId: string): Promise<Notification[]> {
   ensureNotifications();
   return db.notifications
-    .filter((n) => n.user_id === userId)
+    .filter((n) => n.recipient_profile_id === profileId)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .map((n) => ({
       ...n,
@@ -27,18 +27,20 @@ export async function getUserNotifications(userId: string): Promise<Notification
 }
 
 /**
- * Get count of unread notifications for a specific user.
+ * Get count of unread notifications for a specific character profile.
  */
-export async function getUnreadNotificationCount(userId: string): Promise<number> {
+export async function getUnreadNotificationCount(profileId: string): Promise<number> {
   ensureNotifications();
-  return db.notifications.filter((n) => n.user_id === userId && !n.read_at).length;
+  return db.notifications.filter(
+    (n) => n.recipient_profile_id === profileId && !n.read_at
+  ).length;
 }
 
 /**
- * Mark a single notification as read with ownership validation.
+ * Mark a single notification as read with character ownership validation.
  */
 export async function markNotificationAsRead(
-  userId: string,
+  profileId: string,
   notificationId: string
 ): Promise<{ success: boolean; notification?: Notification; error?: string }> {
   ensureNotifications();
@@ -48,7 +50,8 @@ export async function markNotificationAsRead(
     return { success: false, error: 'Bildirim bulunamadı.' };
   }
 
-  if (notif.user_id !== userId) {
+  const isOwner = notif.recipient_profile_id === profileId;
+  if (!isOwner) {
     return { success: false, error: 'Bu bildirimi güncelleme yetkiniz yok.' };
   }
 
@@ -72,15 +75,16 @@ export async function markNotificationAsRead(
 }
 
 /**
- * Mark all notifications as read for a specific user.
+ * Mark all notifications as read for a specific character profile.
  */
-export async function markAllNotificationsAsRead(userId: string): Promise<{ success: boolean; count: number }> {
+export async function markAllNotificationsAsRead(profileId: string): Promise<{ success: boolean; count: number }> {
   ensureNotifications();
   const now = new Date().toISOString();
   let updatedCount = 0;
 
   db.notifications.forEach((n) => {
-    if (n.user_id === userId && !n.read_at) {
+    const isOwner = n.recipient_profile_id === profileId;
+    if (isOwner && !n.read_at) {
       n.read_at = now;
       updatedCount++;
     }
@@ -90,10 +94,11 @@ export async function markAllNotificationsAsRead(userId: string): Promise<{ succ
 }
 
 /**
- * Create a new notification.
+ * Create a new notification (strictly character-scoped).
  */
 export async function createNotification(params: {
-  user_id: string;
+  recipient_profile_id?: string;
+  user_id?: string;
   type: NotificationType;
   title: string;
   message: string;
@@ -104,6 +109,7 @@ export async function createNotification(params: {
   ensureNotifications();
   const newNotif: Notification = {
     id: `notif-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    recipient_profile_id: params.recipient_profile_id,
     user_id: params.user_id,
     type: params.type,
     title: params.title,

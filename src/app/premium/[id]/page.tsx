@@ -1,5 +1,6 @@
 import React from 'react';
 import { notFound, redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { getDealerRepository, getListingRepository } from '@/lib/db/repositories';
 import { ListingCard } from '@/components/listings/ListingCard';
 import { CorporateStoreFollow } from '@/components/dealers/CorporateStoreFollow';
@@ -19,6 +20,8 @@ import {
 import { formatDate } from '@/lib/utils/format';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { isUuid } from '@/lib/db/id-mapper';
+import { normalizeSocialMedia } from '@/lib/dealers/social';
+import { verifySessionToken } from '@/lib/auth/session';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -76,6 +79,24 @@ export default async function PremiumStoreVitrinPage({ params }: PageProps) {
       followerCount = followersList.length;
     } catch {
       // Ignore
+    }
+  }
+
+  // Check initial follow state on server to eliminate F5 flicker (Sections 15-17)
+  const cookieStore = await cookies();
+  const sessionCookie = cookieStore.get('sanboard_session')?.value;
+  let activeProfileId = cookieStore.get('sanboard_profile_id')?.value;
+  if (sessionCookie) {
+    const verified = verifySessionToken(sessionCookie);
+    if (verified?.profileId) activeProfileId = verified.profileId;
+  }
+
+  let initialIsFollowing: boolean | null = null;
+  if (activeProfileId && dealer?.id && typeof (dealerRepo as any).isFollowing === 'function') {
+    try {
+      initialIsFollowing = await (dealerRepo as any).isFollowing(activeProfileId, dealer.id);
+    } catch {
+      initialIsFollowing = null;
     }
   }
 
@@ -160,11 +181,6 @@ export default async function PremiumStoreVitrinPage({ params }: PageProps) {
                   <Crown className="w-3.5 h-3.5 fill-current" />
                   <span>PREMIUM SATICI</span>
                 </span>
-                {dealer.public_id && (
-                  <span className="text-xs font-mono text-[var(--text-dim)] px-2 py-0.5 rounded bg-[var(--bg-surface-secondary)] border border-[var(--border-app)]">
-                    #{dealer.public_id}
-                  </span>
-                )}
               </div>
 
               {dealer.description && (
@@ -192,62 +208,40 @@ export default async function PremiumStoreVitrinPage({ params }: PageProps) {
                 </div>
               </div>
 
-              {/* Social Media Links (Corporate Profile Only) */}
-              {(social.facebrowser || social.twitter || social.instagram || social.website || social.discord) && (
-                <div className="flex items-center gap-2 pt-1 flex-wrap">
-                  <span className="text-[11px] font-bold text-[var(--text-dim)] flex items-center gap-1">
-                    <Share2 className="w-3 h-3 text-[#FF8A1F]" />
-                    <span>Sosyal:</span>
-                  </span>
-                  {social.facebrowser && (
-                    <a
-                      href={social.facebrowser}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-2 py-0.5 rounded-md bg-[var(--bg-surface-secondary)] hover:bg-[#FF8A1F]/20 text-[11px] text-[var(--text-main)] hover:text-[#FF8A1F] border border-[var(--border-app)] transition-colors"
-                    >
-                      Facebrowser
-                    </a>
-                  )}
-                  {social.twitter && (
-                    <a
-                      href={social.twitter}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-2 py-0.5 rounded-md bg-[var(--bg-surface-secondary)] hover:bg-[#FF8A1F]/20 text-[11px] text-[var(--text-main)] hover:text-[#FF8A1F] border border-[var(--border-app)] transition-colors"
-                    >
-                      X (Twitter)
-                    </a>
-                  )}
-                  {social.instagram && (
-                    <a
-                      href={social.instagram}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-2 py-0.5 rounded-md bg-[var(--bg-surface-secondary)] hover:bg-[#FF8A1F]/20 text-[11px] text-[var(--text-main)] hover:text-[#FF8A1F] border border-[var(--border-app)] transition-colors"
-                    >
-                      Instagram
-                    </a>
-                  )}
-                  {social.website && (
-                    <a
-                      href={social.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-2 py-0.5 rounded-md bg-[var(--bg-surface-secondary)] hover:bg-[#FF8A1F]/20 text-[11px] text-[var(--text-main)] hover:text-[#FF8A1F] border border-[var(--border-app)] transition-colors flex items-center gap-1"
-                    >
-                      <Globe className="w-3 h-3" />
-                      Web
-                    </a>
-                  )}
-                </div>
-              )}
+              {/* Social Media Links (Sections 18-23: Up to 2 non-empty valid entries) */}
+              {(() => {
+                const links = normalizeSocialMedia(dealer.social_media);
+                if (links.length === 0) return null;
+                return (
+                  <div className="flex items-center gap-3 pt-1 flex-wrap">
+                    {links.map((link, idx) => (
+                      <div key={idx} className="flex items-center gap-1.5">
+                        <Share2 className="w-3 h-3 text-[#FF8A1F]" />
+                        <span className="text-[11px] font-bold text-[var(--text-dim)]">{link.name}:</span>
+                        <a
+                          href={link.url.startsWith('http') ? link.url : `https://${link.url}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-0.5 rounded-md bg-[var(--bg-surface-secondary)] hover:bg-[#FF8A1F]/20 text-[11px] font-semibold text-[var(--text-main)] hover:text-[#FF8A1F] border border-[var(--border-app)] transition-colors inline-flex items-center gap-1"
+                        >
+                          <span>{link.name}</span>
+                          <span className="text-[9px]">↗</span>
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
           {/* Quick Contact Info & Follow Actions */}
           <div className="flex flex-col sm:flex-row md:flex-col gap-3 w-full md:w-auto shrink-0">
-            <CorporateStoreFollow dealerId={dealer.id} initialFollowerCount={followerCount} />
+            <CorporateStoreFollow
+              dealerId={dealer.id}
+              initialFollowerCount={followerCount}
+              initialIsFollowing={initialIsFollowing}
+            />
 
             <div className="bg-[var(--bg-surface-secondary)] p-4 rounded-xl border border-[var(--border-app)] text-xs space-y-2">
               {dealer.phone && (

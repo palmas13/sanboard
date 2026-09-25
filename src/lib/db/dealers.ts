@@ -1,6 +1,8 @@
 import { db } from './store';
 import { DealerProfile, DealerStatus, Listing, CorporateApplication, CorporateProfile, CharacterProfile, CorporateFollower } from '@/types';
 import { getDealerRepository, getListingRepository, getNotificationRepository } from './repositories';
+import { normalizePhone } from '../utils/format';
+import { normalizeSocialMedia } from '../dealers/social';
 
 export function ensureDealers() {
   if (!db.dealers) {
@@ -187,6 +189,7 @@ export async function reviewApplication(
 
     if (targetUserId) {
       await getNotificationRepository().createNotification({
+        recipient_profile_id: app.applicant_profile_id,
         user_id: targetUserId,
         type: 'CORPORATE_APPLICATION_APPROVED',
         title: 'Kurumsal Profiliniz Onaylandı',
@@ -199,6 +202,7 @@ export async function reviewApplication(
     app.rejection_reason = rejectionReason || 'Fiziksel işletme bilgileri doğrulanamadı.';
     if (targetUserId) {
       await getNotificationRepository().createNotification({
+        recipient_profile_id: app.applicant_profile_id,
         user_id: targetUserId,
         type: 'CORPORATE_APPLICATION_REJECTED',
         title: 'Kurumsal Başvurunuz Reddedildi',
@@ -288,6 +292,14 @@ export async function toggleFollow(
   }
 
   ensureDealers();
+  const dealer = db.dealers.find((d) => d.id === corporateProfileId);
+  if (!dealer) throw new Error('Kurumsal mağaza bulunamadı.');
+
+  // Prevent self-follow (Section 16)
+  if (dealer.owner_profile_id === followerProfileId || dealer.profile_id === followerProfileId) {
+    throw new Error('Kendi mağazanızı takip edemezsiniz.');
+  }
+
   const idx = db.followers.findIndex(
     (f) => f.follower_profile_id === followerProfileId && f.corporate_profile_id === corporateProfileId
   );
@@ -304,6 +316,22 @@ export async function toggleFollow(
       created_at: new Date().toISOString(),
     });
     isFollowing = true;
+
+    // Notify corporate store owner character on NEW follow (Section 16)
+    const followerProfile = db.profiles.find((p) => p.id === followerProfileId);
+    const followerName = followerProfile?.full_name || 'Bir kullanıcı';
+    const ownerProfileId = dealer.owner_profile_id || dealer.profile_id;
+    if (ownerProfileId) {
+      await getNotificationRepository().createNotification({
+        recipient_profile_id: ownerProfileId,
+        user_id: db.profiles.find((p) => p.id === ownerProfileId)?.user_id,
+        type: 'NEW_FOLLOWER',
+        title: 'Yeni Takipçi',
+        message: `${followerName} mağazanızı takip etmeye başladı.`,
+        entity_type: 'application',
+        entity_id: corporateProfileId,
+      });
+    }
   }
 
   const count = db.followers.filter((f) => f.corporate_profile_id === corporateProfileId).length;
@@ -361,9 +389,11 @@ export async function updateDealerProfile(
   if (data.logo_url) dealer.logo_url = data.logo_url.trim();
   if (data.banner_url) dealer.banner_url = data.banner_url.trim();
   if (data.address) dealer.address = data.address.trim();
-  if (data.phone) dealer.phone = data.phone.trim();
+  if (data.phone !== undefined) dealer.phone = normalizePhone(data.phone);
   if (data.sanmail_email) dealer.sanmail_email = data.sanmail_email.trim();
-  if (data.social_media) dealer.social_media = data.social_media;
+  if (data.social_media !== undefined) {
+    dealer.social_media = normalizeSocialMedia(data.social_media);
+  }
   dealer.updated_at = new Date().toISOString();
 
   return { success: true, dealer };

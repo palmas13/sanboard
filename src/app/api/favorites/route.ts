@@ -10,12 +10,26 @@ export async function POST(req: NextRequest) {
 
     // Cryptographically verified session (rejects raw UUID spoofing)
     const session = await getServerSession(req);
-    const sessionUserId = session?.userId;
-
-    if (!sessionUserId) {
+    if (!session?.userId) {
       return NextResponse.json(
         { error: 'Yetkisiz erişim. Lütfen giriş yapın.' },
         { status: 401 }
+      );
+    }
+
+    let activeProfileId = session.profileId || req.cookies.get('sanboard_profile_id')?.value;
+
+    if (!activeProfileId) {
+      const { getUserRepository } = await import('@/lib/db/repositories');
+      const userRepo = getUserRepository();
+      const profs = await userRepo.getProfilesByUserId(session.userId);
+      activeProfileId = profs[0]?.id;
+    }
+
+    if (!activeProfileId) {
+      return NextResponse.json(
+        { error: 'Aktif bir karakter profili seçilmedi. Lütfen bir karakter seçin.' },
+        { status: 400 }
       );
     }
 
@@ -27,16 +41,18 @@ export async function POST(req: NextRequest) {
     }
 
     const repo = getListingRepository();
-    const result = await repo.toggleFavorite(listingId, sessionUserId);
+    const result = await repo.toggleFavorite(listingId, activeProfileId);
     return NextResponse.json({
       success: true,
       isFavorited: result.isFavorited,
       count: result.count,
     });
   } catch (error: any) {
+    const msg = error?.message || 'Bir hata oluştu.';
+    const isSelfAbuse = msg.includes('favorilere ekleyemezsiniz');
     return NextResponse.json(
-      { error: error?.message || 'Bir hata oluştu.' },
-      { status: 500 }
+      { error: msg },
+      { status: isSelfAbuse ? 400 : 500 }
     );
   }
 }
@@ -49,14 +65,14 @@ export async function GET(req: NextRequest) {
 
     // Cryptographically verified session
     const session = await getServerSession(req);
-    const sessionUserId = session?.userId;
+    const activeProfileId = session?.profileId;
 
     if (!listingId) {
       return NextResponse.json({ error: 'listingId parametresi zorunludur.' }, { status: 400 });
     }
 
     const repo = getListingRepository();
-    const { listing } = await repo.getListingById(listingId, session?.profileId, sessionUserId);
+    const { listing } = await repo.getListingById(listingId, activeProfileId);
 
     if (!listing) {
       return NextResponse.json({ error: 'İlan bulunamadı.' }, { status: 404 });
@@ -84,12 +100,25 @@ export async function DELETE(req: NextRequest) {
 
     // Cryptographically verified session
     const session = await getServerSession(req);
-    const sessionUserId = session?.userId;
-
-    if (!sessionUserId) {
+    if (!session?.userId) {
       return NextResponse.json(
         { error: 'Yetkisiz erişim. Lütfen giriş yapın.' },
         { status: 401 }
+      );
+    }
+
+    let activeProfileId = session.profileId || req.cookies.get('sanboard_profile_id')?.value;
+    if (!activeProfileId) {
+      const { getUserRepository } = await import('@/lib/db/repositories');
+      const userRepo = getUserRepository();
+      const profs = await userRepo.getProfilesByUserId(session.userId);
+      activeProfileId = profs[0]?.id;
+    }
+
+    if (!activeProfileId) {
+      return NextResponse.json(
+        { error: 'Aktif bir karakter profili bulunamadı.' },
+        { status: 400 }
       );
     }
 
@@ -101,7 +130,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     const repo = getListingRepository();
-    const result = await repo.removeFavorite(listingId, sessionUserId);
+    const result = await repo.removeFavorite(listingId, activeProfileId);
     return NextResponse.json({
       success: true,
       isFavorited: false,

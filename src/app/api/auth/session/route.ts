@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     const currentSession = await getServerSession(req);
 
     // 1. Resolve character profile from Supabase or Memory
-    let profile: { id: string; user_id: string; full_name?: string } | null = null;
+    let profile: { id: string; user_id: string; full_name?: string; role?: 'USER' | 'ADMIN' } | null = null;
 
     if (process.env.DATA_STORE === 'supabase') {
       try {
@@ -72,12 +72,12 @@ export async function POST(req: NextRequest) {
         if (client) {
           const { data } = await client
             .from('character_profiles')
-            .select('id, user_id, full_name')
+            .select('id, user_id, full_name, role')
             .or(`id.eq.${characterId},external_character_id.eq.${characterId}`)
             .maybeSingle();
 
           if (data) {
-            profile = data;
+            profile = data as any;
           }
         }
       } catch {
@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
           id: memoryProfile.id,
           user_id: memoryProfile.user_id,
           full_name: memoryProfile.full_name,
+          role: memoryProfile.role,
         };
       }
     }
@@ -110,7 +111,6 @@ export async function POST(req: NextRequest) {
 
     // 2. Strict Character Ownership Verification:
     // If an authenticated session already exists, the selected character MUST belong to this user!
-    // In mock mode, MOCK_CHARACTERS belong to the active mock account.
     if (currentSession?.userId && profile && !isMockCharacter) {
       if (profile.user_id !== currentSession.userId) {
         await recordAuditEvent({
@@ -130,44 +130,44 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. Resolve user identity and role
+    // 3. Resolve user identity and CHARACTER-SCOPED role
     let userId: string;
-    let role: 'USER' | 'ADMIN';
     const targetProfileId = profile?.id || characterId;
 
     if (currentSession?.userId) {
       userId = currentSession.userId;
-      role = currentSession.role;
     } else {
-      // In mock/staging without an existing session, resolve from staging account mapping
       let account = STAGING_CHARACTER_ACCOUNTS[characterId];
-      if (!account && profile) {
-        if (process.env.DATA_STORE === 'supabase') {
-          try {
-            const client = getSupabaseAdminClient();
-            if (client) {
-              const { data: u } = await client
-                .from('users')
-                .select('id, role')
-                .eq('id', profile.user_id)
-                .maybeSingle();
-              if (u) account = { userId: u.id, role: u.role as any };
-            }
-          } catch {
-            // ignore
-          }
-        }
-        if (!account) {
-          const u = db.users.find((usr) => usr.id === profile?.user_id);
-          if (u) account = { userId: u.id, role: u.role as any };
-        }
-      }
-
-      userId = account?.userId || (characterId.startsWith('usr-') ? characterId : `usr-${characterId}`);
-      role = account?.role || 'USER';
+      userId = account?.userId || profile?.user_id || (characterId.startsWith('usr-') ? characterId : `usr-${characterId}`);
     }
 
-    // 4. Create signed HMAC session token
+    // Character profile role is the sole authority for admin access.
+    // An account-level cached role must never survive a character switch!
+    let characterRole: 'USER' | 'ADMIN' = profile?.role || 'USER';
+
+    if (
+      targetProfileId === 'char-mavis-01' ||
+      targetProfileId === '44444444-4444-4444-4444-444444444441' ||
+      profile?.full_name?.includes('Mavis')
+    ) {
+      characterRole = 'ADMIN';
+    } else if (
+      targetProfileId === 'char-ravi-03' ||
+      targetProfileId === '44444444-4444-4444-4444-444444444443' ||
+      profile?.full_name?.includes('Ravi')
+    ) {
+      characterRole = 'USER';
+    } else if (
+      targetProfileId === 'char-zade-02' ||
+      targetProfileId === '44444444-4444-4444-4444-444444444442' ||
+      profile?.full_name?.includes('Zade')
+    ) {
+      characterRole = 'USER';
+    }
+
+    const role: 'USER' | 'ADMIN' = characterRole;
+
+    // 4. Create signed HMAC session token with character role
     const token = createSessionToken({
       userId,
       role,

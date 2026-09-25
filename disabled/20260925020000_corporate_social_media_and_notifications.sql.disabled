@@ -1,0 +1,58 @@
+﻿-- ============================================================================
+-- SANBOARD MIGRATION: Kurumsal Sosyal Medya ve Bildirim İzolasyonu
+-- File: 20260925020000_corporate_social_media_and_notifications.sql
+-- ============================================================================
+
+-- 1. CORPORATE SOCIAL MEDIA NORMALIZATION (Section 18-23)
+-- Ensure social_media column exists as JSONB and defaults to empty array '[]'::jsonb
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+          AND table_name = 'corporate_profiles' 
+          AND column_name = 'social_media'
+    ) THEN
+        ALTER TABLE public.corporate_profiles 
+        ADD COLUMN social_media JSONB NOT NULL DEFAULT '[]'::jsonb;
+    ELSE
+        -- Update default to empty array
+        ALTER TABLE public.corporate_profiles 
+        ALTER COLUMN social_media SET DEFAULT '[]'::jsonb;
+    END IF;
+END $$;
+
+-- Migrate any legacy single object {"name":"...", "url":"..."} or nulls to canonical array format
+UPDATE public.corporate_profiles
+SET social_media = jsonb_build_array(social_media)
+WHERE social_media IS NOT NULL 
+  AND jsonb_typeof(social_media) = 'object'
+  AND social_media ? 'name' 
+  AND social_media ? 'url';
+
+UPDATE public.corporate_profiles
+SET social_media = '[]'::jsonb
+WHERE social_media IS NULL 
+   OR jsonb_typeof(social_media) != 'array';
+
+-- 2. NOTIFICATIONS CHARACTER-LEVEL INTEGRITY (Section 1-4)
+-- Ensure recipient_profile_id column and indices are present
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+          AND table_name = 'notifications' 
+          AND column_name = 'recipient_profile_id'
+    ) THEN
+        ALTER TABLE public.notifications 
+        ADD COLUMN recipient_profile_id UUID REFERENCES public.character_profiles(id) ON DELETE CASCADE;
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient_profile_read 
+ON public.notifications(recipient_profile_id, is_read, created_at DESC);
+
+-- 3. CORPORATE FOLLOWERS INDEXING (Section 15, 38)
+CREATE INDEX IF NOT EXISTS idx_corporate_followers_store_follower
+ON public.corporate_followers(corporate_profile_id, follower_profile_id);

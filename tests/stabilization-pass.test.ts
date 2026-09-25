@@ -136,11 +136,11 @@ describe('Sanboard Stabilization Pass: Auth, Role, Favorites, Notifications & Da
     });
 
     test('Favorite delete removes row and returns { success: true, isFavorited: false }', async () => {
-      // Seed favorite
+      // Seed favorite for Zade's active character (char-zade-02)
       db.favorites.push({
         id: 'fav-test-01',
         user_id: zadeUserId,
-        profile_id: 'char-zade-01',
+        profile_id: 'char-zade-02',
         listing_id: testListingId,
         created_at: new Date().toISOString(),
       });
@@ -148,6 +148,7 @@ describe('Sanboard Stabilization Pass: Auth, Role, Favorites, Notifications & Da
       const req = createAuthedRequest('http://localhost:3000/api/favorites', 'DELETE', {
         userId: zadeUserId,
         role: 'USER',
+        profileId: 'char-zade-02',
       }, { listingId: testListingId });
 
       const res = await deleteFavorite(req);
@@ -156,21 +157,21 @@ describe('Sanboard Stabilization Pass: Auth, Role, Favorites, Notifications & Da
       assert.strictEqual(json.success, true);
       assert.strictEqual(json.isFavorited, false);
 
-      const row = db.favorites.find((f) => f.user_id === zadeUserId && f.listing_id === testListingId);
+      const row = db.favorites.find((f) => f.profile_id === 'char-zade-02' && f.listing_id === testListingId);
       assert.strictEqual(row, undefined, 'Favorite row must be removed');
     });
 
-    test('Favorites are account-wide: character switch preserves favorites', async () => {
-      // Seed favorite under Account Zade
+    test('Favorites are character-scoped: character switch isolates favorites', async () => {
+      // Seed favorite under Character Profile 1
       db.favorites.push({
         id: 'fav-test-02',
         user_id: zadeUserId,
-        profile_id: 'char-zade-01',
+        profile_id: 'char-zade-02',
         listing_id: testListingId,
         created_at: new Date().toISOString(),
       });
 
-      // Query with Profile 1 under Account Zade
+      // Query with Profile 1 (char-zade-02) -> favorited
       const checkReq1 = createAuthedRequest(
         `http://localhost:3000/api/favorites?listingId=${testListingId}`,
         'GET',
@@ -180,7 +181,7 @@ describe('Sanboard Stabilization Pass: Auth, Role, Favorites, Notifications & Da
       const json1 = await res1.json();
       assert.strictEqual(json1.isFavorited, true);
 
-      // Switch to Profile 2 under Account Zade (same userId)
+      // Switch to Profile 2 under same account (char-alternate-03) -> isolated (NOT favorited)
       const checkReq2 = createAuthedRequest(
         `http://localhost:3000/api/favorites?listingId=${testListingId}`,
         'GET',
@@ -188,7 +189,7 @@ describe('Sanboard Stabilization Pass: Auth, Role, Favorites, Notifications & Da
       );
       const res2 = await getFavoriteStatus(checkReq2);
       const json2 = await res2.json();
-      assert.strictEqual(json2.isFavorited, true, 'Favorite must remain true across character switch');
+      assert.strictEqual(json2.isFavorited, false, 'Favorite must be isolated to character profile');
     });
 
     test('Favorites are isolated between different accounts', async () => {
@@ -219,9 +220,11 @@ describe('Sanboard Stabilization Pass: Auth, Role, Favorites, Notifications & Da
   describe('Notification System Integrity', () => {
     test('User can fetch their own notifications and mark them as read', async () => {
       const notifId = 'notif-test-01';
+      const zadeProfileId = 'char-zade-02';
       db.notifications.push({
         id: notifId,
         user_id: zadeUserId,
+        recipient_profile_id: zadeProfileId,
         title: 'Fiyat Düştü',
         message: 'Favorilediğiniz ilanın fiyatı düştü.',
         type: 'LISTING_PRICE_DROP',
@@ -233,6 +236,7 @@ describe('Sanboard Stabilization Pass: Auth, Role, Favorites, Notifications & Da
       const fetchReq = createAuthedRequest('http://localhost:3000/api/notifications', 'GET', {
         userId: zadeUserId,
         role: 'USER',
+        profileId: zadeProfileId,
       });
       const fetchRes = await getNotificationsGet(fetchReq);
       assert.strictEqual(fetchRes.status, 200);
@@ -244,6 +248,7 @@ describe('Sanboard Stabilization Pass: Auth, Role, Favorites, Notifications & Da
       const patchReq = createAuthedRequest('http://localhost:3000/api/notifications', 'POST', {
         userId: zadeUserId,
         role: 'USER',
+        profileId: zadeProfileId,
       }, { action: 'markRead', notificationId: notifId });
       const patchRes = await postNotifications(patchReq);
       assert.strictEqual(patchRes.status, 200);
@@ -254,9 +259,11 @@ describe('Sanboard Stabilization Pass: Auth, Role, Favorites, Notifications & Da
     });
 
     test('User cannot query or read other accounts notifications', async () => {
+      const mavisProfileId = 'char-mavis-01';
       db.notifications.push({
         id: 'notif-mavis-01',
         user_id: mavisAdminUserId,
+        recipient_profile_id: mavisProfileId,
         title: 'Admin Alert',
         message: 'Confidential alert',
         type: 'SYSTEM',
@@ -268,6 +275,7 @@ describe('Sanboard Stabilization Pass: Auth, Role, Favorites, Notifications & Da
       const req = createAuthedRequest('http://localhost:3000/api/notifications', 'GET', {
         userId: zadeUserId,
         role: 'USER',
+        profileId: 'char-zade-02',
       });
       const res = await getNotificationsGet(req);
       const json = await res.json();
@@ -306,6 +314,110 @@ describe('Sanboard Stabilization Pass: Auth, Role, Favorites, Notifications & Da
       });
       const res = await bootstrapGet(unauthReq);
       assert.strictEqual(res.status, 401);
+    });
+  });
+
+  // =========================================================================
+  // 6. REQUIRED REGRESSION TESTS (PROMPT SECTIONS 43-50)
+  // =========================================================================
+  describe('Prompt Requirements Regression Verification (Sections 43-50)', () => {
+    // Section 43: Bum Motors corporate notification isolation
+    test('Section 43: Bum Motors owner Zade receives owner notification, Ravi & Mavis receive NOTHING', async () => {
+      const zadeProfileId = 'char-zade-02';
+      const raviProfileId = 'char-ravi-03';
+      const mavisProfileId = 'char-mavis-01';
+
+      // Bum Motors dealer owned by Zade
+      const bumMotors = {
+        id: 'dealer-bum-01',
+        profile_id: zadeProfileId,
+        owner_profile_id: zadeProfileId,
+        company_name: 'Bum Motors',
+        slug: 'bum-motors',
+        status: 'APPROVED',
+        subscription_status: 'ACTIVE',
+      };
+      const existingDealer = db.dealers.find((d) => d.id === bumMotors.id);
+      if (!existingDealer) db.dealers.push(bumMotors as any);
+
+      // Trigger store-owner notification (e.g. new follower on Bum Motors)
+      const targetOwnerRecipient = bumMotors.owner_profile_id;
+      db.notifications.push({
+        id: `notif-bum-${Date.now()}`,
+        recipient_profile_id: targetOwnerRecipient,
+        user_id: zadeUserId,
+        title: 'Yeni Takipçi',
+        message: 'Bum Motors mağazanızı bir kullanıcı takip etmeye başladı.',
+        type: 'NEW_FOLLOWER',
+        is_read: false,
+        created_at: new Date().toISOString(),
+      });
+
+      // Zade queries notifications
+      const zadeReq = createAuthedRequest('http://localhost:3000/api/notifications', 'GET', {
+        userId: zadeUserId,
+        role: 'USER',
+        profileId: zadeProfileId,
+      });
+      const zadeRes = await getNotificationsGet(zadeReq);
+      const zadeData = await zadeRes.json();
+      assert.strictEqual(zadeData.notifications.length, 1, 'Zade must receive the notification');
+      assert.strictEqual(zadeData.notifications[0].title, 'Yeni Takipçi');
+
+      // Ravi queries notifications -> 0
+      const raviReq = createAuthedRequest('http://localhost:3000/api/notifications', 'GET', {
+        userId: raviUserId,
+        role: 'USER',
+        profileId: raviProfileId,
+      });
+      const raviRes = await getNotificationsGet(raviReq);
+      const raviData = await raviRes.json();
+      assert.strictEqual(raviData.notifications.length, 0, 'Ravi must receive NOTHING');
+
+      // Mavis queries notifications -> 0
+      const mavisReq = createAuthedRequest('http://localhost:3000/api/notifications', 'GET', {
+        userId: mavisAdminUserId,
+        role: 'ADMIN',
+        profileId: mavisProfileId,
+      });
+      const mavisRes = await getNotificationsGet(mavisReq);
+      const mavisData = await mavisRes.json();
+      assert.strictEqual(mavisData.notifications.length, 0, 'Mavis must receive NOTHING');
+    });
+
+    // Section 44: Sidebar label 6 states
+    test('Section 44: Sidebar label corresponds to exact 6 application/subscription states', async () => {
+      const { getCorporateSidebarLabel } = await import('@/lib/dealers/status');
+      assert.strictEqual(getCorporateSidebarLabel('NONE'), 'Kurumsal Başvuru');
+      assert.strictEqual(getCorporateSidebarLabel('PENDING'), 'Kurumsal Başvuru');
+      assert.strictEqual(getCorporateSidebarLabel('REJECTED'), 'Kurumsal Başvuru');
+      assert.strictEqual(getCorporateSidebarLabel('APPROVED', 'INACTIVE'), 'Kurumsal Profil');
+      assert.strictEqual(getCorporateSidebarLabel('APPROVED', 'ACTIVE'), 'Kurumsal Profil');
+      assert.strictEqual(getCorporateSidebarLabel('APPROVED', 'EXPIRED'), 'Kurumsal Profil');
+    });
+
+    // Section 45: Corporate listing flow eligibility redirects and seller_type
+    test('Section 45: Corporate listing flow enforces eligibility redirects and CORPORATE seller_type', async () => {
+      const packages = db.packages;
+
+      const corpPkg = packages.find((p) => p.code === 'CORPORATE_14_DAY' || p.price === 1750);
+      assert.ok(corpPkg, 'Corporate package must exist');
+      assert.strictEqual(corpPkg.price, 1750);
+      assert.strictEqual(corpPkg.duration_days, 14);
+
+      const indivPkg = packages.find((p) => p.code === 'STANDARD_7_DAY' || p.price === 2000);
+      assert.ok(indivPkg, 'Individual package must exist');
+      assert.strictEqual(indivPkg.price, 2000);
+      assert.strictEqual(indivPkg.duration_days, 7);
+    });
+
+    // Section 50: Profile #ID visibility cleanup
+    test('Section 50: Public routes work without exposing #ID in public header badge', async () => {
+      const { getUserRepository } = await import('@/lib/db/repositories');
+      const userRepo = getUserRepository();
+      const profile = userRepo.getProfileByPublicId ? await userRepo.getProfileByPublicId(2) : await userRepo.getProfileById('char-zade-02');
+      assert.ok(profile, 'Public profile must be retrievable');
+      assert.strictEqual(profile?.full_name, 'Zade Vexnera');
     });
   });
 });

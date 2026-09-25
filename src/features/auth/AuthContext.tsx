@@ -110,7 +110,7 @@ export function AuthProvider({
   const [characterProfiles, setCharacterProfiles] = useState<Record<string, CharacterProfile>>(
     initialProfile ? { [initialProfile.id]: initialProfile } : {}
   );
-  const [characters, setCharacters] = useState<GtaWorldCharacter[]>(MOCK_CHARACTERS);
+  const [characters, setCharacters] = useState<GtaWorldCharacter[]>([]);
 
   const saveState = useCallback(
     (newUser: User | null, newProfile: CharacterProfile | null) => {
@@ -123,6 +123,7 @@ export function AuthProvider({
         setCharacterProfiles((prev) => ({
           ...prev,
           [newProfile.id]: newProfile,
+          ...(newProfile.external_character_id ? { [newProfile.external_character_id]: newProfile } : {}),
         }));
 
         // Synchronize cryptographically signed server session
@@ -165,6 +166,7 @@ export function AuthProvider({
           setCharacterProfiles((prev) => ({
             ...prev,
             [updated.id]: updated,
+            ...(updated.external_character_id ? { [updated.external_character_id]: updated } : {}),
           }));
         }
       }
@@ -195,8 +197,16 @@ export function AuthProvider({
           const charRes = await fetch('/api/user/characters');
           if (charRes.ok && isMounted) {
             const charData = await charRes.json();
-            if (charData?.success && Array.isArray(charData.characters) && charData.characters.length > 0) {
+            if (charData?.success && Array.isArray(charData.characters)) {
               setCharacters(charData.characters);
+            }
+            if (charData?.success && Array.isArray(charData.profiles)) {
+              const profMap: Record<string, CharacterProfile> = {};
+              for (const p of charData.profiles as CharacterProfile[]) {
+                if (p.id) profMap[p.id] = p;
+                if (p.external_character_id) profMap[p.external_character_id] = p;
+              }
+              setCharacterProfiles((prev) => ({ ...prev, ...profMap }));
             }
           }
         } catch {
@@ -226,7 +236,11 @@ export function AuthProvider({
 
             setUser(linkedUser);
             setCurrentProfile(profile);
-            setCharacterProfiles((prev) => ({ ...prev, [profile.id]: profile }));
+            setCharacterProfiles((prev) => ({
+              ...prev,
+              [profile.id]: profile,
+              ...(profile.external_character_id ? { [profile.external_character_id]: profile } : {}),
+            }));
             setAuthStatus('authenticated');
 
             // Load authorized characters once in background
@@ -234,8 +248,16 @@ export function AuthProvider({
               const charRes = await fetch('/api/user/characters');
               if (charRes.ok && isMounted) {
                 const charData = await charRes.json();
-                if (charData?.success && Array.isArray(charData.characters) && charData.characters.length > 0) {
+                if (charData?.success && Array.isArray(charData.characters)) {
                   setCharacters(charData.characters);
+                }
+                if (charData?.success && Array.isArray(charData.profiles)) {
+                  const profMap: Record<string, CharacterProfile> = {};
+                  for (const p of charData.profiles as CharacterProfile[]) {
+                    if (p.id) profMap[p.id] = p;
+                    if (p.external_character_id) profMap[p.external_character_id] = p;
+                  }
+                  setCharacterProfiles((prev) => ({ ...prev, ...profMap }));
                 }
               }
             } catch {
@@ -250,8 +272,16 @@ export function AuthProvider({
           const charRes = await fetch('/api/user/characters');
           if (charRes.ok && isMounted) {
             const charData = await charRes.json();
-            if (charData?.success && Array.isArray(charData.characters) && charData.characters.length > 0) {
+            if (charData?.success && Array.isArray(charData.characters)) {
               setCharacters(charData.characters);
+            }
+            if (charData?.success && Array.isArray(charData.profiles)) {
+              const profMap: Record<string, CharacterProfile> = {};
+              for (const p of charData.profiles as CharacterProfile[]) {
+                if (p.id) profMap[p.id] = p;
+                if (p.external_character_id) profMap[p.external_character_id] = p;
+              }
+              setCharacterProfiles((prev) => ({ ...prev, ...profMap }));
             }
           }
         } catch {
@@ -343,6 +373,14 @@ export function AuthProvider({
         .then((r) => r.json())
         .then((d) => {
           if (d?.success && Array.isArray(d.characters)) setCharacters(d.characters);
+          if (d?.success && Array.isArray(d.profiles)) {
+            const profMap: Record<string, CharacterProfile> = {};
+            for (const p of d.profiles as CharacterProfile[]) {
+              if (p.id) profMap[p.id] = p;
+              if (p.external_character_id) profMap[p.external_character_id] = p;
+            }
+            setCharacterProfiles((prev) => ({ ...prev, ...profMap }));
+          }
         })
         .catch(() => {});
 
@@ -387,10 +425,18 @@ export function AuthProvider({
       const res = await fetch('/api/user/characters');
       if (res.ok) {
         const data = await res.json();
-        if (data?.success && Array.isArray(data.characters) && data.characters.length > 0) {
+        if (data?.success && Array.isArray(data.characters)) {
           setCharacters(data.characters);
-          return data.characters;
         }
+        if (data?.success && Array.isArray(data.profiles)) {
+          const profMap: Record<string, CharacterProfile> = {};
+          for (const p of data.profiles as CharacterProfile[]) {
+            if (p.id) profMap[p.id] = p;
+            if (p.external_character_id) profMap[p.external_character_id] = p;
+          }
+          setCharacterProfiles((prev) => ({ ...prev, ...profMap }));
+        }
+        return data.characters || null;
       }
     } catch {
       // Ignore background errors
@@ -411,7 +457,7 @@ export function AuthProvider({
         authStatus,
         isLoading,
         isAuthenticated,
-        isAdmin: user?.role === 'ADMIN',
+        isAdmin: currentProfile ? currentProfile.role === 'ADMIN' : user?.role === 'ADMIN',
         login,
         logout,
         selectCharacter,

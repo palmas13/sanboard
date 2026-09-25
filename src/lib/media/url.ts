@@ -77,6 +77,8 @@ export function extractObjectKey(pathOrUrl?: string | null): string | null {
   return null;
 }
 
+export const extractMediaKey = extractObjectKey;
+
 /**
  * Resolves a storage path or URL into a fully qualified image URL.
  * - If pathOrUrl is empty/null/undefined: returns empty string

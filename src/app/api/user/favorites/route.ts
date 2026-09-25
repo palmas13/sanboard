@@ -8,17 +8,17 @@ export async function GET(req: NextRequest) {
     // SERVER-SIDE ONLY: extract authenticated account user_id from verified session token
     // Reject plain unverified query params or raw cookies to prevent user spoofing
     const session = await getServerSession(req);
-    const sessionUserId = session?.userId;
+    const activeProfileId = session?.profileId;
 
-    if (!sessionUserId) {
+    if (!session?.userId || !activeProfileId) {
       return NextResponse.json(
-        { error: 'Yetkisiz erişim. Lütfen giriş yapın.' },
+        { error: 'Yetkisiz erişim. Lütfen giriş yapın ve bir karakter seçin.' },
         { status: 401 }
       );
     }
 
     const repo = getListingRepository();
-    const favorites = await repo.getUserFavorites(sessionUserId);
+    const favorites = await repo.getUserFavorites(activeProfileId);
     return NextResponse.json(favorites);
   } catch (error: any) {
     return NextResponse.json(

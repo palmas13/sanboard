@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test tests/business-rules.test.ts tests/integration-readiness.test.ts tests/favorite-security.test.ts tests/media-optimization.test.ts tests/gtaworld-oauth-and-isolation.test.ts tests/media-lifecycle-and-stabilization.test.ts tests/stabilization-pass.test.ts tests/corporate-individual-system.test.ts",
+    "test": "tsx --test tests/business-rules.test.ts tests/integration-readiness.test.ts tests/favorite-security.test.ts tests/media-optimization.test.ts tests/gtaworld-oauth-and-isolation.test.ts tests/media-lifecycle-and-stabilization.test.ts tests/stabilization-pass.test.ts tests/corporate-individual-system.test.ts tests/post-audit-correction.test.ts",
     "media:cleanup": "node --env-file=.env.local ./node_modules/tsx/dist/cli.mjs scripts/media-cleanup.ts"
   },
   "dependencies": {

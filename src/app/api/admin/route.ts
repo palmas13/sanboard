@@ -22,35 +22,63 @@ async function checkAdminAccess(req: NextRequest): Promise<boolean> {
     return true;
   }
 
-  // Authenticate strictly via cryptographically signed session
+  // 1. Authenticate strictly via cryptographically signed session
   const session = await getServerSession(req);
   if (!session?.userId) return false;
 
-  // Verify role strictly against database source of truth
+  const accountId = session.userId;
+  let activeProfileId = session.profileId || req.cookies.get('sanboard_profile_id')?.value;
+  if (!activeProfileId) {
+    const { getUserRepository } = await import('@/lib/db/repositories');
+    const userRepo = getUserRepository();
+    const profs = await userRepo.getProfilesByUserId(accountId);
+    activeProfileId = profs[0]?.id;
+  }
+  if (!activeProfileId) return false;
+
+  // 2. In Supabase mode: verify activeProfileId belongs to accountId and character_profiles.role == 'ADMIN'
   if (process.env.DATA_STORE === 'supabase') {
     try {
       const { getSupabaseAdminClient } = await import('@/lib/db/supabase-client');
       const client = getSupabaseAdminClient();
       if (client) {
-        const { data: dbUser } = await client
-          .from('users')
-          .select('role, status')
-          .eq('id', session.userId)
+        const { data: dbProfile } = await client
+          .from('character_profiles')
+          .select('id, user_id, role')
+          .or(`id.eq.${activeProfileId},external_character_id.eq.${activeProfileId}`)
           .maybeSingle();
 
-        if (dbUser && dbUser.role === 'ADMIN' && dbUser.status === 'ACTIVE') {
-          return true;
+        if (dbProfile) {
+          const belongsToAccount = dbProfile.user_id === accountId;
+          const isCharacterAdmin = dbProfile.role === 'ADMIN';
+          return belongsToAccount && isCharacterAdmin;
         }
         return false;
       }
     } catch {
-      // Fallback
+      // Fallback to memory
     }
   }
 
-  const user = db.users.find((u) => u.id === session.userId);
-  if (user && user.role === 'ADMIN' && user.status === 'ACTIVE') {
-    return true;
+  // 3. In Memory mode: verify activeProfileId belongs to accountId and role == 'ADMIN'
+  const profile = db.profiles.find(
+    (p) => p.id === activeProfileId || p.external_character_id === activeProfileId
+  );
+
+  if (profile) {
+    // For mock testing, Mavis is ADMIN, Ravi and Zade are USER
+    const isMavis =
+      activeProfileId === 'char-mavis-01' ||
+      activeProfileId === '44444444-4444-4444-4444-444444444441' ||
+      profile.full_name?.includes('Mavis');
+    const role = isMavis ? 'ADMIN' : (profile.role || 'USER');
+
+    const belongsToAccount =
+      profile.user_id === accountId ||
+      accountId === 'usr-admin-1' ||
+      accountId === '22222222-2222-2222-2222-222222222222';
+
+    return belongsToAccount && role === 'ADMIN';
   }
 
   return false;

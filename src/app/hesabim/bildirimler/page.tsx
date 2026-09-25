@@ -20,7 +20,7 @@ import { formatDateTime } from '@/lib/utils/format';
 
 export default function HesabimBildirimlerPage() {
   const router = useRouter();
-  const { user, isAuthenticated } = useAuth();
+  const { user, currentProfile, isAuthenticated } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'ALL' | 'UNREAD'>('ALL');
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -29,7 +29,7 @@ export default function HesabimBildirimlerPage() {
   const [actionLoading, setActionLoading] = useState(false);
 
   const fetchNotifications = async () => {
-    if (!user) return;
+    if (!currentProfile?.id) return;
     setLoading(true);
     try {
       const res = await fetch('/api/notifications');
@@ -45,10 +45,14 @@ export default function HesabimBildirimlerPage() {
   };
 
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (isAuthenticated && currentProfile?.id) {
       fetchNotifications();
+    } else {
+      setNotifications([]);
+      setUnreadCount(0);
+      setLoading(false);
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, currentProfile?.id]);
 
   const handleMarkAsRead = async (notifId: string) => {
     if (!user) return;

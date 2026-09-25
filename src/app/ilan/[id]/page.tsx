@@ -187,20 +187,13 @@ export default async function ListingDetailPage({ params }: PageProps) {
 
           {/* Social Proof Favorite Counter & İlan Açıklaması Kartı */}
           <div className="surface-card p-4 sm:p-5 rounded-2xl border border-[var(--border-app)] space-y-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-                <Heart className="w-4 h-4 text-[#FF8A1F] fill-[#FF8A1F]/20 shrink-0" />
-                <span>
-                  <strong className="text-[var(--text-main)]">{listing.favorite_count} kişi</strong> bu ilanı favori listesine ekledi.
-                </span>
-              </div>
-              <FavoriteButton
-                listingId={listing.id}
-                initialCount={listing.favorite_count}
-                initialIsFavorited={(listing as MemberListingDetail).is_favorited}
-                showCount={false}
-              />
-            </div>
+            <FavoriteButton
+              listingId={listing.id}
+              initialCount={listing.favorite_count}
+              initialIsFavorited={(listing as MemberListingDetail).is_favorited}
+              proofText={true}
+              showCount={false}
+            />
 
             {!isLocked && (
               <>
