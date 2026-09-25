@@ -27,7 +27,11 @@ export function isSanboardMediaUrl(pathOrUrl?: string | null): boolean {
   if (trimmed.startsWith('data:') || trimmed.includes('images.unsplash.com')) {
     return false;
   }
-  if (trimmed.includes('r2.dev') || trimmed.includes('workers.dev') || trimmed.includes('sanboard.xyz')) {
+  if (
+    trimmed.includes('r2.dev') ||
+    trimmed.includes('sanboard-media.esin18457.workers.dev') ||
+    trimmed.includes('cdn.sanboard.xyz')
+  ) {
     return true;
   }
   return (
@@ -90,6 +94,7 @@ export const extractMediaKey = extractObjectKey;
  */
 export function resolveMediaUrl(pathOrUrl?: string | null): string {
   if (!pathOrUrl || typeof pathOrUrl !== 'string') return '';
+
   const trimmed = pathOrUrl.trim();
   if (!trimmed) return '';
 
@@ -97,21 +102,39 @@ export function resolveMediaUrl(pathOrUrl?: string | null): string {
     return trimmed;
   }
 
-  // Rewrite legacy r2.dev URLs to active Worker domain
-  if (trimmed.includes('r2.dev')) {
+  const domain = getR2PublicDomain();
+
+  // Eski Sanboard R2 / Worker URL'lerini canonical CDN domainine çevir.
+  if (
+    trimmed.includes('r2.dev') ||
+    trimmed.includes('sanboard-media.esin18457.workers.dev')
+  ) {
     const key = extractObjectKey(trimmed);
+
     if (key) {
-      return `${getR2PublicDomain()}/${key}`;
+      return `${domain}/${key}`;
     }
   }
 
-  // If already a full HTTP(S) URL
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+  // Zaten yeni CDN domainindeyse aynen bırak.
+  if (
+    trimmed.startsWith(`${domain}/`) ||
+    trimmed === domain
+  ) {
     return trimmed;
   }
 
+  // Sanboard dışındaki external URL'leri koru.
+  if (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://')
+  ) {
+    return trimmed;
+  }
+
+  // R2 object path
   const cleanPath = trimmed.replace(/^\/+/, '');
-  const domain = getR2PublicDomain();
+
   return `${domain}/${cleanPath}`;
 }
 
