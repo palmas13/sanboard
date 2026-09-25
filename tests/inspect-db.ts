@@ -41,7 +41,7 @@ async function main() {
   console.log('--- TESTING WORKER AVATAR FETCH ---');
   for (const p of (profiles || [])) {
     if (p.avatar_path) {
-      const fullUrl = p.avatar_path.startsWith('http') ? p.avatar_path : `https://sanboard-media.esin18457.workers.dev/${p.avatar_path}`;
+      const fullUrl = p.avatar_path.startsWith('http') ? p.avatar_path : `https://cdn.sanboard.xyz/${p.avatar_path}`;
       try {
         const res = await fetch(fullUrl);
         console.log(`Fetch ${p.name || p.full_name}:`, fullUrl, '-> Status:', res.status, res.statusText, 'Type:', res.headers.get('content-type'));

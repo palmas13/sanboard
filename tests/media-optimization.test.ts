@@ -157,7 +157,7 @@ describe('Media URL Resolution & Backward Compatibility', () => {
     const existingR2Url = 'https://pub-454798ec1d264d749a7f16dac2c48498.r2.dev/avatars/old.jpg';
     assert.strictEqual(
       resolveMediaUrl(existingR2Url),
-      'https://sanboard-media.esin18457.workers.dev/avatars/old.jpg'
+      'https://cdn.sanboard.xyz/avatars/old.jpg'
     );
   });
 

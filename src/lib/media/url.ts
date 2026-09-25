@@ -2,7 +2,7 @@
  * Public domain for Cloudflare R2 bucket via Cloudflare Worker media delivery.
  * Prefers NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_DOMAIN or CLOUDFLARE_R2_PUBLIC_DOMAIN.
  */
-const DEFAULT_R2_PUBLIC_DOMAIN = 'https://sanboard-media.esin18457.workers.dev';
+const DEFAULT_R2_PUBLIC_DOMAIN = "https://cdn.sanboard.xyz";
 
 export function getR2PublicDomain(): string {
   const domain =

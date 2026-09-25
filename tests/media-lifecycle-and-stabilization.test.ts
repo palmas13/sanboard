@@ -12,20 +12,20 @@ describe('Media Resolution & URL Normalization', () => {
   it('should resolve canonical object keys to Worker URL without r2.dev', () => {
     const key = 'avatars/44444444-4444-4444-4444-444444444441/uuid.webp';
     const resolved = resolveMediaUrl(key);
-    assert.ok(resolved?.startsWith('https://sanboard-media.esin18457.workers.dev/avatars/'));
+    assert.ok(resolved?.startsWith('https://cdn.sanboard.xyz/avatars/'));
     assert.strictEqual(resolved?.includes('r2.dev'), false);
   });
 
   it('should resolve leading slash keys without double slash or error', () => {
     const key = '/avatars/test/uuid.webp';
     const resolved = resolveMediaUrl(key);
-    assert.strictEqual(resolved, 'https://sanboard-media.esin18457.workers.dev/avatars/test/uuid.webp');
+    assert.strictEqual(resolved, 'https://cdn.sanboard.xyz/avatars/test/uuid.webp');
   });
 
   it('should rewrite legacy r2.dev URLs to Worker domain safely', () => {
     const legacy = 'https://pub-abc.r2.dev/avatars/123/pic.webp';
     const resolved = resolveMediaUrl(legacy);
-    assert.strictEqual(resolved, 'https://sanboard-media.esin18457.workers.dev/avatars/123/pic.webp');
+    assert.strictEqual(resolved, 'https://cdn.sanboard.xyz/avatars/123/pic.webp');
   });
 
   it('should return empty string for null or empty paths', () => {
@@ -40,7 +40,7 @@ describe('Media Resolution & URL Normalization', () => {
   });
 
   it('should correctly extract canonical object key from Worker URL', () => {
-    const workerUrl = 'https://sanboard-media.esin18457.workers.dev/avatars/user-1/abc.webp';
+    const workerUrl = 'https://cdn.sanboard.xyz/avatars/user-1/abc.webp';
     const extracted = extractObjectKey(workerUrl);
     assert.strictEqual(extracted, 'avatars/user-1/abc.webp');
   });
