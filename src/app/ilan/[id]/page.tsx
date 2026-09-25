@@ -13,6 +13,7 @@ import {
 import { getListingRepository } from '@/lib/db/repositories';
 import { getServerSession } from '@/lib/auth/session';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { resolveMediaUrl } from '@/lib/media/url';
 import { ListingGallery } from '@/components/listings/ListingGallery';
 import { SellerCard } from '@/components/listings/SellerCard';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
@@ -56,9 +57,8 @@ function VehicleSpecItem({
 }) {
   return (
     <div
-      className={`flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--bg-surface-secondary)]/60 border border-[var(--border-app)]/50 gap-2 min-h-[38px] ${
-        span2 ? 'sm:col-span-2' : ''
-      }`}
+      className={`flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--bg-surface-secondary)]/60 border border-[var(--border-app)]/50 gap-2 min-h-[38px] ${span2 ? 'sm:col-span-2' : ''
+        }`}
     >
       <span className="text-[var(--text-muted)] text-xs truncate">{label}</span>
       {badge ? (
@@ -67,9 +67,8 @@ function VehicleSpecItem({
         </span>
       ) : (
         <span
-          className={`font-semibold text-right truncate shrink-0 ${
-            highlight ? 'text-[#FF8A1F] font-bold' : 'text-[var(--text-main)]'
-          }`}
+          className={`font-semibold text-right truncate shrink-0 ${highlight ? 'text-[#FF8A1F] font-bold' : 'text-[var(--text-main)]'
+            }`}
         >
           {value}
         </span>
@@ -180,7 +179,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
         {/* LEFT COLUMN: Gallery & Favori/Açıklama Kartı */}
         <div className="space-y-4">
           <ListingGallery
-            images={(listing as MemberListingDetail).images || []}
+            images={((listing as MemberListingDetail).images || []).map(resolveMediaUrl)}
             title={listing.title}
             isLocked={isLocked}
           />
@@ -282,26 +281,24 @@ export default async function ListingDetailPage({ params }: PageProps) {
                               <div className="flex items-center justify-between text-xs">
                                 <span className="text-[var(--text-muted)]">Motor Sağlığı</span>
                                 <span
-                                  className={`font-bold ${
-                                    vd.engine_health >= 70
+                                  className={`font-bold ${vd.engine_health >= 70
                                       ? 'text-emerald-400'
                                       : vd.engine_health >= 40
-                                      ? 'text-amber-400'
-                                      : 'text-red-400'
-                                  }`}
+                                        ? 'text-amber-400'
+                                        : 'text-red-400'
+                                    }`}
                                 >
                                   %{vd.engine_health}
                                 </span>
                               </div>
                               <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden border border-white/5">
                                 <div
-                                  className={`h-full rounded-full transition-all ${
-                                    vd.engine_health >= 70
+                                  className={`h-full rounded-full transition-all ${vd.engine_health >= 70
                                       ? 'bg-emerald-500'
                                       : vd.engine_health >= 40
-                                      ? 'bg-amber-500'
-                                      : 'bg-red-500'
-                                  }`}
+                                        ? 'bg-amber-500'
+                                        : 'bg-red-500'
+                                    }`}
                                   style={{ width: `${Math.min(100, Math.max(0, vd.engine_health))}%` }}
                                 />
                               </div>
