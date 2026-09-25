@@ -181,3 +181,7 @@ export async function resolveCorporateEligibility(profileId: string): Promise<Co
     message: 'Kurumsal ilan yayınlamak için uygunsunuz.',
   };
 }
+
+export { resolveCorporateHeaderActions, type CorporateHeaderActions } from './status';
+
+

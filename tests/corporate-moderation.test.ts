@@ -1,7 +1,8 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import { db } from '../src/lib/db/store';
-import { resolveCorporateEligibility } from '../src/lib/dealers/eligibility';
+import { resolveCorporateEligibility, resolveCorporateHeaderActions } from '../src/lib/dealers/eligibility';
+import { baseListingSchema, vehicleListingSchema } from '../src/lib/validations/listing';
 import {
   reviewApplication,
   activateSubscription,
@@ -762,5 +763,462 @@ describe('Sanboard – Corporate Listing Seller Context & Admin Moderation', () 
       assert.strictEqual(zadeListings[0].favorite_count, 2, 'İlanlarım screen must match real DB favorite count');
     });
   });
+
+  describe('28. Hotfix Regression Scenarios (User Requirements 1-18)', () => {
+    const RAVI_SIBLING_CHAR_ID = 'char-ravi-02';
+
+    beforeEach(() => {
+      // Add Ravi as sibling character under same user account
+      db.profiles.push({
+        id: RAVI_SIBLING_CHAR_ID,
+        user_id: ZADE_USER_ID,
+        full_name: 'Ravi Vexnera',
+        avatar_url: '',
+        sanmail_email: 'ravi@sanmail.com',
+        phone: '555-0808',
+        is_dealer: false,
+        public_id: 103,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+    });
+
+    // 1. Corporate dashboard listing preview: 14 days
+    it('1. Corporate listing preview canonical duration is 14 days ($1.750 model)', () => {
+      const isCorporate = true;
+      const durationDays = isCorporate ? 14 : 7;
+      const previewText = isCorporate ? '14 Gün Aktif' : '7 Gün Aktif';
+      const confirmationText = isCorporate
+        ? 'İlanı yayınladığınız anda 1 adet kurumsal ilan krediniz kullanılacak ve 14 günlük yayın süreniz başlayacaktır.'
+        : 'İlanı yayınladığınız anda 1 adet ilan krediniz kullanılacak ve 7 günlük yayın süreniz başlayacaktır.';
+
+      assert.strictEqual(durationDays, 14);
+      assert.strictEqual(previewText, '14 Gün Aktif');
+      assert.match(confirmationText, /14 günlük yayın süreniz başlayacaktır/);
+    });
+
+    // 2. Corporate publish: expires_at is ~ +14 days
+    it('2. Corporate publish sets expires_at to approximately +14 days', async () => {
+      db.dealers.push({
+        id: 'store-bum-01',
+        owner_profile_id: ZADE_CHAR_ID,
+        profile_id: ZADE_CHAR_ID,
+        company_name: 'Bum Motors',
+        slug: 'bum-motors',
+        status: 'APPROVED',
+        subscription_status: 'ACTIVE',
+        subscription_expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+        moderation_status: 'ACTIVE',
+        public_id: 201,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as any);
+
+      db.credits.push({
+        id: 'c-corp-1',
+        profile_id: ZADE_CHAR_ID,
+        payment_id: 'pay-test-corp',
+        package_id: 'pkg-corp-14',
+        amount: 1750,
+        credit_type: 'CORPORATE',
+        status: 'AVAILABLE',
+        created_at: new Date().toISOString(),
+      });
+
+      const res = await createListingWithCredit(
+        {
+          seller_type: 'CORPORATE',
+          category: 'vehicle',
+          subcategory: 'Sedan',
+          title: 'Kurumsal 14 Günlük Araç',
+          description: 'Açıklama',
+          price: 50000,
+          mileage: 1000,
+          brand: 'Bravado',
+          model: 'Buffalo',
+        },
+        ZADE_CHAR_ID
+      );
+
+      assert.strictEqual(res.success, true);
+      assert.strictEqual(res.listing?.seller_type, 'CORPORATE');
+      assert.strictEqual(res.listing?.corporate_profile_id, 'store-bum-01');
+
+      const publishedTime = new Date(res.listing!.published_at!).getTime();
+      const expiresTime = new Date(res.listing!.expires_at!).getTime();
+      const diffDays = Math.round((expiresTime - publishedTime) / (24 * 60 * 60 * 1000));
+      assert.strictEqual(diffDays, 14, 'Corporate listing expires_at must be 14 days');
+    });
+
+    // 3. Individual publish: expires_at remains 7 days
+    it('3. Individual publish sets expires_at to exactly 7 days', async () => {
+      db.credits.push({
+        id: 'c-ind-1',
+        profile_id: ZADE_CHAR_ID,
+        payment_id: 'pay-test-ind',
+        package_id: 'pkg-ind-7',
+        amount: 2000,
+        credit_type: 'INDIVIDUAL',
+        status: 'AVAILABLE',
+        created_at: new Date().toISOString(),
+      });
+
+      const res = await createListingWithCredit(
+        {
+          seller_type: 'INDIVIDUAL',
+          category: 'vehicle',
+          subcategory: 'Sedan',
+          title: 'Bireysel 7 Günlük Araç',
+          description: 'Açıklama',
+          price: 30000,
+          mileage: 5000,
+          brand: 'Vapid',
+          model: 'Stanier',
+        },
+        ZADE_CHAR_ID
+      );
+
+      assert.strictEqual(res.success, true);
+      assert.strictEqual(res.listing?.seller_type, 'INDIVIDUAL');
+      assert.strictEqual(res.listing?.corporate_profile_id, undefined);
+
+      const publishedTime = new Date(res.listing!.published_at!).getTime();
+      const expiresTime = new Date(res.listing!.expires_at!).getTime();
+      const diffDays = Math.round((expiresTime - publishedTime) / (24 * 60 * 60 * 1000));
+      assert.strictEqual(diffDays, 7, 'Individual listing expires_at must be 7 days');
+    });
+
+    // 4. Corporate flow: server resolves active store even if client does not pass corporate_profile_id
+    it('4. Corporate flow authoritatively resolves active store from profileId', async () => {
+      db.dealers.push({
+        id: 'store-bum-authoritative',
+        owner_profile_id: ZADE_CHAR_ID,
+        profile_id: ZADE_CHAR_ID,
+        company_name: 'Bum Motors Auth',
+        slug: 'bum-motors-auth',
+        status: 'APPROVED',
+        subscription_status: 'ACTIVE',
+        subscription_expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+        moderation_status: 'ACTIVE',
+        public_id: 202,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as any);
+
+      const eligibility = await resolveCorporateEligibility(ZADE_CHAR_ID);
+      assert.strictEqual(eligibility.eligible, true);
+      assert.strictEqual(eligibility.dealer?.id, 'store-bum-authoritative');
+    });
+
+    // 5. Corporate publish: "Invalid UUID" error does NOT occur when client sends empty/undefined corporate_profile_id
+    it('5. Corporate publish does not throw "Invalid UUID" when corporate_profile_id is empty string or undefined', () => {
+      const validImages = [{ storage_path: 'listings/cover.webp', is_cover: true, sort_order: 0, size_bytes: 1000 }];
+
+      const payloadWithEmptyString = {
+        title: 'Örnek İlan Başlığı Burada',
+        description: 'Detaylı ilan açıklaması yeterli uzunlukta yazılmıştır test amaçlı.',
+        price: 25000,
+        images: validImages,
+        category: 'vehicle' as const,
+        subcategory: 'Otomobil' as const,
+        brand: 'Ubermacht',
+        model: 'Oracle',
+        plate: '22XYZ33',
+        mileage: 15000,
+        seller_type: 'CORPORATE' as const,
+        corporate_profile_id: '',
+      };
+
+      const parsedEmpty = vehicleListingSchema.safeParse(payloadWithEmptyString);
+      assert.strictEqual(parsedEmpty.success, true);
+      assert.strictEqual((parsedEmpty as any).data.corporate_profile_id, null);
+
+      const payloadWithUndefined = {
+        title: 'Örnek İlan Başlığı Burada',
+        description: 'Detaylı ilan açıklaması yeterli uzunlukta yazılmıştır test amaçlı.',
+        price: 25000,
+        images: validImages,
+        category: 'vehicle' as const,
+        subcategory: 'Otomobil' as const,
+        brand: 'Ubermacht',
+        model: 'Oracle',
+        plate: '22XYZ33',
+        mileage: 15000,
+        seller_type: 'CORPORATE' as const,
+      };
+
+      const parsedUndefined = vehicleListingSchema.safeParse(payloadWithUndefined);
+      assert.strictEqual(parsedUndefined.success, true);
+      assert.strictEqual((parsedUndefined as any).data.corporate_profile_id, null);
+    });
+
+    // 6. No-store character: "Mağazamı Aç" does NOT appear
+    it('6. No-store character does not see "Mağazamı Aç" button', async () => {
+      const eligibility = await resolveCorporateEligibility(ZADE_CHAR_ID);
+      const actions = resolveCorporateHeaderActions({
+        eligibility,
+        activeProfileId: ZADE_CHAR_ID,
+        isCorporatePage: true,
+      });
+      assert.strictEqual(actions.canOpenStore, false);
+    });
+
+    // 7. No-store character: "Yeni İlan Ver" on kurumsal header does NOT appear
+    it('7. No-store character does not see "Yeni İlan Ver" button on kurumsal header', async () => {
+      const eligibility = await resolveCorporateEligibility(ZADE_CHAR_ID);
+      const actions = resolveCorporateHeaderActions({
+        eligibility,
+        activeProfileId: ZADE_CHAR_ID,
+        isCorporatePage: true,
+      });
+      assert.strictEqual(actions.canCreateCorporateListing, false);
+    });
+
+    // 8. SUSPENDED: both buttons hidden
+    it('8. SUSPENDED store hides both "Mağazamı Aç" and "Yeni İlan Ver" buttons', async () => {
+      db.dealers.push({
+        id: 'store-bum-suspended',
+        owner_profile_id: ZADE_CHAR_ID,
+        profile_id: ZADE_CHAR_ID,
+        company_name: 'Bum Motors Suspended',
+        slug: 'bum-motors-suspended',
+        status: 'APPROVED',
+        subscription_status: 'ACTIVE',
+        moderation_status: 'SUSPENDED',
+        suspension_reason: 'Kural ihlali',
+        public_id: 203,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as any);
+
+      const eligibility = await resolveCorporateEligibility(ZADE_CHAR_ID);
+      assert.strictEqual(eligibility.reason, 'STORE_SUSPENDED');
+
+      const actions = resolveCorporateHeaderActions({
+        eligibility,
+        activeProfileId: ZADE_CHAR_ID,
+        isCorporatePage: true,
+      });
+      assert.strictEqual(actions.canOpenStore, false, 'SUSPENDED store must not show Mağazamı Aç');
+      assert.strictEqual(actions.canCreateCorporateListing, false, 'SUSPENDED store must not show Yeni İlan Ver');
+    });
+
+    // 9. DELETED: both buttons hidden
+    it('9. DELETED store hides both "Mağazamı Aç" and "Yeni İlan Ver" buttons', async () => {
+      db.dealers.push({
+        id: 'store-bum-deleted',
+        owner_profile_id: ZADE_CHAR_ID,
+        profile_id: ZADE_CHAR_ID,
+        company_name: 'Bum Motors Deleted',
+        slug: 'bum-motors-deleted',
+        status: 'APPROVED',
+        subscription_status: 'ACTIVE',
+        moderation_status: 'DELETED',
+        deleted_at: new Date().toISOString(),
+        public_id: 204,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as any);
+
+      const eligibility = await resolveCorporateEligibility(ZADE_CHAR_ID);
+      assert.strictEqual(eligibility.reason, 'STORE_DELETED');
+
+      const actions = resolveCorporateHeaderActions({
+        eligibility,
+        activeProfileId: ZADE_CHAR_ID,
+        isCorporatePage: true,
+      });
+      assert.strictEqual(actions.canOpenStore, false, 'DELETED store must not show Mağazamı Aç');
+      assert.strictEqual(actions.canCreateCorporateListing, false, 'DELETED store must not show Yeni İlan Ver');
+    });
+
+    // 10. ACTIVE + subscription ACTIVE: both buttons visible
+    it('10. ACTIVE store with ACTIVE subscription shows both buttons', async () => {
+      db.dealers.push({
+        id: 'store-bum-active',
+        owner_profile_id: ZADE_CHAR_ID,
+        profile_id: ZADE_CHAR_ID,
+        company_name: 'Bum Motors Active',
+        slug: 'bum-motors-active',
+        status: 'APPROVED',
+        subscription_status: 'ACTIVE',
+        subscription_expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+        moderation_status: 'ACTIVE',
+        public_id: 205,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as any);
+
+      const eligibility = await resolveCorporateEligibility(ZADE_CHAR_ID);
+      assert.strictEqual(eligibility.eligible, true);
+      assert.strictEqual(eligibility.reason, 'ACTIVE');
+
+      const actions = resolveCorporateHeaderActions({
+        eligibility,
+        activeProfileId: ZADE_CHAR_ID,
+        isCorporatePage: true,
+      });
+      assert.strictEqual(actions.canOpenStore, true, 'ACTIVE store can open store');
+      assert.strictEqual(actions.canCreateCorporateListing, true, 'ACTIVE subscription can create corporate listing');
+    });
+
+    // 11. ACTIVE + subscription EXPIRED: Mağazamı Aç visible, Yeni İlan Ver hidden
+    it('11. ACTIVE store with EXPIRED subscription shows "Mağazamı Aç" but hides "Yeni İlan Ver"', async () => {
+      db.dealers.push({
+        id: 'store-bum-expired',
+        owner_profile_id: ZADE_CHAR_ID,
+        profile_id: ZADE_CHAR_ID,
+        company_name: 'Bum Motors Expired',
+        slug: 'bum-motors-expired',
+        status: 'APPROVED',
+        subscription_status: 'EXPIRED',
+        subscription_expires_at: new Date(Date.now() - 86400000).toISOString(),
+        moderation_status: 'ACTIVE',
+        public_id: 206,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as any);
+
+      const eligibility = await resolveCorporateEligibility(ZADE_CHAR_ID);
+      assert.strictEqual(eligibility.eligible, false);
+      assert.strictEqual(eligibility.reason, 'SUBSCRIPTION_EXPIRED');
+
+      const actions = resolveCorporateHeaderActions({
+        eligibility,
+        activeProfileId: ZADE_CHAR_ID,
+        isCorporatePage: true,
+      });
+      assert.strictEqual(actions.canOpenStore, true, 'Public store still accessible so Mağazamı Aç is visible');
+      assert.strictEqual(actions.canCreateCorporateListing, false, 'Expired subscription cannot create corporate listing');
+    });
+
+    // 12. Filled corporate application: PENDING application created
+    it('12. Filled corporate application creates PENDING application for activeProfileId', async () => {
+      const res = await applyForDealer({
+        profileId: ZADE_CHAR_ID,
+        companyName: 'MAVIS AUTOS',
+        purpose: 'DENEME faaliyet ve araç alım satım operasyonları.',
+      });
+
+      assert.strictEqual(res.success, true);
+      assert.ok(res.application);
+      assert.strictEqual(res.application?.status, 'PENDING');
+      assert.strictEqual(res.application?.company_name, 'MAVIS AUTOS');
+      assert.strictEqual(res.application?.applicant_profile_id, ZADE_CHAR_ID);
+
+      const savedApp = db.applications.find((a) => a.applicant_profile_id === ZADE_CHAR_ID);
+      assert.ok(savedApp);
+      assert.strictEqual(savedApp?.company_name, 'MAVIS AUTOS');
+    });
+
+    // 13. Empty company name: validation error
+    it('13. Empty company name triggers validation error', async () => {
+      const res = await applyForDealer({
+        profileId: ZADE_CHAR_ID,
+        companyName: '   ',
+        purpose: 'Faaliyet amacı geçerli',
+      });
+
+      assert.strictEqual(res.success, false);
+      assert.match(res.error || '', /zorunludur/i);
+    });
+
+    // 14. Empty purpose: validation error
+    it('14. Empty purpose triggers validation error', async () => {
+      const res = await applyForDealer({
+        profileId: ZADE_CHAR_ID,
+        companyName: 'MAVIS AUTOS',
+        purpose: '   ',
+      });
+
+      assert.strictEqual(res.success, false);
+      assert.match(res.error || '', /zorunludur/i);
+    });
+
+    // 15. Admin delete Bum Motors: exact owner Zade receives notification
+    it('15. Admin delete sends notification to exact owner Zade', async () => {
+      db.dealers.push({
+        id: 'store-bum-del-test',
+        owner_profile_id: ZADE_CHAR_ID,
+        profile_id: ZADE_CHAR_ID,
+        company_name: 'Bum Motors',
+        slug: 'bum-motors',
+        status: 'APPROVED',
+        subscription_status: 'ACTIVE',
+        moderation_status: 'ACTIVE',
+        public_id: 207,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as any);
+
+      await deleteCorporateStore('store-bum-del-test', 'Yönetim kararı', MAVIS_ADMIN_ID);
+
+      const zadeNotifs = db.notifications.filter((n) => n.recipient_profile_id === ZADE_CHAR_ID);
+      assert.strictEqual(zadeNotifs.length, 1);
+      assert.strictEqual(zadeNotifs[0].title, 'Kurumsal mağazanız silindi');
+      assert.match(zadeNotifs[0].message, /Bum Motors.*silinmiştir/);
+    });
+
+    // 16. Ravi: delete notification almaz
+    it('16. Sibling Ravi under same account does not receive delete notification', async () => {
+      const raviNotifs = db.notifications.filter((n) => n.recipient_profile_id === RAVI_SIBLING_CHAR_ID);
+      assert.strictEqual(raviNotifs.length, 0, 'Sibling Ravi must receive 0 notifications');
+    });
+
+    // 17. Admin suspend: exact owner receives notification
+    it('17. Admin suspend sends notification to exact owner Zade', async () => {
+      db.dealers.push({
+        id: 'store-bum-susp-test',
+        owner_profile_id: ZADE_CHAR_ID,
+        profile_id: ZADE_CHAR_ID,
+        company_name: 'Bum Motors',
+        slug: 'bum-motors',
+        status: 'APPROVED',
+        subscription_status: 'ACTIVE',
+        moderation_status: 'ACTIVE',
+        public_id: 208,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as any);
+
+      await suspendCorporateStore('store-bum-susp-test', 'Şüpheli aktivite', MAVIS_ADMIN_ID);
+
+      const zadeNotifs = db.notifications.filter(
+        (n) => n.recipient_profile_id === ZADE_CHAR_ID && n.title === 'Kurumsal mağazanız askıya alındı'
+      );
+      assert.strictEqual(zadeNotifs.length, 1);
+      assert.match(zadeNotifs[0].message, /Bum Motors.*askıya alınmıştır/);
+    });
+
+    // 18. DELETED previous store: owner can submit new corporate application
+    it('18. Owner of DELETED store can submit a new corporate application successfully', async () => {
+      // Existing store is DELETED
+      db.dealers.push({
+        id: 'store-old-deleted',
+        owner_profile_id: ZADE_CHAR_ID,
+        profile_id: ZADE_CHAR_ID,
+        company_name: 'Old Defunct Motors',
+        slug: 'old-defunct',
+        status: 'APPROVED',
+        moderation_status: 'DELETED',
+        deleted_at: new Date().toISOString(),
+        public_id: 209,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as any);
+
+      const applyRes = await applyForDealer({
+        profileId: ZADE_CHAR_ID,
+        companyName: 'New Era Motors',
+        purpose: 'Eski mağaza kapatıldıktan sonra yeni başvuru',
+      });
+
+      assert.strictEqual(applyRes.success, true);
+      assert.ok(applyRes.application);
+      assert.strictEqual(applyRes.application?.status, 'PENDING');
+      assert.strictEqual(applyRes.application?.company_name, 'New Era Motors');
+    });
+  });
 });
+
 

@@ -31,7 +31,7 @@ export class SupabaseDealerRepository implements IDealerRepository {
   }
 
   async getDealerById(id: string): Promise<CorporateProfile | null> {
-    const client = this.getClient();
+    const client = this.getAdminClient();
     const { data, error } = await client.from('corporate_profiles').select('*').eq('id', id).maybeSingle();
     if (error) {
       throw new Error(`Supabase error fetching corporate profile: ${error.message}`);
@@ -101,6 +101,14 @@ export class SupabaseDealerRepository implements IDealerRepository {
   }
 
   async createApplication(params: { profileId: string; companyName: string; purpose: string }): Promise<{ success: boolean; application?: CorporateApplication; error?: string }> {
+    if (!params.profileId) {
+      return { success: false, error: 'Karakter profili zorunludur.' };
+    }
+
+    if (!params.companyName || !params.companyName.trim() || !params.purpose || !params.purpose.trim()) {
+      return { success: false, error: 'Şirket adı ve başvuru amacı alanları zorunludur.' };
+    }
+
     const client = this.getAdminClient();
 
     // 1. Check if user has an active or suspended store (Requirement 2 B)
@@ -597,17 +605,21 @@ export class SupabaseDealerRepository implements IDealerRepository {
     // Character-scoped notification to corporate store owner (Section 18)
     const ownerId = dealer.owner_profile_id || dealer.profile_id;
     if (ownerId) {
-      const { getNotificationRepository } = await import('../index');
-      await getNotificationRepository().createNotification({
-        recipient_profile_id: ownerId,
-        type: 'CORPORATE_STORE_SUSPENDED',
-        title: 'Kurumsal Mağazanız Askıya Alındı',
-        message: reason
-          ? `${dealer.company_name} mağazanız yönetim tarafından askıya alınmıştır. Neden: ${reason}`
-          : `${dealer.company_name} mağazanız yönetim tarafından askıya alınmıştır.`,
-        entity_type: 'application',
-        entity_id: dealerId,
-      });
+      try {
+        const { getNotificationRepository } = await import('../index');
+        await getNotificationRepository().createNotification({
+          recipient_profile_id: ownerId,
+          type: 'CORPORATE_STORE_SUSPENDED',
+          title: 'Kurumsal mağazanız askıya alındı',
+          message: reason
+            ? `${dealer.company_name} mağazanız yönetim tarafından askıya alınmıştır. Neden: ${reason}`
+            : `${dealer.company_name} mağazanız yönetim tarafından askıya alınmıştır.`,
+          entity_type: 'application',
+          entity_id: dealerId,
+        });
+      } catch (notifErr: any) {
+        console.error('Failed to dispatch corporate store suspended notification:', notifErr);
+      }
     }
 
     // Admin audit log (Section 19)
@@ -711,17 +723,21 @@ export class SupabaseDealerRepository implements IDealerRepository {
     // Character-scoped notification to corporate store owner (Section 18)
     const ownerId = dealer.owner_profile_id || dealer.profile_id;
     if (ownerId) {
-      const { getNotificationRepository } = await import('../index');
-      await getNotificationRepository().createNotification({
-        recipient_profile_id: ownerId,
-        type: 'CORPORATE_STORE_DELETED',
-        title: 'Kurumsal Mağazanız Kaldırıldı',
-        message: reason
-          ? `${dealer.company_name} mağazanız yönetim tarafından silinmiştir. Neden: ${reason}`
-          : `${dealer.company_name} mağazanız yönetim tarafından silinmiştir.`,
-        entity_type: 'application',
-        entity_id: dealerId,
-      });
+      try {
+        const { getNotificationRepository } = await import('../index');
+        await getNotificationRepository().createNotification({
+          recipient_profile_id: ownerId,
+          type: 'CORPORATE_STORE_DELETED',
+          title: 'Kurumsal mağazanız silindi',
+          message: reason
+            ? `${dealer.company_name} mağazanız yönetim tarafından silinmiştir. Neden: ${reason}`
+            : `${dealer.company_name} mağazanız yönetim tarafından silinmiştir.`,
+          entity_type: 'application',
+          entity_id: dealerId,
+        });
+      } catch (notifErr: any) {
+        console.error('Failed to dispatch corporate store deleted notification:', notifErr);
+      }
     }
 
     // Admin audit log (Section 19)

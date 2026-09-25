@@ -3,7 +3,7 @@
 import React, { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SanboardLogo } from '@/components/common/SanboardLogo';
-import { ShieldCheck, LogIn, ArrowRight, AlertCircle, RefreshCw } from 'lucide-react';
+import { ShieldCheck, ArrowRight, AlertCircle, RefreshCw } from 'lucide-react';
 
 function GirisContent() {
   const router = useRouter();
@@ -66,11 +66,15 @@ function GirisContent() {
         <button
           type="button"
           onClick={handleLogin}
-          className="w-full btn-primary py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-lg hover:shadow-orange-500/10 cursor-pointer"
+          className="w-full btn-primary py-3 text-sm font-bold flex items-center justify-center gap-2.5 shadow-lg hover:shadow-orange-500/10 cursor-pointer"
         >
-          <LogIn className="w-4 h-4" />
+          <img
+            src="/brands/gta-world.png"
+            alt="GTA World"
+            className="h-5 w-auto object-contain shrink-0"
+          />
           <span>GTA World ile Giriş Yap</span>
-          <ArrowRight className="w-4 h-4" />
+          <ArrowRight className="w-4 h-4 ml-1 opacity-70" />
         </button>
       </div>
     </div>

@@ -20,6 +20,7 @@ import { PhotoUploader, UploadedImage } from '@/components/forms/PhotoUploader';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { formatCurrency } from '@/lib/utils/format';
 import { getVehicleBrands, getModelsByBrand } from '@/lib/constants/vehicleCatalog';
+import { resolveMediaUrl } from '@/lib/media/url';
 
 const TITLE_MAX = 60;
 const DESC_MAX = 100;
@@ -29,6 +30,7 @@ export default function YeniIlanOlusturPage() {
   const { currentProfile, isAuthenticated, isLoading } = useAuth();
 
   const [isCorporate, setIsCorporate] = useState(false);
+  const [dealer, setDealer] = useState<any>(null);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -95,8 +97,24 @@ export default function YeniIlanOlusturPage() {
 
     if (isLoading) return;
     if (!isAuthenticated || !currentProfile) {
-      router.push('/giris?redirect=/ilan-ver/yeni');
+      router.push(`/giris?redirect=/ilan-ver/yeni${corpParam ? '?corporate=true' : ''}`);
       return;
+    }
+
+    if (corpParam) {
+      // Authoritative corporate eligibility & dealer details check
+      fetch(`/api/dealers/eligibility?profileId=${currentProfile.id}`)
+        .then((res) => res.json())
+        .then((eligData) => {
+          if (!eligData.eligible || !eligData.dealer) {
+            router.replace('/hesabim/kurumsal');
+            return;
+          }
+          setDealer(eligData.dealer);
+        })
+        .catch(() => {
+          router.replace('/hesabim/kurumsal');
+        });
     }
 
     // Verify user actually has an available credit for the chosen mode (INDIVIDUAL vs CORPORATE)
@@ -108,11 +126,11 @@ export default function YeniIlanOlusturPage() {
           : (data.individualCredits !== undefined ? data.individualCredits > 0 : data.availableCredits > 0);
 
         if (!hasNeededCredit) {
-          router.replace('/ilan-ver/paket');
+          router.replace(corpParam ? '/hesabim/kurumsal' : '/ilan-ver/paket');
         }
       })
       .catch(() => {
-        router.replace('/ilan-ver/paket');
+        router.replace(corpParam ? '/hesabim/kurumsal' : '/ilan-ver/paket');
       });
   }, [isLoading, isAuthenticated, currentProfile, router]);
 
@@ -239,8 +257,9 @@ export default function YeniIlanOlusturPage() {
       description: description.trim(),
       price: Number(price),
       images,
-      corporate: isCorporate && Boolean(currentProfile.is_dealer),
-      seller_type: isCorporate && Boolean(currentProfile.is_dealer) ? 'CORPORATE' : 'INDIVIDUAL',
+      corporate: isCorporate,
+      seller_type: isCorporate ? 'CORPORATE' : 'INDIVIDUAL',
+      corporate_profile_id: isCorporate && dealer?.id ? dealer.id : null,
     };
 
     if (category === 'vehicle') {
@@ -293,18 +312,18 @@ export default function YeniIlanOlusturPage() {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* Stepper Header */}
       <div className="text-center space-y-2">
-        {isCorporate && currentProfile?.is_dealer && (
+        {isCorporate && (
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#FF8A1F]/10 border border-[#FF8A1F]/30 text-[#FF8A1F] text-xs font-bold mb-1">
             <Crown className="w-3.5 h-3.5 fill-[#FF8A1F]" />
-            <span>Kurumsal Mağaza İlanı Modu</span>
+            <span>Kurumsal Mağaza İlanı Modu{dealer?.company_name ? ` (${dealer.company_name})` : ''}</span>
           </div>
         )}
         <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)]">
-          {isCorporate && currentProfile?.is_dealer ? 'Yeni Mağaza İlanı Oluştur' : 'Yeni İlan Oluştur'}
+          {isCorporate ? 'Yeni Mağaza İlanı Oluştur' : 'Yeni İlan Oluştur'}
         </h1>
         <p className="text-xs sm:text-sm text-[var(--text-muted)]">
-          {isCorporate && currentProfile?.is_dealer
-            ? 'Kurumsal vitrininize özel ilanınızı oluşturun ve Los Santos pazarında öne çıkın.'
+          {isCorporate
+            ? `${dealer?.company_name ? `${dealer.company_name} kurumsal` : 'Kurumsal'} vitrininize özel 14 günlük ilanınızı oluşturun.`
             : '7 Günlük Standart İlan hakkını kullanarak ilanını Los Santos\'a duyur.'}
         </p>
 
@@ -944,7 +963,7 @@ export default function YeniIlanOlusturPage() {
             <div className="max-w-sm mx-auto surface-card p-4 rounded-xl border border-[#FF8A1F]/30 bg-[var(--bg-surface-secondary)]/30 space-y-3">
               <div className="relative aspect-[16/10] rounded-lg overflow-hidden bg-black/30">
                 <img
-                  src={coverImage}
+                  src={resolveMediaUrl(coverImage)}
                   alt={title}
                   className="w-full h-full object-cover"
                 />
@@ -960,12 +979,23 @@ export default function YeniIlanOlusturPage() {
                 <p className="text-xs text-[var(--text-muted)] line-clamp-2">{description}</p>
                 <div className="pt-2 flex items-center justify-between text-xs text-[var(--text-dim)] border-t border-[var(--border-app)]">
                   <span className="flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-[#FF8A1F]" />
-                    {location}
+                    {isCorporate ? (
+                      <>
+                        <Crown className="w-3.5 h-3.5 text-[#FF8A1F]" />
+                        <span className="font-semibold text-[var(--text-main)] truncate max-w-[120px]">
+                          {dealer?.company_name || 'Kurumsal Mağaza'}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <MapPin className="w-3.5 h-3.5 text-[#FF8A1F]" />
+                        {location || 'Los Santos'}
+                      </>
+                    )}
                   </span>
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-1 font-semibold text-[#FF8A1F]">
                     <Calendar className="w-3.5 h-3.5" />
-                    7 Gün Aktif
+                    {isCorporate ? '14 Gün Aktif' : '7 Gün Aktif'}
                   </span>
                 </div>
               </div>
@@ -1001,10 +1031,17 @@ export default function YeniIlanOlusturPage() {
             )}
           </div>
 
-          <div className="p-4 rounded-xl bg-[var(--brand-orange-subtle)] border border-[rgba(255,138,31,0.25)] text-center text-xs text-[var(--text-main)]">
+          <div className="p-4 rounded-xl bg-[var(--brand-orange-subtle)] border border-[rgba(255,138,31,0.25)] text-center text-xs text-[var(--text-main)] space-y-1">
             <p className="font-semibold text-[#FF8A1F]">
-              İlanı yayınladığınız anda 1 adet ilan krediniz kullanılacak ve 7 günlük yayın süreniz başlayacaktır.
+              {isCorporate
+                ? 'İlanı yayınladığınız anda 1 adet kurumsal ilan krediniz kullanılacak ve 14 günlük yayın süreniz başlayacaktır.'
+                : 'İlanı yayınladığınız anda 1 adet ilan krediniz kullanılacak ve 7 günlük yayın süreniz başlayacaktır.'}
             </p>
+            {isCorporate && (
+              <p className="text-[11px] text-[var(--text-muted)]">
+                Model: Kurumsal İlan ($1.750 / 14 Gün Yayın) • Mağaza: {dealer?.company_name || 'Kurumsal Profil'}
+              </p>
+            )}
           </div>
 
           <div className="flex justify-between items-center pt-2">

@@ -62,9 +62,19 @@ export async function POST(req: NextRequest) {
       const { resolveCorporateEligibility } = await import('@/lib/dealers/eligibility');
       const eligibility = await resolveCorporateEligibility(trustedProfileId);
       if (!eligibility.eligible || !eligibility.dealer) {
+        let businessError = 'Kurumsal ilan yayınlama şartlarını sağlamıyorsunuz.';
+        if (eligibility.reason === 'NO_STORE' || eligibility.reason === 'STORE_DELETED') {
+          businessError = 'Mağaza bulunamadı.';
+        } else if (eligibility.reason === 'STORE_SUSPENDED') {
+          businessError = 'Mağaza askıya alınmış.';
+        } else if (eligibility.reason === 'SUBSCRIPTION_INACTIVE') {
+          businessError = 'Üyelik aktif değil.';
+        } else if (eligibility.reason === 'SUBSCRIPTION_EXPIRED') {
+          businessError = 'Üyelik süresi dolmuş.';
+        }
         return NextResponse.json(
           {
-            error: eligibility.message || 'Kurumsal ilan yayınlama şartlarını sağlamıyorsunuz.',
+            error: businessError,
             reason: eligibility.reason,
           },
           { status: 403 }

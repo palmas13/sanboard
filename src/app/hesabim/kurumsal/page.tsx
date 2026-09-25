@@ -214,9 +214,11 @@ export default function HesabimKurumsalPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          profileId: currentProfile.id,
           profile_id: currentProfile.id,
-          company_name: companyName,
-          purpose,
+          companyName: companyName.trim(),
+          company_name: companyName.trim(),
+          purpose: purpose.trim(),
         }),
       });
 

@@ -55,7 +55,12 @@ export const baseListingFields = {
       'Tam olarak bir vitrin fotoğrafı seçilmelidir'
     ),
   seller_type: z.enum(['INDIVIDUAL', 'CORPORATE']).optional().nullable(),
-  corporate_profile_id: z.string().uuid().optional().nullable(),
+  corporate_profile_id: z
+    .string()
+    .trim()
+    .optional()
+    .nullable()
+    .transform((val) => (val && val.length > 0 ? val : null)),
 };
 
 export const baseListingSchema = z.object({

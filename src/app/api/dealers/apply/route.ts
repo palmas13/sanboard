@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDealerRepository } from '@/lib/db/repositories';
 
+import { getServerSession } from '@/lib/auth/session';
+
 export async function POST(req: NextRequest) {
   try {
-    const { profileId, companyName, purpose } = await req.json();
+    const session = await getServerSession(req);
+    const body = await req.json();
+    const profileId = session?.profileId || body.profileId || body.profile_id;
+    const companyName = (body.companyName || body.company_name || '').trim();
+    const purpose = (body.purpose || body.applicationPurpose || body.business_purpose || '').trim();
 
     if (!profileId || !companyName || !purpose) {
       return NextResponse.json(

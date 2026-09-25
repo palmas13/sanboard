@@ -109,6 +109,15 @@ export async function applyForDealer(params: {
     return getDealerRepository().createApplication(params);
   }
   ensureDealers();
+
+  if (!params.profileId) {
+    return { success: false, error: 'Karakter profili zorunludur.' };
+  }
+
+  if (!params.companyName || !params.companyName.trim() || !params.purpose || !params.purpose.trim()) {
+    return { success: false, error: 'Şirket adı ve başvuru amacı alanları zorunludur.' };
+  }
+
   const profile = db.profiles.find((p) => p.id === params.profileId);
   if (!profile) return { success: false, error: 'Profil bulunamadı.' };
 
@@ -511,7 +520,7 @@ export async function suspendCorporateStore(
       recipient_profile_id: ownerId,
       user_id: profile?.user_id,
       type: 'CORPORATE_STORE_SUSPENDED',
-      title: 'Kurumsal Mağazanız Askıya Alındı',
+      title: 'Kurumsal mağazanız askıya alındı',
       message: reason
         ? `${dealer.company_name} mağazanız yönetim tarafından askıya alınmıştır. Neden: ${reason}`
         : `${dealer.company_name} mağazanız yönetim tarafından askıya alınmıştır.`,
@@ -628,7 +637,7 @@ export async function deleteCorporateStore(
       recipient_profile_id: ownerId,
       user_id: profile?.user_id,
       type: 'CORPORATE_STORE_DELETED',
-      title: 'Kurumsal Mağazanız Kaldırıldı',
+      title: 'Kurumsal mağazanız silindi',
       message: reason
         ? `${dealer.company_name} mağazanız yönetim tarafından silinmiştir. Neden: ${reason}`
         : `${dealer.company_name} mağazanız yönetim tarafından silinmiştir.`,

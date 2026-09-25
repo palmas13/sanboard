@@ -67,3 +67,61 @@ export function getCorporateSidebarLabel(
 
   return 'Kurumsal Başvuru';
 }
+
+export interface CorporateHeaderActions {
+  canOpenStore: boolean;
+  canCreateCorporateListing: boolean;
+}
+
+/**
+ * Single Canonical State Resolver for Header Action Buttons (Section 7, 8, 9).
+ * Guarantees zero contradiction between page content and header buttons.
+ * Fully client-safe (no server/database dependencies).
+ */
+export function resolveCorporateHeaderActions(params: {
+  eligibility?: any;
+  activeProfileId?: string | null;
+  isCorporatePage?: boolean;
+}): CorporateHeaderActions {
+  const { eligibility, activeProfileId, isCorporatePage } = params;
+  if (!eligibility || !activeProfileId) {
+    return { canOpenStore: false, canCreateCorporateListing: false };
+  }
+
+  const store = eligibility.dealer;
+  const isOwner = Boolean(
+    store &&
+    (store.owner_profile_id === activeProfileId || store.profile_id === activeProfileId)
+  );
+  const isStoreModerationActive = Boolean(
+    store &&
+    store.moderation_status === 'ACTIVE' &&
+    !store.deleted_at
+  );
+
+  // Section 7: "Mağazamı Aç"
+  // Minimum: owner_profile_id === activeProfileId AND moderation_status === 'ACTIVE' AND deleted_at IS NULL
+  // Subscription EXPIRED olsa bile public mağaza erişilebilir olduğundan gösterilebilir.
+  // NO_STORE, PENDING, REJECTED, SUSPENDED, DELETED durumlarında ASLA görünmemeli.
+  const canOpenStore = Boolean(
+    isOwner &&
+    isStoreModerationActive &&
+    (eligibility.reason === 'ACTIVE' || eligibility.reason === 'SUBSCRIPTION_EXPIRED')
+  );
+
+  // Section 8: "Yeni İlan Ver" (Kurumsal header'da)
+  // Sadece: owner_profile_id === activeProfileId AND moderation_status === 'ACTIVE' AND deleted_at IS NULL AND subscription_status === 'ACTIVE'
+  // NO_STORE, PENDING, REJECTED, SUSPENDED, DELETED, SUBSCRIPTION_INACTIVE, SUBSCRIPTION_EXPIRED -> görünmez.
+  // ACTIVE + ACTIVE SUBSCRIPTION -> görünür.
+  const canCreateCorporateListing = Boolean(
+    isCorporatePage &&
+    isOwner &&
+    isStoreModerationActive &&
+    store?.subscription_status === 'ACTIVE' &&
+    eligibility.eligible &&
+    eligibility.reason === 'ACTIVE'
+  );
+
+  return { canOpenStore, canCreateCorporateListing };
+}
+

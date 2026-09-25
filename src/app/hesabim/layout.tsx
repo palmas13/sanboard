@@ -20,7 +20,7 @@ import {
   Shield,
   ArrowRight,
 } from 'lucide-react';
-import { getCorporateSidebarLabel } from '@/lib/dealers/status';
+import { getCorporateSidebarLabel, resolveCorporateHeaderActions } from '@/lib/dealers/status';
 
 export default function HesabimLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -28,9 +28,10 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
   const { currentProfile, isAuthenticated, isLoading, isAdmin, logout } = useAuth();
 
   const [headerImgError, setHeaderImgError] = useState(false);
-  const [dealerInfo, setDealerInfo] = useState<{
-    status?: string;
-    subscription_status?: string;
+  const [corporateEligibility, setCorporateEligibility] = useState<{
+    eligible: boolean;
+    reason: string;
+    dealer?: any;
   } | null>(null);
 
   useEffect(() => {
@@ -43,11 +44,11 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
     if (!currentProfile?.id) return;
     let isCancelled = false;
 
-    fetch(`/api/dealers/profile?profileId=${currentProfile.id}`)
+    fetch(`/api/dealers/eligibility?profileId=${currentProfile.id}`)
       .then((res) => res.json())
       .then((data) => {
-        if (!isCancelled && data?.dealer) {
-          setDealerInfo(data.dealer);
+        if (!isCancelled && data) {
+          setCorporateEligibility(data);
         }
       })
       .catch(() => {});
@@ -69,20 +70,35 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
   const avatarSrc = currentProfile.avatar_path || currentProfile.avatar_url;
   const resolvedAvatar = avatarSrc ? resolveAvatarUrl(avatarSrc) : '';
 
-  const isDeletedStore = (dealerInfo as any)?.moderation_status === 'DELETED' || Boolean((dealerInfo as any)?.deleted_at);
-  const hasApprovedCorporate = Boolean(
-    !isDeletedStore &&
-    (dealerInfo?.status === 'APPROVED' || currentProfile.is_dealer || currentProfile.dealer_id)
-  );
+  const corporateReason = corporateEligibility?.reason;
+  const isDeletedStore = corporateReason === 'STORE_DELETED';
+  const isSuspendedStore = corporateReason === 'STORE_SUSPENDED';
+  const hasApprovedCorporate =
+    corporateReason === 'ACTIVE' ||
+    corporateReason === 'SUBSCRIPTION_EXPIRED' ||
+    corporateReason === 'SUBSCRIPTION_INACTIVE';
 
   const corporateLabel = getCorporateSidebarLabel({
     hasApprovedStore: hasApprovedCorporate,
-    subscriptionStatus: (dealerInfo?.subscription_status as any) || (hasApprovedCorporate ? 'ACTIVE' : null),
-    moderationStatus: isDeletedStore ? 'DELETED' : (dealerInfo as any)?.moderation_status,
+    subscriptionStatus:
+      corporateEligibility?.dealer?.subscription_status || (hasApprovedCorporate ? 'ACTIVE' : null),
+    moderationStatus: isDeletedStore
+      ? 'DELETED'
+      : isSuspendedStore
+      ? 'SUSPENDED'
+      : corporateEligibility?.dealer?.moderation_status,
     isDealer: Boolean(hasApprovedCorporate),
   });
 
   const isCorporateIdentity = corporateLabel === 'Kurumsal Profil';
+  const isKurumsalPage = pathname === '/hesabim/kurumsal';
+
+  // Section 7, 8, 9: Canonical eligibility resolver for header actions
+  const { canOpenStore, canCreateCorporateListing } = resolveCorporateHeaderActions({
+    eligibility: corporateEligibility as any,
+    activeProfileId: currentProfile?.id,
+    isCorporatePage: isKurumsalPage,
+  });
 
   const menuItems = [
     { href: '/hesabim', label: 'Genel Bakış', icon: LayoutDashboard },
@@ -159,22 +175,35 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-          {currentProfile.is_dealer && currentProfile.dealer_id && (
+          {canOpenStore && (
             <Link
-              href={`/magaza/${currentProfile.dealer_id}`}
+              href={`/premium/${corporateEligibility?.dealer?.public_id || corporateEligibility?.dealer?.id}`}
               className="btn-secondary text-xs py-2.5 px-4 shadow-sm"
               target="_blank"
             >
               <span>Mağazamı Aç</span>
             </Link>
           )}
-          <Link
-            href="/ilan-ver"
-            className="btn-primary text-xs py-2.5 px-4 shadow-sm flex items-center gap-2"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>Yeni İlan Ver</span>
-          </Link>
+
+          {isKurumsalPage ? (
+            canCreateCorporateListing && (
+              <Link
+                href="/ilan-ver/yeni?corporate=true"
+                className="btn-primary text-xs py-2.5 px-4 shadow-sm flex items-center gap-2"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>Yeni İlan Ver</span>
+              </Link>
+            )
+          ) : (
+            <Link
+              href="/ilan-ver"
+              className="btn-primary text-xs py-2.5 px-4 shadow-sm flex items-center gap-2"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Yeni İlan Ver</span>
+            </Link>
+          )}
         </div>
       </div>
 
