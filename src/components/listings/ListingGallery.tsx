@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { ListingImage } from '@/types';
+import { resolveMediaUrl } from '@/lib/media/url';
 import { Eye, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ListingGalleryProps {
@@ -48,12 +49,11 @@ export function ListingGallery({ images, title, isLocked = false }: ListingGalle
       {/* Main Cover Display */}
       <div
         onClick={() => !isLocked && setLightboxOpen(true)}
-        className={`relative aspect-[16/10] w-full rounded-2xl overflow-hidden border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] group ${
-          !isLocked ? 'cursor-pointer' : ''
-        }`}
+        className={`relative aspect-[16/10] w-full rounded-2xl overflow-hidden border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] group ${!isLocked ? 'cursor-pointer' : ''
+          }`}
       >
         <img
-          src={currentImage.storage_path}
+          src={resolveMediaUrl(currentImage.storage_path)}
           alt={title}
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-102"
         />
@@ -81,14 +81,13 @@ export function ListingGallery({ images, title, isLocked = false }: ListingGalle
               key={img.id}
               type="button"
               onClick={() => setSelectedIdx(idx)}
-              className={`aspect-[16/10] rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
-                selectedIdx === idx
+              className={`aspect-[16/10] rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${selectedIdx === idx
                   ? 'border-[#FF8A1F] ring-2 ring-[#FF8A1F]/30'
                   : 'border-[var(--border-app)] hover:border-[var(--border-app-hover)] opacity-70 hover:opacity-100'
-              }`}
+                }`}
             >
               <img
-                src={img.storage_path}
+                src={resolveMediaUrl(img.storage_path)}
                 alt={`${title} - ${idx + 1}`}
                 className="w-full h-full object-cover"
               />
@@ -131,7 +130,7 @@ export function ListingGallery({ images, title, isLocked = false }: ListingGalle
           )}
 
           <img
-            src={currentImage.storage_path}
+            src={resolveMediaUrl(currentImage.storage_path)}
             alt={title}
             className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl"
             onClick={(e) => e.stopPropagation()}

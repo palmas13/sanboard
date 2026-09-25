@@ -13,7 +13,6 @@ import {
 import { getListingRepository } from '@/lib/db/repositories';
 import { getServerSession } from '@/lib/auth/session';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
-import { resolveMediaUrl } from '@/lib/media/url';
 import { ListingGallery } from '@/components/listings/ListingGallery';
 import { SellerCard } from '@/components/listings/SellerCard';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
@@ -179,7 +178,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
         {/* LEFT COLUMN: Gallery & Favori/Açıklama Kartı */}
         <div className="space-y-4">
           <ListingGallery
-            images={((listing as MemberListingDetail).images || []).map(resolveMediaUrl)}
+            images={(listing as MemberListingDetail).images || []}
             title={listing.title}
             isLocked={isLocked}
           />
@@ -282,10 +281,10 @@ export default async function ListingDetailPage({ params }: PageProps) {
                                 <span className="text-[var(--text-muted)]">Motor Sağlığı</span>
                                 <span
                                   className={`font-bold ${vd.engine_health >= 70
-                                      ? 'text-emerald-400'
-                                      : vd.engine_health >= 40
-                                        ? 'text-amber-400'
-                                        : 'text-red-400'
+                                    ? 'text-emerald-400'
+                                    : vd.engine_health >= 40
+                                      ? 'text-amber-400'
+                                      : 'text-red-400'
                                     }`}
                                 >
                                   %{vd.engine_health}
@@ -294,10 +293,10 @@ export default async function ListingDetailPage({ params }: PageProps) {
                               <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden border border-white/5">
                                 <div
                                   className={`h-full rounded-full transition-all ${vd.engine_health >= 70
-                                      ? 'bg-emerald-500'
-                                      : vd.engine_health >= 40
-                                        ? 'bg-amber-500'
-                                        : 'bg-red-500'
+                                    ? 'bg-emerald-500'
+                                    : vd.engine_health >= 40
+                                      ? 'bg-amber-500'
+                                      : 'bg-red-500'
                                     }`}
                                   style={{ width: `${Math.min(100, Math.max(0, vd.engine_health))}%` }}
                                 />
