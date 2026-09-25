@@ -250,6 +250,10 @@ export async function getSimilarListings(
   currentListingId: string,
   limit: number = 4
 ): Promise<PublicListingSummary[]> {
+  if (isSupabaseConfiguredMode()) {
+    return getSupabaseRepo().getSimilarListings(currentListingId, limit);
+  }
+
   const current = db.listings.find((l) => l.id === currentListingId);
   if (!current) return [];
 
@@ -348,6 +352,10 @@ export async function getSimilarListings(
  * Returns array with matching Listing or null for invalid/removed slots.
  */
 export async function getCompareListings(ids: string[]): Promise<(Listing | null)[]> {
+  if (isSupabaseConfiguredMode()) {
+    return getSupabaseRepo().getCompareListings(ids);
+  }
+
   const now = new Date();
   return ids.map((id) => {
     const listing = db.listings.find((l) => l.id === id);

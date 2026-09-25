@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { Calendar, Sparkles, Building2, User } from 'lucide-react';
+import { Calendar, Sparkles } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { FavoriteButton } from './FavoriteButton';
 import { CompareButton } from '@/components/compare/CompareButton';
@@ -17,7 +17,6 @@ export function VehicleListingRow({ listing, className = '' }: VehicleListingRow
     'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=600&auto=format&fit=crop&q=80';
 
   const displayImage = resolveMediaUrl(listing.cover_image) || fallbackImage;
-  const isCorporate = listing.seller_type === 'CORPORATE';
 
   const brandModelText = [listing.brand, listing.model].filter(Boolean).join(' ') || listing.subcategory;
 
@@ -44,39 +43,27 @@ export function VehicleListingRow({ listing, className = '' }: VehicleListingRow
             )}
           </div>
 
-          {/* Center Column: Brand/Model + Title + Badges */}
-          <div className="flex-1 min-w-0 flex flex-col justify-center space-y-1.5 py-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-base font-bold text-[var(--text-main)] group-hover:text-[#FF8A1F] transition-colors truncate">
+          {/* Center Column: Title (primary) + Brand/Model (subtitle) + Published Date */}
+          <div className="flex-1 min-w-0 flex flex-col justify-center space-y-1 py-1">
+            <h3 className="text-base font-bold text-[var(--text-main)] group-hover:text-[#FF8A1F] transition-colors truncate">
+              {listing.title}
+            </h3>
+
+            {brandModelText && (
+              <p className="text-xs font-medium text-[var(--text-muted)] truncate">
                 {brandModelText}
-              </h3>
-              <span className="badge-tag bg-black/60 text-white/90 border-white/10 text-[11px] font-medium shrink-0">
+              </p>
+            )}
+
+            <div>
+              <span className="inline-flex items-center rounded-full border border-[#FF8A1F]/25 bg-[#FF8A1F]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#FF8A1F]">
                 {listing.subcategory}
               </span>
-              {isCorporate ? (
-                <span className="badge-tag bg-blue-500/15 text-blue-400 border-blue-500/30 text-[10px] font-semibold flex items-center gap-1 shrink-0">
-                  <Building2 className="w-3 h-3" />
-                  Kurumsal
-                </span>
-              ) : (
-                <span className="badge-tag bg-zinc-700/30 text-[var(--text-muted)] border-zinc-700/50 text-[10px] font-medium flex items-center gap-1 shrink-0">
-                  <User className="w-3 h-3" />
-                  Bireysel
-                </span>
-              )}
             </div>
 
-            <p className="text-xs text-[var(--text-muted)] line-clamp-1 group-hover:text-[var(--text-main)] transition-colors">
-              {listing.title}
-            </p>
-
-            <div className="flex items-center gap-3 text-xs text-[var(--text-dim)] pt-1">
-              <span className="font-mono text-[11px]">{listing.listing_number}</span>
-              <span>•</span>
-              <span className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                {formatDate(listing.published_at)}
-              </span>
+            <div className="flex items-center gap-1 text-xs text-[var(--text-dim)] pt-1">
+              <Calendar className="w-3 h-3" />
+              <span>{formatDate(listing.published_at)}</span>
             </div>
           </div>
 
@@ -130,9 +117,6 @@ export function VehicleListingRow({ listing, className = '' }: VehicleListingRow
                   ÖNE ÇIKAN
                 </span>
               )}
-              <span className="badge-tag bg-black/65 backdrop-blur-md text-white border-white/10 text-[10px]">
-                {listing.subcategory}
-              </span>
             </div>
             <div
               className="absolute top-2 right-2 z-10 flex items-center gap-1.5"
@@ -155,21 +139,19 @@ export function VehicleListingRow({ listing, className = '' }: VehicleListingRow
           </div>
 
           <div className="space-y-1">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-bold text-[var(--text-main)] truncate">
+            <h3 className="text-sm font-bold text-[var(--text-main)] truncate">
+              {listing.title}
+            </h3>
+            {brandModelText && (
+              <p className="text-xs font-medium text-[var(--text-muted)] truncate">
                 {brandModelText}
-              </h3>
-              {isCorporate ? (
-                <span className="badge-tag bg-blue-500/15 text-blue-400 border-blue-500/30 text-[10px] font-semibold shrink-0">
-                  Kurumsal
-                </span>
-              ) : (
-                <span className="badge-tag bg-zinc-700/30 text-[var(--text-muted)] border-zinc-700/50 text-[10px] font-medium shrink-0">
-                  Bireysel
-                </span>
-              )}
+              </p>
+            )}
+            <div>
+              <span className="inline-flex items-center rounded-full border border-[#FF8A1F]/25 bg-[#FF8A1F]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#FF8A1F]">
+                {listing.subcategory}
+              </span>
             </div>
-            <p className="text-xs text-[var(--text-muted)] line-clamp-1">{listing.title}</p>
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t border-[var(--border-app)] text-xs">

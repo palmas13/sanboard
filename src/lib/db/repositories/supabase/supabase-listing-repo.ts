@@ -7,6 +7,16 @@ import { deleteMediaSafely } from '@/lib/storage/lifecycle';
 import { resolveUserId, resolveProfileId, isUuid } from '../../id-mapper';
 
 export class SupabaseListingRepository implements IListingRepository {
+  private isPublicCorporateListingVisible(item: any): boolean {
+    if (item.seller_type !== 'CORPORATE') return true;
+    if (!item.corporate_profile_id || !item.corporate) return false;
+    return (
+      item.corporate.moderation_status !== 'SUSPENDED' &&
+      item.corporate.moderation_status !== 'DELETED' &&
+      !item.corporate.deleted_at
+    );
+  }
+
   private getClient() {
     const client = getSupabaseClient();
     if (!client) {
@@ -256,6 +266,241 @@ export class SupabaseListingRepository implements IListingRepository {
 
     return listings;
   }
+  async getCompareListings(ids: string[]): Promise<(Listing | null)[]> {
+    if (!ids || ids.length === 0) return [];
+
+    const validUuids = ids.filter(isUuid);
+    if (validUuids.length === 0) {
+      return ids.map(() => null);
+    }
+
+    const client = this.getClient();
+    const nowIso = new Date().toISOString();
+
+    const { data, error } = await client
+      .from('listings')
+      .select(`
+        *,
+        vehicle_details (*),
+        listing_images (*),
+        corporate:corporate_profiles (*)
+      `)
+      .in('id', validUuids)
+      .eq('status', 'ACTIVE')
+      .gt('expires_at', nowIso)
+      .eq('category', 'vehicle');
+
+    if (error) throw new Error(`Supabase error fetching compare listings: ${error.message}`);
+
+    const rows = data || [];
+    const listingMap = new Map<string, Listing>();
+
+    for (const item of rows) {
+      // Exclude listings from suspended/deleted corporate stores
+      if (!this.isPublicCorporateListingVisible(item)) continue;
+
+      const vd = Array.isArray(item.vehicle_details) ? item.vehicle_details[0] : item.vehicle_details;
+      const listingObj: Listing = {
+        ...item,
+        vehicle_details: vd || undefined,
+        images: item.listing_images || [],
+        location: null,
+      };
+
+      listingMap.set(item.id, listingObj);
+    }
+
+    return ids.map((id) => listingMap.get(id) || null);
+  }
+
+  async getSimilarListings(currentListingId: string, limit: number = 4): Promise<PublicListingSummary[]> {
+    if (!isUuid(currentListingId)) return [];
+
+    const client = this.getClient();
+    const nowIso = new Date().toISOString();
+
+    const { data: current, error: curErr } = await client
+      .from('listings')
+      .select(`
+        id,
+        category,
+        subcategory,
+        price,
+        status,
+        expires_at,
+        seller_type,
+        corporate_profile_id,
+        corporate:corporate_profiles (moderation_status, deleted_at),
+        vehicle_details (*)
+      `)
+      .eq('id', currentListingId)
+      .maybeSingle();
+
+    if (curErr) throw new Error(`Supabase error fetching current similar listing: ${curErr.message}`);
+    if (
+      !current ||
+      current.category !== 'vehicle' ||
+      current.status !== 'ACTIVE' ||
+      !current.expires_at ||
+      new Date(current.expires_at).getTime() <= Date.now() ||
+      !this.isPublicCorporateListingVisible(current)
+    ) return [];
+
+    const candidateSelect = `
+        id,
+        listing_number,
+        category,
+        subcategory,
+        title,
+        price,
+        location,
+        published_at,
+        created_at,
+        is_featured,
+        featured_until,
+        seller_type,
+        corporate_profile_id,
+        corporate:corporate_profiles (moderation_status, deleted_at),
+        vehicle_details (*),
+        listing_images (storage_path, is_cover, sort_order)
+      `;
+
+    const currentPrice = current.price || 1;
+    const currentVeh = Array.isArray(current.vehicle_details) ? current.vehicle_details[0] : current.vehicle_details;
+    const currentBrand = currentVeh?.brand?.toLowerCase().trim();
+    const currentModel = currentVeh?.model?.toLowerCase().trim();
+    const currentSubcategory = current.subcategory;
+
+    const createCandidateQuery = () => client
+      .from('listings')
+      .select(candidateSelect)
+      .eq('status', 'ACTIVE')
+      .gt('expires_at', nowIso)
+      .eq('category', 'vehicle')
+      .neq('id', currentListingId);
+
+    const candidateQueries: PromiseLike<any>[] = [
+      createCandidateQuery()
+        .eq('subcategory', currentSubcategory)
+        .order('published_at', { ascending: false })
+        .limit(80),
+      createCandidateQuery()
+        .gte('price', Math.max(0, currentPrice * 0.6))
+        .lte('price', currentPrice * 1.4)
+        .order('published_at', { ascending: false })
+        .limit(80),
+    ];
+
+    const detailQueries: PromiseLike<any>[] = [];
+    if (currentBrand) detailQueries.push(client.from('vehicle_details').select('listing_id').ilike('brand', currentBrand).limit(80));
+    if (currentModel) detailQueries.push(client.from('vehicle_details').select('listing_id').ilike('model', currentModel).limit(80));
+
+    const detailResults = await Promise.all(detailQueries);
+    for (const result of detailResults) {
+      if (result.error) throw new Error(`Supabase error selecting similar vehicle details: ${result.error.message}`);
+      const listingIds = (result.data || [])
+        .map((detail: any) => detail.listing_id)
+        .filter((id: unknown): id is string => typeof id === 'string' && id !== currentListingId);
+      if (listingIds.length > 0) {
+        candidateQueries.push(
+          createCandidateQuery()
+            .in('id', listingIds)
+            .order('published_at', { ascending: false })
+        );
+      }
+    }
+
+    const candidateResults = await Promise.all(candidateQueries);
+    const candidateMap = new Map<string, any>();
+    for (const result of candidateResults) {
+      if (result.error) throw new Error(`Supabase error fetching similar listing candidates: ${result.error.message}`);
+      for (const candidate of result.data || []) candidateMap.set(candidate.id, candidate);
+    }
+
+    const validCandidates = Array.from(candidateMap.values()).filter((item) =>
+      this.isPublicCorporateListingVisible(item)
+    );
+
+    const scored = validCandidates.map((cand: any) => {
+      let score = 0;
+      const candVeh = Array.isArray(cand.vehicle_details) ? cand.vehicle_details[0] : cand.vehicle_details;
+
+      if (cand.subcategory === currentSubcategory) score += 50;
+
+      const candBrand = candVeh?.brand?.toLowerCase().trim();
+      if (currentBrand && candBrand && candBrand === currentBrand) score += 30;
+
+      const candModel = candVeh?.model?.toLowerCase().trim();
+      if (currentModel && candModel && candModel === currentModel) score += 40;
+
+      const candPrice = cand.price || 1;
+      const priceDiffPct = Math.abs(candPrice - currentPrice) / Math.max(currentPrice, 1);
+      if (priceDiffPct <= 0.10) score += 40;
+      else if (priceDiffPct <= 0.25) score += 25;
+      else if (priceDiffPct <= 0.40) score += 15;
+      else score += 5;
+
+      if (currentVeh && candVeh) {
+        if (currentVeh.fuel_type && currentVeh.fuel_type === candVeh.fuel_type) score += 5;
+        if (currentVeh.turbo === candVeh.turbo) score += 3;
+      }
+
+      return { cand, score };
+    });
+
+    scored.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return (
+        new Date(b.cand.published_at || b.cand.created_at).getTime() -
+        new Date(a.cand.published_at || a.cand.created_at).getTime()
+      );
+    });
+
+    const selected = scored.slice(0, Math.max(0, limit));
+    const selectedIds = selected.map(({ cand }) => cand.id);
+    const favoriteCountMap = new Map<string, number>();
+    if (selectedIds.length > 0) {
+      const { data: favorites, error: favoriteError } = await this.getAdminClient()
+        .from('favorites')
+        .select('listing_id')
+        .in('listing_id', selectedIds);
+      if (favoriteError) throw new Error(`Supabase error fetching similar listing favorite counts: ${favoriteError.message}`);
+      for (const favorite of favorites || []) {
+        favoriteCountMap.set(favorite.listing_id, (favoriteCountMap.get(favorite.listing_id) || 0) + 1);
+      }
+    }
+
+    const nowTime = Date.now();
+    return selected.map(({ cand }) => {
+      const cover = cand.listing_images?.find((img: any) => img.is_cover)?.storage_path || cand.listing_images?.[0]?.storage_path;
+      const candVeh = Array.isArray(cand.vehicle_details) ? cand.vehicle_details[0] : cand.vehicle_details;
+      const isFeatured = Boolean(
+        cand.is_featured &&
+        (!cand.featured_until || new Date(cand.featured_until).getTime() > nowTime)
+      );
+
+      return {
+        id: cand.id,
+        listing_number: cand.listing_number,
+        category: cand.category,
+        subcategory: cand.subcategory,
+        title: cand.title,
+        price: cand.price,
+        location: null,
+        published_at: cand.published_at,
+        cover_image: cover,
+        favorite_count: favoriteCountMap.get(cand.id) || 0,
+        is_locked: true as const,
+        is_featured: isFeatured,
+        featured_until: cand.featured_until,
+        seller_type: cand.seller_type,
+        corporate_profile_id: cand.corporate_profile_id,
+        brand: candVeh?.brand,
+        model: candVeh?.model,
+      };
+    });
+  }
+
 
   async getListingById(
     id: string,

@@ -1,5 +1,7 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
 import { db } from '../src/lib/db/store';
 import {
   getPublicListings,
@@ -514,5 +516,49 @@ describe('Sanboard – Vehicle UX Overhaul, Similar Listings & Comparison Tests'
 
     assert.strictEqual(favoriteSet.has(listingId), true);
     assert.strictEqual(compareSet.has(listingId), true, 'Toggling favorite must not affect compare');
+  });
+
+  it('27. VehicleListingRow keeps category chip and does not render vehicle year', () => {
+    const source = fs.readFileSync(
+      path.join(process.cwd(), 'src/components/listings/VehicleListingRow.tsx'),
+      'utf8'
+    );
+    assert.ok(source.includes('{listing.subcategory}'), 'Category/subcategory chip must remain visible');
+    assert.strictEqual(source.includes('listing.vehicle_details?.year'), false);
+    assert.strictEqual(source.includes('listing.year'), false);
+  });
+
+  it('28. Supabase similar listings use targeted candidate queries instead of an arbitrary first 50', () => {
+    const source = fs.readFileSync(
+      path.join(process.cwd(), 'src/lib/db/repositories/supabase/supabase-listing-repo.ts'),
+      'utf8'
+    );
+    assert.ok(source.includes(".eq('subcategory', currentSubcategory)"));
+    assert.ok(source.includes(".from('vehicle_details').select('listing_id')"));
+    assert.ok(source.includes(".gte('price', Math.max(0, currentPrice * 0.6))"));
+    assert.strictEqual(source.includes('.limit(50)'), false);
+    assert.ok(source.includes(".neq('id', currentListingId)"));
+  });
+
+  it('29. Supabase similar listings validate visibility and aggregate real favorite counts', () => {
+    const source = fs.readFileSync(
+      path.join(process.cwd(), 'src/lib/db/repositories/supabase/supabase-listing-repo.ts'),
+      'utf8'
+    );
+    assert.ok(source.includes("current.status !== 'ACTIVE'"));
+    assert.ok(source.includes('!this.isPublicCorporateListingVisible(current)'));
+    assert.ok(source.includes(".from('favorites')"));
+    assert.ok(source.includes(".select('listing_id')"));
+    assert.strictEqual(source.includes('favorite_count: 0'), false);
+  });
+
+  it('30. compare facade delegates to Supabase repository while API keeps maximum two listings', () => {
+    const facadeSource = fs.readFileSync(path.join(process.cwd(), 'src/lib/db/listings.ts'), 'utf8');
+    const routeSource = fs.readFileSync(
+      path.join(process.cwd(), 'src/app/api/listings/compare/route.ts'),
+      'utf8'
+    );
+    assert.ok(facadeSource.includes('return getSupabaseRepo().getCompareListings(ids);'));
+    assert.ok(routeSource.includes('.slice(0, 2)'));
   });
 });
