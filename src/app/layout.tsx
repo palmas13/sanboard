@@ -18,6 +18,9 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+import { CompareProvider } from '@/components/compare/CompareContext';
+import { CompareTray } from '@/components/compare/CompareTray';
+
 export const metadata: Metadata = {
   title: 'Sanboard – Los Santos\'un İlan Platformu',
   description:
@@ -79,9 +82,12 @@ export default async function RootLayout({
           initialProfile={initialProfile}
           initialStatus={session ? 'authenticated' : 'unauthenticated'}
         >
-          <Navbar />
-          <main className="flex-1 w-full">{children}</main>
-          <Footer />
+          <CompareProvider>
+            <Navbar />
+            <main className="flex-1 w-full">{children}</main>
+            <Footer />
+            <CompareTray />
+          </CompareProvider>
         </AuthProvider>
       </body>
     </html>

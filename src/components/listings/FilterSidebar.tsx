@@ -37,6 +37,9 @@ export function FilterSidebar({
   const [minPrice, setMinPrice] = useState(searchParams.get('minPrice') || '');
   const [maxPrice, setMaxPrice] = useState(searchParams.get('maxPrice') || '');
   const [location, setLocation] = useState(searchParams.get('location') || 'all');
+  const [sellerType, setSellerType] = useState(
+    searchParams.get('sellerType') || searchParams.get('satici') || 'all'
+  );
 
   // Vehicle specific (Brand -> Model hierarchy)
   const [brand, setBrand] = useState(searchParams.get('brand') || 'all');
@@ -82,6 +85,7 @@ export function FilterSidebar({
     setFurnished(searchParams.get('furnished') || 'all');
     setBalcony(searchParams.get('balcony') || 'all');
     setBuildingType(searchParams.get('buildingType') || 'all');
+    setSellerType(searchParams.get('sellerType') || searchParams.get('satici') || 'all');
   }, [searchParams]);
 
   const applyFilters = () => {
@@ -99,6 +103,7 @@ export function FilterSidebar({
     setOrDelete('q', query);
     setOrDelete('minPrice', minPrice);
     setOrDelete('maxPrice', maxPrice);
+    setOrDelete('sellerType', sellerType);
 
     if (category === 'property') {
       setOrDelete('location', location);
@@ -132,6 +137,7 @@ export function FilterSidebar({
     setMinPrice('');
     setMaxPrice('');
     setLocation('all');
+    setSellerType('all');
     setBrand('all');
     setModel('all');
     setMinMileage('');
@@ -253,6 +259,20 @@ export function FilterSidebar({
             className="form-input text-xs"
           />
         </div>
+      </div>
+
+      {/* Satıcı Tipi */}
+      <div className="space-y-1.5">
+        <label className="text-xs font-semibold text-[var(--text-muted)]">Satıcı Tipi</label>
+        <select
+          value={sellerType}
+          onChange={(e) => setSellerType(e.target.value)}
+          className="form-input text-xs cursor-pointer"
+        >
+          <option value="all">Tümü</option>
+          <option value="INDIVIDUAL">Bireysel</option>
+          <option value="CORPORATE">Kurumsal</option>
+        </select>
       </div>
 
       {/* VEHICLE-SPECIFIC FILTERS */}

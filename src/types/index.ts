@@ -152,6 +152,8 @@ export interface PublicListingSummary {
   is_featured?: boolean;
   featured_until?: string | null;
   is_locked: true;
+  brand?: string;
+  model?: string;
 }
 
 // Member-accessible full listing representation

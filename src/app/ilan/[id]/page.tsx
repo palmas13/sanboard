@@ -17,6 +17,9 @@ import { ListingGallery } from '@/components/listings/ListingGallery';
 import { SellerCard } from '@/components/listings/SellerCard';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { ReportModal } from '@/components/listings/ReportModal';
+import { CompareButton } from '@/components/compare/CompareButton';
+import { SimilarListings } from '@/components/listings/SimilarListings';
+import { getSimilarListings } from '@/lib/db/listings';
 import { MemberListingDetail } from '@/types';
 
 interface PageProps {
@@ -99,6 +102,15 @@ export default async function ListingDetailPage({ params }: PageProps) {
   const categoryLink = isVehicle ? '/arac' : '/mulk';
   const categoryName = isVehicle ? 'Araç' : 'Mülk';
 
+  let similarListings: any[] = [];
+  if (isVehicle) {
+    if (repo.getSimilarListings) {
+      similarListings = await repo.getSimilarListings(id, 6);
+    } else {
+      similarListings = await getSimilarListings(id, 6);
+    }
+  }
+
   return (
     <div className="max-w-7xl xl:max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* Breadcrumb Navigation */}
@@ -169,6 +181,12 @@ export default async function ListingDetailPage({ params }: PageProps) {
                 {formatCurrency(listing.price)}
               </div>
             </div>
+
+            {isVehicle && (
+              <div className="pt-2 sm:pt-2.5 flex md:justify-end">
+                <CompareButton listing={listing} />
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -425,6 +443,11 @@ export default async function ListingDetailPage({ params }: PageProps) {
           )}
         </div>
       </section>
+
+      {/* SECTION C: SIMILAR LISTINGS */}
+      {isVehicle && similarListings.length > 0 && (
+        <SimilarListings listings={similarListings} />
+      )}
     </div>
   );
 }

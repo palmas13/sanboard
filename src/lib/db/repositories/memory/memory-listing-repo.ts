@@ -16,6 +16,16 @@ export class MemoryListingRepository implements IListingRepository {
     return getPublicListings(params);
   }
 
+  async getSimilarListings(currentListingId: string, limit?: number) {
+    const { getSimilarListings: fetchSimilar } = await import('../../listings');
+    return fetchSimilar(currentListingId, limit);
+  }
+
+  async getCompareListings(ids: string[]) {
+    const { getCompareListings: fetchCompare } = await import('../../listings');
+    return fetchCompare(ids);
+  }
+
   async getListingById(id: string, viewerProfileId?: string, viewerUserId?: string) {
     return getListingById(id, viewerProfileId, viewerUserId);
   }

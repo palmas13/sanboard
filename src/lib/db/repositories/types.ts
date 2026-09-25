@@ -63,6 +63,8 @@ export interface CreateListingInput {
 
 export interface IListingRepository {
   getPublicListings(params?: ListingFilterParams): Promise<PublicListingSummary[]>;
+  getSimilarListings?(currentListingId: string, limit?: number): Promise<PublicListingSummary[]>;
+  getCompareListings?(ids: string[]): Promise<(Listing | null)[]>;
   getListingById(id: string, viewerProfileId?: string, viewerUserId?: string): Promise<{ listing: MemberListingDetail | PublicListingSummary | null; isLocked: boolean; isOwner: boolean }>;
   createListing(input: CreateListingInput, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   updateListing(id: string, input: Partial<CreateListingInput>, profileId: string, userId?: string, role?: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;

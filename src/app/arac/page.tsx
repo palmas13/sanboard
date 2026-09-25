@@ -1,9 +1,8 @@
 import React from 'react';
 import { getListingRepository } from '@/lib/db/repositories';
-import { ListingCard } from '@/components/listings/ListingCard';
 import { FilterSidebar } from '@/components/listings/FilterSidebar';
 import { MobileFilterDrawer } from '@/components/listings/MobileFilterDrawer';
-import { ListingSortBar } from '@/components/listings/ListingSortBar';
+import { VehicleListingsView } from '@/components/listings/VehicleListingsView';
 import { Car } from 'lucide-react';
 
 interface PageProps {
@@ -27,6 +26,12 @@ export default async function VehicleListingsPage({ searchParams }: PageProps) {
   const turbo = typeof resolvedParams.turbo === 'string' ? (resolvedParams.turbo as any) : undefined;
   const subwoofer = typeof resolvedParams.subwoofer === 'string' ? (resolvedParams.subwoofer as any) : undefined;
   const trade = typeof resolvedParams.trade === 'string' ? (resolvedParams.trade as any) : undefined;
+  const sellerType =
+    typeof resolvedParams.sellerType === 'string'
+      ? (resolvedParams.sellerType as any)
+      : typeof resolvedParams.satici === 'string'
+      ? (resolvedParams.satici as any)
+      : undefined;
   const sort = typeof resolvedParams.sort === 'string' ? (resolvedParams.sort as any) : 'newest';
 
   const repo = getListingRepository();
@@ -44,6 +49,7 @@ export default async function VehicleListingsPage({ searchParams }: PageProps) {
     turbo,
     subwoofer,
     trade,
+    sellerType,
     sort,
   });
 
@@ -81,24 +87,7 @@ export default async function VehicleListingsPage({ searchParams }: PageProps) {
 
         {/* Results Column */}
         <div className="lg:col-span-3 space-y-6">
-          <ListingSortBar totalCount={listings.length} />
-
-          {listings.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-              {listings.map((listing) => (
-                <ListingCard key={listing.id} listing={listing} />
-              ))}
-            </div>
-          ) : (
-            <div className="surface-card p-12 text-center space-y-3">
-              <p className="text-base font-bold text-[var(--text-main)]">
-                Bu filtrelere uygun araç ilanı bulunamadı.
-              </p>
-              <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
-                Filtre kriterlerinizi genişleterek veya arama kelimesini değiştirerek tekrar deneyebilirsiniz.
-              </p>
-            </div>
-          )}
+          <VehicleListingsView listings={listings} />
         </div>
       </div>
     </div>

@@ -30,6 +30,8 @@ export interface ListingFilterParams {
   turbo?: 'all' | 'yes' | 'no';
   subwoofer?: 'all' | 'yes' | 'no';
   trade?: 'all' | 'yes' | 'no';
+  // Seller type filter
+  sellerType?: 'all' | 'INDIVIDUAL' | 'CORPORATE';
   // Property specific
   roomCount?: string;
   furnished?: 'all' | 'yes' | 'no';
@@ -37,7 +39,7 @@ export interface ListingFilterParams {
   buildingType?: 'all' | 'Normal' | 'Dubleks';
   floor?: number;
   // Sorting
-  sort?: 'newest' | 'price_asc' | 'price_desc' | 'popular';
+  sort?: 'newest' | 'oldest' | 'price_asc' | 'price_desc' | 'popular';
 }
 
 /**
@@ -60,6 +62,7 @@ export function sanitizeListingForPublic(listing: Listing): PublicListingSummary
     subcategory: listing.subcategory,
     title: listing.title,
     price: listing.price,
+    previous_price: listing.previous_price,
     location: listing.location,
     published_at: listing.published_at,
     cover_image: coverImg,
@@ -69,6 +72,8 @@ export function sanitizeListingForPublic(listing: Listing): PublicListingSummary
     featured_until: listing.featured_until,
     seller_type: listing.seller_type,
     corporate_profile_id: listing.corporate_profile_id,
+    brand: listing.vehicle_details?.brand,
+    model: listing.vehicle_details?.model,
   };
 }
 
@@ -183,7 +188,12 @@ export async function getPublicListings(filters: ListingFilterParams = {}): Prom
     result = result.filter((l) => l.vehicle_details?.trade_available === wantTrade);
   }
 
-  // 8. Property filters
+  // 8. Seller type filter
+  if (filters.sellerType && filters.sellerType !== 'all') {
+    result = result.filter((l) => (l.seller_type || 'INDIVIDUAL') === filters.sellerType);
+  }
+
+  // 9. Property filters
   if (filters.roomCount && filters.roomCount !== 'all') {
     result = result.filter((l) => l.property_details?.room_count === filters.roomCount);
   }
@@ -199,7 +209,7 @@ export async function getPublicListings(filters: ListingFilterParams = {}): Prom
     result = result.filter((l) => l.property_details?.building_type === filters.buildingType);
   }
 
-  // 9. Sorting (Featured listings always appear first!)
+  // 10. Sorting (Featured listings always appear first!)
   const getFavCount = (id: string) => db.favorites.filter((f) => f.listing_id === id).length;
 
   result.sort((a, b) => {
@@ -217,6 +227,8 @@ export async function getPublicListings(filters: ListingFilterParams = {}): Prom
         return b.price - a.price;
       case 'popular':
         return getFavCount(b.id) - getFavCount(a.id);
+      case 'oldest':
+        return new Date(a.published_at || a.created_at).getTime() - new Date(b.published_at || b.created_at).getTime();
       case 'newest':
       default:
         return new Date(b.published_at || b.created_at).getTime() - new Date(a.published_at || a.created_at).getTime();
@@ -224,6 +236,135 @@ export async function getPublicListings(filters: ListingFilterParams = {}): Prom
   });
 
   return result.map(sanitizeListingForPublic);
+}
+
+/**
+ * Smart Similar Listings scoring & ranking algorithm.
+ * Strictly respects visibility rules:
+ * - Excludes current listing (ASLA kendi benzer ilanları içinde görünmemeli)
+ * - Excludes REMOVED, SOLD, EXPIRED, DRAFT
+ * - Excludes listings from SUSPENDED or DELETED corporate stores
+ * - Evaluates proximity based on subcategory, brand, model, price proximity, and technical attributes
+ */
+export async function getSimilarListings(
+  currentListingId: string,
+  limit: number = 4
+): Promise<PublicListingSummary[]> {
+  const current = db.listings.find((l) => l.id === currentListingId);
+  if (!current) return [];
+
+  const now = new Date();
+
+  // Candidate pool: only ACTIVE vehicle listings, not expired, not the same listing
+  const candidates = db.listings.filter((l) => {
+    if (l.id === currentListingId) return false;
+    if (l.status !== 'ACTIVE') return false;
+    if (!l.expires_at || new Date(l.expires_at) <= now) return false;
+    if (l.category !== 'vehicle') return false;
+
+    // Filter out corporate listings from suspended or deleted stores
+    if (l.seller_type === 'CORPORATE' && l.corporate_profile_id) {
+      const store = (db.dealers || []).find((d) => d.id === l.corporate_profile_id);
+      if (store && (store.moderation_status === 'SUSPENDED' || store.moderation_status === 'DELETED' || store.deleted_at)) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  const currentPrice = current.price || 1;
+  const currentBrand = current.vehicle_details?.brand?.toLowerCase().trim();
+  const currentModel = current.vehicle_details?.model?.toLowerCase().trim();
+  const currentSubcategory = current.subcategory;
+
+  // Score each candidate according to algorithm requirements
+  const scored = candidates.map((cand) => {
+    let score = 0;
+
+    // 1. Exact subcategory match (+50 points)
+    if (cand.subcategory === currentSubcategory) {
+      score += 50;
+    }
+
+    // 2. Brand match (+30 points)
+    const candBrand = cand.vehicle_details?.brand?.toLowerCase().trim();
+    if (currentBrand && candBrand && candBrand === currentBrand) {
+      score += 30;
+    }
+
+    // 3. Model match (+40 points)
+    const candModel = cand.vehicle_details?.model?.toLowerCase().trim();
+    if (currentModel && candModel && candModel === currentModel) {
+      score += 40;
+    }
+
+    // 4. Price proximity (0-10% -> 40, 10-25% -> 25, 25-40% -> 15, >40% -> 5)
+    const candPrice = cand.price || 1;
+    const priceDiffPct = Math.abs(candPrice - currentPrice) / Math.max(currentPrice, 1);
+    if (priceDiffPct <= 0.10) {
+      score += 40;
+    } else if (priceDiffPct <= 0.25) {
+      score += 25;
+    } else if (priceDiffPct <= 0.40) {
+      score += 15;
+    } else {
+      score += 5;
+    }
+
+    // 5. Technical attributes proximity
+    if (current.vehicle_details && cand.vehicle_details) {
+      if (current.vehicle_details.fuel_type && current.vehicle_details.fuel_type === cand.vehicle_details.fuel_type) {
+        score += 5;
+      }
+      if (current.vehicle_details.turbo === cand.vehicle_details.turbo) {
+        score += 3;
+      }
+    }
+
+    return { cand, score };
+  });
+
+  // Sort by score descending; if tied, newer listings first
+  scored.sort((a, b) => {
+    if (b.score !== a.score) {
+      return b.score - a.score;
+    }
+    return (
+      new Date(b.cand.published_at || b.cand.created_at).getTime() -
+      new Date(a.cand.published_at || a.cand.created_at).getTime()
+    );
+  });
+
+  return scored.slice(0, limit).map((s) => sanitizeListingForPublic(s.cand));
+}
+
+/**
+ * Safely fetches listings for comparison by their IDs.
+ * Strictly verifies visibility rules:
+ * - ACTIVE status
+ * - Not expired
+ * - Vehicle category only (Property listings cannot enter vehicle compare)
+ * - Corporate store not suspended or deleted
+ * Returns array with matching Listing or null for invalid/removed slots.
+ */
+export async function getCompareListings(ids: string[]): Promise<(Listing | null)[]> {
+  const now = new Date();
+  return ids.map((id) => {
+    const listing = db.listings.find((l) => l.id === id);
+    if (!listing) return null;
+    if (listing.status !== 'ACTIVE') return null;
+    if (!listing.expires_at || new Date(listing.expires_at) <= now) return null;
+    if (listing.category !== 'vehicle') return null;
+
+    if (listing.seller_type === 'CORPORATE' && listing.corporate_profile_id) {
+      const store = (db.dealers || []).find((d) => d.id === listing.corporate_profile_id);
+      if (store && (store.moderation_status === 'SUSPENDED' || store.moderation_status === 'DELETED' || store.deleted_at)) {
+        return null;
+      }
+    }
+
+    return listing;
+  });
 }
 
 /**
