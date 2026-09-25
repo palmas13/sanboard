@@ -9,9 +9,10 @@ import { resolveMediaUrl } from '@/lib/media/url';
 interface CompareButtonProps {
   listing: Listing | MemberListingDetail | PublicListingSummary;
   className?: string;
+  variant?: 'default' | 'icon';
 }
 
-export function CompareButton({ listing, className = '' }: CompareButtonProps) {
+export function CompareButton({ listing, className = '', variant = 'default' }: CompareButtonProps) {
   const { isInCompare, addToCompare, removeFromCompare, isFull, setIsTrayOpen } = useCompare();
 
   // Property listings cannot be compared
@@ -49,6 +50,24 @@ export function CompareButton({ listing, className = '' }: CompareButtonProps) {
       }
     }
   };
+
+  if (variant === 'icon') {
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${
+          added
+            ? 'bg-[#FF8A1F] text-white shadow-md shadow-[#FF8A1F]/30 scale-105'
+            : 'bg-black/60 backdrop-blur-md text-white/90 hover:text-white hover:bg-black/80 hover:scale-105'
+        } ${className}`}
+        title={added ? 'Karşılaştırmadan Çıkar' : 'Karşılaştırmaya Ekle'}
+        aria-label={added ? 'Karşılaştırmadan Çıkar' : 'Karşılaştırmaya Ekle'}
+      >
+        <ArrowLeftRight className={`w-3.5 h-3.5 ${added ? 'text-white' : 'text-white/90'}`} />
+      </button>
+    );
+  }
 
   return (
     <button

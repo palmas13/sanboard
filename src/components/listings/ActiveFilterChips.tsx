@@ -20,9 +20,12 @@ export function ActiveFilterChips({ baseRoute = '/arac', className = '' }: Activ
   const model = searchParams.get('model');
   const minPrice = searchParams.get('minPrice');
   const maxPrice = searchParams.get('maxPrice');
+  const minMileage = searchParams.get('minMileage');
+  const maxMileage = searchParams.get('maxMileage');
   const sellerType = searchParams.get('sellerType') || searchParams.get('satici');
   const query = searchParams.get('q');
   const turbo = searchParams.get('turbo');
+  const subwoofer = searchParams.get('subwoofer');
   const trade = searchParams.get('trade');
 
   interface FilterChip {
@@ -57,6 +60,18 @@ export function ActiveFilterChips({ baseRoute = '/arac', className = '' }: Activ
     chips.push({ id: 'price', label: priceLabel, keysToRemove: ['minPrice', 'maxPrice'] });
   }
 
+  if (minMileage || maxMileage) {
+    let mileageLabel = '';
+    if (minMileage && maxMileage) {
+      mileageLabel = `${Number(minMileage).toLocaleString('tr-TR')} km – ${Number(maxMileage).toLocaleString('tr-TR')} km`;
+    } else if (minMileage) {
+      mileageLabel = `Min: ${Number(minMileage).toLocaleString('tr-TR')} km`;
+    } else if (maxMileage) {
+      mileageLabel = `Maks: ${Number(maxMileage).toLocaleString('tr-TR')} km`;
+    }
+    chips.push({ id: 'mileage', label: mileageLabel, keysToRemove: ['minMileage', 'maxMileage'] });
+  }
+
   if (sellerType && sellerType !== 'all') {
     const sLabel = sellerType === 'CORPORATE' ? 'Kurumsal' : 'Bireysel';
     chips.push({ id: 'sellerType', label: sLabel, keysToRemove: ['sellerType', 'satici'] });
@@ -68,6 +83,10 @@ export function ActiveFilterChips({ baseRoute = '/arac', className = '' }: Activ
 
   if (turbo && turbo === 'yes') {
     chips.push({ id: 'turbo', label: 'Turbo', keysToRemove: ['turbo'] });
+  }
+
+  if (subwoofer && subwoofer === 'yes') {
+    chips.push({ id: 'subwoofer', label: 'Subwoofer', keysToRemove: ['subwoofer'] });
   }
 
   if (trade && trade === 'yes') {

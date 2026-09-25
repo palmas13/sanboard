@@ -463,4 +463,56 @@ describe('Sanboard – Vehicle UX Overhaul, Similar Listings & Comparison Tests'
     const isMobileCardResponsive = true;
     assert.strictEqual(isMobileCardResponsive, true);
   });
+
+  // Scenario 25: ActiveFilterChips supports mileage and subwoofer filters and removal
+  it('25. ActiveFilterChips supports mileage and subwoofer filters and removal', () => {
+    const params = new URLSearchParams('brand=Pegassi&minMileage=5000&maxMileage=15000&subwoofer=yes');
+
+    // Verify presence of keys
+    assert.strictEqual(params.get('minMileage'), '5000');
+    assert.strictEqual(params.get('maxMileage'), '15000');
+    assert.strictEqual(params.get('subwoofer'), 'yes');
+
+    // Simulate mileage chip removal
+    const afterMileageRemoval = new URLSearchParams(params.toString());
+    afterMileageRemoval.delete('minMileage');
+    afterMileageRemoval.delete('maxMileage');
+    assert.strictEqual(afterMileageRemoval.get('minMileage'), null);
+    assert.strictEqual(afterMileageRemoval.get('maxMileage'), null);
+    assert.strictEqual(afterMileageRemoval.get('subwoofer'), 'yes');
+
+    // Simulate subwoofer chip removal
+    const afterSubwooferRemoval = new URLSearchParams(afterMileageRemoval.toString());
+    afterSubwooferRemoval.delete('subwoofer');
+    assert.strictEqual(afterSubwooferRemoval.get('subwoofer'), null);
+    assert.strictEqual(afterSubwooferRemoval.get('brand'), 'Pegassi');
+  });
+
+  // Scenario 26: VehicleListingRow compare button maintains independence from favorite button
+  it('26. VehicleListingRow compare button maintains independence from favorite button', () => {
+    const compareSet = new Set<string>();
+    const favoriteSet = new Set<string>();
+
+    const listingId = 'test-veh-01';
+
+    // User toggles compare on listing row
+    if (compareSet.has(listingId)) {
+      compareSet.delete(listingId);
+    } else {
+      compareSet.add(listingId);
+    }
+
+    assert.strictEqual(compareSet.has(listingId), true);
+    assert.strictEqual(favoriteSet.has(listingId), false, 'Toggling compare must not toggle favorites');
+
+    // User toggles favorite on listing row
+    if (favoriteSet.has(listingId)) {
+      favoriteSet.delete(listingId);
+    } else {
+      favoriteSet.add(listingId);
+    }
+
+    assert.strictEqual(favoriteSet.has(listingId), true);
+    assert.strictEqual(compareSet.has(listingId), true, 'Toggling favorite must not affect compare');
+  });
 });

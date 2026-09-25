@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Calendar, Sparkles, Building2, User } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { FavoriteButton } from './FavoriteButton';
+import { CompareButton } from '@/components/compare/CompareButton';
 import { PublicListingSummary } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
 
@@ -79,8 +80,8 @@ export function VehicleListingRow({ listing, className = '' }: VehicleListingRow
             </div>
           </div>
 
-          {/* Right Column: Price & Favorite Button */}
-          <div className="flex items-center gap-4 lg:gap-6 shrink-0 pl-2 pr-1 border-l border-[var(--border-app)]/60">
+          {/* Right Column: Price, Compare & Favorite Button */}
+          <div className="flex items-center gap-3 sm:gap-4 lg:gap-5 shrink-0 pl-3 pr-1 border-l border-[var(--border-app)]/60">
             <div className="text-right">
               {listing.previous_price && listing.price < listing.previous_price && (
                 <div className="text-xs font-semibold text-[var(--text-muted)] line-through">
@@ -93,11 +94,16 @@ export function VehicleListingRow({ listing, className = '' }: VehicleListingRow
             </div>
 
             <div
-              className="z-10"
+              className="flex items-center gap-1.5 z-10"
               onClick={(e) => {
                 e.stopPropagation();
               }}
             >
+              <CompareButton
+                listing={listing}
+                variant="icon"
+                className="!bg-[var(--bg-surface)] hover:!bg-[var(--bg-surface-secondary)] !text-[var(--text-main)] hover:!text-[#FF8A1F] border border-[var(--border-app)] hover:border-[#FF8A1F]/50"
+              />
               <FavoriteButton
                 listingId={listing.id}
                 initialCount={listing.favorite_count}
@@ -129,11 +135,16 @@ export function VehicleListingRow({ listing, className = '' }: VehicleListingRow
               </span>
             </div>
             <div
-              className="absolute top-2 right-2 z-10"
+              className="absolute top-2 right-2 z-10 flex items-center gap-1.5"
               onClick={(e) => {
                 e.stopPropagation();
               }}
             >
+              <CompareButton
+                listing={listing}
+                variant="icon"
+                className="w-8 h-8 !bg-black/60 backdrop-blur-md hover:!bg-black/80"
+              />
               <FavoriteButton
                 listingId={listing.id}
                 initialCount={listing.favorite_count}
