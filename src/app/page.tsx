@@ -49,15 +49,18 @@ export default async function HomePage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-14">
         {/* 2. CTA BANNER (IMMEDIATELY AFTER HERO) */}
-        <section className="surface-card p-6 sm:p-8 rounded-2xl border border-[rgba(255,138,31,0.25)] bg-gradient-to-r from-[var(--bg-surface)] via-[var(--brand-orange-subtle)]/20 to-[var(--bg-surface)] flex flex-col md:flex-row items-center justify-between gap-6 shadow-md">
-          <div className="space-y-1.5 text-center md:text-left">
-            <h2 className="text-xl sm:text-2xl font-black text-[var(--text-main)]">
-              Aracını ya da mülkünü dakikalar içinde ilana ver, Los Santos’un dört bir yanına ulaş.
+        <section className="surface-card p-5 sm:p-6 md:p-7 rounded-2xl border border-[rgba(255,138,31,0.25)] bg-gradient-to-r from-[var(--bg-surface)] via-[var(--brand-orange-subtle)]/15 to-[var(--bg-surface)] flex flex-col md:flex-row items-center justify-between gap-5 shadow-sm">
+          <div className="space-y-1 text-center md:text-left">
+            <h2 className="text-lg sm:text-xl font-bold text-[var(--text-main)] tracking-tight">
+              Aracını ya da mülkünü dakikalar içinde ilana ver
             </h2>
+            <p className="text-xs sm:text-sm text-[var(--text-muted)]">
+              Los Santos’un dört bir yanına ulaş.
+            </p>
           </div>
           <Link
             href="/ilan-ver"
-            className="btn-primary text-sm py-3 px-7 shrink-0 shadow-lg flex items-center gap-2"
+            className="btn-primary text-sm py-2.5 px-6 shrink-0 shadow-md flex items-center gap-2 font-medium hover:opacity-95 transition-all w-full md:w-auto justify-center"
           >
             <PlusCircle className="w-4 h-4" />
             <span>İlan Ver</span>
