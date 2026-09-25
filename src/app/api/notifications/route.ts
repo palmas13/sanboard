@@ -15,6 +15,11 @@ export async function GET(req: NextRequest) {
     }
 
     const repo = getNotificationRepository();
+    if (req.nextUrl.searchParams.get('countOnly') === '1') {
+      const unreadCount = await repo.getUnreadCount(activeProfileId);
+      return NextResponse.json({ unreadCount });
+    }
+
     const [notifications, unreadCount] = await Promise.all([
       repo.getUserNotifications(activeProfileId),
       repo.getUnreadCount(activeProfileId),

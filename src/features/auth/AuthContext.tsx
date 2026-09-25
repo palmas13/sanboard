@@ -191,7 +191,9 @@ export function AuthProvider({
     }
 
     async function initSession() {
-      // If initialProfile was provided from server bootstrap, do not double-fetch
+      // If a protected segment supplied initial auth data, only hydrate the
+      // character switcher in the background. Public root layout intentionally
+      // does not block on auth/profile database reads.
       if (initialProfile && isMounted) {
         try {
           const charRes = await fetch('/api/user/characters');

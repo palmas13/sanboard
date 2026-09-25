@@ -27,9 +27,10 @@ export class SupabaseNotificationRepository implements INotificationRepository {
 
     const { data, error } = await client
       .from('notifications')
-      .select('*')
+      .select('id, recipient_profile_id, type, title, message, entity_type, entity_id, metadata, read_at, created_at')
       .eq('recipient_profile_id', safeId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(50);
 
     if (error) {
       throw new Error(`Supabase error fetching notifications: ${error.message}`);

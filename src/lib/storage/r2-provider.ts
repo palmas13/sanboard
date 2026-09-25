@@ -95,6 +95,7 @@ export class CloudflareR2StorageProvider implements StorageProvider {
         Key: key,
         Body: fileBuffer,
         ContentType: options.contentType,
+        CacheControl: 'public, max-age=31536000, immutable',
         Metadata: {
           category: options.category,
         },

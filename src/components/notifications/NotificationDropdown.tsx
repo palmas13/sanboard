@@ -26,13 +26,13 @@ export function NotificationDropdown() {
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = async (countOnly = false) => {
     if (!currentProfile?.id) return;
     try {
-      const res = await fetch('/api/notifications');
+      const res = await fetch(countOnly ? '/api/notifications?countOnly=1' : '/api/notifications');
       if (!res.ok) return;
       const data = await res.json();
-      setNotifications(data.notifications || []);
+      if (!countOnly) setNotifications(data.notifications || []);
       setUnreadCount(data.unreadCount || 0);
     } catch {
       // Ignore
@@ -41,15 +41,22 @@ export function NotificationDropdown() {
 
   useEffect(() => {
     if (isAuthenticated && currentProfile?.id) {
-      fetchNotifications();
-      // Polling or refresh interval
-      const interval = setInterval(fetchNotifications, 20000);
+      // Keep navbar work lightweight: fetch only the unread count until the
+      // dropdown is opened. Full notification rows are secondary UI.
+      fetchNotifications(true);
+      const interval = setInterval(() => fetchNotifications(true), 60000);
       return () => clearInterval(interval);
     } else {
       setNotifications([]);
       setUnreadCount(0);
     }
   }, [isAuthenticated, currentProfile?.id]);
+
+  useEffect(() => {
+    if (isOpen && isAuthenticated && currentProfile?.id) {
+      fetchNotifications(false);
+    }
+  }, [isOpen, isAuthenticated, currentProfile?.id]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

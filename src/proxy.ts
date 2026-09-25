@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const PROTECTED_PREFIXES = ['/hesabim', '/yonetim', '/ilan-ver'];
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Convenient alias: /hesabim/magazam -> /hesabim/kurumsal
@@ -17,10 +17,9 @@ export function middleware(req: NextRequest) {
 
   if (isProtected) {
     const sessionCookie = req.cookies.get('sanboard_session')?.value;
-    const profileIdCookie = req.cookies.get('sanboard_profile_id')?.value;
-
-    // If completely unauthenticated (no session cookie at all), redirect to login
-    if (!sessionCookie && !profileIdCookie) {
+    // The profile cookie is client-writable routing state, not authentication.
+    // Require the signed HttpOnly session cookie for protected route entry.
+    if (!sessionCookie) {
       const loginUrl = new URL('/giris', req.url);
       loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);

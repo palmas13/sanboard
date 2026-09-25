@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { cache } from 'react';
 import { NextRequest } from 'next/server';
 
 export interface SessionPayload {
@@ -119,7 +120,7 @@ export function verifySessionToken(token: string): SessionPayload | null {
  * Extracts and verifies the authenticated server session from an incoming HTTP request.
  * Completely rejects plain/raw UUID cookies to eliminate cookie spoofing.
  */
-export async function getServerSession(
+async function resolveServerSession(
   req?: NextRequest | Request
 ): Promise<SessionPayload | null> {
   let rawToken: string | undefined;
@@ -154,6 +155,13 @@ export async function getServerSession(
 
   return verifySessionToken(rawToken);
 }
+
+/**
+ * Request-scoped memoized session resolver. React cache deduplicates repeated
+ * calls during the same Server Component render/request without persisting
+ * user-specific data across requests.
+ */
+export const getServerSession = cache(resolveServerSession);
 
 /**
  * Returns formatted Set-Cookie header string for the signed session cookie.

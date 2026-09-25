@@ -4,9 +4,6 @@ import './globals.css';
 import { AuthProvider } from '@/features/auth/AuthContext';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
-import { getServerSession } from '@/lib/auth/session';
-import { getUserRepository } from '@/lib/db/repositories';
-import { User, CharacterProfile } from '@/types';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -28,30 +25,11 @@ export const metadata: Metadata = {
   keywords: ['GTA World', 'Sanboard', 'Los Santos', 'Araç İlanları', 'Mülk İlanları'],
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  let initialUser: User | null = null;
-  let initialProfile: CharacterProfile | null = null;
-  let session = null;
-
-  try {
-    session = await getServerSession();
-    if (session?.userId && session?.profileId) {
-      const userRepo = getUserRepository();
-      const [u, p] = await Promise.all([
-        userRepo.getUserById(session.userId),
-        userRepo.getProfileById(session.profileId),
-      ]);
-      if (u) initialUser = u;
-      if (p) initialProfile = p;
-    }
-  } catch {
-    // Non-blocking fallback
-  }
-
   return (
     <html lang="tr" suppressHydrationWarning className="dark">
       <head>
@@ -77,11 +55,7 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen flex flex-col antialiased bg-[var(--bg-app)] text-[var(--text-main)]`}
       >
-        <AuthProvider
-          initialUser={initialUser}
-          initialProfile={initialProfile}
-          initialStatus={session ? 'authenticated' : 'unauthenticated'}
-        >
+        <AuthProvider>
           <CompareProvider>
             <Navbar />
             <main className="flex-1 w-full">{children}</main>

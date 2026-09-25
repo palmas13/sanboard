@@ -108,7 +108,7 @@ export class SupabaseListingRepository implements IListingRepository {
         featured_until,
         seller_type,
         corporate_profile_id,
-        corporate:corporate_profiles (*),
+        corporate:corporate_profiles (moderation_status, deleted_at),
         listing_images (storage_path, is_cover, sort_order)
       `)
       .eq('status', 'ACTIVE')
@@ -132,6 +132,8 @@ export class SupabaseListingRepository implements IListingRepository {
     } else {
       query = query.order('published_at', { ascending: false });
     }
+
+    query = query.limit(60);
 
     let { data, error } = await query;
 
@@ -167,6 +169,8 @@ export class SupabaseListingRepository implements IListingRepository {
       } else {
         fallbackQuery = fallbackQuery.order('published_at', { ascending: false });
       }
+
+      fallbackQuery = fallbackQuery.limit(60);
 
       const retryRes = await fallbackQuery;
       data = retryRes.data as any;
