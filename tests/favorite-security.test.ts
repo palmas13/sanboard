@@ -7,6 +7,9 @@ import { PUT as updateListingPut } from '@/app/api/user/listings/[id]/route';
 import { GET as adminGet } from '@/app/api/admin/route';
 import { db } from '@/lib/db/store';
 import { createSessionToken, verifySessionToken } from '@/lib/auth/session';
+import { getListingRepository } from '@/lib/db/repositories';
+import fs from 'node:fs';
+import path from 'node:path';
 
 describe('Sanboard Favorite & Session Security Hardening Tests', () => {
   const zadeUserId = '33333333-3333-3333-3333-333333333333';
@@ -57,6 +60,7 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
       { userId: zadeUserId, role: 'USER' },
       {
         listingId: testListingId,
+        isFavorited: true,
         userId: mavisUserId, // Spoofed victim in body
       }
     );
@@ -106,7 +110,7 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
       'http://localhost:3000/api/favorites',
       'POST',
       { userId: zadeUserId, role: 'USER' },
-      { listingId: testListingId } // No userId, no profileId
+      { listingId: testListingId, isFavorited: true } // No userId, no profileId
     );
 
     const res = await toggleFavoritePost(cleanReq);
@@ -157,42 +161,184 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
     assert.strictEqual(favListA[0].id, testListingId);
   });
 
-  test('TEST 5: Duplicate favorite for the same (user_id, listing_id) never creates two rows', async () => {
-    // First toggle: Adds favorite
+  test('TEST 5: Repeated ADD for the same (profile_id, listing_id) is idempotent', async () => {
+    // First request adds favorite
     const req1 = createAuthedRequest(
       'http://localhost:3000/api/favorites',
       'POST',
       { userId: zadeUserId, role: 'USER' },
-      { listingId: testListingId }
+      { listingId: testListingId, isFavorited: true }
     );
     const res1 = await toggleFavoritePost(req1);
     const data1 = await res1.json();
     assert.strictEqual(data1.isFavorited, true);
     assert.strictEqual(db.favorites.filter((f) => f.user_id === zadeUserId && f.listing_id === testListingId).length, 1);
 
-    // Second toggle: Removes favorite (toggles off)
+    // Stale client repeats ADD: relation remains present and unique
     const req2 = createAuthedRequest(
       'http://localhost:3000/api/favorites',
       'POST',
       { userId: zadeUserId, role: 'USER' },
-      { listingId: testListingId }
+      { listingId: testListingId, isFavorited: true }
     );
     const res2 = await toggleFavoritePost(req2);
     const data2 = await res2.json();
-    assert.strictEqual(data2.isFavorited, false);
-    assert.strictEqual(db.favorites.filter((f) => f.user_id === zadeUserId && f.listing_id === testListingId).length, 0);
+    assert.strictEqual(data2.isFavorited, true);
+    assert.strictEqual(db.favorites.filter((f) => f.user_id === zadeUserId && f.listing_id === testListingId).length, 1);
 
-    // Third toggle: Re-adds, count is 1 (never duplicate)
+    // Explicit REMOVE removes exactly that profile relation
     const req3 = createAuthedRequest(
       'http://localhost:3000/api/favorites',
       'POST',
       { userId: zadeUserId, role: 'USER' },
-      { listingId: testListingId }
+      { listingId: testListingId, isFavorited: false }
     );
     const res3 = await toggleFavoritePost(req3);
     const data3 = await res3.json();
-    assert.strictEqual(data3.isFavorited, true);
-    assert.strictEqual(db.favorites.filter((f) => f.user_id === zadeUserId && f.listing_id === testListingId).length, 1);
+    assert.strictEqual(data3.isFavorited, false);
+    assert.strictEqual(db.favorites.filter((f) => f.user_id === zadeUserId && f.listing_id === testListingId).length, 0);
+  });
+
+  test('REGRESSION 1-3: refresh hydration is authoritative and sibling profile remains false', async () => {
+    db.favorites.push({
+      id: 'fav-refresh-profile-a',
+      user_id: zadeUserId,
+      profile_id: 'char-profile-a',
+      listing_id: testListingId,
+      created_at: new Date().toISOString(),
+    });
+
+    const activeRequest = createAuthedRequest(
+      `http://localhost:3000/api/favorites?listingIds=${testListingId}`,
+      'GET',
+      { userId: zadeUserId, role: 'USER', profileId: 'char-profile-a' }
+    );
+    const activeData = await (await getFavoriteStatus(activeRequest)).json();
+    assert.strictEqual(activeData.states[testListingId].isFavorited, true);
+    assert.strictEqual(activeData.states[testListingId].count, 1);
+
+    const siblingRequest = createAuthedRequest(
+      `http://localhost:3000/api/favorites?listingIds=${testListingId}`,
+      'GET',
+      { userId: zadeUserId, role: 'USER', profileId: 'char-profile-b' }
+    );
+    const siblingData = await (await getFavoriteStatus(siblingRequest)).json();
+    assert.strictEqual(siblingData.states[testListingId].isFavorited, false);
+    assert.strictEqual(siblingData.states[testListingId].count, 1);
+  });
+
+  test('REGRESSION 4-5: explicit add and remove change aggregate count by exactly one', async () => {
+    db.favorites.push({
+      id: 'fav-other-profile',
+      user_id: mavisUserId,
+      profile_id: 'char-other-profile',
+      listing_id: testListingId,
+      created_at: new Date().toISOString(),
+    });
+
+    const addRequest = createAuthedRequest(
+      'http://localhost:3000/api/favorites',
+      'POST',
+      { userId: zadeUserId, role: 'USER', profileId: 'char-zade-02' },
+      { listingId: testListingId, isFavorited: true }
+    );
+    const added = await (await toggleFavoritePost(addRequest)).json();
+    assert.strictEqual(added.isFavorited, true);
+    assert.strictEqual(added.count, 2);
+
+    const removeRequest = createAuthedRequest(
+      'http://localhost:3000/api/favorites',
+      'POST',
+      { userId: zadeUserId, role: 'USER', profileId: 'char-zade-02' },
+      { listingId: testListingId, isFavorited: false }
+    );
+    const removed = await (await toggleFavoritePost(removeRequest)).json();
+    assert.strictEqual(removed.isFavorited, false);
+    assert.strictEqual(removed.count, 1);
+  });
+
+  test('REGRESSION 6-8: stale false ADD cannot remove an existing DB favorite or create duplicates', async () => {
+    db.favorites.push({
+      id: 'fav-existing-stale-client',
+      user_id: zadeUserId,
+      profile_id: 'char-zade-02',
+      listing_id: testListingId,
+      created_at: new Date().toISOString(),
+    });
+
+    const staleAddRequest = () => createAuthedRequest(
+      'http://localhost:3000/api/favorites',
+      'POST',
+      { userId: zadeUserId, role: 'USER', profileId: 'char-zade-02' },
+      { listingId: testListingId, isFavorited: true }
+    );
+    const [first, second] = await Promise.all([
+      toggleFavoritePost(staleAddRequest()),
+      toggleFavoritePost(staleAddRequest()),
+    ]);
+    assert.strictEqual((await first.json()).isFavorited, true);
+    assert.strictEqual((await second.json()).isFavorited, true);
+    assert.strictEqual(
+      db.favorites.filter((favorite) => favorite.profile_id === 'char-zade-02' && favorite.listing_id === testListingId).length,
+      1
+    );
+  });
+
+  test('REGRESSION 9-11: favorites page returns true membership and the same real aggregate count', async () => {
+    db.favorites.push(
+      {
+        id: 'fav-page-active',
+        user_id: zadeUserId,
+        profile_id: 'char-zade-02',
+        listing_id: testListingId,
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'fav-page-other',
+        user_id: mavisUserId,
+        profile_id: 'char-mavis-01',
+        listing_id: testListingId,
+        created_at: new Date().toISOString(),
+      }
+    );
+
+    const favoritesRequest = createAuthedRequest(
+      'http://localhost:3000/api/user/favorites',
+      'GET',
+      { userId: zadeUserId, role: 'USER', profileId: 'char-zade-02' }
+    );
+    const favorites = await (await getUserFavoritesGet(favoritesRequest)).json();
+    const favoriteListing = favorites.find((listing: any) => listing.id === testListingId);
+    assert.ok(favoriteListing);
+    assert.strictEqual(favoriteListing.is_favorited, true);
+    assert.strictEqual(favoriteListing.favorite_count, 2);
+
+    const states = await getListingRepository().getFavoriteStates([testListingId], 'char-zade-02');
+    assert.strictEqual(states[testListingId].count, favoriteListing.favorite_count);
+  });
+
+  test('REGRESSION 12-14: character cache isolation, logout persistence and batch query guards remain in source', () => {
+    const buttonSource = fs.readFileSync(
+      path.join(process.cwd(), 'src/components/listings/FavoriteButton.tsx'),
+      'utf8'
+    );
+    const repoSource = fs.readFileSync(
+      path.join(process.cwd(), 'src/lib/db/repositories/supabase/supabase-listing-repo.ts'),
+      'utf8'
+    );
+    const authSource = fs.readFileSync(
+      path.join(process.cwd(), 'src/features/auth/AuthContext.tsx'),
+      'utf8'
+    );
+
+    assert.strictEqual(buttonSource.includes('favoriteStateCache.get(`anon:${listingId}`)'), false);
+    assert.ok(buttonSource.includes('listingIds.join'));
+    assert.ok(buttonSource.includes('mutationPendingRef.current'));
+    assert.ok(buttonSource.includes('isFavorited: optimisticFavorited'));
+    assert.ok(repoSource.includes(".select('listing_id, profile_id')"));
+    assert.ok(repoSource.includes(".in('listing_id', ids)"));
+    assert.ok(repoSource.includes('favorite_count: favoriteCountMap[listing.id] || 0'));
+    assert.strictEqual(authSource.includes('db.favorites'), false, 'Logout must not delete favorite relations');
   });
 
   // =========================================================================
@@ -205,7 +351,7 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
       'http://localhost:3000/api/favorites',
       'POST',
       null,
-      { listingId: testListingId },
+      { listingId: testListingId, isFavorited: true },
       `sanboard_user_id=${mavisUserId}; sanboard_role=ADMIN` // Raw un-signed cookie
     );
 
@@ -236,7 +382,7 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
       'http://localhost:3000/api/favorites',
       'POST',
       { userId: zadeUserId, role: 'USER' },
-      { listingId: testListingId }
+      { listingId: testListingId, isFavorited: true }
     );
 
     const res = await toggleFavoritePost(validReq);

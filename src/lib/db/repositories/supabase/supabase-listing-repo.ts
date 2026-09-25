@@ -6,15 +6,30 @@ import { uploadListingImage } from '@/lib/storage';
 import { deleteMediaSafely } from '@/lib/storage/lifecycle';
 import { resolveUserId, resolveProfileId, isUuid } from '../../id-mapper';
 
+export function isPublicCorporateListingVisible(item: any): boolean {
+  if (item.seller_type !== 'CORPORATE') return true;
+  if (!item.corporate_profile_id || !item.corporate) return false;
+
+  const corporate = Array.isArray(item.corporate) ? item.corporate[0] : item.corporate;
+  if (!corporate) return false;
+
+  return (
+    corporate.moderation_status !== 'SUSPENDED' &&
+    corporate.moderation_status !== 'DELETED' &&
+    !corporate.deleted_at
+  );
+}
+
+export function getSimilarPriceRange(price: number): { minPrice: number; maxPrice: number } {
+  return {
+    minPrice: Math.max(0, Math.floor(price * 0.6)),
+    maxPrice: Math.ceil(price * 1.4),
+  };
+}
+
 export class SupabaseListingRepository implements IListingRepository {
   private isPublicCorporateListingVisible(item: any): boolean {
-    if (item.seller_type !== 'CORPORATE') return true;
-    if (!item.corporate_profile_id || !item.corporate) return false;
-    return (
-      item.corporate.moderation_status !== 'SUSPENDED' &&
-      item.corporate.moderation_status !== 'DELETED' &&
-      !item.corporate.deleted_at
-    );
+    return isPublicCorporateListingVisible(item);
   }
 
   private getClient() {
@@ -370,6 +385,7 @@ export class SupabaseListingRepository implements IListingRepository {
       `;
 
     const currentPrice = current.price || 1;
+    const { minPrice, maxPrice } = getSimilarPriceRange(currentPrice);
     const currentVeh = Array.isArray(current.vehicle_details) ? current.vehicle_details[0] : current.vehicle_details;
     const currentBrand = currentVeh?.brand?.toLowerCase().trim();
     const currentModel = currentVeh?.model?.toLowerCase().trim();
@@ -389,8 +405,8 @@ export class SupabaseListingRepository implements IListingRepository {
         .order('published_at', { ascending: false })
         .limit(80),
       createCandidateQuery()
-        .gte('price', Math.max(0, currentPrice * 0.6))
-        .lte('price', currentPrice * 1.4)
+        .gte('price', minPrice)
+        .lte('price', maxPrice)
         .order('published_at', { ascending: false })
         .limit(80),
     ];
@@ -1357,6 +1373,70 @@ export class SupabaseListingRepository implements IListingRepository {
     }
   }
 
+  async setFavorite(
+    listingId: string,
+    profileId: string,
+    isFavorited: boolean
+  ): Promise<{ isFavorited: boolean; count: number }> {
+    const client = this.getAdminClient();
+    const safeProfileId = resolveProfileId(profileId);
+
+    if (!safeProfileId || !isUuid(safeProfileId) || !isUuid(listingId)) {
+      throw new Error('Geçersiz favori isteği.');
+    }
+
+    if (isFavorited) {
+      const { data: targetListing, error: listingError } = await client
+        .from('listings')
+        .select('id, seller_type, seller_profile_id, corporate_profile_id')
+        .eq('id', listingId)
+        .maybeSingle();
+
+      if (listingError) throw new Error(listingError.message);
+      if (!targetListing) throw new Error('İlan bulunamadı.');
+      if (targetListing.seller_type === 'INDIVIDUAL' && targetListing.seller_profile_id === safeProfileId) {
+        throw new Error('Kendi ilanınızı favorilere ekleyemezsiniz.');
+      }
+
+      if (targetListing.seller_type === 'CORPORATE' && targetListing.corporate_profile_id) {
+        const { data: dealer } = await client
+          .from('corporate_profiles')
+          .select('owner_profile_id')
+          .eq('id', targetListing.corporate_profile_id)
+          .maybeSingle();
+        if (dealer?.owner_profile_id === safeProfileId) {
+          throw new Error('Sahibi olduğunuz mağazanın ilanını favorilere ekleyemezsiniz.');
+        }
+      }
+
+      const safeUserId = await this.resolveAccountUserId(undefined, safeProfileId);
+      const { error: insertError } = await client.from('favorites').upsert(
+        {
+          profile_id: safeProfileId,
+          user_id: safeUserId || undefined,
+          listing_id: listingId,
+        },
+        { onConflict: 'profile_id,listing_id', ignoreDuplicates: true }
+      );
+      if (insertError) throw new Error(insertError.message);
+    } else {
+      const { error: deleteError } = await client
+        .from('favorites')
+        .delete()
+        .eq('profile_id', safeProfileId)
+        .eq('listing_id', listingId);
+      if (deleteError) throw new Error(deleteError.message);
+    }
+
+    const { count, error: countError } = await client
+      .from('favorites')
+      .select('*', { count: 'exact', head: true })
+      .eq('listing_id', listingId);
+    if (countError) throw new Error(countError.message);
+
+    return { isFavorited, count: count || 0 };
+  }
+
   async removeFavorite(listingId: string, profileId: string): Promise<{ success: boolean; count: number }> {
     const client = this.getAdminClient();
     const safeProfileId = resolveProfileId(profileId);
@@ -1373,6 +1453,32 @@ export class SupabaseListingRepository implements IListingRepository {
 
     const { count } = await client.from('favorites').select('*', { count: 'exact', head: true }).eq('listing_id', listingId);
     return { success: true, count: count || 0 };
+  }
+
+  async getFavoriteStates(
+    listingIds: string[],
+    profileId?: string
+  ): Promise<Record<string, { isFavorited: boolean; count: number }>> {
+    const ids = [...new Set(listingIds.filter(isUuid))];
+    const states: Record<string, { isFavorited: boolean; count: number }> = {};
+    for (const id of ids) states[id] = { isFavorited: false, count: 0 };
+    if (ids.length === 0) return states;
+
+    const client = this.getAdminClient();
+    const safeProfileId = profileId ? resolveProfileId(profileId) : undefined;
+    const { data, error } = await client
+      .from('favorites')
+      .select('listing_id, profile_id')
+      .in('listing_id', ids);
+    if (error) throw new Error(error.message);
+
+    for (const favorite of data || []) {
+      const state = states[favorite.listing_id];
+      if (!state) continue;
+      state.count += 1;
+      if (safeProfileId && favorite.profile_id === safeProfileId) state.isFavorited = true;
+    }
+    return states;
   }
 
   async getUserFavorites(profileId: string): Promise<(Listing & { isExpired: boolean })[]> {
@@ -1405,16 +1511,25 @@ export class SupabaseListingRepository implements IListingRepository {
     const ids = rows.map((r: any) => r.id);
 
     const priceHistoryMap: Record<string, number> = {};
+    const favoriteCountMap: Record<string, number> = {};
     if (ids.length > 0) {
-      const { data: histories } = await client
-        .from('listing_price_history')
-        .select('listing_id, old_price, changed_at')
-        .in('listing_id', ids)
-        .order('changed_at', { ascending: false });
+      const [{ data: histories }, { data: favoriteRows }] = await Promise.all([
+        client
+          .from('listing_price_history')
+          .select('listing_id, old_price, changed_at')
+          .in('listing_id', ids)
+          .order('changed_at', { ascending: false }),
+        client.from('favorites').select('listing_id').in('listing_id', ids),
+      ]);
 
       if (histories) {
         for (const h of histories) {
           if (!priceHistoryMap[h.listing_id]) priceHistoryMap[h.listing_id] = h.old_price;
+        }
+      }
+      if (favoriteRows) {
+        for (const favorite of favoriteRows) {
+          favoriteCountMap[favorite.listing_id] = (favoriteCountMap[favorite.listing_id] || 0) + 1;
         }
       }
     }
@@ -1425,6 +1540,8 @@ export class SupabaseListingRepository implements IListingRepository {
       location: listing.category === 'vehicle' ? null : listing.location,
       previous_price: priceHistoryMap[listing.id] && priceHistoryMap[listing.id] !== listing.price ? priceHistoryMap[listing.id] : undefined,
       images: listing.listing_images || [],
+      favorite_count: favoriteCountMap[listing.id] || 0,
+      is_favorited: true,
       isExpired: listing.expires_at ? new Date(listing.expires_at) < now : false,
     }));
   }

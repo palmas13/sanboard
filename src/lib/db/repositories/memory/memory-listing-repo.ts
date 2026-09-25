@@ -55,6 +55,17 @@ export class MemoryListingRepository implements IListingRepository {
     return toggleFavorite(profileId, listingId);
   }
 
+  async setFavorite(listingId: string, profileId: string, isFavorited: boolean) {
+    const existing = (await this.getFavoriteStates([listingId], profileId))[listingId]?.isFavorited;
+    if (existing !== isFavorited) {
+      return toggleFavorite(profileId, listingId);
+    }
+    return {
+      isFavorited,
+      count: (await this.getFavoriteStates([listingId], profileId))[listingId]?.count || 0,
+    };
+  }
+
   async removeFavorite(listingId: string, profileId: string) {
     const res = await toggleFavorite(profileId, listingId);
     if (res.isFavorited) {
@@ -66,6 +77,20 @@ export class MemoryListingRepository implements IListingRepository {
 
   async getUserFavorites(profileId: string) {
     return getUserFavorites(profileId);
+  }
+
+  async getFavoriteStates(listingIds: string[], profileId?: string) {
+    const { db } = await import('../../store');
+    const ids = new Set(listingIds);
+    const states: Record<string, { isFavorited: boolean; count: number }> = {};
+    for (const listingId of ids) {
+      const rows = db.favorites.filter((favorite) => favorite.listing_id === listingId);
+      states[listingId] = {
+        isFavorited: Boolean(profileId && rows.some((favorite) => favorite.profile_id === profileId)),
+        count: rows.length,
+      };
+    }
+    return states;
   }
 
   async removeListing(id: string, profileId: string) {

@@ -73,7 +73,9 @@ export interface IListingRepository {
   getUserListings(profileId: string): Promise<Listing[]>;
   getCorporateListings(corporateProfileId: string): Promise<Listing[]>;
   toggleFavorite(listingId: string, profileId: string): Promise<{ isFavorited: boolean; count: number }>;
+  setFavorite(listingId: string, profileId: string, isFavorited: boolean): Promise<{ isFavorited: boolean; count: number }>;
   removeFavorite(listingId: string, profileId: string): Promise<{ success: boolean; count: number }>;
+  getFavoriteStates(listingIds: string[], profileId?: string): Promise<Record<string, { isFavorited: boolean; count: number }>>;
   getUserFavorites(profileId: string): Promise<(Listing & { isExpired: boolean })[]>;
 }
 

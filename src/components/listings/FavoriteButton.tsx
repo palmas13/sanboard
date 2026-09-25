@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Heart } from 'lucide-react';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -15,8 +15,69 @@ interface FavoriteButtonProps {
   onToggle?: (isFavorited: boolean, count: number) => void;
 }
 
-// Module-level character-scoped cache to prevent 0.5s stale-prop flicker (Sections 31-33)
-const favoriteStateCache = new Map<string, { isFavorited: boolean; count: number; timestamp: number }>();
+type FavoriteState = { isFavorited: boolean; count: number };
+
+// Character-scoped client overlay. Public listing data remains safe to cache globally.
+const favoriteStateCache = new Map<string, FavoriteState>();
+const favoriteStateSubscribers = new Map<string, Set<(state: FavoriteState) => void>>();
+const hydrationQueue = new Map<string, Map<string, Set<(state: FavoriteState) => void>>>();
+let hydrationScheduled = false;
+
+function publishFavoriteState(cacheKey: string, state: FavoriteState) {
+  favoriteStateCache.set(cacheKey, state);
+  favoriteStateSubscribers.get(cacheKey)?.forEach((subscriber) => subscriber(state));
+}
+
+function subscribeFavoriteState(cacheKey: string, subscriber: (state: FavoriteState) => void) {
+  const subscribers = favoriteStateSubscribers.get(cacheKey) || new Set();
+  subscribers.add(subscriber);
+  favoriteStateSubscribers.set(cacheKey, subscribers);
+  return () => {
+    subscribers.delete(subscriber);
+    if (subscribers.size === 0) favoriteStateSubscribers.delete(cacheKey);
+  };
+}
+
+function queueFavoriteHydration(
+  profileId: string,
+  listingId: string,
+  onHydrated: (state: FavoriteState) => void
+) {
+  const profileQueue = hydrationQueue.get(profileId) || new Map();
+  const callbacks = profileQueue.get(listingId) || new Set();
+  callbacks.add(onHydrated);
+  profileQueue.set(listingId, callbacks);
+  hydrationQueue.set(profileId, profileQueue);
+
+  if (hydrationScheduled) return;
+  hydrationScheduled = true;
+  queueMicrotask(async () => {
+    hydrationScheduled = false;
+    const batches = [...hydrationQueue.entries()];
+    hydrationQueue.clear();
+
+    await Promise.all(batches.map(async ([batchProfileId, listings]) => {
+      const listingIds = [...listings.keys()];
+      try {
+        const response = await fetch(`/api/favorites?listingIds=${encodeURIComponent(listingIds.join(','))}`);
+        if (!response.ok) return;
+        const data = await response.json();
+        for (const listingId of listingIds) {
+          const state = data.states?.[listingId];
+          if (!state) continue;
+          const normalized = {
+            isFavorited: Boolean(state.isFavorited),
+            count: Math.max(0, Number(state.count) || 0),
+          };
+          publishFavoriteState(`${batchProfileId}:${listingId}`, normalized);
+          listings.get(listingId)?.forEach((callback) => callback(normalized));
+        }
+      } catch {
+        // Keep server-rendered public count if hydration temporarily fails.
+      }
+    }));
+  });
+}
 
 export function FavoriteButton({
   listingId,
@@ -30,31 +91,46 @@ export function FavoriteButton({
   const { currentProfile, isAuthenticated, authStatus } = useAuth();
   const router = useRouter();
 
-  const profileKey = currentProfile?.id || 'anon';
-  const cacheKey = `${profileKey}:${listingId}`;
+  const profileId = currentProfile?.id;
+  const cacheKey = profileId ? `${profileId}:${listingId}` : null;
+  const cached = cacheKey ? favoriteStateCache.get(cacheKey) : undefined;
 
-  const cached = favoriteStateCache.get(cacheKey) || favoriteStateCache.get(`anon:${listingId}`);
-  const isCacheRecent = cached && Date.now() - cached.timestamp < 60000;
-
-  const [isFavorited, setIsFavorited] = useState(isCacheRecent ? cached.isFavorited : initialIsFavorited);
-  const [count, setCount] = useState(isCacheRecent ? cached.count : initialCount);
+  const [isFavorited, setIsFavorited] = useState(cached?.isFavorited ?? initialIsFavorited);
+  const [count, setCount] = useState(cached?.count ?? initialCount);
   const [isLoading, setIsLoading] = useState(false);
+  const mutationPendingRef = useRef(false);
+  const mutationVersionRef = useRef(0);
 
-  // Sync state if props change, respecting recent client mutations
+  // Public props provide aggregate count; authenticated membership is hydrated in one batch request.
   useEffect(() => {
-    const entry = favoriteStateCache.get(cacheKey) || favoriteStateCache.get(`anon:${listingId}`);
-    if (entry && Date.now() - entry.timestamp < 60000) {
-      setIsFavorited(entry.isFavorited);
-      setCount(entry.count);
-      if (profileKey !== 'anon') {
-        favoriteStateCache.set(cacheKey, entry);
-      }
+    const versionAtStart = mutationVersionRef.current;
+    if (!cacheKey || !profileId || authStatus !== 'authenticated') {
+      setIsFavorited(initialIsFavorited);
+      setCount(initialCount);
       return;
     }
 
-    setIsFavorited(initialIsFavorited);
-    setCount(initialCount);
-  }, [initialIsFavorited, initialCount, cacheKey, listingId, profileKey]);
+    const entry = favoriteStateCache.get(cacheKey);
+    if (entry) {
+      setIsFavorited(entry.isFavorited);
+      setCount(entry.count);
+    } else {
+      setIsFavorited(initialIsFavorited);
+      setCount(initialCount);
+    }
+
+    const unsubscribe = subscribeFavoriteState(cacheKey, (state) => {
+      if (mutationPendingRef.current || mutationVersionRef.current !== versionAtStart) return;
+      setIsFavorited(state.isFavorited);
+      setCount(state.count);
+    });
+    queueFavoriteHydration(profileId, listingId, (state) => {
+      if (mutationPendingRef.current || mutationVersionRef.current !== versionAtStart) return;
+      setIsFavorited(state.isFavorited);
+      setCount(state.count);
+    });
+    return unsubscribe;
+  }, [initialIsFavorited, initialCount, cacheKey, listingId, profileId, authStatus]);
 
   const handleToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -69,23 +145,24 @@ export function FavoriteButton({
       return;
     }
 
-    if (isLoading) return;
+    if (mutationPendingRef.current) return;
 
     // Optimistic toggle
     const prevFavorited = isFavorited;
     const prevCount = count;
     const optimisticFavorited = !prevFavorited;
     const optimisticCount = prevFavorited ? Math.max(0, count - 1) : count + 1;
+    const mutationVersion = mutationVersionRef.current + 1;
+    mutationVersionRef.current = mutationVersion;
+    mutationPendingRef.current = true;
 
     setIsFavorited(optimisticFavorited);
     setCount(optimisticCount);
     const optimisticEntry = {
       isFavorited: optimisticFavorited,
       count: optimisticCount,
-      timestamp: Date.now(),
     };
-    favoriteStateCache.set(cacheKey, optimisticEntry);
-    favoriteStateCache.set(`anon:${listingId}`, optimisticEntry);
+    if (cacheKey) publishFavoriteState(cacheKey, optimisticEntry);
     onToggle?.(optimisticFavorited, optimisticCount);
     setIsLoading(true);
 
@@ -93,15 +170,14 @@ export function FavoriteButton({
       const res = await fetch('/api/favorites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ listingId }),
+        body: JSON.stringify({ listingId, isFavorited: optimisticFavorited }),
       });
 
       if (res.status === 401) {
         // Conclusively unauthenticated from server: revert and redirect to login
         setIsFavorited(prevFavorited);
         setCount(prevCount);
-        favoriteStateCache.delete(cacheKey);
-        favoriteStateCache.delete(`anon:${listingId}`);
+        if (cacheKey) favoriteStateCache.delete(cacheKey);
         router.push(`/giris?redirect=/ilan/${listingId}`);
         return;
       }
@@ -113,10 +189,8 @@ export function FavoriteButton({
         const revertEntry = {
           isFavorited: prevFavorited,
           count: prevCount,
-          timestamp: Date.now(),
         };
-        favoriteStateCache.set(cacheKey, revertEntry);
-        favoriteStateCache.set(`anon:${listingId}`, revertEntry);
+        if (cacheKey) publishFavoriteState(cacheKey, revertEntry);
         onToggle?.(prevFavorited, prevCount);
         return;
       }
@@ -125,12 +199,10 @@ export function FavoriteButton({
       const confirmedEntry = {
         isFavorited: data.isFavorited,
         count: data.count,
-        timestamp: Date.now(),
       };
       setIsFavorited(data.isFavorited);
       setCount(data.count);
-      favoriteStateCache.set(cacheKey, confirmedEntry);
-      favoriteStateCache.set(`anon:${listingId}`, confirmedEntry);
+      if (cacheKey) publishFavoriteState(cacheKey, confirmedEntry);
       onToggle?.(data.isFavorited, data.count);
     } catch {
       // Network or fetch exception: revert WITHOUT redirecting
@@ -139,12 +211,11 @@ export function FavoriteButton({
       const revertEntry = {
         isFavorited: prevFavorited,
         count: prevCount,
-        timestamp: Date.now(),
       };
-      favoriteStateCache.set(cacheKey, revertEntry);
-      favoriteStateCache.set(`anon:${listingId}`, revertEntry);
+      if (cacheKey) publishFavoriteState(cacheKey, revertEntry);
       onToggle?.(prevFavorited, prevCount);
     } finally {
+      if (mutationVersionRef.current === mutationVersion) mutationPendingRef.current = false;
       setIsLoading(false);
     }
   };
@@ -158,6 +229,7 @@ export function FavoriteButton({
     <button
       type="button"
       onClick={handleToggle}
+      disabled={isLoading}
       aria-label={isFavorited ? 'Favorilerden çıkar' : 'Favorilere ekle'}
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${
         isFavorited

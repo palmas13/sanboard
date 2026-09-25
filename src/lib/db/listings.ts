@@ -925,6 +925,7 @@ export async function getUserFavorites(
       ...l,
       isExpired,
       favorite_count: favCount,
+      is_favorited: true,
     };
   });
 }

@@ -35,6 +35,7 @@ import { DealerProfile } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { formatDate } from '@/lib/utils/format';
 import { normalizeSocialMedia } from '@/lib/dealers/social';
+import { readJsonResponse } from '@/lib/http/json-response';
 
 export default function HesabimKurumsalPage() {
   const router = useRouter();
@@ -242,14 +243,13 @@ export default function HesabimKurumsalPage() {
     setSuccess('');
 
     try {
-      const res = await fetch('/api/dealers/activate', {
+      const res = await fetch('/api/dealers/subscription/activate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dealerId: dealer.id, profileId: currentProfile.id }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Aktivasyon başarısız.');
+      await readJsonResponse<{ success: true }>(res, 'Kurumsal üyelik aktivasyonu başarısız.');
 
       setSuccess('Kurumsal üyeliğiniz başarıyla aktif edildi! Mağaza vitrininiz açıldı.');
       await fetchDealer();

@@ -18,13 +18,18 @@ export function VehicleListingRow({ listing, className = '' }: VehicleListingRow
 
   const displayImage = resolveMediaUrl(listing.cover_image) || fallbackImage;
 
-  const brandModelText = [listing.brand, listing.model].filter(Boolean).join(' ') || listing.subcategory;
+  const brandModelText = [listing.brand, listing.model].filter(Boolean).join(' ');
 
   return (
     <div
-      className={`group surface-card rounded-xl border border-[var(--border-app)] hover:border-[#FF8A1F]/40 hover:bg-[var(--bg-surface-secondary)]/50 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-lg overflow-hidden ${className}`}
+      className={`group relative surface-card rounded-xl border border-[var(--border-app)] hover:border-[#FF8A1F]/40 hover:bg-[var(--bg-surface-secondary)]/50 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-lg overflow-hidden ${className}`}
     >
-      <Link href={`/ilan/${listing.id}`} className="block">
+      <Link
+        href={`/ilan/${listing.id}`}
+        className="absolute inset-0 z-0"
+        aria-label={`${listing.title} ilanını aç`}
+      />
+      <div className="relative z-10 pointer-events-none">
         {/* Desktop View: Horizontal Row (approx 125-155px height) */}
         <div className="hidden sm:flex items-center min-h-[135px] max-h-[160px] p-3 gap-4 lg:gap-5">
           {/* Cover Photo */}
@@ -55,12 +60,6 @@ export function VehicleListingRow({ listing, className = '' }: VehicleListingRow
               </p>
             )}
 
-            <div>
-              <span className="inline-flex items-center rounded-full border border-[#FF8A1F]/25 bg-[#FF8A1F]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#FF8A1F]">
-                {listing.subcategory}
-              </span>
-            </div>
-
             <div className="flex items-center gap-1 text-xs text-[var(--text-dim)] pt-1">
               <Calendar className="w-3 h-3" />
               <span>{formatDate(listing.published_at)}</span>
@@ -80,12 +79,7 @@ export function VehicleListingRow({ listing, className = '' }: VehicleListingRow
               </div>
             </div>
 
-            <div
-              className="flex items-center gap-1.5 z-10"
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
-            >
+            <div className="relative z-20 flex items-center gap-1.5 pointer-events-auto">
               <CompareButton
                 listing={listing}
                 variant="icon"
@@ -118,12 +112,7 @@ export function VehicleListingRow({ listing, className = '' }: VehicleListingRow
                 </span>
               )}
             </div>
-            <div
-              className="absolute top-2 right-2 z-10 flex items-center gap-1.5"
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
-            >
+            <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 pointer-events-auto">
               <CompareButton
                 listing={listing}
                 variant="icon"
@@ -147,11 +136,6 @@ export function VehicleListingRow({ listing, className = '' }: VehicleListingRow
                 {brandModelText}
               </p>
             )}
-            <div>
-              <span className="inline-flex items-center rounded-full border border-[#FF8A1F]/25 bg-[#FF8A1F]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#FF8A1F]">
-                {listing.subcategory}
-              </span>
-            </div>
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t border-[var(--border-app)] text-xs">
@@ -164,7 +148,7 @@ export function VehicleListingRow({ listing, className = '' }: VehicleListingRow
             </div>
           </div>
         </div>
-      </Link>
+      </div>
     </div>
   );
 }

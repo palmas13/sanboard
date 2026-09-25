@@ -19,7 +19,7 @@ import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { ReportModal } from '@/components/listings/ReportModal';
 import { CompareButton } from '@/components/compare/CompareButton';
 import { SimilarListings } from '@/components/listings/SimilarListings';
-import { getSimilarListings } from '@/lib/db/listings';
+import { getOptionalSimilarListings } from '@/lib/db/optional-listing-data';
 import { MemberListingDetail } from '@/types';
 
 interface PageProps {
@@ -102,14 +102,9 @@ export default async function ListingDetailPage({ params }: PageProps) {
   const categoryLink = isVehicle ? '/arac' : '/mulk';
   const categoryName = isVehicle ? 'Araç' : 'Mülk';
 
-  let similarListings: any[] = [];
-  if (isVehicle) {
-    if (repo.getSimilarListings) {
-      similarListings = await repo.getSimilarListings(id, 6);
-    } else {
-      similarListings = await getSimilarListings(id, 6);
-    }
-  }
+  const similarListings = isVehicle
+    ? await getOptionalSimilarListings(repo, id, 6)
+    : [];
 
   return (
     <div className="max-w-7xl xl:max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">

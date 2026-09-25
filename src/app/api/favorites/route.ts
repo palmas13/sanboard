@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getListingRepository } from '@/lib/db/repositories';
 import { getServerSession } from '@/lib/auth/session';
 
-// Toggle favorite (POST)
+// Set favorite state deterministically (POST)
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const listingId = body.listingId;
+    const desiredState = body.isFavorited;
 
     // Cryptographically verified session (rejects raw UUID spoofing)
     const session = await getServerSession(req);
@@ -40,8 +41,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (typeof desiredState !== 'boolean') {
+      return NextResponse.json(
+        { error: 'isFavorited boolean parametresi zorunludur.' },
+        { status: 400 }
+      );
+    }
+
     const repo = getListingRepository();
-    const result = await repo.toggleFavorite(listingId, activeProfileId);
+    const result = await repo.setFavorite(listingId, activeProfileId, desiredState);
     return NextResponse.json({
       success: true,
       isFavorited: result.isFavorited,
@@ -61,28 +69,27 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const listingId = searchParams.get('listingId');
+    const listingIds = (searchParams.get('listingIds') || searchParams.get('listingId') || '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean)
+      .slice(0, 100);
 
     // Cryptographically verified session
     const session = await getServerSession(req);
     const activeProfileId = session?.profileId;
 
-    if (!listingId) {
-      return NextResponse.json({ error: 'listingId parametresi zorunludur.' }, { status: 400 });
+    if (listingIds.length === 0) {
+      return NextResponse.json({ error: 'listingId veya listingIds parametresi zorunludur.' }, { status: 400 });
     }
 
     const repo = getListingRepository();
-    const { listing } = await repo.getListingById(listingId, activeProfileId);
+    const states = await repo.getFavoriteStates(listingIds, activeProfileId);
+    if (searchParams.has('listingIds')) return NextResponse.json({ states });
 
-    if (!listing) {
-      return NextResponse.json({ error: 'İlan bulunamadı.' }, { status: 404 });
-    }
-
-    return NextResponse.json({
-      listingId,
-      isFavorited: Boolean((listing as any).is_favorited),
-      count: listing.favorite_count || 0,
-    });
+    const listingId = listingIds[0];
+    const state = states[listingId] || { isFavorited: false, count: 0 };
+    return NextResponse.json({ listingId, ...state });
   } catch (error: any) {
     return NextResponse.json(
       { error: error?.message || 'Favori durumu alınamadı.' },

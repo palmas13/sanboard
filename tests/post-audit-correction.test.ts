@@ -19,6 +19,7 @@ import { normalizePhone } from '@/lib/utils/format';
 import { POST as checkoutPost } from '@/app/api/checkout/route';
 import { POST as activateSubscriptionPost } from '@/app/api/dealers/subscription/activate/route';
 import { adminDelistListing } from '@/lib/db/admin';
+import { readJsonResponse } from '@/lib/http/json-response';
 
 describe('Sanboard Post-Audit Correction Pass: Sections 36-47', () => {
   const accountAUserId = '22222222-2222-2222-2222-222222222222';
@@ -567,6 +568,7 @@ describe('Sanboard Post-Audit Correction Pass: Sections 36-47', () => {
     });
     const authRes = await activateSubscriptionPost(authReq);
     assert.strictEqual(authRes.status, 200);
+    assert.match(authRes.headers.get('content-type') || '', /application\/json/);
 
     // Checkout endpoint verification for Corporate Credit ($1,750)
     const checkoutReq = new NextRequest('http://localhost:3000/api/checkout', {
@@ -583,6 +585,50 @@ describe('Sanboard Post-Audit Correction Pass: Sections 36-47', () => {
     assert.strictEqual(checkoutRes.status, 200);
     const checkoutData = await checkoutRes.json();
     assert.strictEqual(checkoutData.amount, 1750, 'Corporate credit checkout price must be $1,750');
+  });
+
+  it('Section 46 regression: corporate subscription client targets the existing JSON route', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const source = fs.readFileSync(
+      path.join(process.cwd(), 'src/app/hesabim/kurumsal/page.tsx'),
+      'utf8'
+    );
+
+    assert.ok(source.includes("fetch('/api/dealers/subscription/activate'"));
+    assert.strictEqual(source.includes("fetch('/api/dealers/activate'"), false);
+    assert.ok(source.includes("readJsonResponse<{ success: true }>(res"));
+  });
+
+  it('Section 46 regression: unauthenticated activation errors are JSON, not login redirects', async () => {
+    const req = new NextRequest('http://localhost:3000/api/dealers/subscription/activate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ dealerId: 'dealer-apex-01' }),
+    });
+    const res = await activateSubscriptionPost(req);
+    const payload = await res.json();
+
+    assert.strictEqual(res.status, 401);
+    assert.match(res.headers.get('content-type') || '', /application\/json/);
+    assert.match(payload.error, /Yetkisiz erişim/);
+    assert.strictEqual(res.headers.get('location'), null);
+  });
+
+  it('Section 46 regression: JSON response reader rejects HTML without exposing parser errors', async () => {
+    const htmlResponse = new Response('<!DOCTYPE html><html><body>Not Found</body></html>', {
+      status: 404,
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+    });
+
+    await assert.rejects(
+      () => readJsonResponse(htmlResponse, 'Kurumsal üyelik aktivasyonu başarısız.'),
+      (error: Error) => {
+        assert.match(error.message, /HTTP 404/);
+        assert.doesNotMatch(error.message, /Unexpected token/);
+        return true;
+      }
+    );
   });
 
   // =========================================================================

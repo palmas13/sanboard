@@ -11,6 +11,11 @@ import {
 } from '../src/lib/db/listings';
 import { resolveMediaUrl } from '../src/lib/media/url';
 import { Listing, PublicListingSummary } from '../src/types';
+import { getOptionalSimilarListings } from '../src/lib/db/optional-listing-data';
+import {
+  getSimilarPriceRange,
+  isPublicCorporateListingVisible,
+} from '../src/lib/db/repositories/supabase/supabase-listing-repo';
 
 describe('Sanboard – Vehicle UX Overhaul, Similar Listings & Comparison Tests', () => {
   const TEST_VEHICLE_A: Listing = {
@@ -518,12 +523,19 @@ describe('Sanboard – Vehicle UX Overhaul, Similar Listings & Comparison Tests'
     assert.strictEqual(compareSet.has(listingId), true, 'Toggling favorite must not affect compare');
   });
 
-  it('27. VehicleListingRow keeps category chip and does not render vehicle year', () => {
+  it('27. VehicleListingRow renders brand/model without category, subcategory, or vehicle year', () => {
     const source = fs.readFileSync(
       path.join(process.cwd(), 'src/components/listings/VehicleListingRow.tsx'),
       'utf8'
     );
-    assert.ok(source.includes('{listing.subcategory}'), 'Category/subcategory chip must remain visible');
+
+    assert.ok(
+      source.includes("const brandModelText = [listing.brand, listing.model].filter(Boolean).join(' ');"),
+      'Existing listing summary brand/model data must drive the vehicle subtitle'
+    );
+    assert.ok(source.includes('{brandModelText}'), 'Brand/model text must be rendered');
+    assert.strictEqual(source.includes('listing.category'), false, 'Category text must not render in the row');
+    assert.strictEqual(source.includes('listing.subcategory'), false, 'Category/subcategory badge must not render or act as a fallback');
     assert.strictEqual(source.includes('listing.vehicle_details?.year'), false);
     assert.strictEqual(source.includes('listing.year'), false);
   });
@@ -535,7 +547,9 @@ describe('Sanboard – Vehicle UX Overhaul, Similar Listings & Comparison Tests'
     );
     assert.ok(source.includes(".eq('subcategory', currentSubcategory)"));
     assert.ok(source.includes(".from('vehicle_details').select('listing_id')"));
-    assert.ok(source.includes(".gte('price', Math.max(0, currentPrice * 0.6))"));
+    assert.ok(source.includes('const { minPrice, maxPrice } = getSimilarPriceRange(currentPrice);'));
+    assert.ok(source.includes(".gte('price', minPrice)"));
+    assert.ok(source.includes(".lte('price', maxPrice)"));
     assert.strictEqual(source.includes('.limit(50)'), false);
     assert.ok(source.includes(".neq('id', currentListingId)"));
   });
@@ -560,5 +574,91 @@ describe('Sanboard – Vehicle UX Overhaul, Similar Listings & Comparison Tests'
     );
     assert.ok(facadeSource.includes('return getSupabaseRepo().getCompareListings(ids);'));
     assert.ok(routeSource.includes('.slice(0, 2)'));
+  });
+
+  it('31. similar listing price range uses bigint-safe integer boundaries', () => {
+    const range = getSimilarPriceRange(49999);
+    assert.deepStrictEqual(range, { minPrice: 29999, maxPrice: 69999 });
+    assert.strictEqual(Number.isInteger(range.minPrice), true);
+    assert.strictEqual(Number.isInteger(range.maxPrice), true);
+  });
+
+  it('32. optional similar listing failure does not break listing detail data', async () => {
+    const originalConsoleError = console.error;
+    let logged = false;
+    console.error = () => { logged = true; };
+
+    try {
+      const result = await getOptionalSimilarListings({
+        getSimilarListings: async () => {
+          throw new Error('secondary query failed');
+        },
+      } as any, TEST_VEHICLE_A.id, 6);
+
+      assert.deepStrictEqual(result, []);
+      assert.strictEqual(logged, true, 'Secondary failure must remain observable in server logs');
+      assert.strictEqual(TEST_VEHICLE_A.status, 'ACTIVE', 'Primary listing remains renderable');
+    } finally {
+      console.error = originalConsoleError;
+    }
+  });
+
+  it('33. optional similar listing empty result is safe', async () => {
+    const result = await getOptionalSimilarListings({
+      getSimilarListings: async () => [],
+    } as any, TEST_VEHICLE_A.id, 6);
+    assert.deepStrictEqual(result, []);
+  });
+
+  it('34. corporate visibility safely handles null and array relations', () => {
+    assert.strictEqual(isPublicCorporateListingVisible({ seller_type: 'INDIVIDUAL' }), true);
+    assert.strictEqual(isPublicCorporateListingVisible({
+      seller_type: 'CORPORATE',
+      corporate_profile_id: 'dealer-1',
+      corporate: null,
+    }), false);
+    assert.strictEqual(isPublicCorporateListingVisible({
+      seller_type: 'CORPORATE',
+      corporate_profile_id: 'dealer-1',
+      corporate: [{ moderation_status: 'ACTIVE', deleted_at: null }],
+    }), true);
+  });
+
+  it('35. VehicleListingRow uses a full-row link without nesting action buttons', () => {
+    const source = fs.readFileSync(
+      path.join(process.cwd(), 'src/components/listings/VehicleListingRow.tsx'),
+      'utf8'
+    );
+    const linkCloseIndex = source.indexOf('/>\n      <div className="relative z-10 pointer-events-none">');
+    const compareIndex = source.indexOf('<CompareButton');
+    const favoriteIndex = source.indexOf('<FavoriteButton');
+
+    assert.ok(source.includes('href={`/ilan/${listing.id}`}'));
+    assert.ok(source.includes('className="absolute inset-0 z-0"'));
+    assert.ok(linkCloseIndex > -1, 'Full-row navigation link must be self-closing');
+    assert.ok(compareIndex > linkCloseIndex, 'CompareButton must be outside the navigation link');
+    assert.ok(favoriteIndex > linkCloseIndex, 'FavoriteButton must be outside the navigation link');
+    assert.ok(source.includes('pointer-events-auto'));
+  });
+
+  it('36. compare and favorite buttons prevent listing navigation only on their own clicks', () => {
+    const compareSource = fs.readFileSync(
+      path.join(process.cwd(), 'src/components/compare/CompareButton.tsx'),
+      'utf8'
+    );
+    const favoriteSource = fs.readFileSync(
+      path.join(process.cwd(), 'src/components/listings/FavoriteButton.tsx'),
+      'utf8'
+    );
+    const rowSource = fs.readFileSync(
+      path.join(process.cwd(), 'src/components/listings/VehicleListingRow.tsx'),
+      'utf8'
+    );
+
+    assert.ok(compareSource.includes('e.preventDefault();'));
+    assert.ok(compareSource.includes('e.stopPropagation();'));
+    assert.ok(favoriteSource.includes('e.preventDefault();'));
+    assert.ok(favoriteSource.includes('e.stopPropagation();'));
+    assert.strictEqual(rowSource.includes('onClick={(e)'), false, 'Row containers must not suppress navigation');
   });
 });

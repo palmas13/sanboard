@@ -140,12 +140,6 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-semibold text-[var(--text-muted)]">Karakter Paneli</span>
-              {currentProfile.is_dealer && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border border-[rgba(255,138,31,0.25)]">
-                  <Crown className="w-3 h-3" />
-                  Kurumsal Mağaza
-                </span>
-              )}
               {isAdmin && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
                   <Shield className="w-3 h-3" />
