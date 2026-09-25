@@ -121,7 +121,7 @@ export interface IDealerRepository {
   getDealerById(id: string): Promise<CorporateProfile | null>;
   getDealerByPublicId?(publicId: number): Promise<CorporateProfile | null>;
   getDealerBySlug(slug: string): Promise<CorporateProfile | null>;
-  getDealerByProfileId(profileId: string): Promise<CorporateProfile | null>;
+  getDealerByProfileId(profileId: string, includeDeleted?: boolean): Promise<CorporateProfile | null>;
   getAllDealers?(): Promise<CorporateProfile[]>;
   getApplicationByProfileId?(profileId: string): Promise<CorporateApplication | null>;
   getAllApplications?(): Promise<CorporateApplication[]>;

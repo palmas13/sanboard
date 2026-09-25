@@ -310,7 +310,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(result);
       }
 
-      // Store Moderation: Suspend (Section 14)
+      // Store Moderation: Suspend (Section 14 & 15)
       case 'suspendStore': {
         if (!payload.reason?.trim()) {
           return NextResponse.json({ error: 'Askıya alma nedeni zorunludur.' }, { status: 400 });
@@ -320,6 +320,18 @@ export async function POST(req: NextRequest) {
           payload.reason,
           adminActorProfileId
         );
+        try {
+          const { revalidatePath } = await import('next/cache');
+          revalidatePath('/');
+          revalidatePath('/arac');
+          revalidatePath('/mulk');
+          revalidatePath('/hesabim');
+          revalidatePath('/hesabim/kurumsal');
+          revalidatePath('/yonetim');
+          if (payload.dealerId) {
+            revalidatePath(`/premium/${payload.dealerId}`);
+          }
+        } catch {}
         return NextResponse.json(result);
       }
 
@@ -329,10 +341,22 @@ export async function POST(req: NextRequest) {
           payload.dealerId,
           adminActorProfileId
         );
+        try {
+          const { revalidatePath } = await import('next/cache');
+          revalidatePath('/');
+          revalidatePath('/arac');
+          revalidatePath('/mulk');
+          revalidatePath('/hesabim');
+          revalidatePath('/hesabim/kurumsal');
+          revalidatePath('/yonetim');
+          if (payload.dealerId) {
+            revalidatePath(`/premium/${payload.dealerId}`);
+          }
+        } catch {}
         return NextResponse.json(result);
       }
 
-      // Store Moderation: Delete (Section 16 - soft delete)
+      // Store Moderation: Delete (Section 16 - soft delete & cache invalidation)
       case 'deleteStore': {
         if (!payload.reason?.trim()) {
           return NextResponse.json({ error: 'Silme gerekçesi zorunludur.' }, { status: 400 });
@@ -342,6 +366,18 @@ export async function POST(req: NextRequest) {
           payload.reason,
           adminActorProfileId
         );
+        try {
+          const { revalidatePath } = await import('next/cache');
+          revalidatePath('/');
+          revalidatePath('/arac');
+          revalidatePath('/mulk');
+          revalidatePath('/hesabim');
+          revalidatePath('/hesabim/kurumsal');
+          revalidatePath('/yonetim');
+          if (payload.dealerId) {
+            revalidatePath(`/premium/${payload.dealerId}`);
+          }
+        } catch {}
         return NextResponse.json(result);
       }
 

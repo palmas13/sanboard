@@ -222,7 +222,7 @@ export function FilterSidebar({
             onChange={(e) => setLocation(e.target.value)}
             className="form-input text-xs"
           >
-            <option value="all">Tüm San Andreas</option>
+            <option value="all">Tüm Los Santos</option>
             {LOS_SANTOS_LOCATIONS.map((loc) => (
               <option key={loc} value={loc}>
                 {loc}

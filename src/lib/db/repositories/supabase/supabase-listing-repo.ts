@@ -175,13 +175,14 @@ export class SupabaseListingRepository implements IListingRepository {
     const favCountMap: Record<string, number> = {};
 
     if (listingIds.length > 0) {
+      const adminClient = this.getAdminClient();
       const [histRes, favRes] = await Promise.all([
-        client
+        adminClient
           .from('listing_price_history')
           .select('listing_id, old_price, changed_at')
           .in('listing_id', listingIds)
           .order('changed_at', { ascending: false }),
-        client
+        adminClient
           .from('favorites')
           .select('listing_id')
           .in('listing_id', listingIds),
@@ -205,7 +206,11 @@ export class SupabaseListingRepository implements IListingRepository {
     const filteredRows = (rows || []).filter((item: any) => {
       // Exclude listings from suspended or deleted corporate stores (Section 14 & 16)
       if (item.seller_type === 'CORPORATE' && item.corporate) {
-        if (item.corporate.moderation_status === 'SUSPENDED' || item.corporate.moderation_status === 'DELETED') {
+        if (
+          item.corporate.moderation_status === 'SUSPENDED' ||
+          item.corporate.moderation_status === 'DELETED' ||
+          item.corporate.deleted_at
+        ) {
           return false;
         }
       }
@@ -286,20 +291,34 @@ export class SupabaseListingRepository implements IListingRepository {
 
     // Resolve viewer identity
     const safeViewerProfileId = viewerProfileId ? resolveProfileId(viewerProfileId) : null;
-    const safeViewerUserId = await this.resolveAccountUserId(viewerUserId, viewerProfileId);
 
-    const isOwner = Boolean(
-      (safeViewerProfileId && listing.seller_profile_id === safeViewerProfileId) ||
-      (safeViewerUserId && listing.seller?.user_id === safeViewerUserId)
-    );
+    let isOwner = false;
+    if (safeViewerProfileId) {
+      const isCorporate = listing.seller_type === 'CORPORATE' || Boolean(listing.corporate_profile_id);
+      if (isCorporate) {
+        const storeOwnerId = listing.corporate?.owner_profile_id;
+        isOwner = Boolean(storeOwnerId && storeOwnerId === safeViewerProfileId);
+      } else {
+        isOwner = Boolean(listing.seller_profile_id === safeViewerProfileId);
+      }
+    }
 
-    // Fetch favorite count and character favorite status
+    // Check store moderation state for corporate listings (Section 2 & 12)
+    if (listing.seller_type === 'CORPORATE' && listing.corporate) {
+      const corpMod = listing.corporate.moderation_status;
+      if ((corpMod === 'SUSPENDED' || corpMod === 'DELETED' || listing.corporate.deleted_at) && !isOwner) {
+        return { listing: null, isLocked: false, isOwner: false };
+      }
+    }
+
+    // Fetch favorite count and character favorite status using adminClient so RLS does not zero-out counts
+    const adminClient = this.getAdminClient();
     const [favCountRes, userFavRes, histRes] = await Promise.all([
-      client.from('favorites').select('*', { count: 'exact', head: true }).eq('listing_id', id),
+      adminClient.from('favorites').select('*', { count: 'exact', head: true }).eq('listing_id', id),
       safeViewerProfileId
-        ? client.from('favorites').select('id').eq('listing_id', id).eq('profile_id', safeViewerProfileId).maybeSingle()
+        ? adminClient.from('favorites').select('id').eq('listing_id', id).eq('profile_id', safeViewerProfileId).maybeSingle()
         : Promise.resolve({ data: null }),
-      client
+      adminClient
         .from('listing_price_history')
         .select('old_price')
         .eq('listing_id', id)
@@ -926,16 +945,30 @@ export class SupabaseListingRepository implements IListingRepository {
     const ids = rows.map((r: any) => r.id);
 
     const priceHistoryMap: Record<string, number> = {};
-    if (ids.length > 0) {
-      const { data: histories } = await client
-        .from('listing_price_history')
-        .select('listing_id, old_price, changed_at')
-        .in('listing_id', ids)
-        .order('changed_at', { ascending: false });
+    const favCountMap: Record<string, number> = {};
 
-      if (histories) {
-        for (const h of histories) {
+    if (ids.length > 0) {
+      const [historiesRes, favsRes] = await Promise.all([
+        client
+          .from('listing_price_history')
+          .select('listing_id, old_price, changed_at')
+          .in('listing_id', ids)
+          .order('changed_at', { ascending: false }),
+        this.getAdminClient()
+          .from('favorites')
+          .select('listing_id')
+          .in('listing_id', ids),
+      ]);
+
+      if (historiesRes.data) {
+        for (const h of historiesRes.data) {
           if (!priceHistoryMap[h.listing_id]) priceHistoryMap[h.listing_id] = h.old_price;
+        }
+      }
+
+      if (favsRes.data) {
+        for (const f of favsRes.data) {
+          favCountMap[f.listing_id] = (favCountMap[f.listing_id] || 0) + 1;
         }
       }
     }
@@ -944,6 +977,7 @@ export class SupabaseListingRepository implements IListingRepository {
       ...item,
       location: item.category === 'vehicle' ? null : item.location,
       previous_price: priceHistoryMap[item.id] && priceHistoryMap[item.id] !== item.price ? priceHistoryMap[item.id] : undefined,
+      favorite_count: favCountMap[item.id] || 0,
       images: item.listing_images || [],
     }));
   }
@@ -977,16 +1011,30 @@ export class SupabaseListingRepository implements IListingRepository {
     const ids = rows.map((r: any) => r.id);
 
     const priceHistoryMap: Record<string, number> = {};
-    if (ids.length > 0) {
-      const { data: histories } = await client
-        .from('listing_price_history')
-        .select('listing_id, old_price, changed_at')
-        .in('listing_id', ids)
-        .order('changed_at', { ascending: false });
+    const favCountMap: Record<string, number> = {};
 
-      if (histories) {
-        for (const h of histories) {
+    if (ids.length > 0) {
+      const [historiesRes, favsRes] = await Promise.all([
+        client
+          .from('listing_price_history')
+          .select('listing_id, old_price, changed_at')
+          .in('listing_id', ids)
+          .order('changed_at', { ascending: false }),
+        this.getAdminClient()
+          .from('favorites')
+          .select('listing_id')
+          .in('listing_id', ids),
+      ]);
+
+      if (historiesRes.data) {
+        for (const h of historiesRes.data) {
           if (!priceHistoryMap[h.listing_id]) priceHistoryMap[h.listing_id] = h.old_price;
+        }
+      }
+
+      if (favsRes.data) {
+        for (const f of favsRes.data) {
+          favCountMap[f.listing_id] = (favCountMap[f.listing_id] || 0) + 1;
         }
       }
     }
@@ -995,6 +1043,7 @@ export class SupabaseListingRepository implements IListingRepository {
       ...item,
       location: item.category === 'vehicle' ? null : item.location,
       previous_price: priceHistoryMap[item.id] && priceHistoryMap[item.id] !== item.price ? priceHistoryMap[item.id] : undefined,
+      favorite_count: favCountMap[item.id] || 0,
       images: item.listing_images || [],
     }));
   }
@@ -1020,6 +1069,33 @@ export class SupabaseListingRepository implements IListingRepository {
       const { count } = await client.from('favorites').select('*', { count: 'exact', head: true }).eq('listing_id', listingId);
       return { isFavorited: false, count: count || 0 };
     } else {
+      // Self-abuse check before adding favorite
+      const { data: targetListing } = await client
+        .from('listings')
+        .select('id, seller_type, seller_profile_id, corporate_profile_id')
+        .eq('id', listingId)
+        .maybeSingle();
+
+      if (!targetListing) {
+        throw new Error('İlan bulunamadı.');
+      }
+
+      if (targetListing.seller_type === 'INDIVIDUAL' && targetListing.seller_profile_id === safeProfileId) {
+        throw new Error('Kendi ilanınızı favorilere ekleyemezsiniz.');
+      }
+
+      if (targetListing.seller_type === 'CORPORATE' && targetListing.corporate_profile_id) {
+        const { data: dealer } = await client
+          .from('corporate_profiles')
+          .select('owner_profile_id')
+          .eq('id', targetListing.corporate_profile_id)
+          .maybeSingle();
+
+        if (dealer && dealer.owner_profile_id === safeProfileId) {
+          throw new Error('Sahibi olduğunuz mağazanın ilanını favorilere ekleyemezsiniz.');
+        }
+      }
+
       const safeUserId = await this.resolveAccountUserId(undefined, safeProfileId);
       await client.from('favorites').insert({
         profile_id: safeProfileId,

@@ -93,31 +93,6 @@ export default function HesabimOverviewPage() {
         </div>
       )}
 
-      {/* Corporate Store Notice (Directs Store Owners to 'Mağazam' without mixing metrics) */}
-      {currentProfile?.is_dealer && (
-        <div className="p-4 rounded-2xl bg-[var(--bg-surface-secondary)] border border-[rgba(255,138,31,0.25)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[var(--brand-orange-subtle)] text-[#FF8A1F] flex items-center justify-center font-bold shrink-0">
-              <Crown className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-[var(--text-main)]">
-                Kurumsal Mağaza Yönetimi
-              </h3>
-              <p className="text-xs text-[var(--text-muted)]">
-                Kurumsal mağazanıza ait envanter, başvuru ve mağaza istatistikleri ayrı olarak <strong className="text-[#FF8A1F]">Kurumsal Profil</strong> menüsü altında yer almaktadır.
-              </p>
-            </div>
-          </div>
-          <Link
-            href="/hesabim/kurumsal"
-            className="btn-secondary text-xs py-2 px-3.5 shadow-sm inline-flex items-center gap-1.5 shrink-0"
-          >
-            <span>Mağazama Git</span>
-            <ChevronRight className="w-3.5 h-3.5 text-[#FF8A1F]" />
-          </Link>
-        </div>
-      )}
 
       {/* Stat Cards Grid: Strictly Personal Account Context */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

@@ -305,7 +305,7 @@ export default function YeniIlanOlusturPage() {
         <p className="text-xs sm:text-sm text-[var(--text-muted)]">
           {isCorporate && currentProfile?.is_dealer
             ? 'Kurumsal vitrininize özel ilanınızı oluşturun ve Los Santos pazarında öne çıkın.'
-            : '7 Günlük Standart İlan hakkını kullanarak ilanını San Andreas\'a duyur.'}
+            : '7 Günlük Standart İlan hakkını kullanarak ilanını Los Santos\'a duyur.'}
         </p>
 
         {/* Stepper pills */}

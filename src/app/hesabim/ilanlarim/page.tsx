@@ -203,7 +203,7 @@ export default function HesabimIlanlarimPage() {
               Aktif ilanınız bulunmuyor.
             </h3>
             <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
-              Araç veya mülkünüzü San Andreas'a duyurmak için hemen yeni bir ilan paketi başlatabilirsiniz.
+              Araç veya mülkünüzü Los Santos'a duyurmak için hemen yeni bir ilan paketi başlatabilirsiniz.
             </p>
             <div className="pt-2">
               <Link href="/ilan-ver" className="btn-primary text-xs py-2 px-4 inline-flex">

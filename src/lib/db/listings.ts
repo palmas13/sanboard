@@ -13,6 +13,7 @@ import { SupabaseListingRepository } from './repositories/supabase/supabase-list
 import { deleteMediaSafely } from '../storage/lifecycle';
 import { extractMediaKey } from '../media/url';
 import { resolveUserId } from './id-mapper';
+import { isListingOwnedByActiveProfile } from '../dealers/eligibility';
 
 export interface ListingFilterParams {
   category?: ListingCategory;
@@ -243,12 +244,15 @@ export async function getListingById(
 
   // Check if expired and viewer is not the owner
   const isExpired = listing.expires_at ? new Date(listing.expires_at) <= new Date() : false;
-  const isOwner = Boolean(viewerProfileId && listing.seller_profile_id === viewerProfileId);
+  const store = listing.seller_type === 'CORPORATE' && listing.corporate_profile_id
+    ? (db.dealers || []).find((d) => d.id === listing.corporate_profile_id)
+    : undefined;
+  const storeOwnerId = store?.owner_profile_id || store?.profile_id;
+  const isOwner = isListingOwnedByActiveProfile(listing, viewerProfileId, storeOwnerId);
 
   // Check store moderation state for corporate listings
-  if (listing.seller_type === 'CORPORATE' && listing.corporate_profile_id) {
-    const store = (db.dealers || []).find((d) => d.id === listing.corporate_profile_id);
-    if (store && (store.moderation_status === 'SUSPENDED' || store.moderation_status === 'DELETED') && !isOwner) {
+  if (listing.seller_type === 'CORPORATE' && store) {
+    if ((store.moderation_status === 'SUSPENDED' || store.moderation_status === 'DELETED' || store.deleted_at) && !isOwner) {
       return { listing: null, isLocked: false, isOwner: false };
     }
   }
@@ -290,7 +294,7 @@ export async function getListingById(
         address: 'Vinewood Boulevard No: 12, Vinewood Hills',
         phone: '555-0192',
         sanmail_email: 'apex.motors@sanmail.com',
-        purpose: 'San Andreas genelinde kurumsal otomobil galerisi ve emlak ofisi işletmek.',
+        purpose: 'Los Santos genelinde kurumsal otomobil galerisi ve emlak ofisi işletmek.',
         status: 'APPROVED',
         created_at: '2026-09-02T10:00:00Z',
         updated_at: '2026-09-02T10:00:00Z',

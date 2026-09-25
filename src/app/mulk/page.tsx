@@ -59,7 +59,7 @@ export default async function PropertyListingsPage({ searchParams }: PageProps) 
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] mt-1 flex items-center gap-2.5">
             <Home className="w-7 h-7 text-[#FF8A1F]" />
-            <span>San Andreas Mülk İlanları</span>
+            <span>Los Santos Mülk İlanları</span>
           </h1>
         </div>
 

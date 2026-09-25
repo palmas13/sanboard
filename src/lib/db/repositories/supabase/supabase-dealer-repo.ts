@@ -60,10 +60,26 @@ export class SupabaseDealerRepository implements IDealerRepository {
     return mapCorporateProfile(data);
   }
 
-  async getDealerByProfileId(profileId: string): Promise<CorporateProfile | null> {
+  async getDealerByProfileId(profileId: string, includeDeleted = false): Promise<CorporateProfile | null> {
     const client = this.getClient();
-    const { data, error } = await client.from('corporate_profiles').select('*').eq('owner_profile_id', profileId).maybeSingle();
+    let query = client.from('corporate_profiles').select('*').eq('owner_profile_id', profileId);
+
+    if (!includeDeleted) {
+      query = query.neq('moderation_status', 'DELETED').is('deleted_at', null);
+    } else {
+      query = query.order('created_at', { ascending: false });
+    }
+
+    const { data, error } = await query.limit(1).maybeSingle();
     if (error) {
+      if (error.message?.includes('moderation_status')) {
+        const { data: fallbackData } = await client
+          .from('corporate_profiles')
+          .select('*')
+          .eq('owner_profile_id', profileId)
+          .maybeSingle();
+        return mapCorporateProfile(fallbackData);
+      }
       throw new Error(`Supabase error fetching corporate profile by owner: ${error.message}`);
     }
     return mapCorporateProfile(data);
@@ -86,6 +102,34 @@ export class SupabaseDealerRepository implements IDealerRepository {
 
   async createApplication(params: { profileId: string; companyName: string; purpose: string }): Promise<{ success: boolean; application?: CorporateApplication; error?: string }> {
     const client = this.getAdminClient();
+
+    // 1. Check if user has an active or suspended store (Requirement 2 B)
+    const { data: existingStore } = await client
+      .from('corporate_profiles')
+      .select('id, moderation_status')
+      .eq('owner_profile_id', params.profileId)
+      .neq('moderation_status', 'DELETED')
+      .is('deleted_at', null)
+      .maybeSingle();
+
+    if (existingStore) {
+      if (existingStore.moderation_status === 'SUSPENDED') {
+        return { success: false, error: 'Askıya alınmış bir kurumsal mağazanız bulunmaktadır. Yeni başvuru yapamazsınız.' };
+      }
+      return { success: false, error: 'Zaten aktif veya onaylanmış bir kurumsal mağazanız bulunmaktadır.' };
+    }
+
+    // 2. Check if user already has a pending application
+    const { data: existingApp } = await client
+      .from('corporate_applications')
+      .select('id')
+      .eq('applicant_profile_id', params.profileId)
+      .eq('status', 'PENDING')
+      .maybeSingle();
+
+    if (existingApp) {
+      return { success: false, error: 'Zaten beklemede olan bir kurumsal başvurunuz bulunmaktadır.' };
+    }
 
     const { data, error } = await client
       .from('corporate_applications')
@@ -558,7 +602,9 @@ export class SupabaseDealerRepository implements IDealerRepository {
         recipient_profile_id: ownerId,
         type: 'CORPORATE_STORE_SUSPENDED',
         title: 'Kurumsal Mağazanız Askıya Alındı',
-        message: `Kurumsal mağazanız yönetim tarafından askıya alındı. Neden: ${reason}`,
+        message: reason
+          ? `${dealer.company_name} mağazanız yönetim tarafından askıya alınmıştır. Neden: ${reason}`
+          : `${dealer.company_name} mağazanız yönetim tarafından askıya alınmıştır.`,
         entity_type: 'application',
         entity_id: dealerId,
       });
@@ -670,7 +716,9 @@ export class SupabaseDealerRepository implements IDealerRepository {
         recipient_profile_id: ownerId,
         type: 'CORPORATE_STORE_DELETED',
         title: 'Kurumsal Mağazanız Kaldırıldı',
-        message: `Kurumsal mağazanız yönetim tarafından kaldırıldı. Neden: ${reason}`,
+        message: reason
+          ? `${dealer.company_name} mağazanız yönetim tarafından silinmiştir. Neden: ${reason}`
+          : `${dealer.company_name} mağazanız yönetim tarafından silinmiştir.`,
         entity_type: 'application',
         entity_id: dealerId,
       });

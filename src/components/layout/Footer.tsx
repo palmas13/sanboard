@@ -10,7 +10,7 @@ export function Footer() {
           <div className="space-y-2 max-w-sm">
             <SanboardLogo size="md" />
             <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-              San Andreas'ın en kapsamlı roleplay ilan platformu. Araç ve mülk alım satımında güvenilir buluşma noktası.
+              Los Santos'un en kapsamlı roleplay ilan platformu. Araç ve mülk alım satımında güvenilir buluşma noktası.
             </p>
           </div>
 
@@ -40,12 +40,7 @@ export function Footer() {
         </div>
 
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-dim)]">
-          <p>© {new Date().getFullYear()} Sanboard. Tüm hakları saklıdır.</p>
-          <p className="flex items-center gap-1.5">
-            <span>Los Santos, San Andreas</span>
-            <span>•</span>
-            <span className="text-[var(--text-muted)]">GTA World RP Community</span>
-          </p>
+          <p>© 2026 Sanboard.</p>
         </div>
       </div>
     </footer>

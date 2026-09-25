@@ -10,7 +10,7 @@ export default function HakkimizdaPage() {
           <SanboardLogo size="lg" />
         </div>
         <h1 className="text-3xl sm:text-4xl font-extrabold text-[var(--text-main)]">
-          San Andreas'ın İlan Platformu
+          Los Santos'un İlan Platformu
         </h1>
         <p className="text-sm text-[var(--text-muted)] max-w-xl mx-auto">
           Sanboard, GTA World evreninde araç ve mülk alım satımını kolaylaştıran bağımsız bir roleplay ilan ağıdır.

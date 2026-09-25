@@ -4,17 +4,20 @@ export type CorporateSubscriptionStatus = 'INACTIVE' | 'ACTIVE' | 'EXPIRED' | nu
 export interface CorporateSidebarLabelParams {
   applicationStatus?: CorporateApplicationStatus;
   subscriptionStatus?: CorporateSubscriptionStatus;
+  moderationStatus?: string;
   isDealer?: boolean;
   hasApprovedStore?: boolean;
 }
 
 /**
  * Computes the navigation label for the corporate dashboard button.
- * Requirements (Sections 5 & 44):
+ * Requirements:
+ * - DELETED: "Kurumsal Başvuru"
  * - NONE / undefined: "Kurumsal Başvuru"
  * - PENDING: "Kurumsal Başvuru"
  * - REJECTED: "Kurumsal Başvuru"
  * - APPROVED + subscription INACTIVE: "Kurumsal Profil"
+ * - SUSPENDED: "Kurumsal Profil"
  * - ACTIVE: "Kurumsal Profil"
  * - EXPIRED: "Kurumsal Profil"
  */
@@ -24,6 +27,7 @@ export function getCorporateSidebarLabel(
 ): string {
   let appStatus: CorporateApplicationStatus | 'NONE' | undefined;
   let subStatus: CorporateSubscriptionStatus | undefined;
+  let moderationStatus: string | undefined;
   let hasApprovedStore = false;
   let isDealer = false;
 
@@ -33,8 +37,13 @@ export function getCorporateSidebarLabel(
   } else if (paramsOrAppStatus && typeof paramsOrAppStatus === 'object') {
     appStatus = paramsOrAppStatus.applicationStatus;
     subStatus = paramsOrAppStatus.subscriptionStatus;
+    moderationStatus = paramsOrAppStatus.moderationStatus;
     hasApprovedStore = Boolean(paramsOrAppStatus.hasApprovedStore);
     isDealer = Boolean(paramsOrAppStatus.isDealer);
+  }
+
+  if (moderationStatus === 'DELETED') {
+    return 'Kurumsal Başvuru';
   }
 
   // If user has an approved corporate store (or approved application)

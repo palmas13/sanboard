@@ -1,4 +1,4 @@
-﻿import { CorporateApplication, DealerProfile } from '@/types';
+import { CorporateApplication, DealerProfile } from '@/types';
 import { getDealerRepository } from '@/lib/db/repositories';
 import { db } from '@/lib/db/store';
 
@@ -21,6 +21,32 @@ export interface CorporateEligibilityResult {
 }
 
 /**
+ * Authoritative Canonical Listing Ownership Checker (Section 4 & 14).
+ * Enforces character-scoped ownership without account-level or sibling fallback.
+ */
+export function isListingOwnedByActiveProfile(
+  listing: {
+    seller_type?: 'INDIVIDUAL' | 'CORPORATE';
+    seller_profile_id?: string;
+    corporate_profile_id?: string | null;
+  },
+  activeProfileId?: string | null,
+  storeOwnerProfileId?: string | null
+): boolean {
+  if (!activeProfileId) return false;
+
+  const isCorporate = listing.seller_type === 'CORPORATE' || Boolean(listing.corporate_profile_id);
+
+  if (isCorporate) {
+    // Kurumsal ilan: corporate_profiles.owner_profile_id === activeProfileId
+    return Boolean(storeOwnerProfileId && storeOwnerProfileId === activeProfileId);
+  }
+
+  // Bireysel ilan: listing.seller_profile_id === activeProfileId
+  return Boolean(listing.seller_profile_id && listing.seller_profile_id === activeProfileId);
+}
+
+/**
  * Authoritative Server-Side Corporate Publishing Eligibility Resolver.
  * Resolves strictly from database state. Does NOT trust client-side flags.
  */
@@ -32,7 +58,9 @@ export async function resolveCorporateEligibility(profileId: string): Promise<Co
   const dealerRepo = getDealerRepository();
 
   // 1. Fetch store by profileId (owner_profile_id or profile_id)
-  let dealer = await dealerRepo.getDealerByProfileId(profileId);
+  let dealer = typeof (dealerRepo as any).getDealerByProfileId === 'function'
+    ? await (dealerRepo as any).getDealerByProfileId(profileId, true)
+    : await dealerRepo.getDealerByProfileId(profileId);
 
   // 2. Fetch application history for profile if available
   let application: CorporateApplication | null = null;

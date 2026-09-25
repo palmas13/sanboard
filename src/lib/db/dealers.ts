@@ -19,7 +19,7 @@ export function ensureDealers() {
         address: 'Vinewood Boulevard No: 12, Vinewood Hills',
         phone: '555-0192',
         sanmail_email: 'apex.motors@sanmail.com',
-        purpose: 'San Andreas genelinde kurumsal otomobil galerisi ve emlak ofisi işletmek.',
+        purpose: 'Los Santos genelinde kurumsal otomobil galerisi ve emlak ofisi işletmek.',
         status: 'APPROVED',
         subscription_status: 'ACTIVE',
         moderation_status: 'ACTIVE',
@@ -42,12 +42,19 @@ export function ensureDealers() {
   }
 }
 
-export async function getDealerByProfileId(profileId: string): Promise<DealerProfile | null> {
+export async function getDealerByProfileId(profileId: string, includeDeleted = false): Promise<DealerProfile | null> {
   if (process.env.DATA_STORE === 'supabase') {
-    return getDealerRepository().getDealerByProfileId(profileId) as any;
+    return (getDealerRepository() as any).getDealerByProfileId(profileId, includeDeleted) as any;
   }
   ensureDealers();
-  return db.dealers.find((d) => d.profile_id === profileId || d.owner_profile_id === profileId) || null;
+  return (
+    db.dealers.find((d) => {
+      const isOwner = d.profile_id === profileId || d.owner_profile_id === profileId;
+      if (!isOwner) return false;
+      if (includeDeleted) return true;
+      return d.moderation_status !== 'DELETED' && !d.deleted_at;
+    }) || null
+  );
 }
 
 export async function getDealerById(dealerId: string): Promise<DealerProfile | null> {
@@ -108,10 +115,13 @@ export async function applyForDealer(params: {
   const existingStore = db.dealers.find(
     (d) =>
       (d.profile_id === params.profileId || d.owner_profile_id === params.profileId) &&
-      d.status === 'APPROVED' &&
-      d.moderation_status !== 'DELETED'
+      d.moderation_status !== 'DELETED' &&
+      !d.deleted_at
   );
   if (existingStore) {
+    if (existingStore.moderation_status === 'SUSPENDED') {
+      return { success: false, error: 'Askıya alınmış bir kurumsal mağazanız bulunmaktadır. Yeni başvuru yapamazsınız.' };
+    }
     return { success: false, error: 'Zaten onaylanmış bir kurumsal hesabınız bulunmaktadır.' };
   }
 
@@ -502,7 +512,9 @@ export async function suspendCorporateStore(
       user_id: profile?.user_id,
       type: 'CORPORATE_STORE_SUSPENDED',
       title: 'Kurumsal Mağazanız Askıya Alındı',
-      message: `Kurumsal mağazanız yönetim tarafından askıya alındı. Neden: ${reason}`,
+      message: reason
+        ? `${dealer.company_name} mağazanız yönetim tarafından askıya alınmıştır. Neden: ${reason}`
+        : `${dealer.company_name} mağazanız yönetim tarafından askıya alınmıştır.`,
       entity_type: 'application',
       entity_id: dealer.id,
     });
@@ -617,7 +629,9 @@ export async function deleteCorporateStore(
       user_id: profile?.user_id,
       type: 'CORPORATE_STORE_DELETED',
       title: 'Kurumsal Mağazanız Kaldırıldı',
-      message: `Kurumsal mağazanız yönetim tarafından kaldırıldı. Neden: ${reason}`,
+      message: reason
+        ? `${dealer.company_name} mağazanız yönetim tarafından silinmiştir. Neden: ${reason}`
+        : `${dealer.company_name} mağazanız yönetim tarafından silinmiştir.`,
       entity_type: 'application',
       entity_id: dealer.id,
     });

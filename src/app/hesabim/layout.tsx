@@ -69,16 +69,17 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
   const avatarSrc = currentProfile.avatar_path || currentProfile.avatar_url;
   const resolvedAvatar = avatarSrc ? resolveAvatarUrl(avatarSrc) : '';
 
+  const isDeletedStore = (dealerInfo as any)?.moderation_status === 'DELETED' || Boolean((dealerInfo as any)?.deleted_at);
   const hasApprovedCorporate = Boolean(
-    dealerInfo?.status === 'APPROVED' ||
-    currentProfile.is_dealer ||
-    currentProfile.dealer_id
+    !isDeletedStore &&
+    (dealerInfo?.status === 'APPROVED' || currentProfile.is_dealer || currentProfile.dealer_id)
   );
 
   const corporateLabel = getCorporateSidebarLabel({
     hasApprovedStore: hasApprovedCorporate,
-    subscriptionStatus: (dealerInfo?.subscription_status as any) || (currentProfile.is_dealer ? 'ACTIVE' : null),
-    isDealer: Boolean(currentProfile.is_dealer || currentProfile.dealer_id),
+    subscriptionStatus: (dealerInfo?.subscription_status as any) || (hasApprovedCorporate ? 'ACTIVE' : null),
+    moderationStatus: isDeletedStore ? 'DELETED' : (dealerInfo as any)?.moderation_status,
+    isDealer: Boolean(hasApprovedCorporate),
   });
 
   const isCorporateIdentity = corporateLabel === 'Kurumsal Profil';

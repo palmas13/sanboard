@@ -29,8 +29,8 @@ export class MemoryDealerRepository implements IDealerRepository {
     return getDealerBySlug(slug);
   }
 
-  async getDealerByProfileId(profileId: string): Promise<CorporateProfile | null> {
-    return getDealerByProfileId(profileId);
+  async getDealerByProfileId(profileId: string, includeDeleted?: boolean): Promise<CorporateProfile | null> {
+    return getDealerByProfileId(profileId, includeDeleted);
   }
 
   async getAllDealers(): Promise<CorporateProfile[]> {

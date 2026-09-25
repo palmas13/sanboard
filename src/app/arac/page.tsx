@@ -65,7 +65,7 @@ export default async function VehicleListingsPage({ searchParams }: PageProps) {
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] mt-1 flex items-center gap-2.5">
             <Car className="w-7 h-7 text-[#FF8A1F]" />
-            <span>San Andreas Araç İlanları</span>
+            <span>Los Santos Araç İlanları</span>
           </h1>
         </div>
 

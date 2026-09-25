@@ -36,15 +36,20 @@ export async function GET(req: NextRequest) {
           profileId
             ? client.from('character_profiles').select('*').eq('id', profileId).maybeSingle()
             : Promise.resolve({ data: null, error: null }),
-          client
-            .from('listings')
-            .select('id, status, favorite_count')
-            .eq('user_id', userId)
-            .eq('seller_type', 'INDIVIDUAL'),
-          client
-            .from('favorites')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', userId),
+          profileId
+            ? client
+                .from('listings')
+                .select('id, status')
+                .eq('seller_profile_id', profileId)
+                .eq('seller_type', 'INDIVIDUAL')
+                .is('corporate_profile_id', null)
+            : Promise.resolve({ data: [], error: null }),
+          profileId
+            ? client
+                .from('favorites')
+                .select('*', { count: 'exact', head: true })
+                .eq('profile_id', profileId)
+            : Promise.resolve({ count: 0, error: null }),
           profileId
             ? client
                 .from('listing_credits')
@@ -55,8 +60,10 @@ export async function GET(req: NextRequest) {
           profileId
             ? client
                 .from('corporate_profiles')
-                .select('id, company_name, status, public_id')
-                .eq('profile_id', profileId)
+                .select('id, company_name, status, moderation_status, public_id, owner_profile_id')
+                .eq('owner_profile_id', profileId)
+                .neq('moderation_status', 'DELETED')
+                .is('deleted_at', null)
                 .maybeSingle()
             : Promise.resolve({ data: null, error: null }),
           client
@@ -69,10 +76,16 @@ export async function GET(req: NextRequest) {
       const personalListings = listingsRes.data || [];
       const activeListings = personalListings.filter((l) => l.status === 'ACTIVE').length;
       const expiredListings = personalListings.filter((l) => l.status === 'EXPIRED').length;
-      const totalReceivedFavorites = personalListings.reduce(
-        (sum, l) => sum + (l.favorite_count || 0),
-        0
-      );
+      
+      let totalReceivedFavorites = 0;
+      const personalListingIds = personalListings.map((l) => l.id);
+      if (personalListingIds.length > 0) {
+        const { count } = await client
+          .from('favorites')
+          .select('*', { count: 'exact', head: true })
+          .in('listing_id', personalListingIds);
+        totalReceivedFavorites = count || 0;
+      }
 
       const availableCredits = creditRes.data?.balance || 0;
       const favoritesCount = favsCountRes.count || 0;
@@ -92,7 +105,7 @@ export async function GET(req: NextRequest) {
           availableCredits,
         },
         corporate: {
-          isDealer: Boolean(corpRes.data && corpRes.data.status === 'APPROVED'),
+          isDealer: Boolean(corpRes.data && (corpRes.data.status === 'APPROVED' || corpRes.data.moderation_status === 'ACTIVE')),
           dealerProfile: corpRes.data || null,
         },
         support: {
@@ -102,42 +115,32 @@ export async function GET(req: NextRequest) {
     }
 
     // Memory Store Implementation
+    const userProfiles = db.profiles.filter((p) => (userId && p.user_id === userId) || (session.userId && p.user_id === session.userId));
+    const profileIds = new Set([profileId, session.profileId, ...userProfiles.map((p) => p.id)].filter(Boolean) as string[]);
+
     const memProfile = db.profiles.find(
       (p) =>
         p.id === profileId ||
         p.id === session.profileId ||
         p.user_id === userId ||
-        p.user_id === session.userId ||
-        (userId === '33333333-3333-3333-3333-333333333333' && p.user_id === 'usr-user-2') ||
-        (userId === '22222222-2222-2222-2222-222222222222' && p.user_id === 'usr-admin-1')
+        p.user_id === session.userId
     );
-    const userProfiles = db.profiles.filter(
-      (p) =>
-        p.id === profileId ||
-        p.id === session.profileId ||
-        p.user_id === userId ||
-        p.user_id === session.userId ||
-        (userId === '33333333-3333-3333-3333-333333333333' && p.user_id === 'usr-user-2') ||
-        (userId === '22222222-2222-2222-2222-222222222222' && p.user_id === 'usr-admin-1')
-    );
-    const profileIds = new Set(userProfiles.map((p) => p.id));
-    if (profileId) profileIds.add(profileId);
 
     const personalListings = db.listings.filter(
-      (l) => profileIds.has(l.seller_profile_id) && l.seller_type !== 'CORPORATE'
+      (l) => l.seller_profile_id === profileId && l.seller_type === 'INDIVIDUAL' && !l.corporate_profile_id
     );
     const activeListings = personalListings.filter((l) => l.status === 'ACTIVE').length;
     const expiredListings = personalListings.filter((l) => l.status === 'EXPIRED').length;
-    const totalReceivedFavorites = personalListings.reduce(
-      (sum, l) => sum + (l.favorite_count || 0),
-      0
-    );
+    const personalListingIds = new Set(personalListings.map((l) => l.id));
+    const totalReceivedFavorites = db.favorites.filter((f) => personalListingIds.has(f.listing_id)).length;
 
-    const favoritesCount = db.favorites.filter((f) => f.user_id === userId).length;
+    const favoritesCount = db.favorites.filter((f) => f.profile_id === profileId).length;
     const availableCredits = db.credits.filter(
       (c) => c.profile_id === profileId && c.status === 'AVAILABLE'
     ).length;
-    const corpStore = db.dealers.find((d) => d.profile_id === profileId);
+    const corpStore = (db.dealers || []).find(
+      (d) => (d.owner_profile_id === profileId || d.profile_id === profileId) && d.moderation_status !== 'DELETED' && !d.deleted_at
+    );
     const openTickets = db.tickets.filter(
       (t) => (profileIds.has(t.profile_id) || t.profile_id === profileId) && t.status === 'OPEN'
     ).length;

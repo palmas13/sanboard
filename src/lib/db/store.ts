@@ -115,7 +115,7 @@ class SanboardDatabase {
       address: 'Vinewood Boulevard No: 12, Vinewood Hills',
       phone: '5550192',
       sanmail_email: 'apex.motors@sanmail.com',
-      purpose: 'San Andreas genelinde kurumsal otomobil galerisi ve emlak ofisi işletmek.',
+      purpose: 'Los Santos genelinde kurumsal otomobil galerisi ve emlak ofisi işletmek.',
       status: 'APPROVED',
       subscription_status: 'ACTIVE',
       subscription_expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),

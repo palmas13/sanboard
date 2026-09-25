@@ -71,7 +71,9 @@ export default async function PremiumStoreVitrinPage({ params }: PageProps) {
     !dealer ||
     dealer.status !== 'APPROVED' ||
     dealer.subscription_status === 'INACTIVE' ||
-    dealer.moderation_status === 'DELETED'
+    dealer.moderation_status === 'DELETED' ||
+    dealer.moderation_status === 'SUSPENDED' ||
+    dealer.deleted_at
   ) {
     notFound();
   }

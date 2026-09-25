@@ -558,4 +558,209 @@ describe('Sanboard – Corporate Listing Seller Context & Admin Moderation', () 
       assert.strictEqual(eligibility.reason, 'PENDING_APPLICATION');
     });
   });
+
+  describe('31. Section 17 Regression Test Suite', () => {
+    const RAVI_SIBLING_CHAR_ID = 'char-ravi-02';
+
+    beforeEach(() => {
+      // Add Ravi as sibling on same user_id ZADE_USER_ID
+      db.profiles.push({
+        id: RAVI_SIBLING_CHAR_ID,
+        user_id: ZADE_USER_ID,
+        full_name: 'Ravi Blumon',
+        avatar_url: '',
+        sanmail_email: 'ravi@sanmail.com',
+        phone: '555-0910',
+        is_dealer: false,
+        public_id: 103,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+    });
+
+    it('Scenario 1 & 14: Zade Bum Motors ACTIVE -> eligible=true, Corporate Dashboard İlan Ver permitted', async () => {
+      db.dealers.push({
+        id: 'store-bum-01',
+        owner_profile_id: ZADE_CHAR_ID,
+        profile_id: ZADE_CHAR_ID,
+        company_name: 'Bum Motors',
+        slug: 'bum-motors',
+        status: 'APPROVED',
+        subscription_status: 'ACTIVE',
+        subscription_expires_at: new Date(Date.now() + 864000000).toISOString(),
+        moderation_status: 'ACTIVE',
+        boost_credits: 3,
+        public_id: 201,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as any);
+
+      const eligibility = await resolveCorporateEligibility(ZADE_CHAR_ID);
+      assert.strictEqual(eligibility.eligible, true);
+      assert.strictEqual(eligibility.reason, 'ACTIVE');
+      assert.strictEqual(eligibility.dealer?.id, 'store-bum-01');
+    });
+
+    it('Scenario 2 & 5 & 7: Admin SUSPENDED -> public hidden, Zade sees STORE_SUSPENDED, Zade gets notif, Ravi gets 0 notifs, new application blocked', async () => {
+      db.dealers.push({
+        id: 'store-bum-01',
+        owner_profile_id: ZADE_CHAR_ID,
+        profile_id: ZADE_CHAR_ID,
+        company_name: 'Bum Motors',
+        slug: 'bum-motors',
+        status: 'APPROVED',
+        subscription_status: 'ACTIVE',
+        subscription_expires_at: new Date(Date.now() + 864000000).toISOString(),
+        moderation_status: 'ACTIVE',
+        boost_credits: 3,
+        public_id: 201,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as any);
+
+      await suspendCorporateStore('store-bum-01', 'Kural ihlali incelemesi', MAVIS_ADMIN_ID);
+
+      // Notification only to Zade
+      const zadeNotifs = db.notifications.filter((n) => n.recipient_profile_id === ZADE_CHAR_ID);
+      const raviNotifs = db.notifications.filter((n) => n.recipient_profile_id === RAVI_SIBLING_CHAR_ID);
+      assert.strictEqual(zadeNotifs.length, 1);
+      assert.match(zadeNotifs[0].message, /Bum Motors/);
+      assert.strictEqual(raviNotifs.length, 0, 'Sibling Ravi must receive 0 notifications');
+
+      // Zade sees STORE_SUSPENDED
+      const eligibility = await resolveCorporateEligibility(ZADE_CHAR_ID);
+      assert.strictEqual(eligibility.eligible, false);
+      assert.strictEqual(eligibility.reason, 'STORE_SUSPENDED');
+
+      // Cannot apply for new dealer while suspended
+      const applyRes = await applyForDealer({
+        profileId: ZADE_CHAR_ID,
+        companyName: 'Zade Another Auto',
+        purpose: 'Deneme',
+      });
+      assert.strictEqual(applyRes.success, false);
+      assert.match(applyRes.error || '', /askıya alınmış/i);
+    });
+
+    it('Scenario 4 & 6 & 7: Admin DELETED -> only Zade gets notif, Ravi gets 0 notifs, Zade sees NO_STORE, can reapply', async () => {
+      db.dealers.push({
+        id: 'store-bum-01',
+        owner_profile_id: ZADE_CHAR_ID,
+        profile_id: ZADE_CHAR_ID,
+        company_name: 'Bum Motors',
+        slug: 'bum-motors',
+        status: 'APPROVED',
+        subscription_status: 'ACTIVE',
+        subscription_expires_at: new Date(Date.now() + 864000000).toISOString(),
+        moderation_status: 'ACTIVE',
+        boost_credits: 3,
+        public_id: 201,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as any);
+
+      await deleteCorporateStore('store-bum-01', 'Kapatıldı', MAVIS_ADMIN_ID);
+
+      const zadeNotifs = db.notifications.filter((n) => n.recipient_profile_id === ZADE_CHAR_ID);
+      const raviNotifs = db.notifications.filter((n) => n.recipient_profile_id === RAVI_SIBLING_CHAR_ID);
+      assert.strictEqual(zadeNotifs.length, 1);
+      assert.match(zadeNotifs[0].message, /Bum Motors.*silinmiştir/);
+      assert.strictEqual(raviNotifs.length, 0, 'Sibling Ravi must receive 0 notifications');
+
+      // Zade sees STORE_DELETED when resolved with store, but getDealerByProfileId(ZADE_CHAR_ID) excludes deleted store!
+      const eligibility = await resolveCorporateEligibility(ZADE_CHAR_ID);
+      assert.strictEqual(eligibility.eligible, false);
+      assert.strictEqual(eligibility.reason, 'STORE_DELETED');
+
+      // Zade can reapply
+      const applyRes = await applyForDealer({
+        profileId: ZADE_CHAR_ID,
+        companyName: 'Zade Fresh Motors',
+        purpose: 'Yeni başlangıç',
+      });
+      assert.strictEqual(applyRes.success, true);
+    });
+
+    it('Scenario 8, 9, 10: Ownership checks (isListingOwnedByActiveProfile)', async () => {
+      const { isListingOwnedByActiveProfile } = await import('../src/lib/dealers/eligibility');
+
+      const indListing = {
+        id: 'l-ind-1',
+        seller_type: 'INDIVIDUAL' as const,
+        seller_profile_id: ZADE_CHAR_ID,
+      };
+
+      const corpListing = {
+        id: 'l-corp-1',
+        seller_type: 'CORPORATE' as const,
+        seller_profile_id: ZADE_CHAR_ID,
+        corporate_profile_id: 'store-bum-01',
+      };
+
+      // 8) Başkasının ilanında owner=false
+      assert.strictEqual(isListingOwnedByActiveProfile(indListing, MAVIS_ADMIN_ID), false);
+      assert.strictEqual(isListingOwnedByActiveProfile(corpListing, MAVIS_ADMIN_ID, ZADE_CHAR_ID), false);
+
+      // 8b) Sibling Ravi on Zade's individual or corporate listing -> false!
+      assert.strictEqual(isListingOwnedByActiveProfile(indListing, RAVI_SIBLING_CHAR_ID), false);
+      assert.strictEqual(isListingOwnedByActiveProfile(corpListing, RAVI_SIBLING_CHAR_ID, ZADE_CHAR_ID), false);
+
+      // 9) Kendi bireysel ilanında owner=true
+      assert.strictEqual(isListingOwnedByActiveProfile(indListing, ZADE_CHAR_ID), true);
+
+      // 10) Kendi kurumsal ilanında owner=true (store owner = Zade)
+      assert.strictEqual(isListingOwnedByActiveProfile(corpListing, ZADE_CHAR_ID, ZADE_CHAR_ID), true);
+    });
+
+    it('Scenario 11 & 12: Favorite count DB aggregate persists across simulated reload and matches İlanlarım', async () => {
+      // Create listing
+      db.listings.push({
+        id: 'l-fav-test',
+        seller_profile_id: ZADE_CHAR_ID,
+        user_id: ZADE_USER_ID,
+        category: 'vehicle',
+        subcategory: 'Sedan',
+        title: 'Favori Test Aracı',
+        description: 'Test',
+        price: 50000,
+        seller_type: 'INDIVIDUAL',
+        status: 'ACTIVE',
+        favorite_count: 0,
+        published_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+      } as any);
+
+      // Someone favorites the listing (Mavis)
+      db.favorites.push({
+        id: 'fav-1',
+        user_id: 'usr-mavis-account',
+        profile_id: MAVIS_ADMIN_ID,
+        listing_id: 'l-fav-test',
+        created_at: new Date().toISOString(),
+      });
+
+      // Query listing details
+      const detail = await getListingById('l-fav-test');
+      assert.strictEqual(detail.listing?.favorite_count, 1, 'Listing detail must reflect real DB count');
+
+      // Another user (Ravi) favorites the listing
+      db.favorites.push({
+        id: 'fav-2',
+        user_id: ZADE_USER_ID,
+        profile_id: RAVI_SIBLING_CHAR_ID,
+        listing_id: 'l-fav-test',
+        created_at: new Date().toISOString(),
+      });
+
+      // Reload/re-query listing details -> count must be 2
+      const reloadedDetail = await getListingById('l-fav-test');
+      assert.strictEqual(reloadedDetail.listing?.favorite_count, 2, 'Reloaded listing must reflect DB count=2');
+
+      // Check Zade's "İlanlarım" screen
+      const zadeListings = await getUserListings(ZADE_CHAR_ID);
+      assert.strictEqual(zadeListings.length, 1);
+      assert.strictEqual(zadeListings[0].favorite_count, 2, 'İlanlarım screen must match real DB favorite count');
+    });
+  });
 });
+

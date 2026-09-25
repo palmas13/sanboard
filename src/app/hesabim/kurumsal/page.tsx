@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
 import {
   Building2,
@@ -10,6 +11,8 @@ import {
   Clock,
   Save,
   AlertCircle,
+  AlertTriangle,
+  LifeBuoy,
   Loader2,
   ExternalLink,
   ListPlus,
@@ -34,6 +37,7 @@ import { formatDate } from '@/lib/utils/format';
 import { normalizeSocialMedia } from '@/lib/dealers/social';
 
 export default function HesabimKurumsalPage() {
+  const router = useRouter();
   const { currentProfile } = useAuth();
   const [dealer, setDealer] = useState<DealerProfile | null>(null);
   const [application, setApplication] = useState<any | null>(null);
@@ -74,6 +78,52 @@ export default function HesabimKurumsalPage() {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
+  const isSubscriptionExpired = Boolean(
+    dealer?.subscription_status === 'EXPIRED' ||
+    (dealer?.subscription_expires_at ? new Date(dealer.subscription_expires_at) <= new Date() : false)
+  );
+
+  const handleCorporateCreateListing = async () => {
+    if (!currentProfile) return;
+    setActionLoading(true);
+    setError('');
+    try {
+      // 1. Authoritative Server-Side Eligibility Verification (Section 7 & 8)
+      const eligRes = await fetch(`/api/dealers/eligibility?profileId=${currentProfile.id}`);
+      const eligData = await eligRes.json();
+      if (!eligRes.ok || !eligData.eligible) {
+        setError(eligData.message || 'Kurumsal mağazanız ilan vermeye uygun değil.');
+        setActionLoading(false);
+        return;
+      }
+
+      // 2. Check if user already has an available corporate credit
+      const credRes = await fetch(`/api/credits?profileId=${currentProfile.id}`);
+      const credData = await credRes.json();
+      if (credData.corporateCredits && credData.corporateCredits > 0) {
+        router.push('/ilan-ver/yeni?corporate=true');
+        return;
+      }
+
+      // 3. Initiate corporate package checkout ($1.750, 14 days)
+      const checkoutRes = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId: currentProfile.id,
+          packageCode: 'CORPORATE_14_DAY',
+        }),
+      });
+      const checkoutData = await checkoutRes.json();
+      if (!checkoutRes.ok) throw new Error(checkoutData.error || 'Kurumsal sipariş oluşturulamadı.');
+      router.push(`/odeme/${checkoutData.orderId}`);
+    } catch (err: any) {
+      setError(err.message || 'Kurumsal ilan verme işlemi başlatılamadı.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const fetchDealer = async () => {
     if (!currentProfile) return;
     setLoading(true);
@@ -96,28 +146,33 @@ export default function HesabimKurumsalPage() {
       }
 
       if (data.dealer) {
-        setDealer(data.dealer);
-        setEditCompanyName(data.dealer.company_name);
-        setEditDescription(data.dealer.description || '');
-        setEditLogoUrl(data.dealer.logo_path || data.dealer.logo_url || '');
-        setEditBannerUrl(data.dealer.banner_path || data.dealer.banner_url || '');
-        setEditAddress(data.dealer.address || '');
-        setEditPhone(data.dealer.phone || '');
-        setEditSanmail(data.dealer.sanmail_email || data.dealer.email || '');
+        // If store is DELETED, do not show as active store; let owner see new application state (Section 2 C)
+        if (data.dealer.moderation_status === 'DELETED' || data.dealer.deleted_at) {
+          setDealer(null);
+        } else {
+          setDealer(data.dealer);
+          setEditCompanyName(data.dealer.company_name);
+          setEditDescription(data.dealer.description || '');
+          setEditLogoUrl(data.dealer.logo_path || data.dealer.logo_url || '');
+          setEditBannerUrl(data.dealer.banner_path || data.dealer.banner_url || '');
+          setEditAddress(data.dealer.address || '');
+          setEditPhone(data.dealer.phone || '');
+          setEditSanmail(data.dealer.sanmail_email || data.dealer.email || '');
 
-        // Normalize social media
-        const normalized = normalizeSocialMedia(data.dealer.social_media);
-        setSocialLinks(normalized.length > 0 ? normalized : [{ name: '', url: '' }]);
+          // Normalize social media
+          const normalized = normalizeSocialMedia(data.dealer.social_media);
+          setSocialLinks(normalized.length > 0 ? normalized : [{ name: '', url: '' }]);
 
-        // Fetch actual followers count
-        try {
-          const flwRes = await fetch(`/api/dealers/${data.dealer.id}/followers`);
-          if (flwRes.ok) {
-            const flwData = await flwRes.json();
-            setFollowerCount(Array.isArray(flwData.followers) ? flwData.followers.length : 0);
+          // Fetch actual followers count
+          try {
+            const flwRes = await fetch(`/api/dealers/${data.dealer.id}/followers`);
+            if (flwRes.ok) {
+              const flwData = await flwRes.json();
+              setFollowerCount(Array.isArray(flwData.followers) ? flwData.followers.length : 0);
+            }
+          } catch {
+            // Ignore
           }
-        } catch {
-          // Ignore
         }
       } else {
         setDealer(null);
@@ -345,8 +400,61 @@ export default function HesabimKurumsalPage() {
           <Loader2 className="w-5 h-5 animate-spin text-[#FF8A1F]" />
           <span>Kurumsal satıcı bilgileri getiriliyor...</span>
         </div>
-      ) : dealer?.status === 'APPROVED' && dealer?.subscription_status === 'ACTIVE' ? (
-        /* CASE 1: APPROVED + ACTIVE SUBSCRIPTION */
+      ) : dealer?.moderation_status === 'SUSPENDED' ? (
+        /* CASE SUSPENDED: STORE SUSPENDED BY ADMIN (Section 2 & 8) */
+        <div className="surface-card p-8 rounded-2xl border border-amber-500/30 text-center space-y-5 max-w-lg mx-auto shadow-xl">
+          <div className="w-14 h-14 mx-auto rounded-full bg-amber-500/10 text-amber-400 flex items-center justify-center">
+            <AlertTriangle className="w-7 h-7" />
+          </div>
+          <div className="space-y-1">
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              ASKIYA ALINDI
+            </span>
+            <h2 className="text-xl font-black text-[var(--text-main)]">
+              Askıya alınmış geçmiş kurumsal profiliniz mevcut.
+            </h2>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+              &ldquo;{dealer.company_name}&rdquo; mağazanız yönetim tarafından askıya alınmıştır. Mağaza vitrininiz ve kurumsal ilanlarınız genel pazardan gizlenmiştir.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] text-left space-y-2.5">
+            <div>
+              <span className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider block">
+                Mağaza Adı
+              </span>
+              <p className="text-xs text-[var(--text-main)] font-semibold">{dealer.company_name}</p>
+            </div>
+            {dealer.suspended_at && (
+              <div>
+                <span className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider block">
+                  Askıya Alma Tarihi
+                </span>
+                <p className="text-xs text-[var(--text-main)]">{formatDate(dealer.suspended_at)}</p>
+              </div>
+            )}
+            {dealer.suspension_reason && (
+              <div>
+                <span className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider block">
+                  Askıya Alma Nedeni
+                </span>
+                <p className="text-xs text-[var(--text-main)] font-medium text-amber-400/90">{dealer.suspension_reason}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-2">
+            <Link
+              href={`/hesabim/destek?subject=${encodeURIComponent('Kurumsal mağaza askı itirazı / yeniden değerlendirme')}`}
+              className="btn-primary text-xs py-3 px-6 inline-flex items-center justify-center gap-2 shadow-md cursor-pointer w-full"
+            >
+              <LifeBuoy className="w-4 h-4" />
+              <span>Destek Talebi Oluştur</span>
+            </Link>
+          </div>
+        </div>
+      ) : dealer?.status === 'APPROVED' && (dealer?.subscription_status === 'ACTIVE' || isSubscriptionExpired) ? (
+        /* CASE 1: APPROVED STORE DASHBOARD (ACTIVE OR EXPIRED SUBSCRIPTION) */
         isEditingStore ? (
           /* SUBVIEW: EDITING VIEW (Section 13) */
           <div className="space-y-6">
@@ -657,12 +765,21 @@ export default function HesabimKurumsalPage() {
                   </div>
                 </div>
 
-                {/* Header Action: Mağaza Bilgilerini Düzenle (Section 13) */}
+                {/* Header Action: Kurumsal İlan Ver & Mağaza Bilgilerini Düzenle */}
                 <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full md:w-auto shrink-0">
                   <button
                     type="button"
+                    onClick={handleCorporateCreateListing}
+                    disabled={actionLoading || isSubscriptionExpired}
+                    className="btn-primary text-xs py-2.5 px-4 flex items-center justify-center gap-1.5 shadow-md flex-1 sm:flex-none cursor-pointer disabled:opacity-50"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Kurumsal İlan Ver</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setIsEditingStore(true)}
-                    className="btn-primary text-xs py-2.5 px-4 flex items-center justify-center gap-1.5 shadow-md flex-1 sm:flex-none cursor-pointer"
+                    className="btn-secondary text-xs py-2.5 px-4 flex items-center justify-center gap-1.5 shadow-md flex-1 sm:flex-none cursor-pointer"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                     <span>Mağaza Bilgilerini Düzenle</span>
@@ -670,6 +787,24 @@ export default function HesabimKurumsalPage() {
                 </div>
               </div>
             </div>
+
+            {/* Subscription Expired Alert */}
+            {isSubscriptionExpired && (
+              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>Kurumsal üyelik süreniz sona ermiştir. Yeni kurumsal ilan veremez ve öne çıkarma yapamazsınız.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleActivateSubscription}
+                  disabled={actionLoading}
+                  className="btn-primary text-xs py-1.5 px-3 shrink-0"
+                >
+                  Üyeliği Yenile
+                </button>
+              </div>
+            )}
 
             {/* COMPACT STATS GRID (Section 14: Aktif İlan, Toplam Takipçi, Kalan Öne Çıkarma Hakkı, Üyelik Bitiş Tarihi) */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -730,12 +865,15 @@ export default function HesabimKurumsalPage() {
                   <p className="text-xs text-[var(--text-muted)]">
                     Mağazanıza ait henüz yayında bir kurumsal ilan bulunmuyor.
                   </p>
-                  <Link
-                    href="/ilan-ver/paket"
-                    className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-1.5"
+                  <button
+                    type="button"
+                    onClick={handleCorporateCreateListing}
+                    disabled={actionLoading || isSubscriptionExpired}
+                    className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
-                    <span>İlan Ver</span>
-                  </Link>
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Kurumsal İlan Ver</span>
+                  </button>
                 </div>
               ) : (
                 <div className="divide-y divide-[var(--border-app)]">
@@ -792,10 +930,12 @@ export default function HesabimKurumsalPage() {
                             <button
                               type="button"
                               onClick={() => handleBoostListing(l.id)}
-                              disabled={actionLoading || (dealer.boost_credits ?? 0) <= 0}
+                              disabled={actionLoading || isSubscriptionExpired || (dealer.boost_credits ?? 0) <= 0}
                               className="btn-secondary text-[11px] py-1.5 px-3 flex items-center gap-1.5 text-amber-400 hover:border-amber-400/40 cursor-pointer disabled:opacity-50"
                               title={
-                                (dealer.boost_credits ?? 0) <= 0
+                                isSubscriptionExpired
+                                  ? 'Abonelik süreniz dolduğu için boost kullanılamaz'
+                                  : (dealer.boost_credits ?? 0) <= 0
                                   ? 'Kalan öne çıkarma hakkınız bulunmuyor'
                                   : '24 saatliğine öne çıkar'
                               }
@@ -941,7 +1081,7 @@ export default function HesabimKurumsalPage() {
             </div>
             <h2 className="text-xl font-black text-[var(--text-main)]">Kurumsal Satıcı Başvurusu</h2>
             <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto">
-              San Andreas'ta fiziksel bir işletme (galeri veya emlak acentesi) işletiyorsanız Sanboard kurumsal mağazası için başvurabilirsiniz.
+              Los Santos'ta fiziksel bir işletme (galeri veya emlak acentesi) işletiyorsanız Sanboard kurumsal mağazası için başvurabilirsiniz.
             </p>
           </div>
 

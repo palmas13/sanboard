@@ -52,11 +52,8 @@ export default async function HomePage() {
         <section className="surface-card p-6 sm:p-8 rounded-2xl border border-[rgba(255,138,31,0.25)] bg-gradient-to-r from-[var(--bg-surface)] via-[var(--brand-orange-subtle)]/20 to-[var(--bg-surface)] flex flex-col md:flex-row items-center justify-between gap-6 shadow-md">
           <div className="space-y-1.5 text-center md:text-left">
             <h2 className="text-xl sm:text-2xl font-black text-[var(--text-main)]">
-              Aracını veya Mülkünü San Andreas'a Duyur
+              Aracını ya da mülkünü dakikalar içinde ilana ver, Los Santos’un dört bir yanına ulaş.
             </h2>
-            <p className="text-sm text-[var(--text-muted)]">
-              7 günlük ilanını oluştur ve binlerce kişinin görmesini sağla.
-            </p>
           </div>
           <Link
             href="/ilan-ver"

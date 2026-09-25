@@ -64,7 +64,7 @@ export function HeroTypewriter() {
 
   return (
     <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-[var(--text-main)] flex flex-wrap items-center justify-center gap-x-3 gap-y-1 select-none">
-      <span>San Andreas&apos;ta</span>
+      <span>Los Santos&apos;da</span>
       <span className="inline-flex items-center text-left text-transparent bg-clip-text bg-gradient-to-r from-[#FF8A1F] via-[#FFA347] to-[#FF8A1F] min-w-[5.2ch] sm:min-w-[5.4ch]">
         <span>{text}</span>
         <span
