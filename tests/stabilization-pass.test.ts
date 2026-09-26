@@ -121,6 +121,7 @@ describe('Sanboard Stabilization Pass: Auth, Role, Favorites, Notifications & Da
       const req = createAuthedRequest('http://localhost:3000/api/favorites', 'POST', {
         userId: zadeUserId,
         role: 'USER',
+        profileId: 'char-zade-02',
       }, { listingId: testListingId, isFavorited: true });
 
       const res = await toggleFavoritePost(req);

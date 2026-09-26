@@ -8,6 +8,7 @@ import { GET as adminGet } from '@/app/api/admin/route';
 import { db } from '@/lib/db/store';
 import { createSessionToken, verifySessionToken } from '@/lib/auth/session';
 import { getListingRepository } from '@/lib/db/repositories';
+import { proxy, config as proxyConfig } from '@/proxy';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -57,7 +58,7 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
     const spoofReq = createAuthedRequest(
       'http://localhost:3000/api/favorites',
       'POST',
-      { userId: zadeUserId, role: 'USER' },
+      { userId: zadeUserId, role: 'USER', profileId: 'char-zade-02' },
       {
         listingId: testListingId,
         isFavorited: true,
@@ -90,7 +91,7 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
     const deleteReq = createAuthedRequest(
       'http://localhost:3000/api/favorites?userId=' + mavisUserId,
       'DELETE',
-      { userId: zadeUserId, role: 'USER' },
+      { userId: zadeUserId, role: 'USER', profileId: 'char-zade-02' },
       {
         listingId: testListingId,
         userId: mavisUserId, // Attacker specifies Mavis ID
@@ -109,7 +110,7 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
     const cleanReq = createAuthedRequest(
       'http://localhost:3000/api/favorites',
       'POST',
-      { userId: zadeUserId, role: 'USER' },
+      { userId: zadeUserId, role: 'USER', profileId: 'char-zade-02' },
       { listingId: testListingId, isFavorited: true } // No userId, no profileId
     );
 
@@ -166,7 +167,7 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
     const req1 = createAuthedRequest(
       'http://localhost:3000/api/favorites',
       'POST',
-      { userId: zadeUserId, role: 'USER' },
+      { userId: zadeUserId, role: 'USER', profileId: 'char-zade-02' },
       { listingId: testListingId, isFavorited: true }
     );
     const res1 = await toggleFavoritePost(req1);
@@ -178,7 +179,7 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
     const req2 = createAuthedRequest(
       'http://localhost:3000/api/favorites',
       'POST',
-      { userId: zadeUserId, role: 'USER' },
+      { userId: zadeUserId, role: 'USER', profileId: 'char-zade-02' },
       { listingId: testListingId, isFavorited: true }
     );
     const res2 = await toggleFavoritePost(req2);
@@ -190,7 +191,7 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
     const req3 = createAuthedRequest(
       'http://localhost:3000/api/favorites',
       'POST',
-      { userId: zadeUserId, role: 'USER' },
+      { userId: zadeUserId, role: 'USER', profileId: 'char-zade-02' },
       { listingId: testListingId, isFavorited: false }
     );
     const res3 = await toggleFavoritePost(req3);
@@ -381,12 +382,51 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
     const validReq = createAuthedRequest(
       'http://localhost:3000/api/favorites',
       'POST',
-      { userId: zadeUserId, role: 'USER' },
+      { userId: zadeUserId, role: 'USER', profileId: 'char-zade-02' },
       { listingId: testListingId, isFavorited: true }
     );
 
     const res = await toggleFavoritePost(validReq);
     assert.strictEqual(res.status, 200);
+  });
+
+  test('SESSION SPOOF 4: client-writable profile cookie cannot supply the active profile', async () => {
+    const token = createSessionToken({ userId: zadeUserId, role: 'USER' });
+    const req = createAuthedRequest(
+      'http://localhost:3000/api/favorites',
+      'POST',
+      null,
+      { listingId: testListingId, isFavorited: true },
+      `sanboard_session=${token}; sanboard_profile_id=char-zade-02`
+    );
+
+    const res = await toggleFavoritePost(req);
+    assert.strictEqual(res.status, 400);
+    assert.match(res.headers.get('content-type') || '', /application\/json/);
+    assert.match((await res.json()).error, /Aktif bir karakter profili seçilmedi/);
+    assert.strictEqual(db.favorites.length, 0);
+  });
+
+  test('SESSION SPOOF 5: signed sibling profile not owned by the account is rejected with JSON 403', async () => {
+    const req = createAuthedRequest(
+      'http://localhost:3000/api/favorites',
+      'POST',
+      { userId: zadeUserId, role: 'USER', profileId: 'char-mavis-01' },
+      { listingId: testListingId, isFavorited: true }
+    );
+
+    const res = await toggleFavoritePost(req);
+    assert.strictEqual(res.status, 403);
+    assert.match(res.headers.get('content-type') || '', /application\/json/);
+    assert.match((await res.json()).error, /bu hesaba ait değil/);
+    assert.strictEqual(db.favorites.length, 0);
+  });
+
+  test('PROXY REGRESSION: /api/favorites is outside proxy matcher and direct proxy evaluation does not redirect', () => {
+    assert.strictEqual(proxyConfig.matcher.some((matcher) => matcher.includes('/api')), false);
+    const response = proxy(new NextRequest('http://localhost:3000/api/favorites'));
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(response.headers.get('location'), null);
   });
 
   // =========================================================================

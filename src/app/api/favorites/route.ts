@@ -1,6 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getListingRepository } from '@/lib/db/repositories';
 import { getServerSession } from '@/lib/auth/session';
+import { resolveUserId } from '@/lib/db/id-mapper';
+
+async function getOwnedActiveProfileId(req: NextRequest): Promise<
+  | { profileId: string; error?: never }
+  | { profileId?: never; error: NextResponse }
+> {
+  const session = await getServerSession(req);
+  if (!session?.userId) {
+    return {
+      error: NextResponse.json(
+        { error: 'Yetkisiz erişim. Lütfen giriş yapın.' },
+        { status: 401 }
+      ),
+    };
+  }
+
+  if (!session.profileId) {
+    return {
+      error: NextResponse.json(
+        { error: 'Aktif bir karakter profili seçilmedi. Lütfen bir karakter seçin.' },
+        { status: 400 }
+      ),
+    };
+  }
+
+  const { getUserRepository } = await import('@/lib/db/repositories');
+  const profile = await getUserRepository().getProfileById(session.profileId);
+  if (!profile || resolveUserId(profile.user_id) !== resolveUserId(session.userId)) {
+    return {
+      error: NextResponse.json(
+        { error: 'Aktif karakter profili bu hesaba ait değil.' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return { profileId: profile.id };
+}
 
 // Set favorite state deterministically (POST)
 export async function POST(req: NextRequest) {
@@ -10,29 +48,8 @@ export async function POST(req: NextRequest) {
     const desiredState = body.isFavorited;
 
     // Cryptographically verified session (rejects raw UUID spoofing)
-    const session = await getServerSession(req);
-    if (!session?.userId) {
-      return NextResponse.json(
-        { error: 'Yetkisiz erişim. Lütfen giriş yapın.' },
-        { status: 401 }
-      );
-    }
-
-    let activeProfileId = session.profileId || req.cookies.get('sanboard_profile_id')?.value;
-
-    if (!activeProfileId) {
-      const { getUserRepository } = await import('@/lib/db/repositories');
-      const userRepo = getUserRepository();
-      const profs = await userRepo.getProfilesByUserId(session.userId);
-      activeProfileId = profs[0]?.id;
-    }
-
-    if (!activeProfileId) {
-      return NextResponse.json(
-        { error: 'Aktif bir karakter profili seçilmedi. Lütfen bir karakter seçin.' },
-        { status: 400 }
-      );
-    }
+    const activeProfile = await getOwnedActiveProfileId(req);
+    if (activeProfile.error) return activeProfile.error;
 
     if (!listingId) {
       return NextResponse.json(
@@ -49,7 +66,7 @@ export async function POST(req: NextRequest) {
     }
 
     const repo = getListingRepository();
-    const result = await repo.setFavorite(listingId, activeProfileId, desiredState);
+    const result = await repo.setFavorite(listingId, activeProfile.profileId, desiredState);
     return NextResponse.json({
       success: true,
       isFavorited: result.isFavorited,
@@ -85,7 +102,7 @@ export async function GET(req: NextRequest) {
 
     const repo = getListingRepository();
     const states = await repo.getFavoriteStates(listingIds, activeProfileId);
-    if (searchParams.has('listingIds')) return NextResponse.json({ states });
+    if (searchParams.has('listingIds')) return NextResponse.json({ states, profileId: activeProfileId || null });
 
     const listingId = listingIds[0];
     const state = states[listingId] || { isFavorited: false, count: 0 };
@@ -106,28 +123,8 @@ export async function DELETE(req: NextRequest) {
     const listingId = body.listingId || searchParams.get('listingId');
 
     // Cryptographically verified session
-    const session = await getServerSession(req);
-    if (!session?.userId) {
-      return NextResponse.json(
-        { error: 'Yetkisiz erişim. Lütfen giriş yapın.' },
-        { status: 401 }
-      );
-    }
-
-    let activeProfileId = session.profileId || req.cookies.get('sanboard_profile_id')?.value;
-    if (!activeProfileId) {
-      const { getUserRepository } = await import('@/lib/db/repositories');
-      const userRepo = getUserRepository();
-      const profs = await userRepo.getProfilesByUserId(session.userId);
-      activeProfileId = profs[0]?.id;
-    }
-
-    if (!activeProfileId) {
-      return NextResponse.json(
-        { error: 'Aktif bir karakter profili bulunamadı.' },
-        { status: 400 }
-      );
-    }
+    const activeProfile = await getOwnedActiveProfileId(req);
+    if (activeProfile.error) return activeProfile.error;
 
     if (!listingId) {
       return NextResponse.json(
@@ -137,7 +134,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     const repo = getListingRepository();
-    const result = await repo.removeFavorite(listingId, activeProfileId);
+    const result = await repo.removeFavorite(listingId, activeProfile.profileId);
     return NextResponse.json({
       success: true,
       isFavorited: false,

@@ -1410,15 +1410,14 @@ export class SupabaseListingRepository implements IListingRepository {
       }
 
       const safeUserId = await this.resolveAccountUserId(undefined, safeProfileId);
-      const { error: insertError } = await client.from('favorites').upsert(
-        {
-          profile_id: safeProfileId,
-          user_id: safeUserId || undefined,
-          listing_id: listingId,
-        },
-        { onConflict: 'profile_id,listing_id', ignoreDuplicates: true }
-      );
-      if (insertError) throw new Error(insertError.message);
+      const { error: insertError } = await client.from('favorites').insert({
+        profile_id: safeProfileId,
+        user_id: safeUserId || undefined,
+        listing_id: listingId,
+      });
+      // A concurrent/stale ADD is idempotent. PostgreSQL 23505 means the
+      // canonical (profile_id, listing_id) relation already exists.
+      if (insertError && insertError.code !== '23505') throw new Error(insertError.message);
     } else {
       const { error: deleteError } = await client
         .from('favorites')
@@ -1445,13 +1444,15 @@ export class SupabaseListingRepository implements IListingRepository {
       return { success: false, count: 0 };
     }
 
-    await client
+    const { error: deleteError } = await client
       .from('favorites')
       .delete()
       .eq('profile_id', safeProfileId)
       .eq('listing_id', listingId);
+    if (deleteError) throw new Error(deleteError.message);
 
-    const { count } = await client.from('favorites').select('*', { count: 'exact', head: true }).eq('listing_id', listingId);
+    const { count, error: countError } = await client.from('favorites').select('*', { count: 'exact', head: true }).eq('listing_id', listingId);
+    if (countError) throw new Error(countError.message);
     return { success: true, count: count || 0 };
   }
 

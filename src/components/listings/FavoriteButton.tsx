@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Heart } from 'lucide-react';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useRouter } from 'next/navigation';
+import { readJsonResponse } from '@/lib/http/json-response';
 
 interface FavoriteButtonProps {
   listingId: string;
@@ -62,6 +63,7 @@ function queueFavoriteHydration(
         const response = await fetch(`/api/favorites?listingIds=${encodeURIComponent(listingIds.join(','))}`);
         if (!response.ok) return;
         const data = await response.json();
+        if (data.profileId !== batchProfileId) return;
         for (const listingId of listingIds) {
           const state = data.states?.[listingId];
           if (!state) continue;
@@ -98,6 +100,7 @@ export function FavoriteButton({
   const [isFavorited, setIsFavorited] = useState(cached?.isFavorited ?? initialIsFavorited);
   const [count, setCount] = useState(cached?.count ?? initialCount);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const mutationPendingRef = useRef(false);
   const mutationVersionRef = useRef(0);
 
@@ -146,6 +149,7 @@ export function FavoriteButton({
     }
 
     if (mutationPendingRef.current) return;
+    setErrorMessage('');
 
     // Optimistic toggle
     const prevFavorited = isFavorited;
@@ -178,12 +182,18 @@ export function FavoriteButton({
         setIsFavorited(prevFavorited);
         setCount(prevCount);
         if (cacheKey) favoriteStateCache.delete(cacheKey);
+        setErrorMessage('Oturumunuz sona erdi. Lütfen tekrar giriş yapın.');
         router.push(`/giris?redirect=/ilan/${listingId}`);
         return;
       }
 
-      if (!res.ok) {
-        // Business error or duplicate: revert WITHOUT redirecting
+      let data: { isFavorited: boolean; count: number };
+      try {
+        data = await readJsonResponse<{ isFavorited: boolean; count: number }>(
+          res,
+          'Favori işlemi tamamlanamadı.'
+        );
+      } catch (error) {
         setIsFavorited(prevFavorited);
         setCount(prevCount);
         const revertEntry = {
@@ -192,10 +202,10 @@ export function FavoriteButton({
         };
         if (cacheKey) publishFavoriteState(cacheKey, revertEntry);
         onToggle?.(prevFavorited, prevCount);
+        setErrorMessage(error instanceof Error ? error.message : 'Favori işlemi tamamlanamadı.');
         return;
       }
 
-      const data = await res.json();
       const confirmedEntry = {
         isFavorited: data.isFavorited,
         count: data.count,
@@ -204,7 +214,7 @@ export function FavoriteButton({
       setCount(data.count);
       if (cacheKey) publishFavoriteState(cacheKey, confirmedEntry);
       onToggle?.(data.isFavorited, data.count);
-    } catch {
+    } catch (error) {
       // Network or fetch exception: revert WITHOUT redirecting
       setIsFavorited(prevFavorited);
       setCount(prevCount);
@@ -214,6 +224,7 @@ export function FavoriteButton({
       };
       if (cacheKey) publishFavoriteState(cacheKey, revertEntry);
       onToggle?.(prevFavorited, prevCount);
+      setErrorMessage(error instanceof Error ? error.message : 'Favori işlemi tamamlanamadı.');
     } finally {
       if (mutationVersionRef.current === mutationVersion) mutationPendingRef.current = false;
       setIsLoading(false);
@@ -246,19 +257,33 @@ export function FavoriteButton({
     </button>
   );
 
+  const errorElement = errorMessage ? (
+    <span role="alert" className="max-w-64 text-right text-[10px] font-semibold text-[var(--color-danger)]">
+      {errorMessage}
+    </span>
+  ) : null;
+
   if (proofText) {
     return (
-      <div className="flex items-center justify-between gap-3 w-full">
-        <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-          <Heart className="w-4 h-4 text-[#FF8A1F] fill-[#FF8A1F]/20 shrink-0" />
-          <span>
-            <strong className="text-[var(--text-main)]">{count} kişi</strong> bu ilanı favori listesine ekledi.
-          </span>
+      <div className="flex flex-col items-end gap-1 w-full">
+        <div className="flex items-center justify-between gap-3 w-full">
+          <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+            <Heart className="w-4 h-4 text-[#FF8A1F] fill-[#FF8A1F]/20 shrink-0" />
+            <span>
+              <strong className="text-[var(--text-main)]">{count} kişi</strong> bu ilanı favori listesine ekledi.
+            </span>
+          </div>
+          {buttonElement}
         </div>
-        {buttonElement}
+        {errorElement}
       </div>
     );
   }
 
-  return buttonElement;
+  return (
+    <span className="relative inline-flex flex-col items-end gap-1">
+      {buttonElement}
+      {errorElement}
+    </span>
+  );
 }
