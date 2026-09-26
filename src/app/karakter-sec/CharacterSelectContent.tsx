@@ -3,7 +3,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
-import { ChevronRight, UserPlus, CheckCircle2, Loader2 } from 'lucide-react';
+import { ChevronRight, CheckCircle2, Loader2 } from 'lucide-react';
 import { SanboardLogo } from '@/components/common/SanboardLogo';
 import { resolveAvatarUrl } from '@/lib/media/url';
 
@@ -14,7 +14,7 @@ interface CharacterSelectContentProps {
 
 export function CharacterSelectContent({ redirect, isTestSource }: CharacterSelectContentProps) {
   const router = useRouter();
-  const { characters, characterProfiles, selectCharacter, currentProfile, refreshCharacters } = useAuth();
+  const { characters, selectCharacter, refreshCharacters } = useAuth();
   const [switchingId, setSwitchingId] = React.useState<string | null>(null);
   const [imgErrors, setImgErrors] = React.useState<Record<string, boolean>>({});
   const [selectionError, setSelectionError] = React.useState('');
@@ -25,26 +25,22 @@ export function CharacterSelectContent({ redirect, isTestSource }: CharacterSele
     });
   }, [refreshCharacters]);
 
-  const handleSelect = async (characterId: string, hasProfile: boolean) => {
+  const handleSelect = async (characterId: string) => {
     if (switchingId) return;
 
-    if (hasProfile) {
-      setSwitchingId(characterId);
-      setSelectionError('');
-      try {
-        const res = await selectCharacter(characterId);
-        if (res) {
-          router.push(redirect);
-        } else {
-          setSelectionError('Karakter oturumu oluşturulamadı. Lütfen tekrar giriş yap.');
-          setSwitchingId(null);
-        }
-      } catch {
+    setSwitchingId(characterId);
+    setSelectionError('');
+    try {
+      const res = await selectCharacter(characterId);
+      if (res) {
+        router.push(redirect);
+      } else {
         setSelectionError('Karakter oturumu oluşturulamadı. Lütfen tekrar giriş yap.');
         setSwitchingId(null);
       }
-    } else {
-      router.push(`/profil-olustur?charId=${characterId}&redirect=${encodeURIComponent(redirect)}`);
+    } catch {
+      setSelectionError('Karakter oturumu oluşturulamadı. Lütfen tekrar giriş yap.');
+      setSwitchingId(null);
     }
   };
 
@@ -97,25 +93,13 @@ export function CharacterSelectContent({ redirect, isTestSource }: CharacterSele
           /* Character Rows */
           <div className="space-y-3 pt-2">
             {characters.map((char) => {
-              const initials = char.fullName
+              const initials = char.displayName
                 .split(' ')
                 .map((n) => n[0])
                 .join('');
 
-              // Resolve avatar strictly by stable IDs (char.id matches profile.id or external_character_id)
-              const profile =
-                characterProfiles[char.id] ||
-                Object.values(characterProfiles).find(
-                  (p) => p.id === char.id || p.external_character_id === char.id
-                ) ||
-                (currentProfile?.id === char.id || currentProfile?.external_character_id === char.id
-                  ? currentProfile
-                  : null);
-
-              const effectiveHasProfile = Boolean(char.hasProfile || profile);
-              const targetId = profile?.id || char.id;
-              const avatarPath = profile?.avatar_path || profile?.avatar_url || null;
-              const charAvatar = avatarPath ? resolveAvatarUrl(avatarPath) : null;
+              const targetId = char.id;
+              const charAvatar = char.avatarUrl ? resolveAvatarUrl(char.avatarUrl) : null;
               const isSwitching = switchingId === targetId || switchingId === char.id;
               const hasImgError = imgErrors[char.id];
 
@@ -124,7 +108,7 @@ export function CharacterSelectContent({ redirect, isTestSource }: CharacterSele
                   key={char.id}
                   type="button"
                   disabled={Boolean(switchingId)}
-                  onClick={() => handleSelect(targetId, effectiveHasProfile)}
+                  onClick={() => handleSelect(targetId)}
                   className={`w-full surface-card surface-card-hover p-4 rounded-xl flex items-center justify-between gap-4 text-left transition-all border ${
                     isSwitching
                       ? 'border-[#FF8A1F] bg-[var(--brand-orange-subtle)]/20 cursor-wait'
@@ -135,7 +119,7 @@ export function CharacterSelectContent({ redirect, isTestSource }: CharacterSele
                     {charAvatar && !hasImgError ? (
                       <img
                         src={charAvatar}
-                        alt={char.fullName}
+                        alt={char.displayName}
                         onError={() => setImgErrors((prev) => ({ ...prev, [char.id]: true }))}
                         className="w-12 h-12 rounded-full object-cover border border-[var(--border-app)] group-hover:border-[#FF8A1F] transition-colors"
                       />
@@ -147,20 +131,13 @@ export function CharacterSelectContent({ redirect, isTestSource }: CharacterSele
 
                     <div>
                       <h3 className="font-bold text-base text-[var(--text-main)] group-hover:text-[#FF8A1F] transition-colors">
-                        {char.fullName}
+                        {char.displayName}
                       </h3>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        {effectiveHasProfile ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-[var(--color-success)] font-medium">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Profil mevcut</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs text-[#FF8A1F] font-medium">
-                            <UserPlus className="w-3.5 h-3.5" />
-                            <span>Profil oluşturulacak</span>
-                          </span>
-                        )}
+                        <span className="inline-flex items-center gap-1 text-xs text-[var(--color-success)] font-medium">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Profil mevcut</span>
+                        </span>
                       </div>
                     </div>
                   </div>

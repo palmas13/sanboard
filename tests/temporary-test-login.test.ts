@@ -93,7 +93,9 @@ describe('SANBOARD temporary test character login harness', () => {
     const listed = await listCharacters(new NextRequest('http://localhost/api/user/characters', { headers: { cookie: selectionCookie } }));
     const body = await listed.json();
     assert.equal(body.isTestIdentity, true);
-    const [profileA, profileB] = body.profiles;
+    assert.equal(body.profiles, undefined);
+    const [profileA, profileB] = body.characters;
+    assert.deepEqual(Object.keys(profileA).sort(), ['avatarUrl', 'displayName', 'id', 'role']);
 
     const outsiderUser = { id: 'outsider-user', provider: 'GTAWORLD' as const, external_user_id: 'real-account', role: 'USER' as const, status: 'ACTIVE' as const, created_at: '', updated_at: '' };
     const outsiderProfile = { id: 'outsider-profile', user_id: outsiderUser.id, external_character_id: 'real-character', full_name: 'Outside Character', avatar_url: '', sanmail_email: '', phone: '', role: 'USER' as const, created_at: '', updated_at: '' };

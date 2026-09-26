@@ -118,7 +118,7 @@ export default function YeniIlanOlusturPage() {
     }
 
     // Verify user actually has an available credit for the chosen mode (INDIVIDUAL vs CORPORATE)
-    fetch(`/api/credits?profileId=${currentProfile.id}`)
+    fetch('/api/credits')
       .then((res) => res.json())
       .then((data) => {
         const hasNeededCredit = corpParam

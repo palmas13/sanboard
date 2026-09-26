@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getNotificationRepository } from '@/lib/db/repositories';
-import { getServerSession } from '@/lib/auth/session';
+import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(req);
-    const activeProfileId = session?.profileId || req.cookies.get('sanboard_profile_id')?.value;
-
-    if (!activeProfileId) {
-      return NextResponse.json(
-        { error: 'Aktif karakter profili seçilmedi. Lütfen giriş yapın veya karakter seçin.' },
-        { status: 401 }
-      );
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) {
+      return NextResponse.json({ error: actor.error }, { status: actor.status });
     }
+    const activeProfileId = actor.profileId;
 
     const repo = getNotificationRepository();
     if (req.nextUrl.searchParams.get('countOnly') === '1') {
@@ -39,15 +35,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(req);
-    const activeProfileId = session?.profileId || req.cookies.get('sanboard_profile_id')?.value;
-
-    if (!activeProfileId) {
-      return NextResponse.json(
-        { error: 'Aktif karakter profili seçilmedi. Lütfen giriş yapın veya karakter seçin.' },
-        { status: 401 }
-      );
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) {
+      return NextResponse.json({ error: actor.error }, { status: actor.status });
     }
+    const activeProfileId = actor.profileId;
 
     const body = await req.json().catch(() => ({}));
     const action = body.action;

@@ -1,23 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPaymentRepository } from '@/lib/db/repositories';
+import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    let profileId = searchParams.get('profileId');
-    if (!profileId) {
-      profileId = req.cookies.get('sanboard_profile_id')?.value || null;
-    }
-
-    if (!profileId) {
-      return NextResponse.json(
-        { error: 'profileId gereklidir.' },
-        { status: 400 }
-      );
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) {
+      return NextResponse.json({ error: actor.error }, { status: actor.status });
     }
 
     const repo = getPaymentRepository();
-    const result = await repo.getUserCredits(profileId);
+    const result = await repo.getUserCredits(actor.profileId);
     const availableList = (result.credits || []).filter((c: any) => c.status === 'AVAILABLE');
     const individualCredits = availableList.filter((c: any) => c.credit_type === 'INDIVIDUAL').length;
     const corporateCredits = availableList.filter((c: any) => c.credit_type === 'CORPORATE').length;

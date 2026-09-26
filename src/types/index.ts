@@ -55,6 +55,13 @@ export interface CharacterProfile {
   updated_at: string;
 }
 
+export interface CharacterSummary {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+  role: UserRole;
+}
+
 export interface ListingImage {
   id: string;
   listing_id: string;

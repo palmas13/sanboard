@@ -1,8 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { CharacterProfile, User } from '@/types';
-import { GtaWorldCharacter } from '@/lib/integrations/gtaworld/types';
+import { CharacterProfile, CharacterSummary, User } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
@@ -10,7 +9,7 @@ export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 interface AuthContextType {
   user: User | null;
   currentProfile: CharacterProfile | null;
-  characters: GtaWorldCharacter[];
+  characters: CharacterSummary[];
   characterProfiles: Record<string, CharacterProfile>;
   authStatus: AuthStatus;
   isLoading: boolean;
@@ -22,7 +21,7 @@ interface AuthContextType {
   selectCharacter: (characterId: string) => Promise<CharacterProfile | null>;
   updateCurrentProfile: (data: Partial<CharacterProfile>) => void;
   refreshProfile: () => Promise<void>;
-  refreshCharacters: () => Promise<GtaWorldCharacter[] | null>;
+  refreshCharacters: () => Promise<CharacterSummary[] | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,7 +47,7 @@ export function AuthProvider({
   const [characterProfiles, setCharacterProfiles] = useState<Record<string, CharacterProfile>>(
     initialProfile ? { [initialProfile.id]: initialProfile } : {}
   );
-  const [characters, setCharacters] = useState<GtaWorldCharacter[]>([]);
+  const [characters, setCharacters] = useState<CharacterSummary[]>([]);
   const [isTestIdentity, setIsTestIdentity] = useState(false);
 
   const refreshProfile = useCallback(async () => {
@@ -101,14 +100,6 @@ export function AuthProvider({
               setCharacters(charData.characters);
             }
             setIsTestIdentity(charData?.isTestIdentity === true);
-            if (charData?.success && Array.isArray(charData.profiles)) {
-              const profMap: Record<string, CharacterProfile> = {};
-              for (const p of charData.profiles as CharacterProfile[]) {
-                if (p.id) profMap[p.id] = p;
-                if (p.external_character_id) profMap[p.external_character_id] = p;
-              }
-              setCharacterProfiles((prev) => ({ ...prev, ...profMap }));
-            }
           }
         } catch {
           // Ignore
@@ -162,12 +153,6 @@ export function AuthProvider({
   }, []);
 
   const selectCharacter = async (characterId: string): Promise<CharacterProfile | null> => {
-    const char = characters.find((c) => c.id === characterId) || {
-      id: characterId,
-      fullName: 'Karakter',
-      hasProfile: true,
-    };
-
     try {
       // 1. Establish server-side signed HMAC session first and await confirmation
       const sessionRes = await fetch('/api/auth/session', {
@@ -249,7 +234,7 @@ export function AuthProvider({
     });
   }, []);
 
-  const refreshCharacters = useCallback(async (): Promise<GtaWorldCharacter[] | null> => {
+  const refreshCharacters = useCallback(async (): Promise<CharacterSummary[] | null> => {
     try {
       const res = await fetch('/api/user/characters');
       if (res.ok) {
@@ -258,14 +243,6 @@ export function AuthProvider({
           setCharacters(data.characters);
         }
         setIsTestIdentity(data?.isTestIdentity === true);
-        if (data?.success && Array.isArray(data.profiles)) {
-          const profMap: Record<string, CharacterProfile> = {};
-          for (const p of data.profiles as CharacterProfile[]) {
-            if (p.id) profMap[p.id] = p;
-            if (p.external_character_id) profMap[p.external_character_id] = p;
-          }
-          setCharacterProfiles((prev) => ({ ...prev, ...profMap }));
-        }
         return data.characters || null;
       }
     } catch {

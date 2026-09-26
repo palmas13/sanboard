@@ -16,7 +16,7 @@ export default function HesabimOdemelerPage() {
 
     async function fetchPayments() {
       try {
-        const res = await fetch(`/api/user/payments?profileId=${currentProfile?.id}`);
+        const res = await fetch('/api/user/payments');
         const data = await res.json();
         if (Array.isArray(data)) {
           setPayments(data);

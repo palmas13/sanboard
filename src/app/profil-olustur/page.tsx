@@ -15,18 +15,16 @@ function ProfilOlusturContent() {
   const { characters, selectCharacter } = useAuth();
   const char = characters.find((c) => c.id === charId) || {
     id: charId,
-    fullName: 'Karakter',
-    hasProfile: false,
-    avatarUrl: '',
-    sanmailEmail: '',
-    phone: '',
+    displayName: 'Karakter',
+    avatarUrl: null,
+    role: 'USER' as const,
   };
 
-  const [fullName] = useState(char.fullName);
+  const [fullName] = useState(char.displayName);
   const [avatarPreview, setAvatarPreview] = useState<string>(char.avatarUrl || '');
   const [avatarData, setAvatarData] = useState<string>('');
-  const [sanmailEmail, setSanmailEmail] = useState(char.sanmailEmail || '');
-  const [phone, setPhone] = useState(char.phone || '');
+  const [sanmailEmail, setSanmailEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [checkingExisting, setCheckingExisting] = useState(true);
   const [error, setError] = useState('');

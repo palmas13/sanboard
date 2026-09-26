@@ -99,7 +99,7 @@ export default function HesabimKurumsalPage() {
       }
 
       // 2. Check if user already has an available corporate credit
-      const credRes = await fetch(`/api/credits?profileId=${currentProfile.id}`);
+      const credRes = await fetch('/api/credits');
       const credData = await credRes.json();
       if (credData.corporateCredits && credData.corporateCredits > 0) {
         router.push('/ilan-ver/yeni?corporate=true');

@@ -244,7 +244,9 @@ describe('SANBOARD dynamic identity foundation', () => {
     const picker = readFileSync(join(process.cwd(), 'src/app/karakter-sec/CharacterSelectContent.tsx'), 'utf8');
     const mockProvider = readFileSync(join(process.cwd(), 'src/lib/integrations/gtaworld/mock-provider.ts'), 'utf8');
     const store = readFileSync(join(process.cwd(), 'src/lib/db/store.ts'), 'utf8');
-    assert.match(picker, /const avatarPath = profile\?\.avatar_path \|\| profile\?\.avatar_url \|\| null/);
+    assert.match(picker, /const charAvatar = char\.avatarUrl \? resolveAvatarUrl\(char\.avatarUrl\) : null/);
+    assert.match(picker, /char\.displayName/);
+    assert.doesNotMatch(picker, /external_character_id/);
     assert.match(picker, /\{initials\}/);
     assert.doesNotMatch(mockProvider, /photo-1500648767791-00dcc994a43e/);
     assert.doesNotMatch(store, /photo-1500648767791-00dcc994a43e/);

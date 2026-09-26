@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCharacterSelectionContext, getServerSession } from '@/lib/auth/session';
 import { getSupabaseAdminClient } from '@/lib/db/supabase-client';
 import { db } from '@/lib/db/store';
-import { GtaWorldCharacter } from '@/lib/integrations/gtaworld/types';
 import { isTestExternalAccountId, isTestLoginEnabled } from '@/lib/auth/test-login';
 import { getUserRepository } from '@/lib/db/repositories';
+import { CharacterProfile, CharacterSummary } from '@/types';
+import { resolveMediaUrl } from '@/lib/media/url';
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(req);
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
   }
 
   // 1. Fetch real / synchronized character profiles from DB for this account
-  let dbProfiles: any[] = [];
+  let dbProfiles: CharacterProfile[] = [];
   if (process.env.DATA_STORE === 'supabase') {
     try {
       const client = getSupabaseAdminClient();
@@ -49,21 +50,16 @@ export async function GET(req: NextRequest) {
     dbProfiles = db.profiles.filter((p) => p.user_id === userId);
   }
 
-  const characters: GtaWorldCharacter[] = dbProfiles.map((p) => ({
+  const characters: CharacterSummary[] = dbProfiles.map((p) => ({
     id: p.id,
-    externalCharacterId: p.external_character_id || p.id,
-    fullName: p.full_name,
-    hasProfile: true,
-    avatarUrl: p.avatar_path || p.avatar_url || '',
-    avatarPath: p.avatar_path || p.avatar_url || '',
-    sanmailEmail: p.sanmail_email || '',
-    phone: p.phone || '',
+    displayName: p.full_name,
+    avatarUrl: resolveMediaUrl(p.avatar_path || p.avatar_url || '') || null,
+    role: p.role || 'USER',
   }));
 
   return NextResponse.json({
     success: true,
     characters,
-    profiles: dbProfiles,
     isTestIdentity,
   });
 }

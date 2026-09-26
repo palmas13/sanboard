@@ -20,7 +20,7 @@ export default function IlanVerRouterPage() {
     // Check available credits
     async function checkCredits() {
       try {
-        const res = await fetch(`/api/credits?profileId=${currentProfile?.id}`);
+        const res = await fetch('/api/credits');
         const data = await res.json();
 
         if (data.availableCredits > 0) {

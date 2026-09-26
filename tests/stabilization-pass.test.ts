@@ -379,7 +379,7 @@ describe('Sanboard Stabilization Pass: Auth, Role, Favorites, Notifications & Da
 
       // Ravi queries notifications -> 0
       const raviReq = createAuthedRequest('http://localhost:3000/api/notifications', 'GET', {
-        userId: raviUserId,
+        userId: mavisAdminUserId,
         role: 'USER',
         profileId: raviProfileId,
       });
