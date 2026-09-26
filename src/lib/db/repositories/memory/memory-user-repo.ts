@@ -3,6 +3,7 @@ import { db } from '../../store';
 import { CharacterProfile, User } from '@/types';
 import { normalizePhone } from '@/lib/utils/format';
 import { resolveUserId, resolveStoreUserId, resolveStoreProfileId } from '../../id-mapper';
+import { selectUnambiguousProfile } from '../../profile-identity';
 
 export class MemoryUserRepository implements IUserRepository {
   async getUserById(id: string): Promise<User | null> {
@@ -13,11 +14,19 @@ export class MemoryUserRepository implements IUserRepository {
   }
 
   async getProfileById(id: string): Promise<CharacterProfile | null> {
+    const identifier = String(id || '').trim();
+    if (!identifier) return null;
+
     const storeProfileId = resolveStoreProfileId(id);
-    const profile = db.profiles.find(
-      (p) => p.id === id || p.external_character_id === id || p.id === storeProfileId
-    );
+    const canonicalProfile = db.profiles.find((profile) => profile.id === identifier) || null;
+    const externalProfile = db.profiles.find(
+      (profile) => profile.external_character_id === identifier
+    ) || null;
+    const profile = selectUnambiguousProfile(identifier, canonicalProfile, externalProfile);
     if (profile) return profile;
+
+    const mappedProfile = db.profiles.find((candidate) => candidate.id === storeProfileId);
+    if (mappedProfile) return mappedProfile;
 
     if (id === '44444444-4444-4444-4444-444444444441') {
       return db.profiles.find((p) => p.id === 'char-mavis-01') || null;

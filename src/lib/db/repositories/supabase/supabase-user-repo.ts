@@ -5,6 +5,7 @@ import { uploadProfileAvatar } from '@/lib/storage';
 import { deleteMediaSafely } from '@/lib/storage/lifecycle';
 import { normalizePhone } from '@/lib/utils/format';
 import { resolveUserId, resolveProfileId, isUuid } from '../../id-mapper';
+import { selectUnambiguousProfile } from '../../profile-identity';
 
 export class SupabaseUserRepository implements IUserRepository {
   private getClient() {
@@ -37,20 +38,32 @@ export class SupabaseUserRepository implements IUserRepository {
 
   async getProfileById(id: string): Promise<CharacterProfile | null> {
     const client = this.getAdminClient();
-    const safeId = resolveProfileId(id);
-    if (!safeId) return null;
+    const identifier = String(id || '').trim();
+    if (!identifier) return null;
 
-    const query = client.from('character_profiles').select('*');
-    const { data, error } = isUuid(safeId)
-      ? await query.eq('id', safeId).maybeSingle()
-      : await query.eq('external_character_id', safeId).maybeSingle();
-
-    if (error) {
-      throw new Error(`Supabase error fetching character profile: ${error.message}`);
+    const canonicalResult = isUuid(identifier)
+      ? await client.from('character_profiles').select('*').eq('id', identifier).maybeSingle()
+      : { data: null, error: null };
+    if (canonicalResult.error) {
+      throw new Error(`Supabase error fetching character profile by canonical id: ${canonicalResult.error.message}`);
     }
-    if (!data) return null;
 
-    const profile = data as CharacterProfile;
+    const externalResult = await client
+      .from('character_profiles')
+      .select('*')
+      .eq('external_character_id', identifier)
+      .maybeSingle();
+    if (externalResult.error) {
+      throw new Error(`Supabase error fetching character profile by external id: ${externalResult.error.message}`);
+    }
+
+    const profile = selectUnambiguousProfile(
+      identifier,
+      canonicalResult.data as CharacterProfile | null,
+      externalResult.data as CharacterProfile | null
+    );
+    if (!profile) return null;
+
     // Canonicalize avatar_path so UI can always read avatar_path
     if (!profile.avatar_path && profile.avatar_url) {
       profile.avatar_path = profile.avatar_url;

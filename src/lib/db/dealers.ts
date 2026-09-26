@@ -4,6 +4,7 @@ import { getDealerRepository, getListingRepository, getNotificationRepository } 
 import { normalizePhone } from '../utils/format';
 import { normalizeSocialMedia } from '../dealers/social';
 import { recordAuditEvent } from '../audit';
+import { notifyNewFollowerBestEffort } from './follow-notifications';
 
 export function ensureDealers() {
   if (!db.dealers) {
@@ -402,6 +403,17 @@ export async function setFollow(
       corporate_profile_id: corporateProfileId,
       created_at: new Date().toISOString(),
     });
+
+    const ownerProfileId = dealer.owner_profile_id || dealer.profile_id;
+    if (ownerProfileId) {
+      const followerProfile = db.profiles.find((profile) => profile.id === followerProfileId);
+      await notifyNewFollowerBestEffort({
+        recipientProfileId: ownerProfileId,
+        recipientUserId: db.profiles.find((profile) => profile.id === ownerProfileId)?.user_id,
+        followerName: followerProfile?.full_name || 'Bir kullanıcı',
+        corporateProfileId,
+      });
+    }
   } else if (!shouldFollow && existingIndex >= 0) {
     db.followers.splice(existingIndex, 1);
   }

@@ -4,6 +4,7 @@ import { CorporateApplication, CorporateProfile, CharacterProfile } from '@/type
 import { uploadCorporateLogo, uploadCorporateBanner, getStorageProvider } from '@/lib/storage';
 import { normalizePhone } from '@/lib/utils/format';
 import { normalizeSocialMedia } from '@/lib/dealers/social';
+import { notifyNewFollowerBestEffort } from '../../follow-notifications';
 
 function mapCorporateProfile(data: any): CorporateProfile | null {
   if (!data) return null;
@@ -577,20 +578,12 @@ export class SupabaseDealerRepository implements IDealerRepository {
 
     let createdFollow = false;
     if (shouldFollow) {
-      const { data: existing, error: existingError } = await client
-        .from('corporate_followers')
-        .select('id')
-        .eq('follower_profile_id', followerProfileId)
-        .eq('corporate_profile_id', corporateProfileId)
-        .maybeSingle();
-      if (existingError) throw new Error(existingError.message);
-
-      const { error } = await client.from('corporate_followers').upsert(
+      const { data: inserted, error } = await client.from('corporate_followers').upsert(
         { follower_profile_id: followerProfileId, corporate_profile_id: corporateProfileId },
         { onConflict: 'follower_profile_id,corporate_profile_id', ignoreDuplicates: true }
-      );
+      ).select('id');
       if (error) throw new Error(error.message);
-      createdFollow = !existing;
+      createdFollow = Boolean(inserted?.length);
     } else {
       const { error } = await client
         .from('corporate_followers')
@@ -606,14 +599,10 @@ export class SupabaseDealerRepository implements IDealerRepository {
         .select('full_name')
         .eq('id', followerProfileId)
         .maybeSingle();
-      const { getNotificationRepository } = await import('../index');
-      await getNotificationRepository().createNotification({
-        recipient_profile_id: dealer.owner_profile_id,
-        type: 'NEW_FOLLOWER',
-        title: 'Yeni Takipçi',
-        message: `${follower?.full_name || 'Bir kullanıcı'} mağazanızı takip etmeye başladı.`,
-        entity_type: 'application',
-        entity_id: corporateProfileId,
+      await notifyNewFollowerBestEffort({
+        recipientProfileId: dealer.owner_profile_id,
+        followerName: follower?.full_name || 'Bir kullanıcı',
+        corporateProfileId,
       });
     }
 

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSessionToken, setSessionCookieOnResponse, clearSessionCookieOnResponse, getServerSession } from '@/lib/auth/session';
 import { db } from '@/lib/db/store';
-import { getSupabaseAdminClient } from '@/lib/db/supabase-client';
 import { recordAuditEvent } from '@/lib/audit';
-import { isUuid } from '@/lib/db/id-mapper';
+import { getUserRepository } from '@/lib/db/repositories';
 
 // Known staging/mock character to user account mapping for mock/staging development
 // In mock mode, Mavis and Zade are characters of the SAME UCP account
@@ -68,21 +67,7 @@ export async function POST(req: NextRequest) {
     let profile: { id: string; user_id: string; full_name?: string; role?: 'USER' | 'ADMIN' } | null = null;
 
     if (process.env.DATA_STORE === 'supabase') {
-      try {
-        const client = getSupabaseAdminClient();
-        if (client) {
-          const query = client.from('character_profiles').select('id, user_id, full_name, role');
-          const { data } = isUuid(characterId)
-            ? await query.eq('id', characterId).maybeSingle()
-            : await query.eq('external_character_id', String(characterId)).maybeSingle();
-
-          if (data) {
-            profile = data as any;
-          }
-        }
-      } catch {
-        // Fallback
-      }
+      profile = await getUserRepository().getProfileById(String(characterId));
     }
 
     if (!profile) {
