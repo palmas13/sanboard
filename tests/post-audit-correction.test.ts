@@ -588,9 +588,15 @@ describe('Sanboard Post-Audit Correction Pass: Sections 36-47', () => {
       }),
     });
     const checkoutRes = await checkoutPost(checkoutReq);
-    assert.strictEqual(checkoutRes.status, 200);
+    assert.strictEqual(checkoutRes.status, 503);
     const checkoutData = await checkoutRes.json();
-    assert.strictEqual(checkoutData.amount, 1750, 'Corporate credit checkout price must be $1,750');
+    assert.strictEqual(checkoutData.code, 'provider_not_configured');
+    const pendingPayment = db.payments.at(-1)!;
+    assert.strictEqual(pendingPayment.profile_id, mavisProfileId, 'Corporate checkout owner must come from the signed active character');
+    assert.strictEqual(pendingPayment.corporate_profile_id, 'dealer-apex-01');
+    assert.strictEqual(pendingPayment.amount, 1750, 'Corporate credit checkout price must be $1,750');
+    assert.strictEqual(pendingPayment.status, 'PENDING');
+    assert.strictEqual(pendingPayment.external_payment_id, undefined);
   });
 
   it('Section 46 regression: corporate subscription client targets duplicate-safe checkout', () => {

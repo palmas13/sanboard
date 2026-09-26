@@ -67,13 +67,13 @@ describe('external integrations foundation contracts', () => {
     assert.equal(typeof new RealGtaWorldAuthProvider().fetchAccount, 'function');
   });
 
-  test('Fleeca provider boundary has explicit local/test mock and real implementations', () => {
+  test('Fleeca provider boundary keeps normal selection real and mock behind an explicit test gate', () => {
     assert.equal(typeof new MockFleecaPaymentProvider().verifyPayment, 'function');
     assert.equal(typeof new RealFleecaPaymentProvider().verifyPayment, 'function');
     const selection = readFileSync(join(process.cwd(), 'src/lib/integrations/fleeca/index.ts'), 'utf8');
-    assert.match(selection, /USE_MOCK_FLEECA === 'true'/);
-    assert.match(selection, /DATA_STORE !== 'supabase'/);
-    assert.match(selection, /NODE_ENV !== 'production'/);
+    assert.match(selection, /return new RealFleecaPaymentProvider\(\)/);
+    assert.match(selection, /ENABLE_TEST_PAYMENTS !== 'true'/);
+    assert.match(selection, /NODE_ENV === 'production'/);
   });
 
   test('payment verification accepts success and rejects pending, failed, amount, payer, and purpose mismatch', () => {

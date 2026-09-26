@@ -32,27 +32,10 @@ export class MockFleecaPaymentProvider implements FleecaPaymentProvider {
     return mockOrdersMap.get(orderId) || null;
   }
 
-  async verifyPayment(
-    orderId: string,
-    simulateSuccess = true
-  ): Promise<VerifiedExternalPayment> {
+  async verifyPayment(orderId: string): Promise<VerifiedExternalPayment> {
     const order = mockOrdersMap.get(orderId);
     if (!order) {
       throw new Error('Sipariş bulunamadı.');
-    }
-
-    if (!simulateSuccess) {
-      order.status = 'FAILED';
-      return {
-        externalTransactionId: `FLC-TX-${orderId}`,
-        status: 'FAILED',
-        orderReference: orderId,
-        payerReference: order.profileId,
-        amount: order.amount,
-        currency: order.currency,
-        purposeReference: order.packageCode,
-        occurredAt: new Date().toISOString(),
-      };
     }
 
     order.status = 'SUCCESS';

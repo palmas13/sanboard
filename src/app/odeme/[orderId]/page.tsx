@@ -45,7 +45,7 @@ export default function FleecaCheckoutPage() {
       .catch(() => setResult({ success: false, error: 'Sipariş bilgisi alınamadı.' }));
   }, [orderId]);
 
-  const handleSimulatePayment = async (simulateSuccess: boolean) => {
+  const handleVerifyPayment = async () => {
     setProcessing(true);
     setResult(null);
 
@@ -55,7 +55,6 @@ export default function FleecaCheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orderId,
-          simulateSuccess,
         }),
       });
 
@@ -178,17 +177,17 @@ export default function FleecaCheckoutPage() {
               <div className="p-4 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] space-y-3">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-[#FF8A1F]">
                   <CreditCard className="w-3.5 h-3.5" />
-                  <span>Fleeca Bank Çevrimiçi Ödeme Onayı</span>
+                  <span>Fleeca Ödeme Bağlantısı</span>
                 </div>
                 <p className="text-[11px] text-[var(--text-dim)]">
-                  İşlemi onaylamak için lütfen banka transferinizi başlatın.
+                  Gerçek Fleeca ödeme sözleşmesi henüz yapılandırılmadı. Ödeme doğrulanmadan sipariş tamamlanmaz ve hak tanımlanmaz.
                 </p>
 
-                <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="pt-1">
                   <button
                     type="button"
                     disabled={processing}
-                    onClick={() => handleSimulatePayment(true)}
+                    onClick={handleVerifyPayment}
                     className="btn-primary text-xs py-2.5 flex items-center justify-center gap-1.5"
                   >
                     {processing ? (
@@ -196,17 +195,7 @@ export default function FleecaCheckoutPage() {
                     ) : (
                       <CheckCircle2 className="w-3.5 h-3.5" />
                     )}
-                    <span>Ödemeyi Başarılı Simüle Et</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={processing}
-                    onClick={() => handleSimulatePayment(false)}
-                    className="btn-danger text-xs py-2.5 flex items-center justify-center gap-1.5"
-                  >
-                    <XCircle className="w-3.5 h-3.5" />
-                    <span>Ödemeyi Başarısız Simüle Et</span>
+                    <span>Ödeme Durumunu Doğrula</span>
                   </button>
                 </div>
               </div>

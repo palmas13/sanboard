@@ -1,6 +1,5 @@
 import { db } from './store';
 import { ListingCredit, Payment } from '@/types';
-import { getFleecaPaymentProvider } from '../integrations/fleeca';
 import { getPaymentRepository } from './repositories';
 
 /**
@@ -15,15 +14,6 @@ export async function createCheckoutOrder(
   if (process.env.DATA_STORE === 'supabase') {
     const repo = getPaymentRepository();
     const order = await repo.createPaymentOrder(profileId, packageCode, options);
-    const fleeca = getFleecaPaymentProvider();
-    await fleeca.createOrder({
-      orderId: order.orderId,
-      profileId,
-      characterName: 'Kullanıcı',
-      packageCode,
-      amount: order.amount,
-      currency: 'GTA_DOLLAR',
-    });
     return {
       orderId: order.orderId,
       amount: order.amount,
@@ -86,19 +76,7 @@ export async function createCheckoutOrder(
     entitlement_type: entitlementType,
     created_at: new Date().toISOString(),
   };
-
   db.payments.push(payment);
-
-  // Initialize order in Fleeca provider
-  const fleeca = getFleecaPaymentProvider();
-  await fleeca.createOrder({
-    orderId,
-    profileId,
-    characterName: profile.full_name,
-    packageCode: pkg.code,
-    amount: pkg.price,
-    currency: 'GTA_DOLLAR',
-  });
 
   return {
     orderId,

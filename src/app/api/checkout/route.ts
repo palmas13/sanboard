@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPaymentRepository, getDealerRepository } from '@/lib/db/repositories';
-import { getFleecaPaymentProvider, validateExternalPayment } from '@/lib/integrations/fleeca';
+import {
+  FleecaProviderNotConfiguredError,
+  getFleecaPaymentProvider,
+  validateExternalPayment,
+} from '@/lib/integrations/fleeca';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 
 export async function GET(req: NextRequest) {
@@ -96,6 +100,12 @@ export async function POST(req: NextRequest) {
       entitlementType: order.entitlementType,
     });
   } catch (error: any) {
+    if (error instanceof FleecaProviderNotConfiguredError) {
+      return NextResponse.json(
+        { error: 'Fleeca ödeme sağlayıcısı henüz kullanıma hazır değil.', code: 'provider_not_configured' },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: error?.message || 'Sipariş oluşturulamadı.' },
       { status: 500 }
@@ -103,12 +113,12 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Process / simulate payment endpoint
+// Server-side provider verification endpoint. Browser fields never prove payment.
 export async function PUT(req: NextRequest) {
   try {
     const actor = await resolveOwnedActiveProfile(req);
     if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
-    const { orderId, simulateSuccess } = await req.json();
+    const { orderId } = await req.json();
 
     if (!orderId) {
       return NextResponse.json(
@@ -125,7 +135,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const fleeca = getFleecaPaymentProvider();
-    const transaction = await fleeca.verifyPayment(orderId, simulateSuccess);
+    const transaction = await fleeca.verifyPayment(orderId);
     const verification = validateExternalPayment(transaction, {
       orderReference: payment.order_id,
       payerReference: payment.profile_id,
@@ -158,6 +168,12 @@ export async function PUT(req: NextRequest) {
       entitlementType: payment.entitlement_type || 'LISTING_CREDIT',
     });
   } catch (error: any) {
+    if (error instanceof FleecaProviderNotConfiguredError) {
+      return NextResponse.json(
+        { success: false, error: 'Fleeca ödeme doğrulaması henüz kullanıma hazır değil.', code: 'provider_not_configured' },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: error?.message || 'Ödeme işlenemedi.' },
       { status: 500 }

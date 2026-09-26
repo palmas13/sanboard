@@ -1,6 +1,17 @@
 import { FleecaPaymentProvider } from './provider';
 import { CreateCheckoutParams, FleecaOrder, VerifiedExternalPayment } from './types';
 
+export const FLEECA_PROVIDER_NOT_CONFIGURED = 'FLEECA_PROVIDER_NOT_CONFIGURED';
+
+export class FleecaProviderNotConfiguredError extends Error {
+  readonly code = FLEECA_PROVIDER_NOT_CONFIGURED;
+
+  constructor() {
+    super('Fleeca ödeme sağlayıcısı henüz yapılandırılmadı.');
+    this.name = 'FleecaProviderNotConfiguredError';
+  }
+}
+
 /**
  * Real Fleeca Bank API payment provider placeholder.
  * 
@@ -9,16 +20,14 @@ import { CreateCheckoutParams, FleecaOrder, VerifiedExternalPayment } from './ty
  */
 export class RealFleecaPaymentProvider implements FleecaPaymentProvider {
   async createOrder(_params: CreateCheckoutParams): Promise<FleecaOrder> {
-    throw new Error(
-      'Real Fleeca Payment is not configured yet. Set USE_MOCK_FLEECA=true for local development.'
-    );
+    throw new FleecaProviderNotConfiguredError();
   }
 
   async getOrder(_orderId: string): Promise<FleecaOrder | null> {
-    throw new Error('Real Fleeca Payment API is not configured yet.');
+    throw new FleecaProviderNotConfiguredError();
   }
 
-  async verifyPayment(_orderId: string, _simulateSuccess?: boolean): Promise<VerifiedExternalPayment> {
-    throw new Error('Real Fleeca Payment API is not configured yet.');
+  async verifyPayment(_orderId: string): Promise<VerifiedExternalPayment> {
+    throw new FleecaProviderNotConfiguredError();
   }
 }
