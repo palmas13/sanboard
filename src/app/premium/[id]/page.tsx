@@ -93,7 +93,7 @@ export default async function PremiumStoreVitrinPage({ params }: PageProps) {
   // Check initial follow state on server to eliminate F5 flicker (Sections 15-17)
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get('sanboard_session')?.value;
-  let activeProfileId = cookieStore.get('sanboard_profile_id')?.value;
+  let activeProfileId: string | undefined;
   if (sessionCookie) {
     const verified = verifySessionToken(sessionCookie);
     if (verified?.profileId) activeProfileId = verified.profileId;

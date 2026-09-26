@@ -151,6 +151,31 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
   });
 
   test('TEST 4: Character switch isolates favorites (char-profile-b does not inherit char-profile-a favorites)', async () => {
+    db.profiles.push(
+      {
+        id: 'char-profile-a',
+        user_id: zadeUserId,
+        full_name: 'Alex Stone',
+        avatar_url: '',
+        sanmail_email: '',
+        phone: '',
+        role: 'USER',
+        created_at: '',
+        updated_at: '',
+      },
+      {
+        id: 'char-profile-b',
+        user_id: zadeUserId,
+        full_name: 'Jordan Reed',
+        avatar_url: '',
+        sanmail_email: '',
+        phone: '',
+        role: 'USER',
+        created_at: '',
+        updated_at: '',
+      }
+    );
+
     // Character A adds favorite
     db.favorites.push({
       id: 'fav-zade-1',

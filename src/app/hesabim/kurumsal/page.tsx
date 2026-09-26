@@ -132,8 +132,8 @@ export default function HesabimKurumsalPage() {
     setLoading(true);
     try {
       const promises: Promise<any>[] = [
-        fetch(`/api/dealers/profile?profileId=${currentProfile.id}`),
-        fetch(`/api/dealers/listings?profileId=${currentProfile.id}`),
+        fetch('/api/dealers/profile'),
+        fetch('/api/dealers/listings'),
         fetch('/api/dealers/apply'),
       ];
 

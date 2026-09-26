@@ -146,7 +146,6 @@ export interface IDealerRepository {
 
 export interface IPaymentRepository {
   getUserCredits(profileId: string): Promise<{ available: number; total: number; credits: any[] }>;
-  consumeCredit(profileId: string, listingId: string): Promise<boolean>;
   createPaymentOrder(profileId: string, packageIdOrCode: string, options?: { idempotencyKey?: string; corporateProfileId?: string | null }): Promise<{ orderId: string; amount: number; packageName?: string; entitlementType?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' }>;
   completePayment(orderId: string, externalPaymentId?: string): Promise<{ success: boolean; credit?: any; error?: string }>;
   getPaymentOrder(orderId: string): Promise<any | null>;

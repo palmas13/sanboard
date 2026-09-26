@@ -111,8 +111,6 @@ function ProfilOlusturContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          characterId: char.id,
-          fullName,
           avatarData: avatarData || undefined,
           sanmailEmail: formattedSanMail || undefined,
           phone: formattedPhone || undefined,

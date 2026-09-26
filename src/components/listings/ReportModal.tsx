@@ -42,7 +42,6 @@ export function ReportModal({ listingId }: ReportModalProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          reporterProfileId: currentProfile.id,
           listingId,
           reason,
           description: description.trim(),

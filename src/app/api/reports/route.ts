@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { reportListing } from '@/lib/db/listings';
+import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 
 export async function POST(req: NextRequest) {
   try {
-    const { reporterProfileId, listingId, reason, description } = await req.json();
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+    const { listingId, reason, description } = await req.json();
 
-    if (!reporterProfileId || !listingId || !reason) {
+    if (!listingId || !reason) {
       return NextResponse.json(
         { error: 'Gerekli alanlar eksik.' },
         { status: 400 }
@@ -13,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await reportListing(
-      reporterProfileId,
+      actor.profileId,
       listingId,
       reason,
       description || ''

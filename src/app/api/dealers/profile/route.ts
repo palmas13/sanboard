@@ -1,19 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDealerRepository } from '@/lib/db/repositories';
-import { getServerSession } from '@/lib/auth/session';
+import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(req);
-    const { searchParams } = new URL(req.url);
-    const profileId = searchParams.get('profileId') || session?.profileId;
-
-    if (!profileId) {
-      return NextResponse.json({ error: 'profileId gereklidir veya oturum açılmalıdır.' }, { status: 400 });
-    }
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
 
     const repo = getDealerRepository();
-    const dealer = await repo.getDealerByProfileId(profileId);
+    const dealer = await repo.getDealerByProfileId(actor.profileId);
     return NextResponse.json({ dealer });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Hata oluştu.' }, { status: 500 });
@@ -22,14 +17,12 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const session = await getServerSession(req);
-    if (!session || !session.profileId) {
-      return NextResponse.json({ error: 'Yetkisiz erişim. Oturum açmanız gerekmektedir.' }, { status: 401 });
-    }
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
 
     const repo = getDealerRepository();
     // Resolve owner's approved store strictly from verified session
-    const existingDealer = await repo.getDealerByProfileId(session.profileId);
+    const existingDealer = await repo.getDealerByProfileId(actor.profileId);
     if (!existingDealer) {
       return NextResponse.json({ error: 'Bu karaktere ait onaylı bir kurumsal mağaza bulunamadı.' }, { status: 404 });
     }

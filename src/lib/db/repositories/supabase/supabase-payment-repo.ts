@@ -42,31 +42,6 @@ export class SupabasePaymentRepository implements IPaymentRepository {
     return { available, total: (data || []).length, credits: data || [] };
   }
 
-  async consumeCredit(profileId: string, listingId: string): Promise<boolean> {
-    const client = this.getAdminClient();
-
-    const { data: availableCredit, error: fetchErr } = await client
-      .from('listing_credits')
-      .select('id')
-      .eq('profile_id', profileId)
-      .eq('status', 'AVAILABLE')
-      .limit(1)
-      .maybeSingle();
-
-    if (fetchErr || !availableCredit) return false;
-
-    const { error } = await client
-      .from('listing_credits')
-      .update({
-        status: 'USED',
-        used_listing_id: listingId,
-        used_at: new Date().toISOString(),
-      })
-      .eq('id', availableCredit.id);
-
-    return !error;
-  }
-
   async createPaymentOrder(
     profileId: string,
     packageIdOrCode: string,

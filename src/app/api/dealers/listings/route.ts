@@ -1,19 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from '@/lib/auth/session';
+import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { getDealerRepository, getListingRepository } from '@/lib/db/repositories';
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(req);
-    const { searchParams } = new URL(req.url);
-    const profileId = searchParams.get('profileId') || session?.profileId;
-
-    if (!profileId) {
-      return NextResponse.json({ error: 'Yetkisiz erişim.' }, { status: 401 });
-    }
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
 
     const dealerRepo = getDealerRepository();
-    const dealer = await dealerRepo.getDealerByProfileId(profileId);
+    const dealer = await dealerRepo.getDealerByProfileId(actor.profileId);
 
     if (!dealer) {
       return NextResponse.json({ listings: [] });

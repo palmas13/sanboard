@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from '@/lib/auth/session';
+import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { getDealerRepository } from '@/lib/db/repositories';
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(req);
-    if (!session?.userId) {
-      return NextResponse.json({ error: 'Yetkisiz erişim. Lütfen giriş yapın.' }, { status: 401 });
-    }
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
 
     const { dealerId } = await req.json().catch(() => ({}));
     if (!dealerId) {
@@ -22,13 +20,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify ownership: active character profile must strictly own the dealer store (Section 28)
-    const activeProfileId = session.profileId;
-    if (!activeProfileId) {
-      return NextResponse.json({ error: 'Abonelik işlemi için aktif bir karakter seçilmelidir.' }, { status: 400 });
-    }
-
     const dealerOwnerId = dealer.owner_profile_id || dealer.profile_id;
-    if (dealerOwnerId !== activeProfileId && session.role !== 'ADMIN') {
+    if (dealerOwnerId !== actor.profileId) {
       return NextResponse.json({ error: 'Bu mağazanın aboneliğini yalnızca mağaza sahibi karakter aktif edebilir.' }, { status: 403 });
     }
 

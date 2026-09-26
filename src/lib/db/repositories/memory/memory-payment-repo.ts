@@ -3,7 +3,6 @@ import { db } from '../../store';
 import {
   createCheckoutOrder,
   completePaymentOrder,
-  getAvailableCredits,
 } from '../../payments';
 
 export class MemoryPaymentRepository implements IPaymentRepository {
@@ -11,17 +10,6 @@ export class MemoryPaymentRepository implements IPaymentRepository {
     const credits = db.credits.filter((c) => c.profile_id === profileId);
     const available = credits.filter((c) => c.status === 'AVAILABLE').length;
     return { available, total: credits.length, credits };
-  }
-
-  async consumeCredit(profileId: string, listingId: string): Promise<boolean> {
-    const available = await getAvailableCredits(profileId);
-    if (!available || available.length === 0) return false;
-
-    const credit = available[0];
-    credit.status = 'USED';
-    credit.used_listing_id = listingId;
-    credit.used_at = new Date().toISOString();
-    return true;
   }
 
   async createPaymentOrder(profileId: string, packageId: string, options?: { idempotencyKey?: string; corporateProfileId?: string | null }) {

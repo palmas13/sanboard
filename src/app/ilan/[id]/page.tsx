@@ -1,7 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { cookies } from 'next/headers';
 import {
   MapPin,
   Calendar,
@@ -83,14 +82,9 @@ function VehicleSpecItem({
 export default async function ListingDetailPage({ params }: PageProps) {
   const { id } = await params;
 
-  // Retrieve current user profile ID and user ID from signed session or cookies
-  const cookieStore = await cookies();
-  const profileIdCookie = cookieStore.get('sanboard_profile_id')?.value;
-  const userIdCookie = cookieStore.get('sanboard_user_id')?.value;
-
   const session = await getServerSession();
-  const userId = session?.userId || userIdCookie;
-  const profileId = session?.profileId || profileIdCookie;
+  const userId = session?.userId;
+  const profileId = session?.profileId;
 
   const repo = getListingRepository();
   const { listing, isLocked, isOwner } = await repo.getListingById(id, profileId, userId);

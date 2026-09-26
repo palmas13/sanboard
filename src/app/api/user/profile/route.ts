@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserRepository } from '@/lib/db/repositories';
 import { resolveMediaUrl } from '@/lib/media/url';
-import { getServerSession, createSessionToken, setSessionCookieOnResponse } from '@/lib/auth/session';
 import { recordAuditEvent } from '@/lib/audit';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 
@@ -51,26 +50,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(req);
-    const userId = session?.userId || null;
-    const userRole = session?.role || 'USER';
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Profil oluşturmak için oturum açmalısınız.' },
-        { status: 401 }
-      );
-    }
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
 
     const body = await req.json().catch(() => ({}));
-    const { characterId, fullName, avatarData, sanmailEmail, phone } = body;
-
-    if (!fullName || !fullName.trim()) {
-      return NextResponse.json(
-        { error: 'Karakter adı zorunludur.' },
-        { status: 400 }
-      );
-    }
+    const { avatarData, sanmailEmail, phone } = body;
 
     // Avatar validation: Reject SVG
     if (avatarData && typeof avatarData === 'string') {
@@ -83,13 +67,13 @@ export async function POST(req: NextRequest) {
     }
 
     const repo = getUserRepository();
-    const result = await repo.createProfile({
-      userId,
-      fullName: fullName.trim(),
-      externalCharacterId: characterId || undefined,
-      avatarData: avatarData || undefined,
-      sanmailEmail: sanmailEmail?.trim() || undefined,
-      phone: phone?.trim() || undefined,
+    const existing = await repo.getProfileById(actor.profileId);
+    if (!existing) return NextResponse.json({ error: 'Karakter profili bulunamadı.' }, { status: 404 });
+
+    const result = await repo.updateProfile(actor.profileId, {
+      ...(avatarData ? { avatar_url: avatarData, avatar_path: avatarData } : {}),
+      ...(sanmailEmail !== undefined ? { sanmail_email: String(sanmailEmail).trim() } : {}),
+      ...(phone !== undefined ? { phone: String(phone).trim() } : {}),
     });
 
     if (!result.success || !result.profile) {
@@ -103,48 +87,18 @@ export async function POST(req: NextRequest) {
     const avatarPath = created.avatar_path || created.avatar_url || '';
     const resolvedAvatarUrl = resolveMediaUrl(avatarPath);
 
-    // Issue updated signed session containing the newly created profileId
-    const newToken = createSessionToken({
-      userId,
-      role: created.role || 'USER',
-      profileId: created.id,
-    });
-
     const response = NextResponse.json({
       success: true,
-      profile: {
-        ...created,
-        avatar_path: avatarPath,
-        avatar_url: resolvedAvatarUrl,
-      },
-    });
-
-    setSessionCookieOnResponse(response, newToken);
-
-    // Set routing cookies
-    response.cookies.set('sanboard_profile_id', created.id, {
-      path: '/',
-      maxAge: 86400,
-      sameSite: 'lax',
-    });
-    response.cookies.set('sanboard_user_id', userId, {
-      path: '/',
-      maxAge: 86400,
-      sameSite: 'lax',
-    });
-    response.cookies.set('sanboard_role', created.role || 'USER', {
-      path: '/',
-      maxAge: 86400,
-      sameSite: 'lax',
+      profile: toPrivateProfileDto({ ...created, avatar_path: avatarPath, avatar_url: resolvedAvatarUrl }),
     });
 
     await recordAuditEvent({
       eventType: 'PROFILE_CREATED',
-      userId,
+      userId: actor.userId,
       profileId: created.id,
       metadata: {
         characterName: created.full_name,
-        externalCharacterId: characterId,
+        source: 'canonical_profile_onboarding',
       },
     });
 
