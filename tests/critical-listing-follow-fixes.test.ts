@@ -199,7 +199,7 @@ describe('Critical listing image and corporate follow regressions', () => {
   test('character switch signs the resolved canonical profile id', () => {
     const source = readFileSync(join(process.cwd(), 'src/app/api/auth/session/route.ts'), 'utf8');
     assert.match(source, /userRepository\.getProfileById\(characterId\)/);
-    assert.match(source, /profile\.user_id !== currentSession\.userId/);
+    assert.match(source, /profile\.user_id !== (?:currentSession\.userId|authenticatedUserId)/);
     assert.match(source, /createSessionToken\(\{ userId: user\.id, role, profileId: profile\.id \}\)/);
   });
 

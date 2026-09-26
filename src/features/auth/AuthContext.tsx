@@ -49,47 +49,6 @@ export function AuthProvider({
   );
   const [characters, setCharacters] = useState<GtaWorldCharacter[]>([]);
 
-  const saveState = useCallback(
-    (newUser: User | null, newProfile: CharacterProfile | null) => {
-      // Keep state strictly in React memory — NO localStorage for profile/user data
-      setUser(newUser);
-      setCurrentProfile(newProfile);
-
-      if (newUser && newProfile) {
-        setAuthStatus('authenticated');
-        setCharacterProfiles((prev) => ({
-          ...prev,
-          [newProfile.id]: newProfile,
-          ...(newProfile.external_character_id ? { [newProfile.external_character_id]: newProfile } : {}),
-        }));
-
-        // Synchronize cryptographically signed server session
-        fetch('/api/auth/session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            characterId: newProfile.id,
-            profileId: newProfile.id,
-            userId: newUser.id,
-            role: newUser.role,
-          }),
-        }).catch(() => {});
-
-        // Lightweight routing cookies (for middleware & SSR redirects)
-        document.cookie = `sanboard_profile_id=${newProfile.id}; path=/; max-age=86400; SameSite=Lax`;
-        document.cookie = `sanboard_user_id=${newUser.id}; path=/; max-age=86400; SameSite=Lax`;
-        document.cookie = `sanboard_role=${newUser.role}; path=/; max-age=86400; SameSite=Lax`;
-      } else {
-        setAuthStatus('unauthenticated');
-        fetch('/api/auth/session', { method: 'DELETE' }).catch(() => {});
-        document.cookie = `sanboard_profile_id=; path=/; max-age=0; SameSite=Lax`;
-        document.cookie = `sanboard_user_id=; path=/; max-age=0; SameSite=Lax`;
-        document.cookie = `sanboard_role=; path=/; max-age=0; SameSite=Lax`;
-      }
-    },
-    []
-  );
-
   const refreshProfile = useCallback(async () => {
     const profileId = currentProfile?.id;
     if (!profileId) return;
@@ -155,26 +114,19 @@ export function AuthProvider({
       }
 
       try {
-        const res = await fetch('/api/user/profile');
+        const res = await fetch('/api/auth/session');
         if (!isMounted) return;
 
         if (res.ok) {
           const data = await res.json();
-          if (data?.success && data.profile) {
+          if (data?.authenticated && data.profile && data.user) {
             const profile = data.profile as CharacterProfile;
-            const sessionRes = await fetch('/api/auth/session');
-            if (!sessionRes.ok) {
-              setAuthStatus('unauthenticated');
-              return;
-            }
-            const sessionData = await sessionRes.json();
             const linkedUser: User = {
-              id: sessionData.session.userId,
+              ...data.user,
+              id: data.session.userId,
               provider: 'GTAWORLD',
-              role: profile.role || sessionData.session.role || 'USER',
+              role: profile.role || data.session.role || 'USER',
               status: 'ACTIVE',
-              created_at: '',
-              updated_at: '',
             };
 
             setUser(linkedUser);
@@ -186,50 +138,11 @@ export function AuthProvider({
             }));
             setAuthStatus('authenticated');
 
-            // Load authorized characters once in background
-            try {
-              const charRes = await fetch('/api/user/characters');
-              if (charRes.ok && isMounted) {
-                const charData = await charRes.json();
-                if (charData?.success && Array.isArray(charData.characters)) {
-                  setCharacters(charData.characters);
-                }
-                if (charData?.success && Array.isArray(charData.profiles)) {
-                  const profMap: Record<string, CharacterProfile> = {};
-                  for (const p of charData.profiles as CharacterProfile[]) {
-                    if (p.id) profMap[p.id] = p;
-                    if (p.external_character_id) profMap[p.external_character_id] = p;
-                  }
-                  setCharacterProfiles((prev) => ({ ...prev, ...profMap }));
-                }
-              }
-            } catch {
-              // Ignore background character errors
-            }
             return;
           }
         }
 
         setAuthStatus('unauthenticated');
-        try {
-          const charRes = await fetch('/api/user/characters');
-          if (charRes.ok && isMounted) {
-            const charData = await charRes.json();
-            if (charData?.success && Array.isArray(charData.characters)) {
-              setCharacters(charData.characters);
-            }
-            if (charData?.success && Array.isArray(charData.profiles)) {
-              const profMap: Record<string, CharacterProfile> = {};
-              for (const p of charData.profiles as CharacterProfile[]) {
-                if (p.id) profMap[p.id] = p;
-                if (p.external_character_id) profMap[p.external_character_id] = p;
-              }
-              setCharacterProfiles((prev) => ({ ...prev, ...profMap }));
-            }
-          }
-        } catch {
-          // Ignore
-        }
       } catch {
         if (isMounted) {
           setAuthStatus('unauthenticated');
@@ -277,16 +190,7 @@ export function AuthProvider({
         updated_at: new Date().toISOString(),
       };
 
-      // 2. Hydrate authoritative profile from Supabase
-      const profRes = await fetch(`/api/user/profile?profileId=${characterId}`);
-      let profile: CharacterProfile | null = null;
-      if (profRes.ok) {
-        const profData = await profRes.json();
-        if (profData?.success && profData.profile) {
-          profile = profData.profile;
-        }
-      }
-
+      const profile = sessionData.profile as CharacterProfile | undefined;
       if (!profile) return null;
 
       setUser(linkedUser);
@@ -298,22 +202,6 @@ export function AuthProvider({
       document.cookie = `sanboard_profile_id=${profile.id}; path=/; max-age=86400; SameSite=Lax`;
       document.cookie = `sanboard_user_id=${linkedUser.id}; path=/; max-age=86400; SameSite=Lax`;
       document.cookie = `sanboard_role=${linkedUser.role}; path=/; max-age=86400; SameSite=Lax`;
-
-      // Refresh characters in background to keep hasProfile up-to-date
-      fetch('/api/user/characters')
-        .then((r) => r.json())
-        .then((d) => {
-          if (d?.success && Array.isArray(d.characters)) setCharacters(d.characters);
-          if (d?.success && Array.isArray(d.profiles)) {
-            const profMap: Record<string, CharacterProfile> = {};
-            for (const p of d.profiles as CharacterProfile[]) {
-              if (p.id) profMap[p.id] = p;
-              if (p.external_character_id) profMap[p.external_character_id] = p;
-            }
-            setCharacterProfiles((prev) => ({ ...prev, ...profMap }));
-          }
-        })
-        .catch(() => {});
 
       return profile;
     } catch (err) {
@@ -327,8 +215,12 @@ export function AuthProvider({
   };
 
   const logout = async () => {
-    saveState(null, null);
     await fetch('/api/auth/session', { method: 'DELETE' }).catch(() => {});
+    setUser(null);
+    setCurrentProfile(null);
+    setCharacters([]);
+    setCharacterProfiles({});
+    setAuthStatus('unauthenticated');
     window.location.href = '/';
   };
 

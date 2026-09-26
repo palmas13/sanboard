@@ -10,7 +10,17 @@ export interface SessionPayload {
   exp: number;
 }
 
+export interface CharacterSelectionPayload {
+  userId: string;
+  nonce: string;
+  purpose: 'CHARACTER_SELECTION';
+  iat: number;
+  exp: number;
+}
+
 const DEFAULT_EXPIRY_SECONDS = 7 * 24 * 60 * 60; // 7 days
+const CHARACTER_SELECTION_EXPIRY_SECONDS = 10 * 60;
+export const CHARACTER_SELECTION_COOKIE = 'sanboard_character_selection';
 
 function getSessionSecret(): string {
   const secret = process.env.SANBOARD_SESSION_SECRET || process.env.SESSION_SECRET;
@@ -48,6 +58,26 @@ function base64UrlDecode(str: string): string {
   return Buffer.from(base64, 'base64').toString('utf8');
 }
 
+function signPayload(payloadB64: string, purpose: string): string {
+  return crypto
+    .createHmac('sha256', getSessionSecret())
+    .update(`${purpose}.${payloadB64}`)
+    .digest('base64url');
+}
+
+function signSessionPayload(payloadB64: string): string {
+  return crypto
+    .createHmac('sha256', getSessionSecret())
+    .update(payloadB64)
+    .digest('base64url');
+}
+
+function signaturesMatch(signature: string, expectedSignature: string): boolean {
+  const sigBuffer = Buffer.from(signature, 'utf8');
+  const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+  return sigBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(sigBuffer, expectedBuffer);
+}
+
 /**
  * Creates a cryptographically signed HMAC-SHA256 session token.
  */
@@ -67,10 +97,7 @@ export function createSessionToken(data: {
   };
 
   const payloadB64 = base64UrlEncode(JSON.stringify(payload));
-  const signature = crypto
-    .createHmac('sha256', getSessionSecret())
-    .update(payloadB64)
-    .digest('base64url');
+  const signature = signSessionPayload(payloadB64);
 
   return `${payloadB64}.${signature}`;
 }
@@ -87,17 +114,8 @@ export function verifySessionToken(token: string): SessionPayload | null {
   const [payloadB64, signature] = parts;
   if (!payloadB64 || !signature) return null;
 
-  const expectedSignature = crypto
-    .createHmac('sha256', getSessionSecret())
-    .update(payloadB64)
-    .digest('base64url');
-
-  // Constant-time comparison to prevent timing attacks
-  const sigBuffer = Buffer.from(signature, 'utf8');
-  const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
-
-  if (sigBuffer.length !== expectedBuffer.length) return null;
-  if (!crypto.timingSafeEqual(sigBuffer, expectedBuffer)) return null;
+  const expectedSignature = signSessionPayload(payloadB64);
+  if (!signaturesMatch(signature, expectedSignature)) return null;
 
   try {
     const payloadStr = base64UrlDecode(payloadB64);
@@ -114,6 +132,50 @@ export function verifySessionToken(token: string): SessionPayload | null {
   } catch {
     return null;
   }
+}
+
+export function createCharacterSelectionToken(userId: string): string {
+  const now = Math.floor(Date.now() / 1000);
+  const payload: CharacterSelectionPayload = {
+    userId,
+    nonce: crypto.randomBytes(24).toString('base64url'),
+    purpose: 'CHARACTER_SELECTION',
+    iat: now,
+    exp: now + CHARACTER_SELECTION_EXPIRY_SECONDS,
+  };
+  const payloadB64 = base64UrlEncode(JSON.stringify(payload));
+  return `${payloadB64}.${signPayload(payloadB64, 'character-selection.v1')}`;
+}
+
+export function verifyCharacterSelectionToken(token: string): CharacterSelectionPayload | null {
+  if (!token || typeof token !== 'string') return null;
+  const [payloadB64, signature, extra] = token.split('.');
+  if (!payloadB64 || !signature || extra) return null;
+  if (!signaturesMatch(signature, signPayload(payloadB64, 'character-selection.v1'))) return null;
+
+  try {
+    const payload = JSON.parse(base64UrlDecode(payloadB64)) as CharacterSelectionPayload;
+    const now = Math.floor(Date.now() / 1000);
+    if (!payload.userId || !payload.nonce || payload.purpose !== 'CHARACTER_SELECTION' || !payload.exp || payload.exp < now) {
+      return null;
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+export function getCharacterSelectionContext(req: NextRequest | Request): CharacterSelectionPayload | null {
+  let rawToken: string | undefined;
+  if ('cookies' in req && typeof req.cookies?.get === 'function') {
+    rawToken = req.cookies.get(CHARACTER_SELECTION_COOKIE)?.value;
+  }
+  if (!rawToken) {
+    const cookieHeader = req.headers.get('cookie') || '';
+    const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${CHARACTER_SELECTION_COOKIE}=([^;]+)`));
+    if (match) rawToken = decodeURIComponent(match[1]);
+  }
+  return rawToken ? verifyCharacterSelectionToken(rawToken) : null;
 }
 
 /**
@@ -205,6 +267,31 @@ export function clearSessionCookieOnResponse(response: import('next/server').Nex
     sameSite: 'lax',
     maxAge: 0,
     secure: isProd,
+  });
+}
+
+export function setCharacterSelectionCookieOnResponse(
+  response: import('next/server').NextResponse,
+  token: string
+): void {
+  response.cookies.set(CHARACTER_SELECTION_COOKIE, token, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: CHARACTER_SELECTION_EXPIRY_SECONDS,
+    secure: process.env.NODE_ENV === 'production',
+  });
+}
+
+export function clearCharacterSelectionCookieOnResponse(
+  response: import('next/server').NextResponse
+): void {
+  response.cookies.set(CHARACTER_SELECTION_COOKIE, '', {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 0,
+    secure: process.env.NODE_ENV === 'production',
   });
 }
 

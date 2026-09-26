@@ -5,8 +5,16 @@ import { join } from 'node:path';
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db/store';
 import { syncGtaWorldAccountAndCharacters } from '@/lib/auth/gtaworld-sync';
-import { createSessionToken, verifySessionToken } from '@/lib/auth/session';
-import { POST as switchCharacter } from '@/app/api/auth/session/route';
+import {
+  CHARACTER_SELECTION_COOKIE,
+  createCharacterSelectionToken,
+  createSessionToken,
+  verifyCharacterSelectionToken,
+  verifySessionToken,
+} from '@/lib/auth/session';
+import { DELETE as logout, POST as switchCharacter } from '@/app/api/auth/session/route';
+import { GET as oauthCallback } from '@/app/api/auth/gtaworld/callback/route';
+import { GET as getCharacters } from '@/app/api/user/characters/route';
 import { getGtaWorldAuthProvider, isMockGtaWorldAuthEnabled } from '@/lib/integrations/gtaworld';
 import { MockGtaWorldAuthProvider } from '@/lib/integrations/gtaworld/mock-provider';
 import { RealGtaWorldAuthProvider } from '@/lib/integrations/gtaworld/real-provider';
@@ -142,6 +150,139 @@ describe('SANBOARD dynamic identity foundation', () => {
     const back = verifySessionToken(backResponse.cookies.get('sanboard_session')!.value);
     assert.equal(back?.profileId, user.id);
     assert.equal(back?.role, 'USER');
+  });
+
+  test('multi-character first login selection context creates canonical full session for selected profile', async () => {
+    const result = await syncGtaWorldAccountAndCharacters(account([
+      ['char-A', 'Alpha', 'One'], ['char-B', 'Beta', 'Two'], ['char-C', 'Gamma', 'Three'],
+    ]));
+    const target = result.profiles.find((profile) => profile.external_character_id === 'char-B')!;
+    target.role = 'ADMIN';
+    const selectionToken = createCharacterSelectionToken(result.user.id);
+
+    const response = await switchCharacter(new NextRequest('http://localhost/api/auth/session', {
+      method: 'POST',
+      headers: {
+        cookie: `${CHARACTER_SELECTION_COOKIE}=${selectionToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ characterId: target.external_character_id }),
+    }));
+
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    const fullSession = verifySessionToken(response.cookies.get('sanboard_session')!.value);
+    assert.equal(fullSession?.userId, result.user.id);
+    assert.equal(fullSession?.profileId, target.id);
+    assert.equal(fullSession?.role, 'ADMIN');
+    assert.equal(body.profile.id, target.id);
+    assert.equal(response.cookies.get(CHARACTER_SELECTION_COOKIE)?.value, '');
+  });
+
+  test('explicit mock callback uses the same selection context and canonical picker state machine', async () => {
+    process.env.USE_MOCK_GTAWORLD_AUTH = 'true';
+    const callbackResponse = await oauthCallback(new NextRequest(
+      'http://localhost/api/auth/gtaworld/callback?code=mock_authorization_code&redirect=%2F'
+    ));
+    assert.equal(callbackResponse.status, 307);
+    assert.match(callbackResponse.headers.get('location') || '', /\/karakter-sec\?redirect=%2F$/);
+    assert.equal(callbackResponse.cookies.get('sanboard_session')?.value, '');
+
+    const selectionToken = callbackResponse.cookies.get(CHARACTER_SELECTION_COOKIE)?.value;
+    assert.ok(selectionToken);
+    const listResponse = await getCharacters(new NextRequest('http://localhost/api/user/characters', {
+      headers: { cookie: `${CHARACTER_SELECTION_COOKIE}=${selectionToken}` },
+    }));
+    const listBody = await listResponse.json();
+    assert.equal(listResponse.status, 200);
+    assert.equal(listBody.isMock, true);
+    assert.equal(listBody.characters.length, 3);
+    assert.ok(listBody.characters.every((character: any) => character.id !== character.externalCharacterId));
+
+    const selected = listBody.characters[1];
+    const selectResponse = await switchCharacter(new NextRequest('http://localhost/api/auth/session', {
+      method: 'POST',
+      headers: {
+        cookie: `${CHARACTER_SELECTION_COOKIE}=${selectionToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ characterId: selected.id }),
+    }));
+    assert.equal(selectResponse.status, 200);
+    assert.equal(verifySessionToken(selectResponse.cookies.get('sanboard_session')!.value)?.profileId, selected.id);
+  });
+
+  test('direct character selection without full session or selection context is denied', async () => {
+    const result = await syncGtaWorldAccountAndCharacters(account([['char-B', 'Beta', 'Two']]));
+    const response = await switchCharacter(new NextRequest('http://localhost/api/auth/session', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ characterId: result.profiles[0].id }),
+    }));
+    assert.equal(response.status, 401);
+    assert.equal(response.cookies.get('sanboard_session'), undefined);
+  });
+
+  test('selection context cannot select another account profile', async () => {
+    const first = await syncGtaWorldAccountAndCharacters(account([['char-A', 'Alpha', 'One']]));
+    const second = await syncGtaWorldAccountAndCharacters({
+      ...account([['char-Y', 'Other', 'Character']]),
+      id: 'gtaw-user-other',
+      username: 'other',
+    });
+    const response = await switchCharacter(new NextRequest('http://localhost/api/auth/session', {
+      method: 'POST',
+      headers: {
+        cookie: `${CHARACTER_SELECTION_COOKIE}=${createCharacterSelectionToken(first.user.id)}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ characterId: second.profiles[0].id }),
+    }));
+    assert.equal(response.status, 403);
+    assert.equal(response.cookies.get('sanboard_session'), undefined);
+  });
+
+  test('logout clears full session, selection context, and OAuth attempt cookies', async () => {
+    const result = await syncGtaWorldAccountAndCharacters(account([['char-A', 'Alpha', 'One']]));
+    const fullToken = createSessionToken({ userId: result.user.id, profileId: result.profiles[0].id, role: 'USER' });
+    const response = await logout(new NextRequest('http://localhost/api/auth/session', {
+      method: 'DELETE',
+      headers: { cookie: `sanboard_session=${fullToken}; ${CHARACTER_SELECTION_COOKIE}=${createCharacterSelectionToken(result.user.id)}; gtaw_oauth_attempt=test` },
+    }));
+    assert.equal(response.status, 200);
+    assert.equal(response.cookies.get('sanboard_session')?.value, '');
+    assert.equal(response.cookies.get(CHARACTER_SELECTION_COOKIE)?.value, '');
+    assert.equal(response.cookies.get('gtaw_oauth_attempt')?.value, '');
+  });
+
+  test('selection token is purpose-separated, signed, and rejects tampering', () => {
+    const token = createCharacterSelectionToken('canonical-user');
+    assert.equal(verifyCharacterSelectionToken(token)?.userId, 'canonical-user');
+    assert.equal(verifySessionToken(token), null);
+    assert.equal(verifyCharacterSelectionToken(`${token}tampered`), null);
+  });
+
+  test('single-character full session uses canonical profile UUID and profile role', async () => {
+    const result = await syncGtaWorldAccountAndCharacters(account([['char-only', 'Only', 'Character']]));
+    result.profiles[0].role = 'ADMIN';
+    const token = createSessionToken({
+      userId: result.user.id,
+      profileId: result.profiles[0].id,
+      role: result.profiles[0].role,
+    });
+    const session = verifySessionToken(token);
+    assert.equal(session?.profileId, result.profiles[0].id);
+    assert.equal(session?.role, 'ADMIN');
+  });
+
+  test('picker production flow has initials fallback and no Ravi demo avatar fallback', () => {
+    const picker = readFileSync(join(process.cwd(), 'src/app/karakter-sec/page.tsx'), 'utf8');
+    const mockProvider = readFileSync(join(process.cwd(), 'src/lib/integrations/gtaworld/mock-provider.ts'), 'utf8');
+    const store = readFileSync(join(process.cwd(), 'src/lib/db/store.ts'), 'utf8');
+    assert.match(picker, /const avatarPath = profile\?\.avatar_path \|\| profile\?\.avatar_url \|\| null/);
+    assert.match(picker, /\{initials\}/);
+    assert.doesNotMatch(mockProvider, /photo-1500648767791-00dcc994a43e/);
+    assert.doesNotMatch(store, /photo-1500648767791-00dcc994a43e/);
   });
 
   test('banned account cannot switch or receive a new signed character session', async () => {

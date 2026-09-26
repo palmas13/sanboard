@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from '@/lib/auth/session';
-import { MOCK_CHARACTERS } from '@/lib/integrations/gtaworld/mock-provider';
+import { getCharacterSelectionContext, getServerSession } from '@/lib/auth/session';
 import { getSupabaseAdminClient } from '@/lib/db/supabase-client';
 import { db } from '@/lib/db/store';
 import { GtaWorldCharacter } from '@/lib/integrations/gtaworld/types';
@@ -9,7 +8,8 @@ import { isMockGtaWorldAuthEnabled } from '@/lib/integrations/gtaworld';
 export async function GET(req: NextRequest) {
   const isMock = isMockGtaWorldAuthEnabled();
   const session = await getServerSession(req);
-  const userId = session?.userId || null;
+  const selectionContext = session ? null : getCharacterSelectionContext(req);
+  const userId = session?.userId || selectionContext?.userId || null;
 
   if (!userId) {
     return NextResponse.json(
@@ -43,47 +43,6 @@ export async function GET(req: NextRequest) {
     dbProfiles = db.profiles.filter((p) => p.user_id === userId);
   }
 
-  if (isMock) {
-    // Merge mock character list with persisted profiles strictly by stable identity
-    const merged = MOCK_CHARACTERS.map((char) => {
-      const matched = dbProfiles.find(
-        (p) =>
-          p.id === char.id ||
-          p.external_character_id === char.id ||
-          p.external_character_id === char.id
-      );
-
-      if (matched) {
-        return {
-          ...char,
-          id: matched.id,
-          externalCharacterId: matched.external_character_id || char.id,
-          fullName: matched.full_name,
-          hasProfile: true,
-          avatarUrl: matched.avatar_path || matched.avatar_url || '',
-          avatarPath: matched.avatar_path || matched.avatar_url || '',
-          sanmailEmail: matched.sanmail_email || '',
-          phone: matched.phone || '',
-        };
-      }
-
-      return {
-        ...char,
-        hasProfile: Boolean(char.hasProfile),
-        avatarUrl: char.avatarUrl || '',
-        sanmailEmail: char.sanmailEmail || '',
-        phone: char.phone || '',
-      };
-    });
-
-    return NextResponse.json({
-      success: true,
-      characters: merged,
-      profiles: dbProfiles,
-      isMock: true,
-    });
-  }
-
   const characters: GtaWorldCharacter[] = dbProfiles.map((p) => ({
     id: p.id,
     externalCharacterId: p.external_character_id || p.id,
@@ -99,6 +58,6 @@ export async function GET(req: NextRequest) {
     success: true,
     characters,
     profiles: dbProfiles,
-    isMock: false,
+    isMock,
   });
 }

@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGtaWorldAuthProvider, isMockGtaWorldAuthEnabled } from '@/lib/integrations/gtaworld';
 import { syncGtaWorldAccountAndCharacters } from '@/lib/auth/gtaworld-sync';
-import { createSessionToken, setSessionCookieOnResponse } from '@/lib/auth/session';
+import {
+  clearCharacterSelectionCookieOnResponse,
+  clearSessionCookieOnResponse,
+  createCharacterSelectionToken,
+  createSessionToken,
+  setCharacterSelectionCookieOnResponse,
+  setSessionCookieOnResponse,
+} from '@/lib/auth/session';
 import { recordAuditEvent } from '@/lib/audit';
 
 export async function GET(req: NextRequest) {
@@ -122,12 +129,6 @@ export async function GET(req: NextRequest) {
     const isSingleCharacter = profiles.length === 1;
     const selectedProfile = isSingleCharacter ? profiles[0] : undefined;
 
-    const token = createSessionToken({
-      userId: user.id,
-      role: selectedProfile?.role || 'USER',
-      profileId: selectedProfile?.id,
-    });
-
     // Audit login success
     await recordAuditEvent({
       eventType: 'AUTH_LOGIN_SUCCESS',
@@ -162,8 +163,18 @@ export async function GET(req: NextRequest) {
 
     const response = NextResponse.redirect(new URL(destinationUrl, req.url));
 
-    // Set signed HMAC session cookie directly on response object
-    setSessionCookieOnResponse(response, token);
+    if (selectedProfile) {
+      const token = createSessionToken({
+        userId: user.id,
+        role: selectedProfile.role || 'USER',
+        profileId: selectedProfile.id,
+      });
+      setSessionCookieOnResponse(response, token);
+      clearCharacterSelectionCookieOnResponse(response);
+    } else {
+      clearSessionCookieOnResponse(response);
+      setCharacterSelectionCookieOnResponse(response, createCharacterSelectionToken(user.id));
+    }
 
     // Clear temporary OAuth attempt cookie
     response.cookies.set('gtaw_oauth_attempt', '', {
@@ -173,11 +184,14 @@ export async function GET(req: NextRequest) {
     });
 
     // Set routing cookies
-    response.cookies.set('sanboard_user_id', user.id, { path: '/', maxAge: 86400, sameSite: 'lax' });
-    response.cookies.set('sanboard_role', selectedProfile?.role || 'USER', { path: '/', maxAge: 86400, sameSite: 'lax' });
-
     if (selectedProfile) {
+      response.cookies.set('sanboard_user_id', user.id, { path: '/', maxAge: 86400, sameSite: 'lax' });
+      response.cookies.set('sanboard_role', selectedProfile.role || 'USER', { path: '/', maxAge: 86400, sameSite: 'lax' });
       response.cookies.set('sanboard_profile_id', selectedProfile.id, { path: '/', maxAge: 86400, sameSite: 'lax' });
+    } else {
+      response.cookies.set('sanboard_profile_id', '', { path: '/', maxAge: 0 });
+      response.cookies.set('sanboard_user_id', '', { path: '/', maxAge: 0 });
+      response.cookies.set('sanboard_role', '', { path: '/', maxAge: 0 });
     }
 
     return response;

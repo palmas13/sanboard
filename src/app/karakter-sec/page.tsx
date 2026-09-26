@@ -14,9 +14,12 @@ function KarakterSecContent() {
   const { characters, characterProfiles, selectCharacter, currentProfile, refreshCharacters } = useAuth();
   const [switchingId, setSwitchingId] = React.useState<string | null>(null);
   const [imgErrors, setImgErrors] = React.useState<Record<string, boolean>>({});
+  const [selectionError, setSelectionError] = React.useState('');
 
   React.useEffect(() => {
-    refreshCharacters().catch(() => {});
+    refreshCharacters().then((result) => {
+      if (!result) setSelectionError('Karakterler yüklenemedi. Lütfen tekrar giriş yap.');
+    });
   }, [refreshCharacters]);
 
   const handleSelect = async (characterId: string, hasProfile: boolean) => {
@@ -24,14 +27,17 @@ function KarakterSecContent() {
 
     if (hasProfile) {
       setSwitchingId(characterId);
+      setSelectionError('');
       try {
         const res = await selectCharacter(characterId);
         if (res) {
           router.push(redirect);
         } else {
+          setSelectionError('Karakter oturumu oluşturulamadı. Lütfen tekrar giriş yap.');
           setSwitchingId(null);
         }
       } catch {
+        setSelectionError('Karakter oturumu oluşturulamadı. Lütfen tekrar giriş yap.');
         setSwitchingId(null);
       }
     } else {
@@ -53,6 +59,12 @@ function KarakterSecContent() {
             Sanboard'u kullanmak istediğin karakteri seç.
           </p>
         </div>
+
+        {selectionError && (
+          <div role="alert" className="rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger-subtle)] px-4 py-3 text-sm text-[var(--color-danger)]">
+            {selectionError}
+          </div>
+        )}
 
         {/* Loading Skeleton */}
         {characters.length === 0 ? (
@@ -93,7 +105,7 @@ function KarakterSecContent() {
 
               const effectiveHasProfile = Boolean(char.hasProfile || profile);
               const targetId = profile?.id || char.id;
-              const avatarPath = profile?.avatar_path || profile?.avatar_url || (char.hasProfile ? char.avatarUrl : null);
+              const avatarPath = profile?.avatar_path || profile?.avatar_url || null;
               const charAvatar = avatarPath ? resolveAvatarUrl(avatarPath) : null;
               const isSwitching = switchingId === targetId || switchingId === char.id;
               const hasImgError = imgErrors[char.id];

@@ -92,7 +92,7 @@ class SanboardDatabase {
       user_id: 'usr-admin-1',
       external_character_id: 'char-ravi-03',
       full_name: 'Ravi Blumon',
-      avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=250&auto=format&fit=crop&q=80',
+      avatar_url: '',
       sanmail_email: 'ravi.blumon@sanmail.com',
       phone: '5557722',
       role: 'USER',
