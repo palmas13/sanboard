@@ -4,6 +4,7 @@ import { createCharacterSelectionToken, clearSessionCookieOnResponse, setCharact
 import { assertTestLoginAccountNamespace, isTestLoginEnabled } from '@/lib/auth/test-login';
 import { MockGtaWorldAuthProvider } from '@/lib/integrations/gtaworld/mock-provider';
 import { recordAuditEvent } from '@/lib/audit';
+import { normalizeInternalRedirect } from '@/lib/auth/redirect';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
     if (user.status !== 'ACTIVE') return NextResponse.json({ error: 'Bu test hesabı ile oturum açılamaz.' }, { status: 403 });
 
     await recordAuditEvent({ eventType: 'AUTH_LOGIN_SUCCESS', userId: user.id, metadata: { provider: 'temporary-test-login', characterCount: profiles.length } });
-    const redirect = req.nextUrl.searchParams.get('redirect') || '/';
+    const redirect = normalizeInternalRedirect(req.nextUrl.searchParams.get('redirect'));
     const destination = `/karakter-sec?redirect=${encodeURIComponent(redirect)}&source=test`;
     const response = NextResponse.redirect(new URL(destination, req.url));
     clearSessionCookieOnResponse(response);

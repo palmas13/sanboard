@@ -1,6 +1,6 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert';
-import { RealGtaWorldAuthProvider } from '../src/lib/integrations/gtaworld/real-provider';
+import { GtaWorldProviderNotConfiguredError, RealGtaWorldAuthProvider } from '../src/lib/integrations/gtaworld/real-provider';
 import { MockGtaWorldAuthProvider } from '../src/lib/integrations/gtaworld/mock-provider';
 import { syncGtaWorldAccountAndCharacters } from '../src/lib/auth/gtaworld-sync';
 import { createSessionToken, verifySessionToken } from '../src/lib/auth/session';
@@ -13,50 +13,25 @@ describe('GTA World OAuth & Authorize URL Generation', () => {
   beforeEach(() => {
     process.env = {
       ...origEnv,
-      GTAWORLD_API_BASE_URL: 'https://ucp-tr.gta.world',
-      GTAWORLD_CLIENT_ID: 'test_client_id_123',
-      GTAWORLD_CLIENT_SECRET: 'super_secret_client_key_do_not_expose',
-      GTAWORLD_REDIRECT_URI: 'https://sanboard.app/api/auth/gtaworld/callback',
       SANBOARD_SESSION_SECRET: 'test-session-secret-at-least-32-characters-long-12345',
     };
   });
 
-  it('should generate valid authorize URL with required parameters and NO client secret', () => {
+  it('fails closed without inventing an authorization URL', () => {
     const provider = new RealGtaWorldAuthProvider();
-    const state = 'secure_random_state_98765';
-    const authUrl = provider.getAuthorizeUrl(state);
-
-    const parsed = new URL(authUrl);
-    assert.strictEqual(parsed.origin, 'https://ucp-tr.gta.world');
-    assert.strictEqual(parsed.pathname, '/oauth/authorize');
-    assert.strictEqual(parsed.searchParams.get('client_id'), 'test_client_id_123');
-    assert.strictEqual(parsed.searchParams.get('redirect_uri'), 'https://sanboard.app/api/auth/gtaworld/callback');
-    assert.strictEqual(parsed.searchParams.get('response_type'), 'code');
-    assert.strictEqual(parsed.searchParams.get('scope'), '');
-    assert.strictEqual(parsed.searchParams.get('state'), state);
-
-    // Strictly ensure client secret is NEVER in authorize URL
-    assert.ok(!authUrl.includes('super_secret_client_key_do_not_expose'));
-    assert.ok(!authUrl.includes('client_secret'));
+    assert.throws(() => provider.getAuthorizeUrl('secure-state'), GtaWorldProviderNotConfiguredError);
   });
 
-  it('should throw explicit error if CLIENT_ID or REDIRECT_URI is missing', () => {
-    delete process.env.GTAWORLD_CLIENT_ID;
+  it('fails closed for token exchange and account retrieval', async () => {
     const provider = new RealGtaWorldAuthProvider();
-    assert.throws(() => provider.getAuthorizeUrl('state'), /GTAWORLD_CLIENT_ID is not configured/);
+    await assert.rejects(provider.exchangeCodeForToken('code'), GtaWorldProviderNotConfiguredError);
+    await assert.rejects(provider.fetchAccount('token'), GtaWorldProviderNotConfiguredError);
   });
 });
-
 describe('GTA World Upstream Response & Defensive Validation', () => {
-  it('should reject malformed user response missing user object', async () => {
+  it('production boundary exposes no guessed raw-user transport helper', async () => {
     const provider = new RealGtaWorldAuthProvider();
-    // Test invalid fetchUser call handling
-    await assert.rejects(
-      async () => {
-        await provider.fetchUser('');
-      },
-      /Erişim belirteci \(access_token\) eksik/
-    );
+    assert.strictEqual('fetchUser' in provider, false);
   });
 
   it('Mock provider should return valid structured OAuth flow for development', async () => {
@@ -383,32 +358,3 @@ describe('Audit Logging & Secret Scrubbing', () => {
     }
   });
 });
-
-describe('OAuth State Parameter Compatibility & CSRF Invariant', () => {
-  it('should validate state when returned, but protect via HttpOnly attempt cookie if provider does not echo state', () => {
-    const attemptState = 'active_state_abc123';
-
-    // Helper simulating callback state validation logic
-    function validateCallbackState(cookieState: string | undefined, incomingStateParam: string | null): boolean {
-      if (!cookieState) return false; // Missing or expired attempt
-      if (incomingStateParam && incomingStateParam !== cookieState) {
-        return false; // Tampered or mismatched state
-      }
-      return true; // Validated! (Either state matched, or provider did not echo state but cookie proves active attempt)
-    }
-
-    // Case 1: Provider returns matching state -> Valid
-    assert.strictEqual(validateCallbackState(attemptState, 'active_state_abc123'), true);
-
-    // Case 2: Provider returns mismatched state -> Rejected
-    assert.strictEqual(validateCallbackState(attemptState, 'different_state_xyz'), false);
-
-    // Case 3: Provider does NOT return state (undocumented GTAW contract) but attempt cookie exists -> Valid & Protected
-    assert.strictEqual(validateCallbackState(attemptState, null), true);
-
-    // Case 4: No attempt cookie (unsolicited or attacker-triggered callback) -> Rejected
-    assert.strictEqual(validateCallbackState(undefined, 'active_state_abc123'), false);
-    assert.strictEqual(validateCallbackState(undefined, null), false);
-  });
-});
-

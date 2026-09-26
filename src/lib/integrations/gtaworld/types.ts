@@ -21,8 +21,6 @@ export interface GtaWorldAuthResult {
   error?: string;
 }
 
-export type OAuthStateSupportStatus = 'unverified' | 'supported' | 'unsupported';
-
 /** Provider-neutral identity snapshot consumed by Sanboard application code. */
 export interface ExternalGameCharacter {
   externalCharacterId: string;
@@ -36,10 +34,7 @@ export interface ExternalGameAccount {
 }
 
 
-// ============================================================================
-// Official GTA World UCP OAuth & API Contract Types
-// ============================================================================
-
+/** Placeholder raw types retained only for legacy tests until the official contract arrives. */
 export interface GtaWorldApiCharacter {
   id: string | number;
   memberid?: string | number;
@@ -82,10 +77,7 @@ function opaqueId(value: unknown, field: string): string {
   return String(value).trim();
 }
 
-/**
- * GTA World raw payload adapter. TODO(GTAWORLD-CONTRACT): confirm the raw field
- * names against official documentation before enabling/changing the real API.
- */
+/** @deprecated Unknown raw field assumptions. Production provider must not use this adapter. */
 export function adaptGtaWorldApiUser(user: GtaWorldApiUser): ExternalGameAccount {
   return {
     externalAccountId: opaqueId(user.id, 'account ID'),

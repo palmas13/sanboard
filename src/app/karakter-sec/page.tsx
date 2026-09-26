@@ -1,4 +1,5 @@
 import { CharacterSelectContent } from './CharacterSelectContent';
+import { normalizeInternalRedirect } from '@/lib/auth/redirect';
 
 interface CharacterSelectPageProps {
   searchParams: Promise<{
@@ -9,7 +10,7 @@ interface CharacterSelectPageProps {
 
 export default async function CharacterSelectPage({ searchParams }: CharacterSelectPageProps) {
   const params = await searchParams;
-  const redirect = typeof params.redirect === 'string' ? params.redirect : '/';
+  const redirect = normalizeInternalRedirect(params.redirect);
   const isTestSource = params.source === 'test';
 
   return <CharacterSelectContent redirect={redirect} isTestSource={isTestSource} />;

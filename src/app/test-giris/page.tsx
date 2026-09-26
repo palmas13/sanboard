@@ -4,12 +4,14 @@ import { AlertTriangle, ArrowRight } from 'lucide-react';
 import { SanboardLogo } from '@/components/common/SanboardLogo';
 import { isTestLoginEnabled } from '@/lib/auth/test-login';
 import { MOCK_CHARACTERS } from '@/lib/integrations/gtaworld/mock-provider';
+import { normalizeInternalRedirect } from '@/lib/auth/redirect';
 
 export const dynamic = 'force-dynamic';
 
 export default async function TestGirisPage({ searchParams }: { searchParams: Promise<{ redirect?: string }> }) {
   if (!isTestLoginEnabled()) notFound();
-  const { redirect = '/' } = await searchParams;
+  const params = await searchParams;
+  const redirect = normalizeInternalRedirect(params.redirect);
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">

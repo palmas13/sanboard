@@ -5,7 +5,6 @@ import {
   GtaWorldUserSession,
   ExternalGameAccount,
   GtaWorldApiUserResponse,
-  OAuthStateSupportStatus,
 } from './types';
 import { TEST_LOGIN_ACCOUNT_PREFIX, TEST_LOGIN_CHARACTER_PREFIX } from '@/lib/auth/test-login';
 
@@ -37,8 +36,6 @@ export const MOCK_CHARACTERS: GtaWorldCharacter[] = [
 ];
 
 export class MockGtaWorldAuthProvider implements GtaWorldAuthProvider {
-  readonly oauthStateSupport: OAuthStateSupportStatus = 'supported';
-
   async login(): Promise<GtaWorldAuthResult> {
     return {
       success: true,
@@ -65,7 +62,7 @@ export class MockGtaWorldAuthProvider implements GtaWorldAuthProvider {
     };
   }
 
-  getAuthorizeUrl(state?: string): string {
+  getAuthorizeUrl(state: string): string {
     const redirectUri = process.env.GTAWORLD_REDIRECT_URI || '/api/auth/gtaworld/callback';
     return `${redirectUri}?code=mock_authorization_code${state ? `&state=${encodeURIComponent(state)}` : ''}`;
   }

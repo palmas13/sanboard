@@ -130,7 +130,7 @@ describe('SANBOARD temporary test character login harness', () => {
     process.env.ENABLE_TEST_LOGIN = 'true';
     const real = await startRealLogin(new NextRequest('http://localhost/api/auth/gtaworld/login'));
     assert.equal(real.status, 307);
-    assert.match(real.headers.get('location') || '', /\/giris\?error=oauth_config_missing$/);
+    assert.match(real.headers.get('location') || '', /\/giris\?error=provider_not_configured$/);
     assert.equal(db.users.length, 0);
 
     const start = await startTestLogin(new NextRequest('http://localhost/api/auth/test-login'));

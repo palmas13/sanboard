@@ -5,10 +5,11 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { SanboardLogo } from '@/components/common/SanboardLogo';
 import { ShieldCheck, ArrowRight, AlertCircle, RefreshCw, FlaskConical } from 'lucide-react';
+import { normalizeInternalRedirect } from '@/lib/auth/redirect';
 
 function GirisContent({ testLoginEnabled }: { testLoginEnabled: boolean }) {
   const searchParams = useSearchParams();
-  const redirect = searchParams.get('redirect') || '/';
+  const redirect = normalizeInternalRedirect(searchParams.get('redirect'));
   const errorCode = searchParams.get('error');
 
   const handleLogin = () => {
@@ -31,7 +32,11 @@ function GirisContent({ testLoginEnabled }: { testLoginEnabled: boolean }) {
             <div className="flex items-center gap-2 text-xs font-semibold text-red-400">
               <AlertCircle className="w-4 h-4 flex-shrink-0" /><span>Giriş Yapılamadı</span>
             </div>
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed">GTA World ile giriş yapılamadı. Lütfen tekrar deneyin.</p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+              {errorCode === 'provider_not_configured'
+                ? 'GTA World bağlantısı henüz yapılandırılmadı.'
+                : 'GTA World ile giriş yapılamadı. Lütfen tekrar deneyin.'}
+            </p>
             <button type="button" onClick={handleLogin} className="mt-1 text-xs font-bold text-[#FF8A1F] hover:underline flex items-center gap-1.5">
               <RefreshCw className="w-3.5 h-3.5" /><span>Tekrar dene</span>
             </button>

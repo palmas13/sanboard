@@ -18,10 +18,12 @@ export function CharacterSelectContent({ redirect, isTestSource }: CharacterSele
   const [switchingId, setSwitchingId] = React.useState<string | null>(null);
   const [imgErrors, setImgErrors] = React.useState<Record<string, boolean>>({});
   const [selectionError, setSelectionError] = React.useState('');
+  const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
     refreshCharacters().then((result) => {
       if (!result) setSelectionError('Karakterler yüklenemedi. Lütfen tekrar giriş yap.');
+      setIsLoading(false);
     });
   }, [refreshCharacters]);
 
@@ -72,7 +74,7 @@ export function CharacterSelectContent({ redirect, isTestSource }: CharacterSele
         )}
 
         {/* Loading Skeleton */}
-        {characters.length === 0 ? (
+        {isLoading ? (
           <div className="space-y-3 pt-2">
             {[1, 2].map((i) => (
               <div
@@ -88,6 +90,11 @@ export function CharacterSelectContent({ redirect, isTestSource }: CharacterSele
                 </div>
               </div>
             ))}
+          </div>
+        ) : characters.length === 0 ? (
+          <div className="rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] px-4 py-6 text-center space-y-2">
+            <p className="text-sm font-bold text-[var(--text-main)]">Bu hesapta seçilebilir karakter bulunamadı.</p>
+            <p className="text-xs text-[var(--text-muted)]">Sanboard sahte karakter oluşturmaz. GTA World hesabındaki karakter durumu değiştiğinde tekrar giriş yapabilirsin.</p>
           </div>
         ) : (
           /* Character Rows */
