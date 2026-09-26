@@ -241,7 +241,7 @@ describe('SANBOARD dynamic identity foundation', () => {
   });
 
   test('picker production flow has initials fallback and no Ravi demo avatar fallback', () => {
-    const picker = readFileSync(join(process.cwd(), 'src/app/karakter-sec/page.tsx'), 'utf8');
+    const picker = readFileSync(join(process.cwd(), 'src/app/karakter-sec/CharacterSelectContent.tsx'), 'utf8');
     const mockProvider = readFileSync(join(process.cwd(), 'src/lib/integrations/gtaworld/mock-provider.ts'), 'utf8');
     const store = readFileSync(join(process.cwd(), 'src/lib/db/store.ts'), 'utf8');
     assert.match(picker, /const avatarPath = profile\?\.avatar_path \|\| profile\?\.avatar_url \|\| null/);

@@ -11,6 +11,8 @@ import { GET as listCharacters } from '@/app/api/user/characters/route';
 import { POST as setFavorite } from '@/app/api/favorites/route';
 import { CHARACTER_SELECTION_COOKIE, verifySessionToken } from '@/lib/auth/session';
 import { TEST_LOGIN_ACCOUNT_PREFIX, TEST_LOGIN_CHARACTER_PREFIX, isTestLoginEnabled } from '@/lib/auth/test-login';
+import CharacterSelectPage from '@/app/karakter-sec/page';
+import { CharacterSelectContent } from '@/app/karakter-sec/CharacterSelectContent';
 
 describe('SANBOARD temporary test character login harness', () => {
   const existingListings = [...db.listings];
@@ -63,6 +65,24 @@ describe('SANBOARD temporary test character login harness', () => {
     assert.ok(db.profiles.every((profile) => profile.id !== profile.external_character_id));
     assert.equal(response.cookies.get('sanboard_session')?.value, '');
     assert.ok(response.cookies.get(CHARACTER_SELECTION_COOKIE)?.value);
+  });
+
+  test('character picker resolves test and normal UI from server search params without client URL branching', async () => {
+    const testPage = await CharacterSelectPage({ searchParams: Promise.resolve({ redirect: '/arac', source: 'test' }) });
+    assert.equal(testPage.type, CharacterSelectContent);
+    assert.deepEqual(testPage.props, { redirect: '/arac', isTestSource: true });
+
+    const normalPage = await CharacterSelectPage({ searchParams: Promise.resolve({}) });
+    assert.equal(normalPage.type, CharacterSelectContent);
+    assert.deepEqual(normalPage.props, { redirect: '/', isTestSource: false });
+
+    const clientSource = readFileSync(join(process.cwd(), 'src/app/karakter-sec/CharacterSelectContent.tsx'), 'utf8');
+    assert.doesNotMatch(clientSource, /useSearchParams/);
+    assert.doesNotMatch(clientSource, /searchParams\.get\(['"]source['"]\)/);
+    assert.match(clientSource, /isTestSource &&/);
+    assert.match(clientSource, /Bu karakterler gerçek GTA World hesabı veya UCP karakteri değildir/);
+    assert.match(clientSource, /onClick=\{\(\) => handleSelect/);
+    assert.match(clientSource, /await selectCharacter\(characterId\)/);
   });
 
   test('canonical picker creates canonical session, rejects cross-account injection, and isolates favorites after switch', async () => {
