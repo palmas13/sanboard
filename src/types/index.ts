@@ -180,6 +180,10 @@ export interface Payment {
   package_id: string;
   provider: 'FLEECA';
   external_payment_id?: string;
+  idempotency_key?: string;
+  corporate_profile_id?: string | null;
+  entitlement_type?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION';
+  entitlement_applied_at?: string | null;
   amount: number; // 2000
   status: PaymentStatus;
   created_at: string;

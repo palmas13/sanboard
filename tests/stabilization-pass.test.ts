@@ -1,6 +1,8 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { NextRequest } from 'next/server';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createSessionToken, verifySessionToken, getServerSession } from '@/lib/auth/session';
 import { POST as toggleFavoritePost, DELETE as deleteFavorite, GET as getFavoriteStatus } from '@/app/api/favorites/route';
 import { GET as adminGet } from '@/app/api/admin/route';
@@ -315,6 +317,15 @@ describe('Sanboard Stabilization Pass: Auth, Role, Favorites, Notifications & Da
       });
       const res = await bootstrapGet(unauthReq);
       assert.strictEqual(res.status, 401);
+    });
+
+    test('Supabase bootstrap uses canonical support tickets and row-based available credit count', () => {
+      const source = readFileSync(join(process.cwd(), 'src/app/api/account/bootstrap/route.ts'), 'utf8');
+      assert.match(source, /\.from\('support_tickets'\)/);
+      assert.doesNotMatch(source, /\.from\('tickets'\)/);
+      assert.match(source, /\.from\('listing_credits'\)[\s\S]*\.eq\('status', 'AVAILABLE'\)/);
+      assert.doesNotMatch(source, /\.select\('balance'\)/);
+      assert.match(source, /const availableCredits = creditRes\.count \|\| 0/);
     });
   });
 

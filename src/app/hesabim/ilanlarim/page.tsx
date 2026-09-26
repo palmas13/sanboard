@@ -28,12 +28,14 @@ export default function HesabimIlanlarimPage() {
   // Mark as sold modal state
   const [soldModalListing, setSoldModalListing] = useState<Listing | null>(null);
   const [isProcessingSold, setIsProcessingSold] = useState(false);
+  const [republishingId, setRepublishingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState('');
 
   const fetchListings = async () => {
     if (!currentProfile) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/user/listings?profileId=${currentProfile.id}`);
+      const res = await fetch('/api/user/listings');
       const data = await res.json();
       if (Array.isArray(data)) {
         setListings(data);
@@ -62,7 +64,7 @@ export default function HesabimIlanlarimPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           listingId: soldModalListing.id,
-          profileId: currentProfile.id,
+          action: 'SOLD',
         }),
       });
 
@@ -74,6 +76,26 @@ export default function HesabimIlanlarimPage() {
       // Ignore
     } finally {
       setIsProcessingSold(false);
+    }
+  };
+
+  const handleRepublish = async (listing: Listing) => {
+    setRepublishingId(listing.id);
+    setActionError('');
+    try {
+      const res = await fetch('/api/user/listings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listingId: listing.id, action: 'REPUBLISH' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'İlan yeniden yayınlanamadı.');
+      await fetchListings();
+      setActiveTab('ACTIVE');
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'İlan yeniden yayınlanamadı.');
+    } finally {
+      setRepublishingId(null);
     }
   };
 
@@ -238,13 +260,15 @@ export default function HesabimIlanlarimPage() {
               </div>
 
               <div className="shrink-0 w-full sm:w-auto">
-                <Link
-                  href="/ilan-ver/paket"
+                <button
+                  type="button"
+                  onClick={() => handleRepublish(listing)}
+                  disabled={republishingId === listing.id}
                   className="w-full sm:w-auto btn-primary text-xs py-2.5 px-4 flex items-center justify-center gap-1.5 shadow"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
+                  {republishingId === listing.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
                   <span>Yeniden Yayınla ($2.000)</span>
-                </Link>
+                </button>
               </div>
             </div>
           ))}
@@ -258,6 +282,12 @@ export default function HesabimIlanlarimPage() {
           <p className="text-xs text-[var(--text-muted)]">
             7 günlük yayın süresi tamamlanan ilanlarınız burada listelenir.
           </p>
+        </div>
+      )}
+
+      {actionError && (
+        <div className="p-3 rounded-xl bg-[var(--color-danger-subtle)] text-[var(--color-danger)] text-xs font-semibold">
+          {actionError} Önce uygun ilan paketini satın alabilirsiniz.
         </div>
       )}
 

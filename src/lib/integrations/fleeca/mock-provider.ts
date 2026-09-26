@@ -6,6 +6,13 @@ const mockOrdersMap = new Map<string, FleecaOrder>();
 
 export class MockFleecaPaymentProvider implements FleecaPaymentProvider {
   async createOrder(params: CreateCheckoutParams): Promise<FleecaOrder> {
+    const existing = mockOrdersMap.get(params.orderId);
+    if (existing) {
+      if (existing.profileId !== params.profileId || existing.packageCode !== params.packageCode || existing.amount !== params.amount) {
+        throw new Error('Aynı sipariş kimliği farklı ödeme bilgileriyle kullanılamaz.');
+      }
+      return existing;
+    }
     const order: FleecaOrder = {
       orderId: params.orderId,
       profileId: params.profileId,
@@ -46,11 +53,19 @@ export class MockFleecaPaymentProvider implements FleecaPaymentProvider {
       };
     }
 
+    if (order.status === 'SUCCESS') {
+      return {
+        success: true,
+        orderId,
+        transactionId: `FLC-TX-${orderId}`,
+      };
+    }
+
     order.status = 'SUCCESS';
     return {
       success: true,
       orderId,
-      transactionId: `FLC-TX-${Math.floor(100000 + Math.random() * 900000)}`,
+      transactionId: `FLC-TX-${orderId}`,
     };
   }
 }

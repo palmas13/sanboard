@@ -128,6 +128,16 @@ export async function resolveCorporateEligibility(profileId: string): Promise<Co
     };
   }
 
+  // Unknown/missing moderation state must never become publishable.
+  if (dealer.moderation_status !== 'ACTIVE') {
+    return {
+      eligible: false,
+      reason: 'STORE_SUSPENDED',
+      dealer,
+      message: 'Kurumsal mağazanın moderasyon durumu aktif değildir.',
+    };
+  }
+
   // Case D: Store application is not approved
   if (dealer.status === 'PENDING') {
     return {
@@ -145,6 +155,15 @@ export async function resolveCorporateEligibility(profileId: string): Promise<Co
       dealer,
       application,
       message: 'Kurumsal mağaza başvurunuz reddedilmiştir.',
+    };
+  }
+  if (dealer.status !== 'APPROVED') {
+    return {
+      eligible: false,
+      reason: 'NO_STORE',
+      dealer,
+      application,
+      message: 'Kurumsal mağaza onaylı durumda değildir.',
     };
   }
 
@@ -170,6 +189,15 @@ export async function resolveCorporateEligibility(profileId: string): Promise<Co
       reason: 'SUBSCRIPTION_EXPIRED',
       dealer,
       message: 'Kurumsal üyelik süreniz sona ermiştir. Lütfen aboneliğinizi yenileyin.',
+    };
+  }
+
+  if (dealer.subscription_status !== 'ACTIVE') {
+    return {
+      eligible: false,
+      reason: 'SUBSCRIPTION_INACTIVE',
+      dealer,
+      message: 'Kurumsal üyeliğiniz aktif değildir.',
     };
   }
 

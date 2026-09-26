@@ -5,6 +5,7 @@ import {
   createListingWithCredit,
   updateListing,
   markListingAsSold,
+  republishListing,
   getUserListings,
   toggleFavorite,
   getUserFavorites,
@@ -40,6 +41,10 @@ export class MemoryListingRepository implements IListingRepository {
 
   async markListingAsSold(id: string, profileId: string) {
     return markListingAsSold(id, profileId);
+  }
+
+  async republishListing(id: string, profileId: string) {
+    return republishListing(id, profileId);
   }
 
   async getUserListings(profileId: string) {

@@ -5,6 +5,7 @@ import { ListingFilterParams } from '../../listings';
 import { uploadListingImage } from '@/lib/storage';
 import { deleteMediaSafely } from '@/lib/storage/lifecycle';
 import { resolveUserId, resolveProfileId, isUuid } from '../../id-mapper';
+import { getEffectiveListingStatus } from '@/lib/listings/visibility';
 
 export function isPublicCorporateListingVisible(item: any): boolean {
   if (item.seller_type !== 'CORPORATE') return true;
@@ -643,7 +644,8 @@ export class SupabaseListingRepository implements IListingRepository {
   }
 
   async createListing(input: CreateListingInput, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }> {
-    const client = this.getAdminClient();
+    const client = getSupabaseAdminClient();
+    if (!client) return { success: false, error: 'Güvenilir ilan işlemi için sunucu Supabase anahtarı yapılandırılmamış.' };
     const safeProfileId = resolveProfileId(profileId);
 
     const sellerType = input.seller_type || (input.corporate_profile_id ? 'CORPORATE' : 'INDIVIDUAL');
@@ -665,6 +667,56 @@ export class SupabaseListingRepository implements IListingRepository {
         return { success: false, error: 'Bu kurumsal mağaza adına ilan yayınlama yetkiniz bulunmuyor.' };
       }
       targetCreditOwnerId = dealer.owner_profile_id || safeProfileId;
+    }
+
+    const processedImages: Array<{ storage_path: string; is_cover: boolean; sort_order: number; size_bytes: number }> = [];
+    for (let i = 0; i < (input.images || []).length; i++) {
+      const img = input.images[i];
+      let finalPath = img.storage_path;
+      let sizeBytes = img.size_bytes || 500000;
+      if (finalPath.startsWith('data:image/')) {
+        const matches = finalPath.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
+        if (matches) {
+          const uploadRes = await uploadListingImage(Buffer.from(matches[2], 'base64'), `pending-${Date.now()}`, matches[1]);
+          if (!uploadRes.success) return { success: false, error: `R2 görsel yükleme hatası: ${uploadRes.error}` };
+          finalPath = uploadRes.url;
+          sizeBytes = uploadRes.sizeBytes;
+        }
+      }
+      processedImages.push({ storage_path: finalPath, sort_order: img.sort_order ?? i, is_cover: Boolean(img.is_cover ?? i === 0), size_bytes: sizeBytes });
+    }
+
+    const rpcListingNumber = `#SB-${Math.floor(100000 + Math.random() * 900000)}`;
+    const details = input.category === 'vehicle' ? {
+      vehicle_category: input.subcategory, brand: input.brand || '', model: input.model || '', plate: input.plate || 'LS-TEMP',
+      mileage: input.mileage || 0, engine_upgrade: input.engine_upgrade || 0, transmission_upgrade: input.transmission_upgrade || 0,
+      brake_upgrade: input.brake_upgrade || 0, turbo: Boolean(input.turbo), subwoofer: Boolean(input.subwoofer),
+      trade_available: Boolean(input.trade_available), lock_level: input.lock_level ?? null, alarm_level: input.alarm_level ?? null,
+      anti_theft_level: input.anti_theft_level ?? null, engine_health: input.engine_health ?? null,
+      suspension: input.suspension || null, fuel_type: input.fuel_type || null, factory_price: input.factory_price ?? null,
+    } : {
+      property_type: input.subcategory, floor: input.floor || 1, room_count: input.room_count || '1+1',
+      furnished: Boolean(input.furnished), building_type: input.building_type || 'Normal', balcony: Boolean(input.balcony),
+    };
+
+    const { data: rpcData, error: rpcError } = await client.rpc('create_listing_with_credit', {
+      p_profile_id: targetCreditOwnerId,
+      p_seller_type: sellerType,
+      p_corporate_profile_id: corporateProfileId,
+      p_listing: {
+        listing_number: rpcListingNumber, category: input.category, subcategory: input.subcategory,
+        title: input.title, description: input.description, price: input.price,
+        location: input.category === 'vehicle' ? null : (input.location?.trim() || null),
+      },
+      p_details: details,
+      p_images: processedImages,
+    });
+    if (!rpcError) {
+      const rpcResult = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+      return { success: Boolean(rpcResult?.success), listing: rpcResult?.listing, error: rpcResult?.error };
+    }
+    if (!rpcError.message?.includes('create_listing_with_credit')) {
+      return { success: false, error: rpcError.message };
     }
 
     // 1. Check and consume 1 available credit strictly matching context (INDIVIDUAL vs CORPORATE)
@@ -857,6 +909,21 @@ export class SupabaseListingRepository implements IListingRepository {
     }
 
     return { success: true, listing: newListing };
+  }
+
+  async republishListing(id: string, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }> {
+    if (!isUuid(id)) return { success: false, error: 'Geçersiz ilan ID formatı.' };
+    const safeProfileId = resolveProfileId(profileId);
+    if (!isUuid(safeProfileId)) return { success: false, error: 'Geçersiz profil ID formatı.' };
+    const client = getSupabaseAdminClient();
+    if (!client) return { success: false, error: 'Güvenilir ilan işlemi için sunucu Supabase anahtarı yapılandırılmamış.' };
+    const { data, error } = await client.rpc('republish_listing_with_credit', {
+      p_listing_id: id,
+      p_profile_id: safeProfileId,
+    });
+    if (error) return { success: false, error: error.message };
+    const result = Array.isArray(data) ? data[0] : data;
+    return { success: Boolean(result?.success), listing: result?.listing, error: result?.error };
   }
 
   async updateListing(
@@ -1244,6 +1311,7 @@ export class SupabaseListingRepository implements IListingRepository {
       previous_price: priceHistoryMap[item.id] && priceHistoryMap[item.id] !== item.price ? priceHistoryMap[item.id] : undefined,
       favorite_count: favCountMap[item.id] || 0,
       images: item.listing_images || [],
+      status: getEffectiveListingStatus(item),
     }));
   }
 
@@ -1310,6 +1378,7 @@ export class SupabaseListingRepository implements IListingRepository {
       previous_price: priceHistoryMap[item.id] && priceHistoryMap[item.id] !== item.price ? priceHistoryMap[item.id] : undefined,
       favorite_count: favCountMap[item.id] || 0,
       images: item.listing_images || [],
+      status: getEffectiveListingStatus(item),
     }));
   }
 

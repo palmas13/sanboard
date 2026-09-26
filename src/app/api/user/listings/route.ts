@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getListingRepository } from '@/lib/db/repositories';
+import { getServerSession } from '@/lib/auth/session';
+import { revalidatePath } from 'next/cache';
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const profileId = searchParams.get('profileId') || req.cookies.get('sanboard_profile_id')?.value;
+    const session = await getServerSession(req);
+    const profileId = session?.profileId;
 
     if (!profileId) {
       return NextResponse.json(
-        { error: 'profileId gereklidir.' },
-        { status: 400 }
+        { error: 'Doğrulanmış aktif karakter gereklidir.' },
+        { status: 401 }
       );
     }
 
@@ -27,22 +29,34 @@ export async function GET(req: NextRequest) {
 // Mark as sold
 export async function PATCH(req: NextRequest) {
   try {
-    const { listingId, profileId } = await req.json();
+    const session = await getServerSession(req);
+    const profileId = session?.profileId;
+    const { listingId, action = 'SOLD' } = await req.json();
 
     if (!listingId || !profileId) {
       return NextResponse.json(
-        { error: 'listingId ve profileId gereklidir.' },
-        { status: 400 }
+        { error: 'Doğrulanmış aktif karakter ve listingId gereklidir.' },
+        { status: 401 }
       );
     }
 
     const repo = getListingRepository();
-    const result = await repo.markListingAsSold(listingId, profileId);
+    const result = action === 'REPUBLISH'
+      ? await repo.republishListing(listingId, profileId)
+      : await repo.markListingAsSold(listingId, profileId);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true });
+    revalidatePath('/');
+    revalidatePath('/arac');
+    revalidatePath('/mulk');
+    revalidatePath(`/ilan/${listingId}`);
+    revalidatePath('/hesabim/ilanlarim');
+    return NextResponse.json({
+      success: true,
+      listing: action === 'REPUBLISH' && 'listing' in result ? result.listing : undefined,
+    });
   } catch (error: any) {
     return NextResponse.json(
       { error: error?.message || 'İşlem gerçekleştirilemedi.' },

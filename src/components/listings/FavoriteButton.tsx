@@ -20,11 +20,14 @@ type FavoriteState = { isFavorited: boolean; count: number };
 
 // Character-scoped client overlay. Public listing data remains safe to cache globally.
 const favoriteStateCache = new Map<string, FavoriteState>();
+const favoriteCountCache = new Map<string, number>();
 const favoriteStateSubscribers = new Map<string, Set<(state: FavoriteState) => void>>();
 const hydrationQueue = new Map<string, Map<string, Set<(state: FavoriteState) => void>>>();
 let hydrationScheduled = false;
 
 function publishFavoriteState(cacheKey: string, state: FavoriteState) {
+  const listingId = cacheKey.slice(cacheKey.indexOf(':') + 1);
+  favoriteCountCache.set(listingId, state.count);
   favoriteStateCache.set(cacheKey, state);
   favoriteStateSubscribers.get(cacheKey)?.forEach((subscriber) => subscriber(state));
 }
@@ -98,7 +101,7 @@ export function FavoriteButton({
   const cached = cacheKey ? favoriteStateCache.get(cacheKey) : undefined;
 
   const [isFavorited, setIsFavorited] = useState(cached?.isFavorited ?? initialIsFavorited);
-  const [count, setCount] = useState(cached?.count ?? initialCount);
+  const [count, setCount] = useState(favoriteCountCache.get(listingId) ?? initialCount);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const mutationPendingRef = useRef(false);
@@ -109,17 +112,17 @@ export function FavoriteButton({
     const versionAtStart = mutationVersionRef.current;
     if (!cacheKey || !profileId || authStatus !== 'authenticated') {
       setIsFavorited(initialIsFavorited);
-      setCount(initialCount);
+      setCount(favoriteCountCache.get(listingId) ?? initialCount);
       return;
     }
 
     const entry = favoriteStateCache.get(cacheKey);
     if (entry) {
       setIsFavorited(entry.isFavorited);
-      setCount(entry.count);
+      setCount(favoriteCountCache.get(listingId) ?? entry.count);
     } else {
       setIsFavorited(initialIsFavorited);
-      setCount(initialCount);
+      setCount(favoriteCountCache.get(listingId) ?? initialCount);
     }
 
     const unsubscribe = subscribeFavoriteState(cacheKey, (state) => {

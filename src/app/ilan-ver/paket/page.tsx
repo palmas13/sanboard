@@ -26,9 +26,11 @@ export default function IlanPaketSecPage() {
     try {
       const res = await fetch('/api/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': `listing-credit:${currentProfile.id}:${crypto.randomUUID()}`,
+        },
         body: JSON.stringify({
-          profileId: currentProfile.id,
           packageCode: 'STANDARD_7_DAY',
         }),
       });

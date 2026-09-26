@@ -19,8 +19,8 @@ export async function GET(req: NextRequest) {
     const repo = getPaymentRepository();
     const result = await repo.getUserCredits(profileId);
     const availableList = (result.credits || []).filter((c: any) => c.status === 'AVAILABLE');
-    const individualCredits = availableList.filter((c: any) => c.credit_type === 'INDIVIDUAL' || (!c.credit_type && c.amount !== 1750)).length;
-    const corporateCredits = availableList.filter((c: any) => c.credit_type === 'CORPORATE' || c.amount === 1750).length;
+    const individualCredits = availableList.filter((c: any) => c.credit_type === 'INDIVIDUAL').length;
+    const corporateCredits = availableList.filter((c: any) => c.credit_type === 'CORPORATE').length;
 
     return NextResponse.json({
       availableCredits: result.available,

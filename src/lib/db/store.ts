@@ -141,6 +141,7 @@ class SanboardDatabase {
       price: 2000,
       duration_days: 7,
       active: true,
+      seller_type: 'INDIVIDUAL',
     },
     {
       id: 'pkg-corporate-14-day',
@@ -149,6 +150,7 @@ class SanboardDatabase {
       price: 1750,
       duration_days: 14,
       active: true,
+      seller_type: 'CORPORATE',
     },
   ];
 

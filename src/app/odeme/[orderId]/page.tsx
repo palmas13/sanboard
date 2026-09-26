@@ -29,9 +29,21 @@ export default function FleecaCheckoutPage() {
     transactionId?: string;
     error?: string;
   } | null>(null);
+  const [order, setOrder] = useState<{ amount: number; entitlementType: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' } | null>(null);
 
-  const amount = 2000;
+  const amount = order?.amount || 0;
   const buyerName = currentProfile?.full_name || 'Mavis Pierce';
+
+  useEffect(() => {
+    if (!orderId) return;
+    fetch(`/api/checkout?orderId=${encodeURIComponent(orderId)}`)
+      .then((response) => response.json().then((data) => ({ response, data })))
+      .then(({ response, data }) => {
+        if (response.ok) setOrder({ amount: data.amount, entitlementType: data.entitlementType });
+        else setResult({ success: false, error: data.error || 'Sipariş bilgisi alınamadı.' });
+      })
+      .catch(() => setResult({ success: false, error: 'Sipariş bilgisi alınamadı.' }));
+  }, [orderId]);
 
   const handleSimulatePayment = async (simulateSuccess: boolean) => {
     setProcessing(true);
@@ -116,7 +128,9 @@ export default function FleecaCheckoutPage() {
                   Ödeme Başarılı!
                 </h2>
                 <p className="text-sm text-[var(--text-muted)]">
-                  Fleeca işlemi onaylandı. 1 adet ilan yayınlama hakkınız hesabınıza tanımlandı.
+                  {order?.entitlementType === 'CORPORATE_SUBSCRIPTION'
+                    ? 'Fleeca işlemi onaylandı. Kurumsal üyeliğiniz 30 gün uzatıldı.'
+                    : 'Fleeca işlemi onaylandı. 1 adet ilan yayınlama hakkınız hesabınıza tanımlandı.'}
                 </p>
                 <p className="text-xs font-mono text-[var(--text-dim)] pt-1">
                   Referans: {result.transactionId}
@@ -125,16 +139,18 @@ export default function FleecaCheckoutPage() {
 
               <div className="p-4 rounded-xl bg-[var(--brand-orange-subtle)] border border-[rgba(255,138,31,0.25)] text-center">
                 <p className="text-xs font-bold text-[#FF8A1F]">
-                  İlan hakkın hazır. İlanını dilediğin an oluşturup yayınlayabilirsin.
+                   {order?.entitlementType === 'CORPORATE_SUBSCRIPTION'
+                     ? 'Kurumsal mağaza özellikleriniz kullanıma hazır.'
+                     : 'İlan hakkın hazır. İlanını dilediğin an oluşturup yayınlayabilirsin.'}
                 </p>
               </div>
 
               <button
                 type="button"
-                onClick={() => router.push('/ilan-ver/yeni')}
+                onClick={() => router.push(order?.entitlementType === 'CORPORATE_SUBSCRIPTION' ? '/hesabim/kurumsal' : '/ilan-ver/yeni')}
                 className="w-full btn-primary py-3.5 text-sm font-bold flex items-center justify-center gap-2 shadow-lg"
               >
-                <span>İlanını Oluştur</span>
+                <span>{order?.entitlementType === 'CORPORATE_SUBSCRIPTION' ? 'Kurumsal Panele Dön' : 'İlanını Oluştur'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>

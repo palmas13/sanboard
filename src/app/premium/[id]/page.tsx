@@ -18,6 +18,7 @@ import {
   Share2,
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/format';
+import { isPublicListingVisible } from '@/lib/listings/visibility';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { isUuid } from '@/lib/db/id-mapper';
 import { normalizeSocialMedia } from '@/lib/dealers/social';
@@ -112,8 +113,8 @@ export default async function PremiumStoreVitrinPage({ params }: PageProps) {
   const listingRepo = getListingRepository();
   const allListings = await listingRepo.getCorporateListings(dealer.id);
   // While suspended, corporate listings are removed from public marketplace visibility (Section 14)
-  const vehicles = isSuspended ? [] : allListings.filter((l) => l.category === 'vehicle' && l.status === 'ACTIVE');
-  const properties = isSuspended ? [] : allListings.filter((l) => l.category === 'property' && l.status === 'ACTIVE');
+  const vehicles = isSuspended ? [] : allListings.filter((l) => l.category === 'vehicle' && isPublicListingVisible(l, dealer));
+  const properties = isSuspended ? [] : allListings.filter((l) => l.category === 'property' && isPublicListingVisible(l, dealer));
 
   const mapToSummary = (l: any) => ({
     id: l.id,

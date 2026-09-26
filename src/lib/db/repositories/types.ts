@@ -69,6 +69,7 @@ export interface IListingRepository {
   createListing(input: CreateListingInput, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   updateListing(id: string, input: Partial<CreateListingInput>, profileId: string, userId?: string, role?: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   markListingAsSold(id: string, profileId: string): Promise<{ success: boolean; error?: string }>;
+  republishListing(id: string, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   removeListing?(id: string, profileId: string): Promise<{ success: boolean; error?: string }>;
   getUserListings(profileId: string): Promise<Listing[]>;
   getCorporateListings(corporateProfileId: string): Promise<Listing[]>;
@@ -145,8 +146,9 @@ export interface IDealerRepository {
 export interface IPaymentRepository {
   getUserCredits(profileId: string): Promise<{ available: number; total: number; credits: any[] }>;
   consumeCredit(profileId: string, listingId: string): Promise<boolean>;
-  createPaymentOrder(profileId: string, packageIdOrCode: string): Promise<{ orderId: string; amount: number; packageName?: string }>;
+  createPaymentOrder(profileId: string, packageIdOrCode: string, options?: { idempotencyKey?: string; corporateProfileId?: string | null }): Promise<{ orderId: string; amount: number; packageName?: string; entitlementType?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' }>;
   completePayment(orderId: string, externalPaymentId?: string): Promise<{ success: boolean; credit?: any; error?: string }>;
+  getPaymentOrder(orderId: string): Promise<any | null>;
   getUserPayments(profileId: string): Promise<any[]>;
 }
 

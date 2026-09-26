@@ -3,23 +3,47 @@ import { getPaymentRepository, getDealerRepository } from '@/lib/db/repositories
 import { getFleecaPaymentProvider } from '@/lib/integrations/fleeca';
 import { getServerSession } from '@/lib/auth/session';
 
+export async function GET(req: NextRequest) {
+  try {
+    const session = await getServerSession(req);
+    if (!session?.profileId) return NextResponse.json({ error: 'Yetkisiz erişim.' }, { status: 401 });
+    const orderId = new URL(req.url).searchParams.get('orderId');
+    if (!orderId) return NextResponse.json({ error: 'orderId zorunludur.' }, { status: 400 });
+    const payment = await getPaymentRepository().getPaymentOrder(orderId);
+    if (!payment) return NextResponse.json({ error: 'Ödeme kaydı bulunamadı.' }, { status: 404 });
+    if (payment.profile_id !== session.profileId && session.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Bu ödeme siparişini görüntüleme yetkiniz yok.' }, { status: 403 });
+    }
+    return NextResponse.json({
+      orderId: payment.order_id,
+      amount: payment.amount,
+      status: payment.status,
+      entitlementType: payment.entitlement_type || 'LISTING_CREDIT',
+    });
+  } catch (error: any) {
+    return NextResponse.json({ error: error?.message || 'Sipariş bilgisi alınamadı.' }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(req);
     const body = await req.json().catch(() => ({}));
     const requestedPackage = body.packageCode || 'STANDARD_7_DAY';
+    const idempotencyKey = req.headers.get('idempotency-key') || body.idempotencyKey;
 
     // Do not trust raw profileId submitted from browser; resolve from signed session
-    const activeProfileId = session?.profileId || body.profileId;
+    const activeProfileId = session?.profileId;
 
     if (!activeProfileId) {
       return NextResponse.json(
-        { error: 'Karakter profili zorunludur. Lütfen aktif bir karakter seçiniz.' },
-        { status: 400 }
+        { error: 'Ödeme işlemi için doğrulanmış bir oturum ve aktif karakter zorunludur.' },
+        { status: 401 }
       );
     }
 
     let chargeProfileId = activeProfileId;
+    let corporateProfileId: string | null = null;
 
     // Corporate package validation & eligibility resolution (Section 1 & 4)
     if (requestedPackage === 'CORPORATE_14_DAY') {
@@ -35,11 +59,25 @@ export async function POST(req: NextRequest) {
         );
       }
       chargeProfileId = eligibility.dealer.owner_profile_id || activeProfileId;
+      corporateProfileId = eligibility.dealer.id;
+    } else if (requestedPackage === 'CORPORATE_SUBSCRIPTION_30_DAY') {
+      const dealerRepo = getDealerRepository();
+      const dealer = await dealerRepo.getDealerByProfileId(activeProfileId, true);
+      if (!dealer || (dealer.owner_profile_id || dealer.profile_id) !== activeProfileId) {
+        return NextResponse.json({ error: 'Kurumsal mağaza bulunamadı.' }, { status: 403 });
+      }
+      if (dealer.status !== 'APPROVED' || dealer.moderation_status === 'DELETED') {
+        return NextResponse.json({ error: 'Bu mağaza için üyelik satın alınamaz.' }, { status: 403 });
+      }
+      corporateProfileId = dealer.id;
     }
 
     // Backend determines price from packageCode strictly via payment repository
     const repo = getPaymentRepository();
-    const order = await repo.createPaymentOrder(chargeProfileId, requestedPackage);
+    const order = await repo.createPaymentOrder(chargeProfileId, requestedPackage, {
+      idempotencyKey,
+      corporateProfileId,
+    });
 
     // Also notify Fleeca provider
     const fleeca = getFleecaPaymentProvider();
@@ -55,6 +93,7 @@ export async function POST(req: NextRequest) {
       orderId: order.orderId,
       amount: order.amount,
       packageName: order.packageName || (requestedPackage === 'CORPORATE_14_DAY' ? '14 Günlük Kurumsal İlan' : '7 Günlük Standart İlan'),
+      entitlementType: order.entitlementType,
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -67,6 +106,10 @@ export async function POST(req: NextRequest) {
 // Process / simulate payment endpoint
 export async function PUT(req: NextRequest) {
   try {
+    const session = await getServerSession(req);
+    if (!session?.profileId) {
+      return NextResponse.json({ error: 'Ödeme işlemi için doğrulanmış oturum gereklidir.' }, { status: 401 });
+    }
     const { orderId, simulateSuccess } = await req.json();
 
     if (!orderId) {
@@ -74,6 +117,13 @@ export async function PUT(req: NextRequest) {
         { error: 'orderId zorunludur.' },
         { status: 400 }
       );
+    }
+
+    const repo = getPaymentRepository();
+    const payment = await repo.getPaymentOrder(orderId);
+    if (!payment) return NextResponse.json({ error: 'Ödeme kaydı bulunamadı.' }, { status: 404 });
+    if (payment.profile_id !== session.profileId && session.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Bu ödeme siparişini tamamlama yetkiniz yok.' }, { status: 403 });
     }
 
     const fleeca = getFleecaPaymentProvider();
@@ -87,7 +137,6 @@ export async function PUT(req: NextRequest) {
     }
 
     // Mark as completed in database and issue listing credit via repository
-    const repo = getPaymentRepository();
     const completion = await repo.completePayment(orderId, result.transactionId);
 
     if (!completion.success) {
@@ -101,6 +150,7 @@ export async function PUT(req: NextRequest) {
       success: true,
       transactionId: result.transactionId,
       credit: completion.credit,
+      entitlementType: payment.entitlement_type || 'LISTING_CREDIT',
     });
   } catch (error: any) {
     return NextResponse.json(

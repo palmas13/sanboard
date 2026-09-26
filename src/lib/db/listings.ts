@@ -14,6 +14,7 @@ import { deleteMediaSafely } from '../storage/lifecycle';
 import { extractMediaKey } from '../media/url';
 import { resolveUserId } from './id-mapper';
 import { isListingOwnedByActiveProfile } from '../dealers/eligibility';
+import { getEffectiveListingStatus, isPublicListingVisible } from '../listings/visibility';
 
 export interface ListingFilterParams {
   category?: ListingCategory;
@@ -101,10 +102,10 @@ export async function getPublicListings(filters: ListingFilterParams = {}): Prom
 
   // 1. Strict status & expiration filter
   let result = db.listings.filter((l) => {
-    if (l.status !== 'ACTIVE') return false;
-    if (!l.expires_at) return false;
-    const expiry = new Date(l.expires_at);
-    return expiry > now;
+    const store = l.seller_type === 'CORPORATE'
+      ? (db.dealers || []).find((dealer) => dealer.id === l.corporate_profile_id)
+      : null;
+    return isPublicListingVisible(l, store, now);
   });
 
   // Filter out corporate listings from suspended or deleted stores (Section 14 & 16)
@@ -483,6 +484,13 @@ export async function createListingWithCredit(
   if (isSupabaseConfiguredMode()) {
     return getSupabaseRepo().createListing(input, sellerProfileId);
   }
+  if (input.category !== 'vehicle' && input.category !== 'property') {
+    return { success: false, error: 'Desteklenmeyen ilan kategorisi.' };
+  }
+  const imageLimit = input.category === 'vehicle' ? 3 : 5;
+  if (input.images !== undefined && (!Array.isArray(input.images) || input.images.length > imageLimit)) {
+    return { success: false, error: `${input.category === 'vehicle' ? 'Araç' : 'Mülk'} ilanlarında en fazla ${imageLimit} fotoğraf kullanılabilir.` };
+  }
   const now = new Date();
   const sellerProfile = db.profiles.find((p) => p.id === sellerProfileId);
   const isCorporateRequest = input.seller_type === 'CORPORATE';
@@ -508,10 +516,18 @@ export async function createListingWithCredit(
   // 1. Find available credit strictly matching the seller_type
   const credit = db.credits.find((c) => {
     if (c.profile_id !== sellerProfileId || c.status !== 'AVAILABLE') return false;
+    const packageCode = db.packages.find((pkg) => pkg.id === c.package_id)?.code;
+    const effectiveCreditType = c.credit_type || (
+      packageCode === 'CORPORATE_14_DAY'
+        ? 'CORPORATE'
+        : packageCode === 'STANDARD_7_DAY'
+          ? 'INDIVIDUAL'
+          : undefined
+    );
     if (sellerType === 'CORPORATE') {
-      return c.credit_type === 'CORPORATE' || c.amount === 1750;
+      return effectiveCreditType === 'CORPORATE';
     } else {
-      return (c.credit_type === 'INDIVIDUAL' || (!c.credit_type && c.amount !== 1750));
+      return effectiveCreditType === 'INDIVIDUAL';
     }
   });
 
@@ -812,7 +828,7 @@ export async function getUserListings(sellerProfileId: string): Promise<Listing[
     const favCount = db.favorites.filter((f) => f.listing_id === l.id).length;
     return {
       ...l,
-      status: l.status === 'ACTIVE' && isExpired ? 'EXPIRED' : l.status,
+      status: getEffectiveListingStatus(l, now),
       favorite_count: favCount,
     };
   });
@@ -836,7 +852,7 @@ export async function getCorporateListings(corporateProfileId: string): Promise<
     const favCount = db.favorites.filter((f) => f.listing_id === l.id).length;
     return {
       ...l,
-      status: l.status === 'ACTIVE' && isExpired ? 'EXPIRED' : l.status,
+      status: getEffectiveListingStatus(l, now),
       favorite_count: favCount,
     };
   });
@@ -858,6 +874,18 @@ export async function toggleFavorite(
     throw new Error('İlan bulunamadı.');
   }
 
+  const existingIdx = db.favorites.findIndex(
+    (f) => f.profile_id === profileId && f.listing_id === listingId
+  );
+  if (existingIdx < 0) {
+    const store = listing.seller_type === 'CORPORATE'
+      ? (db.dealers || []).find((dealer) => dealer.id === listing.corporate_profile_id)
+      : null;
+    if (!isPublicListingVisible(listing, store)) {
+      throw new Error('Yayında olmayan ilan favorilere eklenemez.');
+    }
+  }
+
   // Self-abuse checks (Section 9)
   // 1. Individual listing owner cannot favorite own listing
   if (listing.seller_profile_id === profileId) {
@@ -872,10 +900,6 @@ export async function toggleFavorite(
       throw new Error('Sahibi olduğunuz mağazanın ilanını favorilere ekleyemezsiniz.');
     }
   }
-
-  const existingIdx = db.favorites.findIndex(
-    (f) => f.profile_id === profileId && f.listing_id === listingId
-  );
 
   if (existingIdx >= 0) {
     db.favorites.splice(existingIdx, 1);
@@ -895,6 +919,56 @@ export async function toggleFavorite(
   const isFavorited = existingIdx < 0;
 
   return { isFavorited, count };
+}
+
+export async function republishListing(
+  id: string,
+  activeProfileId: string
+): Promise<{ success: boolean; listing?: Listing; error?: string }> {
+  if (isSupabaseConfiguredMode()) return getSupabaseRepo().republishListing(id, activeProfileId);
+
+  const listing = db.listings.find((item) => item.id === id);
+  if (!listing) return { success: false, error: 'İlan bulunamadı.' };
+  if (getEffectiveListingStatus(listing) !== 'EXPIRED') {
+    return { success: false, error: 'Yalnızca süresi dolmuş ilanlar yeniden yayınlanabilir.' };
+  }
+
+  let creditOwnerId = activeProfileId;
+  if (listing.seller_type === 'CORPORATE') {
+    const store = (db.dealers || []).find((dealer) => dealer.id === listing.corporate_profile_id);
+    if (!store || (store.owner_profile_id || store.profile_id) !== activeProfileId) {
+      return { success: false, error: 'Bu kurumsal ilanı yeniden yayınlama yetkiniz yok.' };
+    }
+    if (store.status !== 'APPROVED' || store.moderation_status !== 'ACTIVE' ||
+        store.subscription_status !== 'ACTIVE' || !store.subscription_expires_at ||
+        new Date(store.subscription_expires_at) <= new Date()) {
+      return { success: false, error: 'Kurumsal mağaza yeniden yayınlamaya uygun değil.' };
+    }
+    creditOwnerId = store.owner_profile_id || activeProfileId;
+  } else if (listing.seller_profile_id !== activeProfileId) {
+    return { success: false, error: 'Bu ilanı yeniden yayınlama yetkiniz yok.' };
+  }
+
+  const credit = db.credits.find((item) =>
+    item.profile_id === creditOwnerId &&
+    item.status === 'AVAILABLE' &&
+    item.credit_type === (listing.seller_type === 'CORPORATE' ? 'CORPORATE' : 'INDIVIDUAL') &&
+    (listing.seller_type !== 'CORPORATE' || item.corporate_profile_id === listing.corporate_profile_id)
+  );
+  if (!credit) return { success: false, error: 'Uygun yayın hakkı bulunamadı.' };
+
+  const now = new Date();
+  const durationDays = listing.seller_type === 'CORPORATE' ? 14 : 7;
+  credit.status = 'USED';
+  credit.used_listing_id = listing.id;
+  credit.used_at = now.toISOString();
+  listing.status = 'ACTIVE';
+  listing.published_at = now.toISOString();
+  listing.expires_at = new Date(now.getTime() + durationDays * 86400000).toISOString();
+  listing.is_featured = false;
+  listing.featured_until = null;
+  listing.updated_at = now.toISOString();
+  return { success: true, listing };
 }
 
 /**

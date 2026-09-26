@@ -265,6 +265,7 @@ describe('Sanboard – Individual vs Corporate System & Lifecycle', () => {
     it('consumes 1 credit, sets 24h boost, and sorts featured listing before normal listings', async () => {
       const store = db.dealers[0];
       store.subscription_status = 'ACTIVE';
+      store.moderation_status = 'ACTIVE';
       store.boost_credits = 3;
 
       // Normal listing (created first)

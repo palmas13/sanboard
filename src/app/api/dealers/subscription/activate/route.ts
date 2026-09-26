@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/auth/session';
-import { getDealerRepository, getUserRepository } from '@/lib/db/repositories';
+import { getDealerRepository } from '@/lib/db/repositories';
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,20 +36,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Yalnızca onaylanmış kurumsal mağazalar üyelik aktif edebilir.' }, { status: 400 });
     }
 
-    if (typeof dealerRepo.activateSubscription !== 'function') {
-      return NextResponse.json({ error: 'Abonelik aktivasyon servisi kullanılamıyor.' }, { status: 500 });
-    }
-
-    const result = await dealerRepo.activateSubscription(dealerId);
-    if (!result.success) {
-      return NextResponse.json({ error: result.error || 'Abonelik aktif edilemedi.' }, { status: 400 });
-    }
-
-    return NextResponse.json({
-      success: true,
-      dealer: result.dealer,
-      message: 'Kurumsal mağaza aboneliğiniz 30 gün boyunca aktif edildi. 3 adet öne çıkarma hakkı tanımlandı.',
-    });
+    return NextResponse.json(
+      { error: 'Doğrudan üyelik aktivasyonu kapatıldı. Üyelik Fleeca ödeme akışı üzerinden etkinleştirilmelidir.' },
+      { status: 409 }
+    );
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Abonelik işlemi gerçekleştirilemedi.' }, { status: 500 });
   }

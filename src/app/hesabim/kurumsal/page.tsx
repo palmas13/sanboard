@@ -109,9 +109,11 @@ export default function HesabimKurumsalPage() {
       // 3. Initiate corporate package checkout ($1.750, 14 days)
       const checkoutRes = await fetch('/api/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': `corporate-listing-credit:${eligData.dealer.id}:${crypto.randomUUID()}`,
+        },
         body: JSON.stringify({
-          profileId: currentProfile.id,
           packageCode: 'CORPORATE_14_DAY',
         }),
       });
@@ -243,16 +245,16 @@ export default function HesabimKurumsalPage() {
     setSuccess('');
 
     try {
-      const res = await fetch('/api/dealers/subscription/activate', {
+      const res = await fetch('/api/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dealerId: dealer.id, profileId: currentProfile.id }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': `corporate-subscription:${dealer.id}:${crypto.randomUUID()}`,
+        },
+        body: JSON.stringify({ packageCode: 'CORPORATE_SUBSCRIPTION_30_DAY' }),
       });
-
-      await readJsonResponse<{ success: true }>(res, 'Kurumsal üyelik aktivasyonu başarısız.');
-
-      setSuccess('Kurumsal üyeliğiniz başarıyla aktif edildi! Mağaza vitrininiz açıldı.');
-      await fetchDealer();
+      const data = await readJsonResponse<{ orderId: string }>(res, 'Kurumsal üyelik ödeme siparişi oluşturulamadı.');
+      router.push(`/odeme/${data.orderId}`);
     } catch (err: any) {
       setError(err.message || 'Üyelik aktif edilemedi.');
     } finally {

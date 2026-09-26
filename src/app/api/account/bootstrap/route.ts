@@ -53,10 +53,10 @@ export async function GET(req: NextRequest) {
           profileId
             ? client
                 .from('listing_credits')
-                .select('balance')
+                .select('*', { count: 'exact', head: true })
                 .eq('profile_id', profileId)
-                .maybeSingle()
-            : Promise.resolve({ data: null, error: null }),
+                .eq('status', 'AVAILABLE')
+            : Promise.resolve({ count: 0, error: null }),
           profileId
             ? client
                 .from('corporate_profiles')
@@ -66,11 +66,13 @@ export async function GET(req: NextRequest) {
                 .is('deleted_at', null)
                 .maybeSingle()
             : Promise.resolve({ data: null, error: null }),
-          client
-            .from('tickets')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', userId)
-            .eq('status', 'OPEN'),
+          profileId
+            ? client
+                .from('support_tickets')
+                .select('*', { count: 'exact', head: true })
+                .eq('profile_id', profileId)
+                .eq('status', 'OPEN')
+            : Promise.resolve({ count: 0, error: null }),
         ]);
 
       const personalListings = listingsRes.data || [];
@@ -87,7 +89,7 @@ export async function GET(req: NextRequest) {
         totalReceivedFavorites = count || 0;
       }
 
-      const availableCredits = creditRes.data?.balance || 0;
+      const availableCredits = creditRes.count || 0;
       const favoritesCount = favsCountRes.count || 0;
       const openTickets = ticketCountRes.count || 0;
 

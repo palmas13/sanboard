@@ -32,6 +32,15 @@ export const imageSchema = z.object({
   size_bytes: z.number().max(2 * 1024 * 1024, 'Her fotoğraf maksimum 2 MB olabilir'),
 });
 
+const listingImagesSchema = (maxImages: number) => z
+  .array(imageSchema)
+  .min(1, 'En az 1 fotoğraf yüklenmelidir')
+  .max(maxImages, `En fazla ${maxImages} fotoğraf yüklenebilir`)
+  .refine(
+    (imgs) => imgs.filter((img) => img.is_cover).length === 1,
+    'Tam olarak bir vitrin fotoğrafı seçilmelidir'
+  );
+
 export const baseListingFields = {
   title: z
     .string()
@@ -46,14 +55,7 @@ export const baseListingFields = {
     .number({ message: 'Geçerli bir fiyat giriniz' })
     .positive('Fiyat 0\'dan büyük olmalıdır')
     .max(1_000_000_000, 'Fiyat çok yüksek'),
-  images: z
-    .array(imageSchema)
-    .min(1, 'En az 1 fotoğraf yüklenmelidir')
-    .max(3, 'En fazla 3 fotoğraf yüklenebilir')
-    .refine(
-      (imgs) => imgs.filter((img) => img.is_cover).length === 1,
-      'Tam olarak bir vitrin fotoğrafı seçilmelidir'
-    ),
+  images: listingImagesSchema(3),
   seller_type: z.enum(['INDIVIDUAL', 'CORPORATE']).optional().nullable(),
   corporate_profile_id: z
     .string()
@@ -99,6 +101,7 @@ export const vehicleListingSchema = z.object({
 
 export const propertyListingSchema = z.object({
   ...baseListingFields,
+  images: listingImagesSchema(5),
   category: z.literal('property'),
   subcategory: z.enum(propertyTypes, {
     message: 'Geçerli bir mülk türü seçiniz',

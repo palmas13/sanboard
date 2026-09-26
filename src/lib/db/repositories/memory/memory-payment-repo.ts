@@ -24,9 +24,10 @@ export class MemoryPaymentRepository implements IPaymentRepository {
     return true;
   }
 
-  async createPaymentOrder(profileId: string, packageId: string) {
-    const res = await createCheckoutOrder(profileId, packageId);
-    return { orderId: res.orderId, amount: res.amount };
+  async createPaymentOrder(profileId: string, packageId: string, options?: { idempotencyKey?: string; corporateProfileId?: string | null }) {
+    const res = await createCheckoutOrder(profileId, packageId, options);
+    if (res.error) throw new Error(res.error);
+    return { orderId: res.orderId, amount: res.amount, packageName: res.packageName };
   }
 
   async completePayment(orderId: string, externalPaymentId?: string) {
@@ -38,5 +39,9 @@ export class MemoryPaymentRepository implements IPaymentRepository {
     return db.payments
       .filter((p) => p.profile_id === profileId)
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+
+  async getPaymentOrder(orderId: string) {
+    return db.payments.find((payment) => payment.order_id === orderId) || null;
   }
 }

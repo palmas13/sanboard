@@ -552,7 +552,7 @@ describe('Sanboard Post-Audit Correction Pass: Sections 36-47', () => {
     const unauthRes = await activateSubscriptionPost(unauthReq);
     assert.strictEqual(unauthRes.status, 403, 'Sibling character cannot activate subscription of another store');
 
-    // Mavis activates -> Allowed, charges Mavis profile
+    // Direct activation is closed even for the owner; payment flow is mandatory.
     const mavisToken = createSessionToken({
       userId: accountAUserId,
       role: 'ADMIN',
@@ -567,8 +567,14 @@ describe('Sanboard Post-Audit Correction Pass: Sections 36-47', () => {
       body: JSON.stringify({ dealerId: 'dealer-apex-01' }),
     });
     const authRes = await activateSubscriptionPost(authReq);
-    assert.strictEqual(authRes.status, 200);
+    assert.strictEqual(authRes.status, 409);
     assert.match(authRes.headers.get('content-type') || '', /application\/json/);
+
+    // Corporate listing-credit checkout requires an already active paid membership.
+    const apexStore = db.dealers.find((dealer) => dealer.id === 'dealer-apex-01')!;
+    apexStore.subscription_status = 'ACTIVE';
+    apexStore.moderation_status = 'ACTIVE';
+    apexStore.subscription_expires_at = new Date(Date.now() + 30 * 86400000).toISOString();
 
     // Checkout endpoint verification for Corporate Credit ($1,750)
     const checkoutReq = new NextRequest('http://localhost:3000/api/checkout', {
@@ -587,7 +593,7 @@ describe('Sanboard Post-Audit Correction Pass: Sections 36-47', () => {
     assert.strictEqual(checkoutData.amount, 1750, 'Corporate credit checkout price must be $1,750');
   });
 
-  it('Section 46 regression: corporate subscription client targets the existing JSON route', () => {
+  it('Section 46 regression: corporate subscription client targets duplicate-safe checkout', () => {
     const fs = require('node:fs');
     const path = require('node:path');
     const source = fs.readFileSync(
@@ -595,9 +601,9 @@ describe('Sanboard Post-Audit Correction Pass: Sections 36-47', () => {
       'utf8'
     );
 
-    assert.ok(source.includes("fetch('/api/dealers/subscription/activate'"));
-    assert.strictEqual(source.includes("fetch('/api/dealers/activate'"), false);
-    assert.ok(source.includes("readJsonResponse<{ success: true }>(res"));
+    assert.ok(source.includes("fetch('/api/checkout'"));
+    assert.ok(source.includes("packageCode: 'CORPORATE_SUBSCRIPTION_30_DAY'"));
+    assert.ok(source.includes("'Idempotency-Key'"));
   });
 
   it('Section 46 regression: unauthenticated activation errors are JSON, not login redirects', async () => {

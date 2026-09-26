@@ -6,6 +6,7 @@ import { resolveAvatarUrl } from '@/lib/media/url';
 import { isUuid } from '@/lib/db/id-mapper';
 import { User, Calendar, Phone, Mail, Car, Home } from 'lucide-react';
 import { formatDate } from '@/lib/utils/format';
+import { isPublicListingVisible } from '@/lib/listings/visibility';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -51,7 +52,7 @@ export default async function PublicUserProfilePage({ params }: PageProps) {
   const listingRepo = getListingRepository();
   const allListings = await listingRepo.getUserListings(profile.id);
   const activeListings = allListings.filter(
-    (l) => l.status === 'ACTIVE' && l.seller_type !== 'CORPORATE' && !l.corporate_profile_id
+    (l) => isPublicListingVisible(l) && l.seller_type !== 'CORPORATE' && !l.corporate_profile_id
   );
   const vehicles = activeListings.filter((l) => l.category === 'vehicle');
   const properties = activeListings.filter((l) => l.category === 'property');
@@ -76,7 +77,6 @@ export default async function PublicUserProfilePage({ params }: PageProps) {
     published_at: l.published_at,
     cover_image: l.images?.find((i: any) => i.is_cover)?.storage_path || l.images?.[0]?.storage_path,
     favorite_count: l.favorite_count || 0,
-    is_favorited: false,
   });
 
   const vehicleSummaries = vehicles.map(mapToSummary);
