@@ -1,24 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { getGtaWorldAuthProvider, isMockGtaWorldAuthEnabled } from '@/lib/integrations/gtaworld';
+import { RealGtaWorldAuthProvider } from '@/lib/integrations/gtaworld/real-provider';
 import { recordAuditEvent } from '@/lib/audit';
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
   const redirect = searchParams.get('redirect') || '/';
-  const isMock = isMockGtaWorldAuthEnabled();
-
-  // 1. Explicit mock mode still traverses callback + canonical account/profile sync.
-  if (isMock) {
-    const callbackUrl = new URL('/api/auth/gtaworld/callback', req.url);
-    callbackUrl.searchParams.set('code', 'mock_authorization_code');
-    callbackUrl.searchParams.set('redirect', redirect);
-    return NextResponse.redirect(callbackUrl);
-  }
-
-  // 2. Real OAuth Mode
+  // Real GTA World login never falls back to the temporary test provider.
   try {
-    const provider = getGtaWorldAuthProvider();
+    const provider = new RealGtaWorldAuthProvider();
 
     // Check configuration
     const clientId = process.env.GTAWORLD_CLIENT_ID;

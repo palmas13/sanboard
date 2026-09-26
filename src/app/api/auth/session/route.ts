@@ -9,6 +9,7 @@ import {
 } from '@/lib/auth/session';
 import { recordAuditEvent } from '@/lib/audit';
 import { getUserRepository } from '@/lib/db/repositories';
+import { isTestExternalAccountId, isTestLoginEnabled } from '@/lib/auth/test-login';
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(req);
@@ -20,6 +21,9 @@ export async function GET(req: NextRequest) {
     repo.getUserById(session.userId),
     repo.getProfileById(session.profileId),
   ]);
+  if (user && isTestExternalAccountId(user.external_user_id) && !isTestLoginEnabled()) {
+    return NextResponse.json({ authenticated: false, session: null }, { status: 401 });
+  }
   if (!user || user.status !== 'ACTIVE' || !profile || profile.user_id !== session.userId) {
     return NextResponse.json({ authenticated: false, session: null }, { status: 401 });
   }
@@ -28,6 +32,7 @@ export async function GET(req: NextRequest) {
     session: { ...session, role: profile.role || 'USER', profileId: profile.id },
     user: { ...user, role: profile.role || 'USER' },
     profile,
+    isTestIdentity: isTestExternalAccountId(user.external_user_id),
   });
 }
 
@@ -48,6 +53,9 @@ export async function POST(req: NextRequest) {
       userRepository.getProfileById(characterId),
     ]);
     if (!user) return NextResponse.json({ error: 'Hesap bulunamadı.' }, { status: 401 });
+    if (isTestExternalAccountId(user.external_user_id) && !isTestLoginEnabled()) {
+      return NextResponse.json({ error: 'Test login devre dışı.' }, { status: 404 });
+    }
     if (user.status !== 'ACTIVE') return NextResponse.json({ error: 'Bu hesap ile oturum açılamaz.' }, { status: 403 });
 
     if (!profile) return NextResponse.json({ error: 'Karakter profili bulunamadı.' }, { status: 404 });
@@ -58,7 +66,7 @@ export async function POST(req: NextRequest) {
     const isSwitch = Boolean(currentSession?.profileId && currentSession.profileId !== profile.id);
     await recordAuditEvent({ eventType: isSwitch ? 'CHARACTER_SWITCHED' : 'CHARACTER_SELECTED', userId: user.id, profileId: profile.id, metadata: { characterName: profile.full_name, previousProfileId: currentSession?.profileId || null } });
 
-    const response = NextResponse.json({ success: true, user: { ...user, role }, profile, profileId: profile.id });
+    const response = NextResponse.json({ success: true, user: { ...user, role }, profile, profileId: profile.id, isTestIdentity: isTestExternalAccountId(user.external_user_id) });
     setSessionCookieOnResponse(response, token);
     clearCharacterSelectionCookieOnResponse(response);
     response.cookies.set('sanboard_profile_id', profile.id, { path: '/', maxAge: 86400, sameSite: 'lax' });

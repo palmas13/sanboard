@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGtaWorldAuthProvider, isMockGtaWorldAuthEnabled } from '@/lib/integrations/gtaworld';
+import { RealGtaWorldAuthProvider } from '@/lib/integrations/gtaworld/real-provider';
 import { syncExternalGameAccount } from '@/lib/auth/gtaworld-sync';
 import {
   clearCharacterSelectionCookieOnResponse,
@@ -13,16 +13,10 @@ import { recordAuditEvent } from '@/lib/audit';
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
-  const isMock = isMockGtaWorldAuthEnabled();
-
   // 1. Read and validate OAuth attempt cookie
   const attemptCookie = req.cookies.get('gtaw_oauth_attempt')?.value;
   let attemptState: string | undefined;
   let targetRedirect = '/';
-  if (isMock) {
-    targetRedirect = searchParams.get('redirect') || '/';
-  }
-
   if (attemptCookie) {
     try {
       const parsed = JSON.parse(attemptCookie);
@@ -39,45 +33,43 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const provider = getGtaWorldAuthProvider();
+  const provider = new RealGtaWorldAuthProvider();
 
-  // In real mode, enforce attempt cookie as defense-in-depth AND validate state parameter
-  if (!isMock) {
-    // 1. Attempt cookie check (Defense-in-depth: proves this browser recently initiated an attempt)
-    if (!attemptState) {
+  // Enforce attempt cookie as defense-in-depth AND validate state parameter.
+  // 1. Attempt cookie check (Defense-in-depth: proves this browser recently initiated an attempt)
+  if (!attemptState) {
+    await recordAuditEvent({
+      eventType: 'AUTH_LOGIN_FAILURE',
+      metadata: { category: 'expired_or_missing_attempt' },
+    });
+    return NextResponse.redirect(new URL('/giris?error=invalid_attempt', req.url));
+  }
+
+  const stateParam = searchParams.get('state');
+
+  // 2. Strict State Verification:
+  // If returned, state must strictly match attempt state.
+  if (stateParam) {
+    if (stateParam !== attemptState) {
       await recordAuditEvent({
         eventType: 'AUTH_LOGIN_FAILURE',
-        metadata: { category: 'expired_or_missing_attempt' },
+        metadata: { category: 'state_mismatch' },
       });
       return NextResponse.redirect(new URL('/giris?error=invalid_attempt', req.url));
     }
-
-    const stateParam = searchParams.get('state');
-
-    // 2. Strict State Verification:
-    // If returned, state must strictly match attempt state.
-    if (stateParam) {
-      if (stateParam !== attemptState) {
-        await recordAuditEvent({
-          eventType: 'AUTH_LOGIN_FAILURE',
-          metadata: { category: 'state_mismatch' },
-        });
-        return NextResponse.redirect(new URL('/giris?error=invalid_attempt', req.url));
-      }
-    } else {
-      // If state was NOT returned by GTA World:
-      // An attempt cookie alone does NOT cryptographically bind the returned code to the request.
-      // Real OAuth activation MUST remain blocked until state support is confirmed with the provider.
-      if (provider.oauthStateSupport !== 'supported') {
-        await recordAuditEvent({
-          eventType: 'AUTH_LOGIN_FAILURE',
-          metadata: {
-            category: 'oauth_state_unverified_or_unsupported',
-            oauthStateSupport: provider.oauthStateSupport,
-          },
-        });
-        return NextResponse.redirect(new URL('/giris?error=oauth_state_unsupported', req.url));
-      }
+  } else {
+    // If state was NOT returned by GTA World:
+    // An attempt cookie alone does NOT cryptographically bind the returned code to the request.
+    // Real OAuth activation MUST remain blocked until state support is confirmed with the provider.
+    if (provider.oauthStateSupport !== 'supported') {
+      await recordAuditEvent({
+        eventType: 'AUTH_LOGIN_FAILURE',
+        metadata: {
+          category: 'oauth_state_unverified_or_unsupported',
+          oauthStateSupport: provider.oauthStateSupport,
+        },
+      });
+      return NextResponse.redirect(new URL('/giris?error=oauth_state_unsupported', req.url));
     }
   }
 

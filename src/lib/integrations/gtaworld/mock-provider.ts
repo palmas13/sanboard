@@ -7,10 +7,11 @@ import {
   GtaWorldApiUserResponse,
   OAuthStateSupportStatus,
 } from './types';
+import { TEST_LOGIN_ACCOUNT_PREFIX, TEST_LOGIN_CHARACTER_PREFIX } from '@/lib/auth/test-login';
 
 export const MOCK_CHARACTERS: GtaWorldCharacter[] = [
   {
-    id: '44444444-4444-4444-4444-444444444441',
+    id: `${TEST_LOGIN_CHARACTER_PREFIX}mavis-pierce`,
     fullName: 'Mavis Pierce',
     hasProfile: true,
     avatarUrl: '',
@@ -18,7 +19,7 @@ export const MOCK_CHARACTERS: GtaWorldCharacter[] = [
     phone: '555-0192',
   },
   {
-    id: '44444444-4444-4444-4444-444444444442',
+    id: `${TEST_LOGIN_CHARACTER_PREFIX}zade-vexnera`,
     fullName: 'Zade Vexnera',
     hasProfile: true,
     avatarUrl: '',
@@ -26,7 +27,7 @@ export const MOCK_CHARACTERS: GtaWorldCharacter[] = [
     phone: '555-8831',
   },
   {
-    id: '44444444-4444-4444-4444-444444444443',
+    id: `${TEST_LOGIN_CHARACTER_PREFIX}ravi-blumon`,
     fullName: 'Ravi Blumon',
     hasProfile: true,
     avatarUrl: '',
@@ -42,9 +43,9 @@ export class MockGtaWorldAuthProvider implements GtaWorldAuthProvider {
     return {
       success: true,
       session: {
-        userId: 'gta-mock-user-1',
-        username: 'mavis_player',
-        role: 'ADMIN', // Set as admin for full developer access in mock mode
+        userId: `${TEST_LOGIN_ACCOUNT_PREFIX}fixtures`,
+        username: 'sanboard_test_fixtures',
+        role: 'USER',
         characters: MOCK_CHARACTERS,
       },
     };
@@ -57,9 +58,9 @@ export class MockGtaWorldAuthProvider implements GtaWorldAuthProvider {
   async verifySession(token: string): Promise<GtaWorldUserSession | null> {
     if (!token) return null;
     return {
-      userId: 'gta-mock-user-1',
-      username: 'mavis_player',
-      role: 'ADMIN',
+      userId: `${TEST_LOGIN_ACCOUNT_PREFIX}fixtures`,
+      username: 'sanboard_test_fixtures',
+      role: 'USER',
       characters: MOCK_CHARACTERS,
     };
   }
@@ -90,7 +91,7 @@ export class MockGtaWorldAuthProvider implements GtaWorldAuthProvider {
 
   async fetchAccount(_accessToken: string): Promise<ExternalGameAccount> {
     return {
-      externalAccountId: 'gta-mock-user-1',
+      externalAccountId: `${TEST_LOGIN_ACCOUNT_PREFIX}fixtures`,
       characters: MOCK_CHARACTERS.map((character) => ({
         externalCharacterId: character.id,
         displayName: character.fullName,

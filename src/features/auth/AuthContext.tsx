@@ -16,6 +16,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isTestIdentity: boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
   selectCharacter: (characterId: string) => Promise<CharacterProfile | null>;
@@ -48,6 +49,7 @@ export function AuthProvider({
     initialProfile ? { [initialProfile.id]: initialProfile } : {}
   );
   const [characters, setCharacters] = useState<GtaWorldCharacter[]>([]);
+  const [isTestIdentity, setIsTestIdentity] = useState(false);
 
   const refreshProfile = useCallback(async () => {
     const profileId = currentProfile?.id;
@@ -98,6 +100,7 @@ export function AuthProvider({
             if (charData?.success && Array.isArray(charData.characters)) {
               setCharacters(charData.characters);
             }
+            setIsTestIdentity(charData?.isTestIdentity === true);
             if (charData?.success && Array.isArray(charData.profiles)) {
               const profMap: Record<string, CharacterProfile> = {};
               for (const p of charData.profiles as CharacterProfile[]) {
@@ -137,6 +140,7 @@ export function AuthProvider({
               ...(profile.external_character_id ? { [profile.external_character_id]: profile } : {}),
             }));
             setAuthStatus('authenticated');
+            setIsTestIdentity(data?.isTestIdentity === true);
 
             return;
           }
@@ -197,6 +201,7 @@ export function AuthProvider({
       setCurrentProfile(profile);
       setCharacterProfiles((prev) => ({ ...prev, [profile.id]: profile }));
       setAuthStatus('authenticated');
+      setIsTestIdentity(sessionData?.isTestIdentity === true);
 
       // Set client routing cookies
       document.cookie = `sanboard_profile_id=${profile.id}; path=/; max-age=86400; SameSite=Lax`;
@@ -220,6 +225,7 @@ export function AuthProvider({
     setCurrentProfile(null);
     setCharacters([]);
     setCharacterProfiles({});
+    setIsTestIdentity(false);
     setAuthStatus('unauthenticated');
     window.location.href = '/';
   };
@@ -251,6 +257,7 @@ export function AuthProvider({
         if (data?.success && Array.isArray(data.characters)) {
           setCharacters(data.characters);
         }
+        setIsTestIdentity(data?.isTestIdentity === true);
         if (data?.success && Array.isArray(data.profiles)) {
           const profMap: Record<string, CharacterProfile> = {};
           for (const p of data.profiles as CharacterProfile[]) {
@@ -281,6 +288,7 @@ export function AuthProvider({
         isLoading,
         isAuthenticated,
         isAdmin: currentProfile?.role === 'ADMIN',
+        isTestIdentity,
         login,
         logout,
         selectCharacter,

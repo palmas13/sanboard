@@ -13,10 +13,8 @@ import {
   verifySessionToken,
 } from '@/lib/auth/session';
 import { DELETE as logout, POST as switchCharacter } from '@/app/api/auth/session/route';
-import { GET as oauthCallback } from '@/app/api/auth/gtaworld/callback/route';
 import { GET as getCharacters } from '@/app/api/user/characters/route';
-import { getGtaWorldAuthProvider, isMockGtaWorldAuthEnabled } from '@/lib/integrations/gtaworld';
-import { MockGtaWorldAuthProvider } from '@/lib/integrations/gtaworld/mock-provider';
+import { getGtaWorldAuthProvider } from '@/lib/integrations/gtaworld';
 import { RealGtaWorldAuthProvider } from '@/lib/integrations/gtaworld/real-provider';
 import { GtaWorldApiUser } from '@/lib/integrations/gtaworld/types';
 
@@ -30,7 +28,7 @@ describe('SANBOARD dynamic identity foundation', () => {
   beforeEach(() => {
     process.env.DATA_STORE = 'memory';
     process.env.SANBOARD_SESSION_SECRET = 'dynamic-identity-test-secret-at-least-32-characters';
-    delete process.env.USE_MOCK_GTAWORLD_AUTH;
+    delete process.env.ENABLE_TEST_LOGIN;
     db.users = [];
     db.profiles = [];
     db.auditLogs = [];
@@ -179,39 +177,6 @@ describe('SANBOARD dynamic identity foundation', () => {
     assert.equal(response.cookies.get(CHARACTER_SELECTION_COOKIE)?.value, '');
   });
 
-  test('explicit mock callback uses the same selection context and canonical picker state machine', async () => {
-    process.env.USE_MOCK_GTAWORLD_AUTH = 'true';
-    const callbackResponse = await oauthCallback(new NextRequest(
-      'http://localhost/api/auth/gtaworld/callback?code=mock_authorization_code&redirect=%2F'
-    ));
-    assert.equal(callbackResponse.status, 307);
-    assert.match(callbackResponse.headers.get('location') || '', /\/karakter-sec\?redirect=%2F$/);
-    assert.equal(callbackResponse.cookies.get('sanboard_session')?.value, '');
-
-    const selectionToken = callbackResponse.cookies.get(CHARACTER_SELECTION_COOKIE)?.value;
-    assert.ok(selectionToken);
-    const listResponse = await getCharacters(new NextRequest('http://localhost/api/user/characters', {
-      headers: { cookie: `${CHARACTER_SELECTION_COOKIE}=${selectionToken}` },
-    }));
-    const listBody = await listResponse.json();
-    assert.equal(listResponse.status, 200);
-    assert.equal(listBody.isMock, true);
-    assert.equal(listBody.characters.length, 3);
-    assert.ok(listBody.characters.every((character: any) => character.id !== character.externalCharacterId));
-
-    const selected = listBody.characters[1];
-    const selectResponse = await switchCharacter(new NextRequest('http://localhost/api/auth/session', {
-      method: 'POST',
-      headers: {
-        cookie: `${CHARACTER_SELECTION_COOKIE}=${selectionToken}`,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ characterId: selected.id }),
-    }));
-    assert.equal(selectResponse.status, 200);
-    assert.equal(verifySessionToken(selectResponse.cookies.get('sanboard_session')!.value)?.profileId, selected.id);
-  });
-
   test('direct character selection without full session or selection context is denied', async () => {
     const result = await syncGtaWorldAccountAndCharacters(account([['char-B', 'Beta', 'Two']]));
     const response = await switchCharacter(new NextRequest('http://localhost/api/auth/session', {
@@ -298,12 +263,8 @@ describe('SANBOARD dynamic identity foundation', () => {
     assert.equal(response.cookies.get('sanboard_session'), undefined);
   });
 
-  test('mock mode is explicit and missing env defaults to real provider', () => {
-    assert.equal(isMockGtaWorldAuthEnabled(), false);
+  test('production provider selector always returns real provider', () => {
     assert.ok(getGtaWorldAuthProvider() instanceof RealGtaWorldAuthProvider);
-    process.env.USE_MOCK_GTAWORLD_AUTH = 'true';
-    assert.equal(isMockGtaWorldAuthEnabled(), true);
-    assert.ok(getGtaWorldAuthProvider() instanceof MockGtaWorldAuthProvider);
   });
 
   test('production-facing identity modules contain no named fixture authorization', () => {

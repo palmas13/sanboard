@@ -26,7 +26,7 @@ import { resolveAvatarUrl } from '@/lib/media/url';
 
 export function Navbar() {
   const pathname = usePathname();
-  const { currentProfile, isAuthenticated, isLoading, isAdmin, logout } = useAuth();
+  const { currentProfile, isAuthenticated, isLoading, isAdmin, isTestIdentity, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [navbarImgError, setNavbarImgError] = useState(false);
@@ -129,6 +129,7 @@ export function Navbar() {
                   <span className="hidden sm:inline text-xs font-semibold text-[var(--text-main)] max-w-[110px] truncate">
                     {currentProfile.full_name}
                   </span>
+                  {isTestIdentity && <span title="Bu bir Sanboard test karakteridir." className="rounded border border-amber-500/30 bg-amber-500/10 px-1 py-0.5 text-[9px] font-extrabold text-amber-500">TEST</span>}
                   <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                 </button>
 
@@ -136,6 +137,7 @@ export function Navbar() {
                 <div className="absolute right-0 mt-2 w-56 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface)] shadow-2xl py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                   <div className="px-4 py-2.5 border-b border-[var(--border-app)]">
                     <p className="text-xs text-[var(--text-muted)]">Oturum açıldı</p>
+                    {isTestIdentity && <p className="mt-1 text-[10px] font-semibold text-amber-500">Bu bir Sanboard test karakteridir.</p>}
                     <p className="text-sm font-bold text-[var(--text-main)] truncate">
                       {currentProfile.full_name}
                     </p>

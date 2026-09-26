@@ -11,6 +11,7 @@ function KarakterSecContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/';
+  const isTestSource = searchParams.get('source') === 'test';
   const { characters, characterProfiles, selectCharacter, currentProfile, refreshCharacters } = useAuth();
   const [switchingId, setSwitchingId] = React.useState<string | null>(null);
   const [imgErrors, setImgErrors] = React.useState<Record<string, boolean>>({});
@@ -59,6 +60,12 @@ function KarakterSecContent() {
             Sanboard'u kullanmak istediğin karakteri seç.
           </p>
         </div>
+
+        {isTestSource && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs leading-relaxed text-[var(--text-muted)]">
+            <strong className="text-amber-500">TEST:</strong> Bu karakterler gerçek GTA World hesabı veya UCP karakteri değildir.
+          </div>
+        )}
 
         {selectionError && (
           <div role="alert" className="rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger-subtle)] px-4 py-3 text-sm text-[var(--color-danger)]">
@@ -168,7 +175,7 @@ function KarakterSecContent() {
         )}
 
         <p className="text-center text-xs text-[var(--text-dim)] pt-2 border-t border-[var(--border-app)]">
-          Bir GTA World hesabı birden fazla karaktere sahip olabilir. Her karakterin Sanboard profili bağımsızdır.
+          {isTestSource ? 'Her test karakterinin Sanboard profili ve karakter kapsamlı verileri bağımsızdır.' : 'Bir GTA World hesabı birden fazla karaktere sahip olabilir. Her karakterin Sanboard profili bağımsızdır.'}
         </p>
       </div>
     </div>

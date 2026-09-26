@@ -3,10 +3,10 @@ import { getCharacterSelectionContext, getServerSession } from '@/lib/auth/sessi
 import { getSupabaseAdminClient } from '@/lib/db/supabase-client';
 import { db } from '@/lib/db/store';
 import { GtaWorldCharacter } from '@/lib/integrations/gtaworld/types';
-import { isMockGtaWorldAuthEnabled } from '@/lib/integrations/gtaworld';
+import { isTestExternalAccountId, isTestLoginEnabled } from '@/lib/auth/test-login';
+import { getUserRepository } from '@/lib/db/repositories';
 
 export async function GET(req: NextRequest) {
-  const isMock = isMockGtaWorldAuthEnabled();
   const session = await getServerSession(req);
   const selectionContext = session ? null : getCharacterSelectionContext(req);
   const userId = session?.userId || selectionContext?.userId || null;
@@ -16,6 +16,12 @@ export async function GET(req: NextRequest) {
       { error: 'Karakterleri listelemek için oturum açmalısınız.', characters: [] },
       { status: 401 }
     );
+  }
+
+  const user = await getUserRepository().getUserById(userId);
+  const isTestIdentity = isTestExternalAccountId(user?.external_user_id);
+  if (isTestIdentity && !isTestLoginEnabled()) {
+    return NextResponse.json({ error: 'Test login devre dışı.', characters: [] }, { status: 404 });
   }
 
   // 1. Fetch real / synchronized character profiles from DB for this account
@@ -58,6 +64,6 @@ export async function GET(req: NextRequest) {
     success: true,
     characters,
     profiles: dbProfiles,
-    isMock,
+    isTestIdentity,
   });
 }
