@@ -15,6 +15,7 @@ import { extractMediaKey } from '../media/url';
 import { resolveUserId } from './id-mapper';
 import { isListingOwnedByActiveProfile } from '../dealers/eligibility';
 import { getEffectiveListingStatus, isPublicListingVisible } from '../listings/visibility';
+import { getListingCoverPath, sortListingImages } from '../listings/images';
 
 export interface ListingFilterParams {
   category?: ListingCategory;
@@ -48,7 +49,7 @@ export interface ListingFilterParams {
  * Returns only public-safe fields.
  */
 export function sanitizeListingForPublic(listing: Listing): PublicListingSummary {
-  const coverImg = listing.images?.find((i) => i.is_cover)?.storage_path || listing.images?.[0]?.storage_path;
+  const coverImg = getListingCoverPath(listing.images);
   const favCount = db.favorites.filter((f) => f.listing_id === listing.id).length;
   const now = new Date();
   const isFeatured = Boolean(
@@ -460,6 +461,7 @@ export async function getListingById(
 
   const memberListing: MemberListingDetail = {
     ...listing,
+    images: sortListingImages(listing.images),
     seller,
     dealer,
     favorite_count: favoriteCount,

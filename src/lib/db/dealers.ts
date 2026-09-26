@@ -372,6 +372,44 @@ export async function toggleFollow(
   return { isFollowing, count, followerCount: count };
 }
 
+export async function setFollow(
+  followerProfileId: string,
+  corporateProfileId: string,
+  shouldFollow: boolean
+): Promise<{ isFollowing: boolean; count: number; followerCount?: number }> {
+  if (process.env.DATA_STORE === 'supabase') {
+    const repo = getDealerRepository();
+    if (typeof repo.setFollow === 'function') {
+      return repo.setFollow(followerProfileId, corporateProfileId, shouldFollow);
+    }
+  }
+
+  ensureDealers();
+  const dealer = db.dealers.find((item) => item.id === corporateProfileId);
+  if (!dealer) throw new Error('Kurumsal mağaza bulunamadı.');
+  if (dealer.owner_profile_id === followerProfileId || dealer.profile_id === followerProfileId) {
+    throw new Error('Kendi mağazanızı takip edemezsiniz.');
+  }
+
+  const existingIndex = db.followers.findIndex(
+    (follow) => follow.follower_profile_id === followerProfileId && follow.corporate_profile_id === corporateProfileId
+  );
+
+  if (shouldFollow && existingIndex < 0) {
+    db.followers.push({
+      id: `flw-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      follower_profile_id: followerProfileId,
+      corporate_profile_id: corporateProfileId,
+      created_at: new Date().toISOString(),
+    });
+  } else if (!shouldFollow && existingIndex >= 0) {
+    db.followers.splice(existingIndex, 1);
+  }
+
+  const count = db.followers.filter((follow) => follow.corporate_profile_id === corporateProfileId).length;
+  return { isFollowing: shouldFollow, count, followerCount: count };
+}
+
 export async function getFollowers(corporateProfileId: string): Promise<CharacterProfile[]> {
   if (process.env.DATA_STORE === 'supabase') {
     const repo = getDealerRepository();

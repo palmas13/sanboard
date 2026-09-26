@@ -6,6 +6,7 @@ import { uploadListingImage } from '@/lib/storage';
 import { deleteMediaSafely } from '@/lib/storage/lifecycle';
 import { resolveUserId, resolveProfileId, isUuid } from '../../id-mapper';
 import { getEffectiveListingStatus } from '@/lib/listings/visibility';
+import { getListingCoverPath, sortListingImages } from '@/lib/listings/images';
 
 export function isPublicCorporateListingVisible(item: any): boolean {
   if (item.seller_type !== 'CORPORATE') return true;
@@ -249,7 +250,7 @@ export class SupabaseListingRepository implements IListingRepository {
 
     const nowTime = Date.now();
     const listings = filteredRows.map((item: any) => {
-      const cover = item.listing_images?.find((img: any) => img.is_cover)?.storage_path || item.listing_images?.[0]?.storage_path;
+      const cover = getListingCoverPath(item.listing_images);
       const prevPrice = priceHistoryMap[item.id];
       const isFeatured = Boolean(
         item.is_featured &&
@@ -493,7 +494,7 @@ export class SupabaseListingRepository implements IListingRepository {
 
     const nowTime = Date.now();
     return selected.map(({ cand }) => {
-      const cover = cand.listing_images?.find((img: any) => img.is_cover)?.storage_path || cand.listing_images?.[0]?.storage_path;
+      const cover = getListingCoverPath(cand.listing_images);
       const candVeh = Array.isArray(cand.vehicle_details) ? cand.vehicle_details[0] : cand.vehicle_details;
       const isFeatured = Boolean(
         cand.is_featured &&
@@ -601,7 +602,7 @@ export class SupabaseListingRepository implements IListingRepository {
 
     // If unauthenticated viewer, return sanitized public summary
     if (!viewerProfileId && !viewerUserId) {
-      const cover = listing.listing_images?.find((i: any) => i.is_cover)?.storage_path || listing.listing_images?.[0]?.storage_path;
+      const cover = getListingCoverPath(listing.listing_images);
       return {
         listing: {
           id: listing.id,
@@ -634,7 +635,7 @@ export class SupabaseListingRepository implements IListingRepository {
           : undefined,
         location: listing.category === 'vehicle' ? null : listing.location,
         previous_price: previousPrice,
-        images: listing.listing_images || [],
+        images: sortListingImages(listing.listing_images),
         favorite_count: favoriteCount,
         is_favorited: isFavorited,
       },

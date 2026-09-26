@@ -21,6 +21,7 @@ import { CompareButton } from '@/components/compare/CompareButton';
 import { SimilarListings } from '@/components/listings/SimilarListings';
 import { getOptionalSimilarListings } from '@/lib/db/optional-listing-data';
 import { MemberListingDetail } from '@/types';
+import { sortListingImages } from '@/lib/listings/images';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -99,6 +100,22 @@ export default async function ListingDetailPage({ params }: PageProps) {
   }
 
   const isVehicle = listing.category === 'vehicle';
+  const publicCoverImage = 'cover_image' in listing ? listing.cover_image : undefined;
+  const galleryImages = sortListingImages(
+    'images' in listing && listing.images
+      ? listing.images
+      : publicCoverImage
+        ? [{
+            id: `cover-${listing.id}`,
+            listing_id: listing.id,
+            storage_path: publicCoverImage,
+            sort_order: 0,
+            is_cover: true,
+            size_bytes: 0,
+            created_at: listing.published_at || '',
+          }]
+        : []
+  );
   const categoryLink = isVehicle ? '/arac' : '/mulk';
   const categoryName = isVehicle ? 'Araç' : 'Mülk';
 
@@ -191,7 +208,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
         {/* LEFT COLUMN: Gallery & Favori/Açıklama Kartı */}
         <div className="space-y-4">
           <ListingGallery
-            images={(listing as MemberListingDetail).images || []}
+            images={galleryImages}
             title={listing.title}
             isLocked={isLocked}
           />

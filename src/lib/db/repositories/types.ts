@@ -135,6 +135,7 @@ export interface IDealerRepository {
   activateSubscription?(dealerId: string): Promise<{ success: boolean; dealer?: CorporateProfile; error?: string }>;
   boostListing?(dealerId: string, listingId: string): Promise<{ success: boolean; error?: string; remainingBoosts?: number; featured_until?: string }>;
   toggleFollow?(followerProfileId: string, corporateProfileId: string): Promise<{ isFollowing: boolean; count: number; followerCount?: number }>;
+  setFollow?(followerProfileId: string, corporateProfileId: string, shouldFollow: boolean): Promise<{ isFollowing: boolean; count: number; followerCount?: number }>;
   getFollowers?(corporateProfileId: string): Promise<CharacterProfile[]>;
   isFollowing?(followerProfileId: string, corporateProfileId: string): Promise<boolean>;
   updateDealerProfile(id: string, data: Partial<CorporateProfile>): Promise<{ success: boolean; dealer?: CorporateProfile; error?: string }>;

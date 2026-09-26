@@ -14,8 +14,8 @@ export async function POST(
       return NextResponse.json({ error: 'Yetkisiz erişim. Lütfen giriş yapın.' }, { status: 401 });
     }
 
-    const { profileId } = await req.json().catch(() => ({}));
-    const activeProfileId = profileId || session.profileId;
+    const { isFollowing } = await req.json().catch(() => ({}));
+    const activeProfileId = session.profileId;
 
     if (!activeProfileId) {
       return NextResponse.json({ error: 'Takip işlemi için aktif bir karakter profili seçilmelidir.' }, { status: 400 });
@@ -31,11 +31,15 @@ export async function POST(
     }
 
     const dealerRepo = getDealerRepository();
-    if (typeof dealerRepo.toggleFollow !== 'function') {
+    if (typeof isFollowing !== 'boolean') {
+      return NextResponse.json({ error: 'Takip durumu belirtilmelidir.' }, { status: 400 });
+    }
+
+    if (typeof dealerRepo.setFollow !== 'function') {
       return NextResponse.json({ error: 'Takipçi servisi kullanılamıyor.' }, { status: 500 });
     }
 
-    const result = await dealerRepo.toggleFollow(activeProfileId, dealerId);
+    const result = await dealerRepo.setFollow(activeProfileId, dealerId, isFollowing);
     return NextResponse.json({
       success: true,
       isFollowing: result.isFollowing,
@@ -53,7 +57,7 @@ export async function GET(
   try {
     const { id: dealerId } = await params;
     const session = await getServerSession(req);
-    const profileId = req.nextUrl.searchParams.get('profileId') || session?.profileId;
+    const profileId = session?.profileId;
 
     const dealerRepo = getDealerRepository();
     let isFollowing = false;

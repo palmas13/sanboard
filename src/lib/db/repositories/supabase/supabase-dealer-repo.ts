@@ -557,6 +557,84 @@ export class SupabaseDealerRepository implements IDealerRepository {
     return { isFollowing, count: count || 0, followerCount: count || 0 };
   }
 
+  async setFollow(
+    followerProfileId: string,
+    corporateProfileId: string,
+    shouldFollow: boolean
+  ): Promise<{ isFollowing: boolean; count: number; followerCount?: number }> {
+    const client = this.getAdminClient();
+    const { data: dealer, error: dealerError } = await client
+      .from('corporate_profiles')
+      .select('owner_profile_id')
+      .eq('id', corporateProfileId)
+      .maybeSingle();
+
+    if (dealerError) throw new Error(dealerError.message);
+    if (!dealer) throw new Error('Kurumsal mağaza bulunamadı.');
+    if (dealer.owner_profile_id === followerProfileId) {
+      throw new Error('Kendi mağazanızı takip edemezsiniz.');
+    }
+
+    let createdFollow = false;
+    if (shouldFollow) {
+      const { data: existing, error: existingError } = await client
+        .from('corporate_followers')
+        .select('id')
+        .eq('follower_profile_id', followerProfileId)
+        .eq('corporate_profile_id', corporateProfileId)
+        .maybeSingle();
+      if (existingError) throw new Error(existingError.message);
+
+      const { error } = await client.from('corporate_followers').upsert(
+        { follower_profile_id: followerProfileId, corporate_profile_id: corporateProfileId },
+        { onConflict: 'follower_profile_id,corporate_profile_id', ignoreDuplicates: true }
+      );
+      if (error) throw new Error(error.message);
+      createdFollow = !existing;
+    } else {
+      const { error } = await client
+        .from('corporate_followers')
+        .delete()
+        .eq('follower_profile_id', followerProfileId)
+        .eq('corporate_profile_id', corporateProfileId);
+      if (error) throw new Error(error.message);
+    }
+
+    if (createdFollow && dealer.owner_profile_id) {
+      const { data: follower } = await client
+        .from('character_profiles')
+        .select('full_name')
+        .eq('id', followerProfileId)
+        .maybeSingle();
+      const { getNotificationRepository } = await import('../index');
+      await getNotificationRepository().createNotification({
+        recipient_profile_id: dealer.owner_profile_id,
+        type: 'NEW_FOLLOWER',
+        title: 'Yeni Takipçi',
+        message: `${follower?.full_name || 'Bir kullanıcı'} mağazanızı takip etmeye başladı.`,
+        entity_type: 'application',
+        entity_id: corporateProfileId,
+      });
+    }
+
+    const [{ data: relation, error: relationError }, { count, error: countError }] = await Promise.all([
+      client
+        .from('corporate_followers')
+        .select('id')
+        .eq('follower_profile_id', followerProfileId)
+        .eq('corporate_profile_id', corporateProfileId)
+        .maybeSingle(),
+      client
+        .from('corporate_followers')
+        .select('*', { count: 'exact', head: true })
+        .eq('corporate_profile_id', corporateProfileId),
+    ]);
+
+    if (relationError) throw new Error(relationError.message);
+    if (countError) throw new Error(countError.message);
+    return { isFollowing: Boolean(relation), count: count || 0, followerCount: count || 0 };
+  }
+
   async getFollowers(corporateProfileId: string): Promise<CharacterProfile[]> {
     const client = this.getAdminClient();
     const { data, error } = await client

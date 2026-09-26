@@ -60,7 +60,7 @@ export function CorporateStoreFollow({
 
     async function checkStatus() {
       try {
-        const res = await fetch(`/api/dealers/${dealerId}/follow?profileId=${currentProfile?.id}`);
+        const res = await fetch(`/api/dealers/${dealerId}/follow`, { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
           if (!isCancelled) {
@@ -87,19 +87,20 @@ export function CorporateStoreFollow({
       return;
     }
 
+    if (actionLoading) return;
+    const desiredIsFollowing = followState !== 'following';
     setActionLoading(true);
     try {
       const res = await fetch(`/api/dealers/${dealerId}/follow`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ followerProfileId: currentProfile.id }),
+        body: JSON.stringify({ isFollowing: desiredIsFollowing }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setFollowState(data.isFollowing ? 'following' : 'not_following');
-        setFollowerCount(data.followerCount ?? data.count ?? 0);
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Takip işlemi gerçekleştirilemedi.');
+      setFollowState(data.isFollowing ? 'following' : 'not_following');
+      setFollowerCount(data.followerCount ?? data.count ?? followerCount);
     } catch {
       // Ignore
     } finally {

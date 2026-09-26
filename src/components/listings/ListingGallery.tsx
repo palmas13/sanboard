@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { ListingImage } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { Eye, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { sortListingImages } from '@/lib/listings/images';
 
 interface ListingGalleryProps {
   images: ListingImage[];
@@ -15,20 +16,15 @@ export function ListingGallery({ images, title, isLocked = false }: ListingGalle
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
-  const fallbackImage =
-    'https://images.unsplash.com/photo-1617788138017-80ad40651399?w=900&auto=format&fit=crop&q=80';
+  const validImages = sortListingImages(images);
 
-  const validImages = images.length > 0 ? images : [
-    {
-      id: 'fallback-1',
-      listing_id: '',
-      storage_path: fallbackImage,
-      sort_order: 0,
-      is_cover: true,
-      size_bytes: 800000,
-      created_at: '',
-    },
-  ];
+  if (validImages.length === 0) {
+    return (
+      <div className="relative aspect-[16/10] w-full rounded-2xl overflow-hidden border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] flex items-center justify-center">
+        <span className="text-sm font-semibold text-[var(--text-muted)]">Fotoğraf bulunamadı</span>
+      </div>
+    );
+  }
 
   // If locked, only allow viewing the cover photo
   const visibleImages = isLocked ? [validImages[0]] : validImages;

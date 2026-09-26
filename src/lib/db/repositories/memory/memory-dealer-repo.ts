@@ -11,6 +11,7 @@ import {
   activateSubscription,
   boostListing,
   toggleFollow,
+  setFollow,
   getFollowers,
   isFollowing,
   updateDealerProfile,
@@ -75,6 +76,10 @@ export class MemoryDealerRepository implements IDealerRepository {
     corporateProfileId: string
   ): Promise<{ isFollowing: boolean; count: number; followerCount?: number }> {
     return toggleFollow(followerProfileId, corporateProfileId);
+  }
+
+  async setFollow(followerProfileId: string, corporateProfileId: string, shouldFollow: boolean) {
+    return setFollow(followerProfileId, corporateProfileId, shouldFollow);
   }
 
   async getFollowers(corporateProfileId: string): Promise<CharacterProfile[]> {
