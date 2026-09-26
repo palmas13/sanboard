@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/auth/session';
-import { getDealerRepository, getUserRepository } from '@/lib/db/repositories';
+import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
+import { getDealerRepository } from '@/lib/db/repositories';
 
 export async function POST(
   req: NextRequest,
@@ -8,26 +9,10 @@ export async function POST(
 ) {
   try {
     const { id: dealerId } = await params;
-    const session = await getServerSession(req);
-
-    if (!session?.userId) {
-      return NextResponse.json({ error: 'Yetkisiz erişim. Lütfen giriş yapın.' }, { status: 401 });
-    }
-
     const { isFollowing } = await req.json().catch(() => ({}));
-    const activeProfileId = session.profileId;
-
-    if (!activeProfileId) {
-      return NextResponse.json({ error: 'Takip işlemi için aktif bir karakter profili seçilmelidir.' }, { status: 400 });
-    }
-
-    // Verify profile belongs to authenticated user
-    const userRepo = getUserRepository();
-    const userProfiles = await userRepo.getProfilesByUserId(session.userId);
-    const hasProfile = userProfiles.some((p) => p.id === activeProfileId);
-
-    if (!hasProfile && session.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Bu karakter profili adına işlem yapamazsınız.' }, { status: 403 });
+    const activeProfile = await resolveOwnedActiveProfile(req);
+    if (!activeProfile.ok) {
+      return NextResponse.json({ error: activeProfile.error }, { status: activeProfile.status });
     }
 
     const dealerRepo = getDealerRepository();
@@ -39,7 +24,7 @@ export async function POST(
       return NextResponse.json({ error: 'Takipçi servisi kullanılamıyor.' }, { status: 500 });
     }
 
-    const result = await dealerRepo.setFollow(activeProfileId, dealerId, isFollowing);
+    const result = await dealerRepo.setFollow(activeProfile.profileId, dealerId, isFollowing);
     return NextResponse.json({
       success: true,
       isFollowing: result.isFollowing,
@@ -57,7 +42,8 @@ export async function GET(
   try {
     const { id: dealerId } = await params;
     const session = await getServerSession(req);
-    const profileId = session?.profileId;
+    const resolvedProfile = session?.profileId ? await resolveOwnedActiveProfile(req) : null;
+    const profileId = resolvedProfile?.ok ? resolvedProfile.profileId : undefined;
 
     const dealerRepo = getDealerRepository();
     let isFollowing = false;

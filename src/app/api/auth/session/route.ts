@@ -3,6 +3,7 @@ import { createSessionToken, setSessionCookieOnResponse, clearSessionCookieOnRes
 import { db } from '@/lib/db/store';
 import { getSupabaseAdminClient } from '@/lib/db/supabase-client';
 import { recordAuditEvent } from '@/lib/audit';
+import { isUuid } from '@/lib/db/id-mapper';
 
 // Known staging/mock character to user account mapping for mock/staging development
 // In mock mode, Mavis and Zade are characters of the SAME UCP account
@@ -70,11 +71,10 @@ export async function POST(req: NextRequest) {
       try {
         const client = getSupabaseAdminClient();
         if (client) {
-          const { data } = await client
-            .from('character_profiles')
-            .select('id, user_id, full_name, role')
-            .or(`id.eq.${characterId},external_character_id.eq.${characterId}`)
-            .maybeSingle();
+          const query = client.from('character_profiles').select('id, user_id, full_name, role');
+          const { data } = isUuid(characterId)
+            ? await query.eq('id', characterId).maybeSingle()
+            : await query.eq('external_character_id', String(characterId)).maybeSingle();
 
           if (data) {
             profile = data as any;
@@ -108,6 +108,10 @@ export async function POST(req: NextRequest) {
       characterId === 'char-zade-02' ||
       characterId === 'char-ravi-03'
     );
+
+    if (!profile && process.env.DATA_STORE === 'supabase' && !isMockCharacter) {
+      return NextResponse.json({ error: 'Karakter profili bulunamadı.' }, { status: 404 });
+    }
 
     // 2. Strict Character Ownership Verification:
     // If an authenticated session already exists, the selected character MUST belong to this user!

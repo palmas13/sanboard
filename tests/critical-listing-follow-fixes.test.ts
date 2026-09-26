@@ -15,11 +15,12 @@ describe('Critical listing image and corporate follow regressions', () => {
   const raviId = 'follow-ravi';
   const outsiderId = 'follow-outsider';
   const storeId = 'follow-store';
+  const externalMavisId = '77701';
 
   beforeEach(() => {
     process.env.DATA_STORE = 'memory';
     db.profiles = [
-      { id: mavisId, user_id: accountId, full_name: 'Mavis Pierce', avatar_url: '', sanmail_email: 'mavis@sanmail.com', phone: '1', created_at: '', updated_at: '' },
+      { id: mavisId, user_id: accountId, external_character_id: externalMavisId, full_name: 'Mavis Pierce', avatar_url: '', sanmail_email: 'mavis@sanmail.com', phone: '1', created_at: '', updated_at: '' },
       { id: raviId, user_id: accountId, full_name: 'Ravi Blumon', avatar_url: '', sanmail_email: 'ravi@sanmail.com', phone: '2', created_at: '', updated_at: '' },
       { id: outsiderId, user_id: 'other-account', full_name: 'Other', avatar_url: '', sanmail_email: 'other@sanmail.com', phone: '3', created_at: '', updated_at: '' },
     ];
@@ -69,5 +70,16 @@ describe('Critical listing image and corporate follow regressions', () => {
     const removed = await (await setFollow(request(mavisId, 'POST', { isFollowing: false }), params)).json();
     assert.equal(removed.isFollowing, false);
     assert.equal(removed.followerCount, 0);
+  });
+
+  test('follow canonicalizes an external character session ID before mutation', async () => {
+    const params = { params: Promise.resolve({ id: storeId }) };
+    const response = await setFollow(request(externalMavisId, 'POST', { isFollowing: true }), params);
+    const data = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(data.isFollowing, true);
+    assert.equal(data.followerCount, 1);
+    assert.equal(db.followers[0].follower_profile_id, mavisId);
   });
 });

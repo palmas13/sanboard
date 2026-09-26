@@ -38,13 +38,12 @@ export class SupabaseUserRepository implements IUserRepository {
   async getProfileById(id: string): Promise<CharacterProfile | null> {
     const client = this.getAdminClient();
     const safeId = resolveProfileId(id);
-    if (!isUuid(safeId)) return null;
+    if (!safeId) return null;
 
-    const { data, error } = await client
-      .from('character_profiles')
-      .select('*')
-      .or(`id.eq.${safeId},external_character_id.eq.${safeId}`)
-      .maybeSingle();
+    const query = client.from('character_profiles').select('*');
+    const { data, error } = isUuid(safeId)
+      ? await query.eq('id', safeId).maybeSingle()
+      : await query.eq('external_character_id', safeId).maybeSingle();
 
     if (error) {
       throw new Error(`Supabase error fetching character profile: ${error.message}`);

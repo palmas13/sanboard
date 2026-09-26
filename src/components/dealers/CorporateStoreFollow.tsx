@@ -40,6 +40,7 @@ export function CorporateStoreFollow({
   const [modalOpen, setModalOpen] = useState(false);
   const [followers, setFollowers] = useState<FollowerItem[]>([]);
   const [loadingFollowers, setLoadingFollowers] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Check follow status on mount & character switch (Sections 15-17)
   useEffect(() => {
@@ -89,6 +90,7 @@ export function CorporateStoreFollow({
 
     if (actionLoading) return;
     const desiredIsFollowing = followState !== 'following';
+    setErrorMessage('');
     setActionLoading(true);
     try {
       const res = await fetch(`/api/dealers/${dealerId}/follow`, {
@@ -101,8 +103,8 @@ export function CorporateStoreFollow({
       if (!res.ok) throw new Error(data.error || 'Takip işlemi gerçekleştirilemedi.');
       setFollowState(data.isFollowing ? 'following' : 'not_following');
       setFollowerCount(data.followerCount ?? data.count ?? followerCount);
-    } catch {
-      // Ignore
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Takip işlemi gerçekleştirilemedi.');
     } finally {
       setActionLoading(false);
     }
@@ -182,6 +184,11 @@ export function CorporateStoreFollow({
           </button>
         )}
       </div>
+      {errorMessage && (
+        <p role="alert" className="mt-2 text-xs font-semibold text-red-400">
+          {errorMessage}
+        </p>
+      )}
 
       {/* Followers List Modal */}
       {modalOpen && (

@@ -1,44 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getListingRepository } from '@/lib/db/repositories';
 import { getServerSession } from '@/lib/auth/session';
-import { resolveUserId } from '@/lib/db/id-mapper';
-
-async function getOwnedActiveProfileId(req: NextRequest): Promise<
-  | { profileId: string; error?: never }
-  | { profileId?: never; error: NextResponse }
-> {
-  const session = await getServerSession(req);
-  if (!session?.userId) {
-    return {
-      error: NextResponse.json(
-        { error: 'Yetkisiz erişim. Lütfen giriş yapın.' },
-        { status: 401 }
-      ),
-    };
-  }
-
-  if (!session.profileId) {
-    return {
-      error: NextResponse.json(
-        { error: 'Aktif bir karakter profili seçilmedi. Lütfen bir karakter seçin.' },
-        { status: 400 }
-      ),
-    };
-  }
-
-  const { getUserRepository } = await import('@/lib/db/repositories');
-  const profile = await getUserRepository().getProfileById(session.profileId);
-  if (!profile || resolveUserId(profile.user_id) !== resolveUserId(session.userId)) {
-    return {
-      error: NextResponse.json(
-        { error: 'Aktif karakter profili bu hesaba ait değil.' },
-        { status: 403 }
-      ),
-    };
-  }
-
-  return { profileId: profile.id };
-}
+import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 
 // Set favorite state deterministically (POST)
 export async function POST(req: NextRequest) {
@@ -48,8 +11,10 @@ export async function POST(req: NextRequest) {
     const desiredState = body.isFavorited;
 
     // Cryptographically verified session (rejects raw UUID spoofing)
-    const activeProfile = await getOwnedActiveProfileId(req);
-    if (activeProfile.error) return activeProfile.error;
+    const activeProfile = await resolveOwnedActiveProfile(req);
+    if (!activeProfile.ok) {
+      return NextResponse.json({ error: activeProfile.error }, { status: activeProfile.status });
+    }
 
     if (!listingId) {
       return NextResponse.json(
@@ -123,8 +88,10 @@ export async function DELETE(req: NextRequest) {
     const listingId = body.listingId || searchParams.get('listingId');
 
     // Cryptographically verified session
-    const activeProfile = await getOwnedActiveProfileId(req);
-    if (activeProfile.error) return activeProfile.error;
+    const activeProfile = await resolveOwnedActiveProfile(req);
+    if (!activeProfile.ok) {
+      return NextResponse.json({ error: activeProfile.error }, { status: activeProfile.status });
+    }
 
     if (!listingId) {
       return NextResponse.json(

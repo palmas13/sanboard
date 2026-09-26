@@ -126,6 +126,30 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
     assert.strictEqual(favRow.user_id, zadeUserId);
   });
 
+  test('TEST 3B: external character session ID resolves to canonical profile for favorite mutation', async () => {
+    const profile = db.profiles.find((item) => item.id === 'char-zade-02');
+    assert.ok(profile);
+    const previousExternalId = profile.external_character_id;
+    profile.external_character_id = '77702';
+
+    try {
+      const req = createAuthedRequest(
+        'http://localhost:3000/api/favorites',
+        'POST',
+        { userId: zadeUserId, role: 'USER', profileId: '77702' },
+        { listingId: testListingId, isFavorited: true }
+      );
+      const res = await toggleFavoritePost(req);
+      const data = await res.json();
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(data.isFavorited, true);
+      assert.ok(db.favorites.some((favorite) => favorite.profile_id === profile.id));
+    } finally {
+      profile.external_character_id = previousExternalId;
+    }
+  });
+
   test('TEST 4: Character switch isolates favorites (char-profile-b does not inherit char-profile-a favorites)', async () => {
     // Character A adds favorite
     db.favorites.push({
