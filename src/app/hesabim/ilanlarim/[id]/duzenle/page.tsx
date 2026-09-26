@@ -103,7 +103,7 @@ export default function IlanDuzenlePage({
       setLoading(true);
       setError('');
       try {
-        const res = await fetch(`/api/user/listings/${id}?profileId=${currentProfile?.id}`);
+        const res = await fetch(`/api/user/listings/${id}`);
         const data = await res.json();
 
         if (!res.ok) {

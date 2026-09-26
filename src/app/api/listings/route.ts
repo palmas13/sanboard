@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getListingRepository, getDealerRepository } from '@/lib/db/repositories';
 import { listingUnionSchema } from '@/lib/validations/listing';
-import { getServerSession } from '@/lib/auth/session';
+import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { revalidatePath } from 'next/cache';
 
 // Public listings search endpoint
@@ -43,18 +43,11 @@ export async function GET(req: NextRequest) {
 // Create new listing consuming 1 credit
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(req);
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
     const body = await req.json();
-    const { sellerProfileId, corporate, isCorporate, ...listingData } = body;
-
-    const trustedProfileId = session?.profileId || sellerProfileId;
-
-    if (!trustedProfileId) {
-      return NextResponse.json(
-        { error: 'Satıcı profili zorunludur. Lütfen oturum açın.' },
-        { status: 401 }
-      );
-    }
+    const { sellerProfileId: _sellerProfileId, profileId: _profileId, userId: _userId, corporate, isCorporate, ...listingData } = body;
+    const trustedProfileId = actor.profileId;
 
     // Corporate Seller Authorization Check (Section 6 & 7)
     const wantsCorporate = corporate === true || isCorporate === true || listingData.seller_type === 'CORPORATE';
@@ -152,16 +145,14 @@ export async function POST(req: NextRequest) {
 // Update existing listing (owner only)
 export async function PUT(req: NextRequest) {
   try {
-    const session = await getServerSession(req);
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
     const body = await req.json();
-    const { id, sellerProfileId, userId: explicitUserId, ...listingData } = body;
-    const userId = session?.userId || explicitUserId || req.cookies.get('sanboard_user_id')?.value;
-    const role = session?.role || req.cookies.get('sanboard_role')?.value;
-    const trustedProfileId = session?.profileId || sellerProfileId;
+    const { id, sellerProfileId: _sellerProfileId, profileId: _profileId, userId: _userId, ...listingData } = body;
 
-    if (!id || !trustedProfileId) {
+    if (!id) {
       return NextResponse.json(
-        { error: 'id ve sellerProfileId zorunludur.' },
+        { error: 'id zorunludur.' },
         { status: 400 }
       );
     }
@@ -173,7 +164,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const repo = getListingRepository();
-    const result = await repo.updateListing(id, parsed.data, trustedProfileId, userId, role);
+    const result = await repo.updateListing(id, parsed.data, actor.profileId, actor.userId, actor.role);
 
     if (!result.success) {
       const isForbidden = result.error?.includes('yetkiniz yok');

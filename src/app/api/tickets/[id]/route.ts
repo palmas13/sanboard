@@ -1,18 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTicketRepository } from '@/lib/db/repositories';
+import { getUserRepository } from '@/lib/db/repositories';
+import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(_req: NextRequest, { params }: RouteContext) {
+export async function GET(req: NextRequest, { params }: RouteContext) {
   try {
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
     const { id } = await params;
     const repo = getTicketRepository();
     const ticket = await repo.getTicketById(id);
 
     if (!ticket) {
       return NextResponse.json({ error: 'Talep bulunamadı.' }, { status: 404 });
+    }
+    if (ticket.profile_id !== actor.profileId) {
+      return NextResponse.json({ error: 'Bu destek talebine erişim yetkiniz yok.' }, { status: 403 });
     }
 
     return NextResponse.json(ticket);
@@ -25,9 +32,9 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 export async function POST(req: NextRequest, { params }: RouteContext) {
   try {
     const { id } = await params;
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
     const body = await req.json();
-    const senderRole = body.senderRole || body.sender_role || (req.cookies.get('sanboard_role')?.value === 'ADMIN' ? 'ADMIN' : 'USER');
-    const senderName = body.senderName || body.sender_name || 'Kullanıcı';
     const message = body.message;
 
     if (!message || !message.trim()) {
@@ -35,10 +42,19 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     }
 
     const repo = getTicketRepository();
+    const [ticket, profile] = await Promise.all([
+      repo.getTicketById(id),
+      getUserRepository().getProfileById(actor.profileId),
+    ]);
+    if (!ticket) return NextResponse.json({ error: 'Talep bulunamadı.' }, { status: 404 });
+    if (ticket.profile_id !== actor.profileId) {
+      return NextResponse.json({ error: 'Bu destek talebine yanıt verme yetkiniz yok.' }, { status: 403 });
+    }
+    if (!profile) return NextResponse.json({ error: 'Aktif karakter bulunamadı.' }, { status: 403 });
     const result = await repo.addTicketMessage({
       ticketId: id,
-      senderRole: senderRole as 'USER' | 'ADMIN',
-      senderName,
+      senderRole: 'USER',
+      senderName: profile.full_name,
       message: message.trim(),
     });
 
@@ -56,9 +72,17 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
   try {
     const { id } = await params;
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
     const { status } = await req.json();
 
     const repo = getTicketRepository();
+    const ticket = await repo.getTicketById(id);
+    if (!ticket) return NextResponse.json({ error: 'Talep bulunamadı.' }, { status: 404 });
+    if (ticket.profile_id !== actor.profileId) {
+      return NextResponse.json({ error: 'Bu destek talebini güncelleme yetkiniz yok.' }, { status: 403 });
+    }
+    if (status !== 'CLOSED') return NextResponse.json({ error: 'Geçersiz durum.' }, { status: 400 });
     const success = await repo.updateTicketStatus(id, status);
     return NextResponse.json({ success });
   } catch (error: any) {

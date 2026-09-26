@@ -3,26 +3,32 @@ import { getUserRepository } from '@/lib/db/repositories';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { getServerSession, createSessionToken, setSessionCookieOnResponse } from '@/lib/auth/session';
 import { recordAuditEvent } from '@/lib/audit';
+import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
+
+function toPrivateProfileDto(profile: Awaited<ReturnType<ReturnType<typeof getUserRepository>['getProfileById']>>) {
+  if (!profile) return null;
+  const avatarPath = profile.avatar_path || profile.avatar_url || '';
+  return {
+    id: profile.id,
+    full_name: profile.full_name,
+    avatar_path: avatarPath,
+    avatar_url: resolveMediaUrl(avatarPath),
+    sanmail_email: profile.sanmail_email,
+    phone: profile.phone,
+    role: profile.role || 'USER',
+    is_dealer: profile.is_dealer,
+    dealer_id: profile.dealer_id,
+    public_id: profile.public_id,
+  };
+}
 
 export async function GET(req: NextRequest) {
   try {
-    let profileId = req.nextUrl.searchParams.get('profileId');
-
-    // Fallback to authenticated server session or cookie if not passed as query param
-    if (!profileId) {
-      const session = await getServerSession(req);
-      profileId = session?.profileId || req.cookies.get('sanboard_profile_id')?.value || null;
-    }
-
-    if (!profileId) {
-      return NextResponse.json(
-        { error: 'profileId parametresi veya aktif oturum zorunludur.' },
-        { status: 400 }
-      );
-    }
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
 
     const repo = getUserRepository();
-    const profile = await repo.getProfileById(profileId);
+    const profile = await repo.getProfileById(actor.profileId);
 
     if (!profile) {
       return NextResponse.json(
@@ -31,16 +37,9 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const avatarPath = profile.avatar_path || profile.avatar_url || '';
-    const resolvedAvatarUrl = resolveMediaUrl(avatarPath);
-
     return NextResponse.json({
       success: true,
-      profile: {
-        ...profile,
-        avatar_path: avatarPath,
-        avatar_url: resolvedAvatarUrl,
-      },
+      profile: toPrivateProfileDto(profile),
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -160,27 +159,10 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const session = await getServerSession(req);
-    const userId = session?.userId || null;
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Profil güncellemek için oturum açmalısınız.' },
-        { status: 401 }
-      );
-    }
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
 
     const body = await req.json().catch(() => ({}));
-    // Derive target profile from server session; allow fallback to cookie/body only for ADMIN
-    const sessionProfileId = session?.profileId || req.cookies.get('sanboard_profile_id')?.value;
-    const targetProfileId = body.profileId || sessionProfileId;
-
-    if (!targetProfileId) {
-      return NextResponse.json(
-        { error: 'Güncellenecek profil belirlenemedi.' },
-        { status: 400 }
-      );
-    }
 
     // Avatar validation: Reject SVG
     const incomingAvatar = body.avatar_path || body.avatar_url;
@@ -194,8 +176,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const repo = getUserRepository();
-    // Verify ownership
-    const existing = await repo.getProfileById(targetProfileId);
+    const existing = await repo.getProfileById(actor.profileId);
     if (!existing) {
       return NextResponse.json(
         { error: 'Profil bulunamadı.' },
@@ -203,21 +184,14 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const isAdmin = session?.role === 'ADMIN';
-    if (!isAdmin && existing.user_id !== userId && existing.id !== sessionProfileId) {
-      return NextResponse.json(
-        { error: 'Bu profili düzenleme yetkiniz yok.' },
-        { status: 403 }
-      );
-    }
-
-    const result = await repo.updateProfile(targetProfileId, {
-      avatar_url: body.avatar_url,
-      avatar_path: body.avatar_path,
-      sanmail_email: body.sanmail_email,
-      phone: body.phone,
-      full_name: body.full_name,
-    });
+    const editableFields = {
+      ...(body.avatar_url !== undefined ? { avatar_url: body.avatar_url } : {}),
+      ...(body.avatar_path !== undefined ? { avatar_path: body.avatar_path } : {}),
+      ...(body.sanmail_email !== undefined ? { sanmail_email: body.sanmail_email } : {}),
+      ...(body.phone !== undefined ? { phone: body.phone } : {}),
+      ...(body.full_name !== undefined ? { full_name: body.full_name } : {}),
+    };
+    const result = await repo.updateProfile(actor.profileId, editableFields);
 
     if (!result.success || !result.profile) {
       return NextResponse.json(
@@ -226,17 +200,9 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const updated = result.profile;
-    const avatarPath = updated.avatar_path || updated.avatar_url || '';
-    const resolvedAvatarUrl = resolveMediaUrl(avatarPath);
-
     return NextResponse.json({
       success: true,
-      profile: {
-        ...updated,
-        avatar_path: avatarPath,
-        avatar_url: resolvedAvatarUrl,
-      },
+      profile: toPrivateProfileDto(result.profile),
     });
   } catch (error: any) {
     return NextResponse.json(

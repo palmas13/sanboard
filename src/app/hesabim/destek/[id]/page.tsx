@@ -62,8 +62,6 @@ export default function TicketDetailPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          senderRole: 'USER',
-          senderName: currentProfile.full_name,
           message: replyText.trim(),
         }),
       });

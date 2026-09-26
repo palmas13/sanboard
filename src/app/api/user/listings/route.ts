@@ -1,22 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getListingRepository } from '@/lib/db/repositories';
-import { getServerSession } from '@/lib/auth/session';
+import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { revalidatePath } from 'next/cache';
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(req);
-    const profileId = session?.profileId;
-
-    if (!profileId) {
-      return NextResponse.json(
-        { error: 'Doğrulanmış aktif karakter gereklidir.' },
-        { status: 401 }
-      );
-    }
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
 
     const repo = getListingRepository();
-    const listings = await repo.getUserListings(profileId);
+    const listings = await repo.getUserListings(actor.profileId);
     return NextResponse.json(listings);
   } catch (error: any) {
     return NextResponse.json(
@@ -29,11 +22,11 @@ export async function GET(req: NextRequest) {
 // Mark as sold
 export async function PATCH(req: NextRequest) {
   try {
-    const session = await getServerSession(req);
-    const profileId = session?.profileId;
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
     const { listingId, action = 'SOLD' } = await req.json();
 
-    if (!listingId || !profileId) {
+    if (!listingId) {
       return NextResponse.json(
         { error: 'Doğrulanmış aktif karakter ve listingId gereklidir.' },
         { status: 401 }
@@ -42,8 +35,8 @@ export async function PATCH(req: NextRequest) {
 
     const repo = getListingRepository();
     const result = action === 'REPUBLISH'
-      ? await repo.republishListing(listingId, profileId)
-      : await repo.markListingAsSold(listingId, profileId);
+      ? await repo.republishListing(listingId, actor.profileId)
+      : await repo.markListingAsSold(listingId, actor.profileId);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }

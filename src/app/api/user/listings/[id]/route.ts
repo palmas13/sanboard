@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getListingRepository } from '@/lib/db/repositories';
+import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
+import { revalidatePath } from 'next/cache';
 
 export async function GET(
   req: NextRequest,
@@ -7,17 +9,17 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { searchParams } = new URL(req.url);
-    const profileId = searchParams.get('profileId') || req.cookies.get('sanboard_profile_id')?.value;
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
 
     const repo = getListingRepository();
-    const { listing, isOwner } = await repo.getListingById(id, profileId);
+    const { listing, isOwner } = await repo.getListingById(id, actor.profileId, actor.userId);
 
     if (!listing) {
       return NextResponse.json({ error: 'İlan bulunamadı.' }, { status: 404 });
     }
 
-    if (!profileId || !isOwner) {
+    if (!isOwner || (listing as any).seller_profile_id !== actor.profileId) {
       return NextResponse.json(
         { error: 'Bu ilanı görüntüleme veya düzenleme yetkiniz yok.' },
         { status: 403 }
@@ -41,9 +43,6 @@ export async function GET(
   }
 }
 
-import { revalidatePath } from 'next/cache';
-import { getServerSession } from '@/lib/auth/session';
-
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -51,21 +50,12 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await req.json();
-    const session = await getServerSession(req);
-    const profileId = session?.profileId || body.profileId || body.sellerProfileId || body.characterId;
-    const userId = session?.userId || body.userId;
-    const role = session?.role;
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
     const { profileId: _, sellerProfileId: ____, characterId: __, userId: ___, ...input } = body;
 
-    if (!profileId && !userId) {
-      return NextResponse.json(
-        { error: 'Yetkisiz erişim. Lütfen giriş yapın.' },
-        { status: 401 }
-      );
-    }
-
     const repo = getListingRepository();
-    const result = await repo.updateListing(id, input, profileId, userId, role);
+    const result = await repo.updateListing(id, input, actor.profileId, actor.userId, actor.role);
 
     if (!result.success) {
       const isForbidden = result.error?.includes('yetkiniz yok');
@@ -98,15 +88,8 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const session = await getServerSession(req);
-    const profileId = session?.profileId;
-
-    if (!session?.userId || !profileId) {
-      return NextResponse.json(
-        { error: 'Yetkisiz erişim. Lütfen giriş yapın ve aktif karakter seçin.' },
-        { status: 401 }
-      );
-    }
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
 
     const repo = getListingRepository();
     if (!repo.removeListing) {
@@ -116,7 +99,7 @@ export async function DELETE(
       );
     }
 
-    const result = await repo.removeListing(id, profileId);
+    const result = await repo.removeListing(id, actor.profileId);
     if (!result.success) {
       const isForbidden = result.error?.includes('yetkiniz yok');
       return NextResponse.json({ error: result.error }, { status: isForbidden ? 403 : 400 });

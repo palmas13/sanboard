@@ -103,7 +103,7 @@ export default function YeniIlanOlusturPage() {
 
     if (corpParam) {
       // Authoritative corporate eligibility & dealer details check
-      fetch(`/api/dealers/eligibility?profileId=${currentProfile.id}`)
+      fetch('/api/dealers/eligibility')
         .then((res) => res.json())
         .then((eligData) => {
           if (!eligData.eligible || !eligData.dealer) {

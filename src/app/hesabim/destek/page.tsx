@@ -35,7 +35,7 @@ export default function HesabimDestekPage() {
     if (!currentProfile) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/tickets?profileId=${currentProfile.id}`);
+      const res = await fetch('/api/tickets');
       const data = await res.json();
       if (Array.isArray(data)) {
         setTickets(data);
@@ -68,8 +68,6 @@ export default function HesabimDestekPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          profileId: currentProfile.id,
-          creatorName: currentProfile.full_name,
           subject: subject.trim(),
           message: message.trim(),
         }),

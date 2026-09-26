@@ -34,7 +34,7 @@ function ProfilOlusturContent() {
     let active = true;
     async function checkExistingProfile() {
       try {
-        const res = await fetch(`/api/user/profile?profileId=${charId}`);
+        const res = await fetch('/api/user/profile');
         if (res.ok) {
           const data = await res.json();
           if (data?.success && data.profile && active) {

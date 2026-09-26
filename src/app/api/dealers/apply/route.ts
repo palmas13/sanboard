@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDealerRepository } from '@/lib/db/repositories';
 
-import { getServerSession } from '@/lib/auth/session';
+import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(req);
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
     const body = await req.json();
-    const profileId = session?.profileId || body.profileId || body.profile_id;
     const companyName = (body.companyName || body.company_name || '').trim();
     const purpose = (body.purpose || body.applicationPurpose || body.business_purpose || '').trim();
 
-    if (!profileId || !companyName || !purpose) {
+    if (!companyName || !purpose) {
       return NextResponse.json(
         { error: 'Şirket adı ve başvuru amacı alanları zorunludur.' },
         { status: 400 }
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
     const repo = getDealerRepository();
     const result = await repo.createApplication({
-      profileId,
+      profileId: actor.profileId,
       companyName,
       purpose,
     });
@@ -40,14 +40,12 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    const profileId = req.nextUrl.searchParams.get('profileId');
-    if (!profileId) {
-      return NextResponse.json({ success: true, application: null });
-    }
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
 
     const repo = getDealerRepository();
     if (typeof repo.getApplicationByProfileId === 'function') {
-      const app = await repo.getApplicationByProfileId(profileId);
+      const app = await repo.getApplicationByProfileId(actor.profileId);
       return NextResponse.json({ success: true, application: app });
     }
 

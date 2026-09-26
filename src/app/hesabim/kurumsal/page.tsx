@@ -90,7 +90,7 @@ export default function HesabimKurumsalPage() {
     setError('');
     try {
       // 1. Authoritative Server-Side Eligibility Verification (Section 7 & 8)
-      const eligRes = await fetch(`/api/dealers/eligibility?profileId=${currentProfile.id}`);
+      const eligRes = await fetch('/api/dealers/eligibility');
       const eligData = await eligRes.json();
       if (!eligRes.ok || !eligData.eligible) {
         setError(eligData.message || 'Kurumsal mağazanız ilan vermeye uygun değil.');
@@ -134,7 +134,7 @@ export default function HesabimKurumsalPage() {
       const promises: Promise<any>[] = [
         fetch(`/api/dealers/profile?profileId=${currentProfile.id}`),
         fetch(`/api/dealers/listings?profileId=${currentProfile.id}`),
-        fetch(`/api/dealers/apply?profileId=${currentProfile.id}`),
+        fetch('/api/dealers/apply'),
       ];
 
       const [dealerRes, listingsRes, applyRes] = await Promise.all(promises);
@@ -217,8 +217,6 @@ export default function HesabimKurumsalPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          profileId: currentProfile.id,
-          profile_id: currentProfile.id,
           companyName: companyName.trim(),
           company_name: companyName.trim(),
           purpose: purpose.trim(),

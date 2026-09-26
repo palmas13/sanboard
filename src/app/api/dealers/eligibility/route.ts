@@ -1,23 +1,13 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from '@/lib/auth/session';
+import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { resolveCorporateEligibility } from '@/lib/dealers/eligibility';
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(req);
-    const { searchParams } = new URL(req.url);
-    const queryProfileId = searchParams.get('profileId');
-    const cookieProfileId = req.cookies.get('sanboard_profile_id')?.value;
-    const activeProfileId = session?.profileId || queryProfileId || cookieProfileId;
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ eligible: false, reason: 'NO_STORE', error: actor.error }, { status: actor.status });
 
-    if (!activeProfileId) {
-      return NextResponse.json(
-        { eligible: false, reason: 'NO_STORE', message: 'Oturum açmış karakter bulunamadı.' },
-        { status: 401 }
-      );
-    }
-
-    const result = await resolveCorporateEligibility(activeProfileId);
+    const result = await resolveCorporateEligibility(actor.profileId);
     return NextResponse.json(result);
   } catch (error: any) {
     return NextResponse.json(

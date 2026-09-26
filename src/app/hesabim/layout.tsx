@@ -44,7 +44,7 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
     if (!currentProfile?.id) return;
     let isCancelled = false;
 
-    fetch(`/api/dealers/eligibility?profileId=${currentProfile.id}`)
+    fetch('/api/dealers/eligibility')
       .then((res) => res.json())
       .then((data) => {
         if (!isCancelled && data) {
