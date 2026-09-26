@@ -1,5 +1,5 @@
 import { FleecaPaymentProvider } from './provider';
-import { CreateCheckoutParams, FleecaOrder, FleecaPaymentResult } from './types';
+import { CreateCheckoutParams, FleecaOrder, VerifiedExternalPayment } from './types';
 
 /**
  * Real Fleeca Bank API payment provider placeholder.
@@ -18,7 +18,7 @@ export class RealFleecaPaymentProvider implements FleecaPaymentProvider {
     throw new Error('Real Fleeca Payment API is not configured yet.');
   }
 
-  async processPayment(_orderId: string, _simulateSuccess?: boolean): Promise<FleecaPaymentResult> {
+  async verifyPayment(_orderId: string, _simulateSuccess?: boolean): Promise<VerifiedExternalPayment> {
     throw new Error('Real Fleeca Payment API is not configured yet.');
   }
 }

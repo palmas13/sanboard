@@ -8,7 +8,11 @@ export * from './mock-provider';
 export * from './real-provider';
 
 export function getFleecaPaymentProvider(): FleecaPaymentProvider {
-  const useMock = process.env.USE_MOCK_FLEECA !== 'false';
+  const explicitMock = process.env.USE_MOCK_FLEECA === 'true';
+  const localDevelopmentMock = process.env.USE_MOCK_FLEECA === undefined
+    && process.env.DATA_STORE !== 'supabase'
+    && process.env.NODE_ENV !== 'production';
+  const useMock = explicitMock || localDevelopmentMock;
   if (useMock) {
     return new MockFleecaPaymentProvider();
   }

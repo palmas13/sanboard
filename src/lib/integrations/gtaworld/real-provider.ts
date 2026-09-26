@@ -3,7 +3,9 @@ import {
   GtaWorldAuthResult,
   GtaWorldCharacter,
   GtaWorldUserSession,
+  ExternalGameAccount,
   GtaWorldApiUserResponse,
+  adaptGtaWorldApiUser,
   OAuthStateSupportStatus,
 } from './types';
 
@@ -145,6 +147,7 @@ export class RealGtaWorldAuthProvider implements GtaWorldAuthProvider {
   /**
    * Fetches the authenticated user and character list from GTA World /api/user.
    */
+  /** @deprecated Raw transport helper; application code must use fetchAccount. */
   async fetchUser(accessToken: string): Promise<GtaWorldApiUserResponse> {
     if (!accessToken || typeof accessToken !== 'string') {
       throw new Error('Erişim belirteci (access_token) eksik.');
@@ -187,6 +190,11 @@ export class RealGtaWorldAuthProvider implements GtaWorldAuthProvider {
     }
 
     return data as GtaWorldApiUserResponse;
+  }
+
+  async fetchAccount(accessToken: string): Promise<ExternalGameAccount> {
+    const response = await this.fetchUser(accessToken);
+    return adaptGtaWorldApiUser(response.user);
   }
 
   async login(): Promise<GtaWorldAuthResult> {

@@ -3,6 +3,7 @@ import {
   GtaWorldAuthResult,
   GtaWorldCharacter,
   GtaWorldUserSession,
+  ExternalGameAccount,
   GtaWorldApiUserResponse,
   OAuthStateSupportStatus,
 } from './types';
@@ -72,39 +73,29 @@ export class MockGtaWorldAuthProvider implements GtaWorldAuthProvider {
     return 'mock_gtaworld_access_token_12345';
   }
 
+  /** @deprecated Raw fixture helper retained only for regression tests. */
   async fetchUser(_accessToken: string): Promise<GtaWorldApiUserResponse> {
     return {
       user: {
         id: 1,
         username: 'mavis_player',
-        confirmed: 1,
-        role: {
-          id: 585,
-          user_id: 1,
-          role_id: 'Manager',
-          server: 0,
-        },
         character: [
-          {
-            id: 425345,
-            memberid: 1,
-            firstname: 'Mavis',
-            lastname: 'Pierce',
-          },
-          {
-            id: 5442345,
-            memberid: 1,
-            firstname: 'Zade',
-            lastname: 'Vexnera',
-          },
-          {
-            id: 7891234,
-            memberid: 1,
-            firstname: 'Ravi',
-            lastname: 'Blumon',
-          },
+          { id: 425345, firstname: 'Mavis', lastname: 'Pierce' },
+          { id: 5442345, firstname: 'Zade', lastname: 'Vexnera' },
+          { id: 7891234, firstname: 'Ravi', lastname: 'Blumon' },
         ],
       },
+    };
+  }
+
+  async fetchAccount(_accessToken: string): Promise<ExternalGameAccount> {
+    return {
+      externalAccountId: 'gta-mock-user-1',
+      characters: MOCK_CHARACTERS.map((character) => ({
+        externalCharacterId: character.id,
+        displayName: character.fullName,
+        avatarUrl: character.avatarUrl || null,
+      })),
     };
   }
 }

@@ -22,6 +22,7 @@ export async function createCheckoutOrder(
       characterName: 'Kullanıcı',
       packageCode,
       amount: order.amount,
+      currency: 'GTA_DOLLAR',
     });
     return {
       orderId: order.orderId,
@@ -96,6 +97,7 @@ export async function createCheckoutOrder(
     characterName: profile.full_name,
     packageCode: pkg.code,
     amount: pkg.price,
+    currency: 'GTA_DOLLAR',
   });
 
   return {

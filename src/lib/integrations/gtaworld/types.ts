@@ -23,6 +23,18 @@ export interface GtaWorldAuthResult {
 
 export type OAuthStateSupportStatus = 'unverified' | 'supported' | 'unsupported';
 
+/** Provider-neutral identity snapshot consumed by Sanboard application code. */
+export interface ExternalGameCharacter {
+  externalCharacterId: string;
+  displayName: string;
+  avatarUrl?: string | null;
+}
+
+export interface ExternalGameAccount {
+  externalAccountId: string;
+  characters: ExternalGameCharacter[];
+}
+
 
 // ============================================================================
 // Official GTA World UCP OAuth & API Contract Types
@@ -61,4 +73,30 @@ export interface GtaWorldTokenResponse {
   scope?: string;
   error?: string;
   error_description?: string;
+}
+
+function opaqueId(value: unknown, field: string): string {
+  if ((typeof value !== 'string' && typeof value !== 'number') || String(value).trim() === '') {
+    throw new Error(`GTA World ${field} eksik veya geçersiz.`);
+  }
+  return String(value).trim();
+}
+
+/**
+ * GTA World raw payload adapter. TODO(GTAWORLD-CONTRACT): confirm the raw field
+ * names against official documentation before enabling/changing the real API.
+ */
+export function adaptGtaWorldApiUser(user: GtaWorldApiUser): ExternalGameAccount {
+  return {
+    externalAccountId: opaqueId(user.id, 'account ID'),
+    characters: (Array.isArray(user.character) ? user.character : []).map((character) => {
+      const displayName = `${String(character.firstname || '').trim()} ${String(character.lastname || '').trim()}`.trim();
+      if (!displayName) throw new Error('GTA World karakter adı eksik.');
+      return {
+        externalCharacterId: opaqueId(character.id, 'character ID'),
+        displayName,
+        avatarUrl: null,
+      };
+    }),
+  };
 }

@@ -2,7 +2,7 @@ import {
   GtaWorldAuthResult,
   GtaWorldCharacter,
   GtaWorldUserSession,
-  GtaWorldApiUserResponse,
+  ExternalGameAccount,
   OAuthStateSupportStatus,
 } from './types';
 
@@ -15,5 +15,5 @@ export interface GtaWorldAuthProvider {
 
   getAuthorizeUrl(state?: string): string;
   exchangeCodeForToken(code: string): Promise<string>;
-  fetchUser(accessToken: string): Promise<GtaWorldApiUserResponse>;
+  fetchAccount(accessToken: string): Promise<ExternalGameAccount>;
 }

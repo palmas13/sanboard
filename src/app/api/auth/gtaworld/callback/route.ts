@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGtaWorldAuthProvider, isMockGtaWorldAuthEnabled } from '@/lib/integrations/gtaworld';
-import { syncGtaWorldAccountAndCharacters } from '@/lib/auth/gtaworld-sync';
+import { syncExternalGameAccount } from '@/lib/auth/gtaworld-sync';
 import {
   clearCharacterSelectionCookieOnResponse,
   clearSessionCookieOnResponse,
@@ -107,14 +107,14 @@ export async function GET(req: NextRequest) {
     const accessToken = await provider.exchangeCodeForToken(code);
 
     // Fetch user and characters from GTA World /api/user
-    const gtawResponse = await provider.fetchUser(accessToken);
+    const externalAccount = await provider.fetchAccount(accessToken);
 
-    if (!gtawResponse?.user?.id) {
+    if (!externalAccount.externalAccountId) {
       throw new Error('Geçersiz GTA World kullanıcı verisi.');
     }
 
     // Synchronize user and characters into Sanboard
-    const { user, profiles } = await syncGtaWorldAccountAndCharacters(gtawResponse.user);
+    const { user, profiles } = await syncExternalGameAccount(externalAccount);
 
     if (user.status !== 'ACTIVE') {
       await recordAuditEvent({
@@ -136,7 +136,7 @@ export async function GET(req: NextRequest) {
       profileId: selectedProfile?.id || null,
       metadata: {
         provider: 'gtaworld',
-        externalUserId: String(gtawResponse.user.id),
+        externalUserId: externalAccount.externalAccountId,
         characterCount: profiles.length,
         autoSelected: isSingleCharacter,
       },

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPaymentRepository, getDealerRepository } from '@/lib/db/repositories';
-import { getFleecaPaymentProvider } from '@/lib/integrations/fleeca';
+import { getFleecaPaymentProvider, validateExternalPayment } from '@/lib/integrations/fleeca';
 import { getServerSession } from '@/lib/auth/session';
 
 export async function GET(req: NextRequest) {
@@ -87,6 +87,7 @@ export async function POST(req: NextRequest) {
       characterName: 'Kullanıcı',
       packageCode: requestedPackage,
       amount: order.amount,
+      currency: 'GTA_DOLLAR',
     });
 
     return NextResponse.json({
@@ -127,17 +128,24 @@ export async function PUT(req: NextRequest) {
     }
 
     const fleeca = getFleecaPaymentProvider();
-    const result = await fleeca.processPayment(orderId, simulateSuccess);
+    const transaction = await fleeca.verifyPayment(orderId, simulateSuccess);
+    const verification = validateExternalPayment(transaction, {
+      orderReference: payment.order_id,
+      payerReference: payment.profile_id,
+      amount: payment.amount,
+      currency: 'GTA_DOLLAR',
+      purposeReference: requestedPackageCode(payment),
+    });
 
-    if (!result.success) {
+    if (!verification.verified) {
       return NextResponse.json(
-        { success: false, error: result.error || 'Ödeme başarısız oldu.' },
+        { success: false, error: 'Ödeme sağlayıcı tarafından doğrulanamadı.', reason: verification.reason },
         { status: 400 }
       );
     }
 
     // Mark as completed in database and issue listing credit via repository
-    const completion = await repo.completePayment(orderId, result.transactionId);
+    const completion = await repo.completePayment(orderId, verification.transaction.externalTransactionId);
 
     if (!completion.success) {
       return NextResponse.json(
@@ -148,7 +156,7 @@ export async function PUT(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      transactionId: result.transactionId,
+      transactionId: verification.transaction.externalTransactionId,
       credit: completion.credit,
       entitlementType: payment.entitlement_type || 'LISTING_CREDIT',
     });
@@ -158,4 +166,9 @@ export async function PUT(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function requestedPackageCode(payment: any): string {
+  if (payment.entitlement_type === 'CORPORATE_SUBSCRIPTION') return 'CORPORATE_SUBSCRIPTION_30_DAY';
+  return payment.corporate_profile_id ? 'CORPORATE_14_DAY' : 'STANDARD_7_DAY';
 }

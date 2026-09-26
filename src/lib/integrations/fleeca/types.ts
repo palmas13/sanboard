@@ -4,6 +4,7 @@ export interface CreateCheckoutParams {
   characterName: string;
   packageCode: string;
   amount: number;
+  currency: string;
 }
 
 export interface FleecaOrder {
@@ -13,13 +14,55 @@ export interface FleecaOrder {
   packageCode: string;
   packageName: string;
   amount: number;
+  currency: string;
   status: 'PENDING' | 'SUCCESS' | 'FAILED';
   createdAt: string;
 }
 
-export interface FleecaPaymentResult {
-  success: boolean;
-  orderId: string;
-  transactionId?: string;
-  error?: string;
+export type ExternalPaymentStatus = 'VERIFIED' | 'PENDING' | 'FAILED';
+
+export interface VerifiedExternalPayment {
+  externalTransactionId: string;
+  status: ExternalPaymentStatus;
+  orderReference: string;
+  payerReference: string;
+  amount: number;
+  currency: string;
+  purposeReference: string;
+  occurredAt: string;
+}
+
+export interface PaymentVerificationExpectation {
+  orderReference: string;
+  payerReference: string;
+  amount: number;
+  currency: string;
+  purposeReference: string;
+}
+
+export type PaymentVerificationFailure =
+  | 'PENDING'
+  | 'FAILED'
+  | 'WRONG_ORDER'
+  | 'WRONG_AMOUNT'
+  | 'WRONG_PAYER'
+  | 'WRONG_CURRENCY'
+  | 'WRONG_PURPOSE';
+
+export type PaymentVerificationDecision =
+  | { verified: true; transaction: VerifiedExternalPayment }
+  | { verified: false; reason: PaymentVerificationFailure };
+
+export function validateExternalPayment(
+  transaction: VerifiedExternalPayment,
+  expected: PaymentVerificationExpectation
+): PaymentVerificationDecision {
+  if (transaction.status === 'PENDING') return { verified: false, reason: 'PENDING' };
+  if (transaction.status === 'FAILED') return { verified: false, reason: 'FAILED' };
+  if (transaction.orderReference !== expected.orderReference) return { verified: false, reason: 'WRONG_ORDER' };
+  if (transaction.amount !== expected.amount) return { verified: false, reason: 'WRONG_AMOUNT' };
+  if (transaction.payerReference !== expected.payerReference) return { verified: false, reason: 'WRONG_PAYER' };
+  if (transaction.currency !== expected.currency) return { verified: false, reason: 'WRONG_CURRENCY' };
+  if (transaction.purposeReference !== expected.purposeReference) return { verified: false, reason: 'WRONG_PURPOSE' };
+  return { verified: true, transaction };
 }

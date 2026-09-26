@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { CharacterProfile, User } from '@/types';
-import { GtaWorldApiUser } from '@/lib/integrations/gtaworld/types';
+import { ExternalGameAccount, GtaWorldApiUser, adaptGtaWorldApiUser } from '@/lib/integrations/gtaworld/types';
 import { getSupabaseAdminClient } from '@/lib/db/supabase-client';
 import { db } from '@/lib/db/store';
 
@@ -13,8 +13,8 @@ function isUniqueViolation(error: { code?: string } | null): boolean {
   return error?.code === '23505';
 }
 
-export async function syncGtaWorldAccountAndCharacters(gtawUser: GtaWorldApiUser): Promise<SyncGtaWorldResult> {
-  const externalUserId = String(gtawUser.id);
+export async function syncExternalGameAccount(account: ExternalGameAccount): Promise<SyncGtaWorldResult> {
+  const externalUserId = String(account.externalAccountId);
   const now = new Date().toISOString();
 
   if (process.env.DATA_STORE === 'supabase') {
@@ -39,9 +39,9 @@ export async function syncGtaWorldAccountAndCharacters(gtawUser: GtaWorldApiUser
     }
     if (!user) throw new Error(`GTA World account conflict recovery failed for ${externalUserId}.`);
 
-    for (const character of Array.isArray(gtawUser.character) ? gtawUser.character : []) {
-      const externalCharacterId = String(character.id);
-      const fullName = `${character.firstname.trim()} ${character.lastname.trim()}`.trim();
+    for (const character of account.characters) {
+      const externalCharacterId = String(character.externalCharacterId);
+      const fullName = character.displayName.trim();
       const findProfile = async () => {
         const result = await client.from('character_profiles').select('*').eq('external_character_id', externalCharacterId).maybeSingle();
         if (result.error) throw new Error(`Failed to resolve GTA World character: ${result.error.message}`);
@@ -55,7 +55,7 @@ export async function syncGtaWorldAccountAndCharacters(gtawUser: GtaWorldApiUser
         const updated = await client.from('character_profiles').update({ full_name: fullName, updated_at: now }).eq('id', profile.id).eq('user_id', user.id).select().single();
         if (updated.error || !updated.data) throw new Error(`Failed to update GTA World character ${externalCharacterId}: ${updated.error?.message}`);
       } else {
-        const inserted = await client.from('character_profiles').insert({ user_id: user.id, external_character_id: externalCharacterId, full_name: fullName, role: 'USER', avatar_path: null, avatar_url: null, sanmail_email: null, phone: null, created_at: now, updated_at: now }).select().single();
+        const inserted = await client.from('character_profiles').insert({ user_id: user.id, external_character_id: externalCharacterId, full_name: fullName, role: 'USER', avatar_path: null, avatar_url: character.avatarUrl || null, sanmail_email: null, phone: null, created_at: now, updated_at: now }).select().single();
         if (inserted.error) {
           if (!isUniqueViolation(inserted.error)) throw new Error(`Failed to create GTA World character ${externalCharacterId}: ${inserted.error.message}`);
           profile = await findProfile();
@@ -77,19 +77,24 @@ export async function syncGtaWorldAccountAndCharacters(gtawUser: GtaWorldApiUser
     db.users.push(user);
   }
 
-  for (const character of Array.isArray(gtawUser.character) ? gtawUser.character : []) {
-    const externalCharacterId = String(character.id);
-    const fullName = `${character.firstname.trim()} ${character.lastname.trim()}`.trim();
+  for (const character of account.characters) {
+    const externalCharacterId = String(character.externalCharacterId);
+    const fullName = character.displayName.trim();
     let profile = db.profiles.find((candidate) => candidate.external_character_id === externalCharacterId);
     if (profile && profile.user_id !== user.id) throw new Error(`GTA World character identity collision for external ID ${externalCharacterId}.`);
     if (profile) {
       profile.full_name = fullName;
       profile.updated_at = now;
     } else {
-      profile = { id: randomUUID(), user_id: user.id, external_character_id: externalCharacterId, full_name: fullName, role: 'USER', avatar_path: '', avatar_url: '', sanmail_email: '', phone: '', created_at: now, updated_at: now };
+      profile = { id: randomUUID(), user_id: user.id, external_character_id: externalCharacterId, full_name: fullName, role: 'USER', avatar_path: '', avatar_url: character.avatarUrl || '', sanmail_email: '', phone: '', created_at: now, updated_at: now };
       db.profiles.push(profile);
     }
   }
 
   return { user, profiles: db.profiles.filter((profile) => profile.user_id === user!.id) };
+}
+
+/** @deprecated Test/backward-compatible raw adapter; production uses syncExternalGameAccount. */
+export async function syncGtaWorldAccountAndCharacters(user: GtaWorldApiUser): Promise<SyncGtaWorldResult> {
+  return syncExternalGameAccount(adaptGtaWorldApiUser(user));
 }

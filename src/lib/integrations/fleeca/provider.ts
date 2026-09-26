@@ -1,7 +1,7 @@
-import { CreateCheckoutParams, FleecaOrder, FleecaPaymentResult } from './types';
+import { CreateCheckoutParams, FleecaOrder, VerifiedExternalPayment } from './types';
 
 export interface FleecaPaymentProvider {
   createOrder(params: CreateCheckoutParams): Promise<FleecaOrder>;
   getOrder(orderId: string): Promise<FleecaOrder | null>;
-  processPayment(orderId: string, simulateSuccess?: boolean): Promise<FleecaPaymentResult>;
+  verifyPayment(orderId: string, simulateSuccess?: boolean): Promise<VerifiedExternalPayment>;
 }
