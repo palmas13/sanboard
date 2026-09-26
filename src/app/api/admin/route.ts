@@ -20,19 +20,12 @@ import {
 } from '@/lib/db/dealers';
 import { getAllTicketsForAdmin, updateTicketStatus, addTicketMessage } from '@/lib/db/tickets';
 import { db } from '@/lib/db/store';
-
 import { getServerSession } from '@/lib/auth/session';
+import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 
 async function getAdminActorProfileId(req: NextRequest): Promise<string> {
-  const session = await getServerSession(req);
-  let activeProfileId = session?.profileId || req.cookies.get('sanboard_profile_id')?.value;
-  if (!activeProfileId && session?.userId) {
-    const { getUserRepository } = await import('@/lib/db/repositories');
-    const userRepo = getUserRepository();
-    const profs = await userRepo.getProfilesByUserId(session.userId);
-    activeProfileId = profs[0]?.id;
-  }
-  return activeProfileId || 'SYSTEM_ADMIN';
+  const actor = await resolveOwnedActiveProfile(req);
+  return actor.ok ? actor.profileId : 'SYSTEM_ADMIN';
 }
 
 async function checkAdminAccess(req: NextRequest): Promise<boolean> {
@@ -42,66 +35,8 @@ async function checkAdminAccess(req: NextRequest): Promise<boolean> {
     return true;
   }
 
-  // 1. Authenticate strictly via cryptographically signed session
-  const session = await getServerSession(req);
-  if (!session?.userId) return false;
-
-  const accountId = session.userId;
-  let activeProfileId = session.profileId || req.cookies.get('sanboard_profile_id')?.value;
-  if (!activeProfileId) {
-    const { getUserRepository } = await import('@/lib/db/repositories');
-    const userRepo = getUserRepository();
-    const profs = await userRepo.getProfilesByUserId(accountId);
-    activeProfileId = profs[0]?.id;
-  }
-  if (!activeProfileId) return false;
-
-  // 2. In Supabase mode: verify activeProfileId belongs to accountId and character_profiles.role == 'ADMIN'
-  if (process.env.DATA_STORE === 'supabase') {
-    try {
-      const { getSupabaseAdminClient } = await import('@/lib/db/supabase-client');
-      const client = getSupabaseAdminClient();
-      if (client) {
-        const { data: dbProfile } = await client
-          .from('character_profiles')
-          .select('id, user_id, role')
-          .or(`id.eq.${activeProfileId},external_character_id.eq.${activeProfileId}`)
-          .maybeSingle();
-
-        if (dbProfile) {
-          const belongsToAccount = dbProfile.user_id === accountId;
-          const isCharacterAdmin = dbProfile.role === 'ADMIN';
-          return belongsToAccount && isCharacterAdmin;
-        }
-        return false;
-      }
-    } catch {
-      // Fallback to memory
-    }
-  }
-
-  // 3. In Memory mode: verify activeProfileId belongs to accountId and role == 'ADMIN'
-  const profile = db.profiles.find(
-    (p) => p.id === activeProfileId || p.external_character_id === activeProfileId
-  );
-
-  if (profile) {
-    // For mock testing, Mavis is ADMIN, Ravi and Zade are USER
-    const isMavis =
-      activeProfileId === 'char-mavis-01' ||
-      activeProfileId === '44444444-4444-4444-4444-444444444441' ||
-      profile.full_name?.includes('Mavis');
-    const role = isMavis ? 'ADMIN' : (profile.role || 'USER');
-
-    const belongsToAccount =
-      profile.user_id === accountId ||
-      accountId === 'usr-admin-1' ||
-      accountId === '22222222-2222-2222-2222-222222222222';
-
-    return belongsToAccount && role === 'ADMIN';
-  }
-
-  return false;
+  const actor = await resolveOwnedActiveProfile(req);
+  return actor.ok && actor.role === 'ADMIN';
 }
 
 export async function GET(req: NextRequest) {

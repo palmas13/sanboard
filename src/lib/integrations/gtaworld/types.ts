@@ -29,8 +29,8 @@ export type OAuthStateSupportStatus = 'unverified' | 'supported' | 'unsupported'
 // ============================================================================
 
 export interface GtaWorldApiCharacter {
-  id: number;
-  memberid?: number;
+  id: string | number;
+  memberid?: string | number;
   firstname: string;
   lastname: string;
 }
@@ -43,7 +43,7 @@ export interface GtaWorldApiRole {
 }
 
 export interface GtaWorldApiUser {
-  id: number;
+  id: string | number;
   username: string;
   confirmed?: number;
   role?: GtaWorldApiRole;

@@ -53,9 +53,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(req);
-    const isMock = process.env.USE_MOCK_GTAWORLD_AUTH !== 'false';
-    const userId = session?.userId || (isMock ? '22222222-2222-2222-2222-222222222222' : null);
-    const userRole = session?.role || (isMock ? 'ADMIN' : 'USER');
+    const userId = session?.userId || null;
+    const userRole = session?.role || 'USER';
 
     if (!userId) {
       return NextResponse.json(
@@ -108,7 +107,7 @@ export async function POST(req: NextRequest) {
     // Issue updated signed session containing the newly created profileId
     const newToken = createSessionToken({
       userId,
-      role: userRole,
+      role: created.role || 'USER',
       profileId: created.id,
     });
 
@@ -134,7 +133,7 @@ export async function POST(req: NextRequest) {
       maxAge: 86400,
       sameSite: 'lax',
     });
-    response.cookies.set('sanboard_role', userRole, {
+    response.cookies.set('sanboard_role', created.role || 'USER', {
       path: '/',
       maxAge: 86400,
       sameSite: 'lax',
@@ -162,8 +161,7 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const session = await getServerSession(req);
-    const isMock = process.env.USE_MOCK_GTAWORLD_AUTH !== 'false';
-    const userId = session?.userId || (isMock ? '22222222-2222-2222-2222-222222222222' : null);
+    const userId = session?.userId || null;
 
     if (!userId) {
       return NextResponse.json(
@@ -205,7 +203,7 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const isAdmin = session?.role === 'ADMIN' || (isMock && userId === '22222222-2222-2222-2222-222222222222');
+    const isAdmin = session?.role === 'ADMIN';
     if (!isAdmin && existing.user_id !== userId && existing.id !== sessionProfileId) {
       return NextResponse.json(
         { error: 'Bu profili düzenleme yetkiniz yok.' },

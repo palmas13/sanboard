@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { getGtaWorldAuthProvider } from '@/lib/integrations/gtaworld';
+import { getGtaWorldAuthProvider, isMockGtaWorldAuthEnabled } from '@/lib/integrations/gtaworld';
 import { recordAuditEvent } from '@/lib/audit';
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
   const redirect = searchParams.get('redirect') || '/';
-  const isMock = process.env.USE_MOCK_GTAWORLD_AUTH !== 'false';
+  const isMock = isMockGtaWorldAuthEnabled();
 
-  // 1. Mock Mode: Redirect directly to character selection
+  // 1. Explicit mock mode still traverses callback + canonical account/profile sync.
   if (isMock) {
-    return NextResponse.redirect(
-      new URL(`/karakter-sec?redirect=${encodeURIComponent(redirect)}`, req.url)
-    );
+    const callbackUrl = new URL('/api/auth/gtaworld/callback', req.url);
+    callbackUrl.searchParams.set('code', 'mock_authorization_code');
+    callbackUrl.searchParams.set('redirect', redirect);
+    return NextResponse.redirect(callbackUrl);
   }
 
   // 2. Real OAuth Mode

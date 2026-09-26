@@ -198,9 +198,9 @@ describe('Critical listing image and corporate follow regressions', () => {
 
   test('character switch signs the resolved canonical profile id', () => {
     const source = readFileSync(join(process.cwd(), 'src/app/api/auth/session/route.ts'), 'utf8');
-    assert.match(source, /getUserRepository\(\)\.getProfileById\(String\(characterId\)\)/);
-    assert.match(source, /const targetProfileId = profile\?\.id \|\| characterId/);
-    assert.match(source, /createSessionToken\(\{[\s\S]*profileId: targetProfileId/);
+    assert.match(source, /userRepository\.getProfileById\(characterId\)/);
+    assert.match(source, /profile\.user_id !== currentSession\.userId/);
+    assert.match(source, /createSessionToken\(\{ userId: user\.id, role, profileId: profile\.id \}\)/);
   });
 
   test('notification failure does not turn a successful follow relation into a failure', async () => {

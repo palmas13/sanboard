@@ -9,13 +9,13 @@ import Link from 'next/link';
 function ProfilOlusturContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const charId = searchParams.get('charId') || '44444444-4444-4444-4444-444444444443';
+  const charId = searchParams.get('charId') || '';
   const redirect = searchParams.get('redirect') || '/hesabim';
 
   const { characters, selectCharacter } = useAuth();
   const char = characters.find((c) => c.id === charId) || {
     id: charId,
-    fullName: 'Ravi Blumon',
+    fullName: 'Karakter',
     hasProfile: false,
     avatarUrl: '',
     sanmailEmail: '',

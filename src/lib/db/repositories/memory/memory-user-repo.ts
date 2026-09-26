@@ -2,60 +2,41 @@ import { IUserRepository } from '../types';
 import { db } from '../../store';
 import { CharacterProfile, User } from '@/types';
 import { normalizePhone } from '@/lib/utils/format';
-import { resolveUserId, resolveStoreUserId, resolveStoreProfileId } from '../../id-mapper';
 import { selectUnambiguousProfile } from '../../profile-identity';
+import { getMockProfileAliases, getMockUserAliases, resolveMockUserId } from '@/lib/integrations/gtaworld/mock-identities';
 
 export class MemoryUserRepository implements IUserRepository {
   async getUserById(id: string): Promise<User | null> {
-    const storeId = resolveStoreUserId(id);
-    const uuid = resolveUserId(id);
-    const user = db.users.find((u) => u.id === id || u.id === storeId || u.id === uuid);
-    return user || null;
+    const aliases = getMockUserAliases(id);
+    const user = db.users.find((u) => aliases.includes(u.id));
+    return user ? { ...user, id: resolveMockUserId(user.id) } : null;
   }
 
   async getProfileById(id: string): Promise<CharacterProfile | null> {
     const identifier = String(id || '').trim();
     if (!identifier) return null;
 
-    const storeProfileId = resolveStoreProfileId(id);
-    const canonicalProfile = db.profiles.find((profile) => profile.id === identifier) || null;
+    const aliases = getMockProfileAliases(identifier);
+    const canonicalProfile = db.profiles.find((profile) => aliases.includes(profile.id)) || null;
     const externalProfile = db.profiles.find(
       (profile) => profile.external_character_id === identifier
     ) || null;
     const profile = selectUnambiguousProfile(identifier, canonicalProfile, externalProfile);
-    if (profile) return profile;
-
-    const mappedProfile = db.profiles.find((candidate) => candidate.id === storeProfileId);
-    if (mappedProfile) return mappedProfile;
-
-    if (id === '44444444-4444-4444-4444-444444444441') {
-      return db.profiles.find((p) => p.id === 'char-mavis-01') || null;
-    }
-    if (id === '44444444-4444-4444-4444-444444444442') {
-      return db.profiles.find((p) => p.id === 'char-zade-02') || null;
-    }
-    if (id === '44444444-4444-4444-4444-444444444443') {
-      return db.profiles.find((p) => p.id === 'char-ravi-03') || null;
-    }
-
-    return null;
+    return profile ? { ...profile, user_id: resolveMockUserId(profile.user_id) } : null;
   }
 
   async getProfileByPublicId(publicId: number): Promise<CharacterProfile | null> {
     const profile = db.profiles.find((p) => p.public_id === publicId);
-    if (profile) return profile;
-
-    if (publicId === 1) return db.profiles.find((p) => p.id === 'char-mavis-01') || null;
-    if (publicId === 2) return db.profiles.find((p) => p.id === 'char-zade-02') || null;
-    if (publicId === 3) return db.profiles.find((p) => p.id === 'char-ravi-03') || null;
+    if (profile) return { ...profile, user_id: resolveMockUserId(profile.user_id) };
 
     return null;
   }
 
   async getProfilesByUserId(userId: string): Promise<CharacterProfile[]> {
-    const storeId = resolveStoreUserId(userId);
-    const uuid = resolveUserId(userId);
-    return db.profiles.filter((p) => p.user_id === userId || p.user_id === storeId || p.user_id === uuid);
+    const aliases = getMockUserAliases(userId);
+    return db.profiles
+      .filter((p) => aliases.includes(p.user_id))
+      .map((profile) => ({ ...profile, user_id: resolveMockUserId(profile.user_id) }));
   }
 
   async updateProfile(

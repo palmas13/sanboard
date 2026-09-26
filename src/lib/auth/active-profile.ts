@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getServerSession } from '@/lib/auth/session';
 import { getUserRepository } from '@/lib/db/repositories';
-import { resolveUserId } from '@/lib/db/id-mapper';
 
 export type ActiveProfileResolution =
   | { ok: true; profileId: string; userId: string; role: 'USER' | 'ADMIN' }
@@ -28,7 +27,7 @@ export async function resolveOwnedActiveProfile(
   }
 
   const profile = await getUserRepository().getProfileById(session.profileId);
-  if (!profile || resolveUserId(profile.user_id) !== resolveUserId(session.userId)) {
+  if (!profile || profile.user_id !== session.userId) {
     return { ok: false, status: 403, error: 'Aktif karakter profili bu hesaba ait değil.' };
   }
 
@@ -36,6 +35,6 @@ export async function resolveOwnedActiveProfile(
     ok: true,
     profileId: profile.id,
     userId: session.userId,
-    role: session.role,
+    role: profile.role || 'USER',
   };
 }

@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { CharacterProfile, User } from '@/types';
 import { GtaWorldCharacter } from '@/lib/integrations/gtaworld/types';
-import { MOCK_CHARACTERS } from '@/lib/integrations/gtaworld/mock-provider';
 import { resolveMediaUrl } from '@/lib/media/url';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
@@ -26,68 +25,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const MOCK_CHARACTER_ACCOUNTS: Record<string, User> = {
-  // Admin Account (Mavis in seed.sql)
-  '44444444-4444-4444-4444-444444444441': {
-    id: '22222222-2222-2222-2222-222222222222',
-    provider: 'GTAWORLD',
-    role: 'ADMIN',
-    status: 'ACTIVE',
-    created_at: '2026-09-01T10:00:00Z',
-    updated_at: '2026-09-01T10:00:00Z',
-  },
-  'char-mavis-01': {
-    id: '22222222-2222-2222-2222-222222222222',
-    provider: 'GTAWORLD',
-    role: 'ADMIN',
-    status: 'ACTIVE',
-    created_at: '2026-09-01T10:00:00Z',
-    updated_at: '2026-09-01T10:00:00Z',
-  },
-  // Character on same admin account
-  '44444444-4444-4444-4444-444444444442': {
-    id: '22222222-2222-2222-2222-222222222222',
-    provider: 'GTAWORLD',
-    role: 'ADMIN',
-    status: 'ACTIVE',
-    created_at: '2026-09-10T12:00:00Z',
-    updated_at: '2026-09-10T12:00:00Z',
-  },
-  'char-zade-02': {
-    id: '22222222-2222-2222-2222-222222222222',
-    provider: 'GTAWORLD',
-    role: 'ADMIN',
-    status: 'ACTIVE',
-    created_at: '2026-09-10T12:00:00Z',
-    updated_at: '2026-09-10T12:00:00Z',
-  },
-  // Standard User Account (Ravi Blumon & standard users - strictly USER role)
-  '44444444-4444-4444-4444-444444444443': {
-    id: '33333333-3333-3333-3333-333333333333',
-    provider: 'GTAWORLD',
-    role: 'USER',
-    status: 'ACTIVE',
-    created_at: '2026-09-15T10:00:00Z',
-    updated_at: '2026-09-15T10:00:00Z',
-  },
-  'b0de6077-d32b-42dc-909f-d12719749f96': {
-    id: '33333333-3333-3333-3333-333333333333',
-    provider: 'GTAWORLD',
-    role: 'USER',
-    status: 'ACTIVE',
-    created_at: '2026-09-15T10:00:00Z',
-    updated_at: '2026-09-15T10:00:00Z',
-  },
-  'char-ravi-03': {
-    id: '33333333-3333-3333-3333-333333333333',
-    provider: 'GTAWORLD',
-    role: 'USER',
-    status: 'ACTIVE',
-    created_at: '2026-09-15T10:00:00Z',
-    updated_at: '2026-09-15T10:00:00Z',
-  },
-};
 
 export interface AuthProviderProps {
   children: React.ReactNode;
@@ -225,16 +162,20 @@ export function AuthProvider({
           const data = await res.json();
           if (data?.success && data.profile) {
             const profile = data.profile as CharacterProfile;
-            const linkedUser: User =
-              MOCK_CHARACTER_ACCOUNTS[profile.id] ||
-              MOCK_CHARACTER_ACCOUNTS[profile.user_id] || {
-                id: profile.user_id || `usr-${profile.id}`,
-                provider: 'GTAWORLD',
-                role: 'USER',
-                status: 'ACTIVE',
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              };
+            const sessionRes = await fetch('/api/auth/session');
+            if (!sessionRes.ok) {
+              setAuthStatus('unauthenticated');
+              return;
+            }
+            const sessionData = await sessionRes.json();
+            const linkedUser: User = {
+              id: sessionData.session.userId,
+              provider: 'GTAWORLD',
+              role: profile.role || sessionData.session.role || 'USER',
+              status: 'ACTIVE',
+              created_at: '',
+              updated_at: '',
+            };
 
             setUser(linkedUser);
             setCurrentProfile(profile);
@@ -323,8 +264,9 @@ export function AuthProvider({
       }
 
       const sessionData = await sessionRes.json();
-      const userId = sessionData.user?.id || user?.id || (characterId.startsWith('usr-') ? characterId : `usr-${characterId}`);
-      const role = (sessionData.user?.role || user?.role || 'USER') as 'USER' | 'ADMIN';
+      const userId = sessionData.user?.id;
+      const role = (sessionData.user?.role || 'USER') as 'USER' | 'ADMIN';
+      if (!userId) return null;
 
       const linkedUser: User = {
         id: userId,
@@ -345,20 +287,7 @@ export function AuthProvider({
         }
       }
 
-      if (!profile) {
-        profile = {
-          id: char.id,
-          user_id: linkedUser.id,
-          external_character_id: char.id,
-          full_name: char.fullName,
-          avatar_path: '',
-          avatar_url: '',
-          sanmail_email: char.sanmailEmail || '',
-          phone: char.phone || '',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-      }
+      if (!profile) return null;
 
       setUser(linkedUser);
       setCurrentProfile(profile);
@@ -459,7 +388,7 @@ export function AuthProvider({
         authStatus,
         isLoading,
         isAuthenticated,
-        isAdmin: currentProfile ? currentProfile.role === 'ADMIN' : user?.role === 'ADMIN',
+        isAdmin: currentProfile?.role === 'ADMIN',
         login,
         logout,
         selectCharacter,

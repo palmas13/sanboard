@@ -109,6 +109,7 @@ describe('Sanboard Stabilization Pass: Auth, Role, Favorites, Notifications & Da
       const adminReq = createAuthedRequest('http://localhost:3000/api/admin', 'GET', {
         userId: mavisAdminUserId,
         role: 'ADMIN',
+        profileId: 'char-mavis-01',
       });
       const res = await adminGet(adminReq);
       assert.strictEqual(res.status, 200, 'Admin must get 200 OK');

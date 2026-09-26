@@ -13,6 +13,7 @@ import { SupabaseListingRepository } from './repositories/supabase/supabase-list
 import { deleteMediaSafely } from '../storage/lifecycle';
 import { extractMediaKey } from '../media/url';
 import { resolveUserId } from './id-mapper';
+import { resolveMockUserId } from '@/lib/integrations/gtaworld/mock-identities';
 import { isListingOwnedByActiveProfile } from '../dealers/eligibility';
 import { getEffectiveListingStatus, isPublicListingVisible } from '../listings/visibility';
 import { getListingCoverPath, sortListingImages } from '../listings/images';
@@ -907,7 +908,7 @@ export async function toggleFavorite(
     db.favorites.splice(existingIdx, 1);
   } else {
     const profile = db.profiles.find((p) => p.id === profileId);
-    const resolvedUser = userIdParam || resolveUserId(profile?.user_id) || profile?.user_id;
+    const resolvedUser = userIdParam || resolveMockUserId(resolveUserId(profile?.user_id) || profile?.user_id || '');
     db.favorites.push({
       id: `fav-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       user_id: resolvedUser,

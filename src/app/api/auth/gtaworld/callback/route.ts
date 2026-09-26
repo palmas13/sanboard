@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGtaWorldAuthProvider } from '@/lib/integrations/gtaworld';
+import { getGtaWorldAuthProvider, isMockGtaWorldAuthEnabled } from '@/lib/integrations/gtaworld';
 import { syncGtaWorldAccountAndCharacters } from '@/lib/auth/gtaworld-sync';
 import { createSessionToken, setSessionCookieOnResponse } from '@/lib/auth/session';
 import { recordAuditEvent } from '@/lib/audit';
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
-  const isMock = process.env.USE_MOCK_GTAWORLD_AUTH !== 'false';
+  const isMock = isMockGtaWorldAuthEnabled();
 
   // 1. Read and validate OAuth attempt cookie
   const attemptCookie = req.cookies.get('gtaw_oauth_attempt')?.value;
   let attemptState: string | undefined;
   let targetRedirect = '/';
+  if (isMock) {
+    targetRedirect = searchParams.get('redirect') || '/';
+  }
 
   if (attemptCookie) {
     try {
@@ -106,13 +109,22 @@ export async function GET(req: NextRequest) {
     // Synchronize user and characters into Sanboard
     const { user, profiles } = await syncGtaWorldAccountAndCharacters(gtawResponse.user);
 
+    if (user.status !== 'ACTIVE') {
+      await recordAuditEvent({
+        eventType: 'AUTH_LOGIN_FAILURE',
+        userId: user.id,
+        metadata: { category: 'account_banned' },
+      });
+      return NextResponse.redirect(new URL('/giris?error=account_banned', req.url));
+    }
+
     // 5. Establish Sanboard HMAC Session
     const isSingleCharacter = profiles.length === 1;
     const selectedProfile = isSingleCharacter ? profiles[0] : undefined;
 
     const token = createSessionToken({
       userId: user.id,
-      role: user.role,
+      role: selectedProfile?.role || 'USER',
       profileId: selectedProfile?.id,
     });
 
@@ -162,7 +174,7 @@ export async function GET(req: NextRequest) {
 
     // Set routing cookies
     response.cookies.set('sanboard_user_id', user.id, { path: '/', maxAge: 86400, sameSite: 'lax' });
-    response.cookies.set('sanboard_role', user.role, { path: '/', maxAge: 86400, sameSite: 'lax' });
+    response.cookies.set('sanboard_role', selectedProfile?.role || 'USER', { path: '/', maxAge: 86400, sameSite: 'lax' });
 
     if (selectedProfile) {
       response.cookies.set('sanboard_profile_id', selectedProfile.id, { path: '/', maxAge: 86400, sameSite: 'lax' });

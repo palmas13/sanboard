@@ -32,7 +32,7 @@ export default function FleecaCheckoutPage() {
   const [order, setOrder] = useState<{ amount: number; entitlementType: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' } | null>(null);
 
   const amount = order?.amount || 0;
-  const buyerName = currentProfile?.full_name || 'Mavis Pierce';
+  const buyerName = currentProfile?.full_name || 'Sanboard Kullanıcısı';
 
   useEffect(() => {
     if (!orderId) return;
