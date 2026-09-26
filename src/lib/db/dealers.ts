@@ -25,7 +25,7 @@ export function ensureDealers() {
         subscription_status: 'ACTIVE',
         moderation_status: 'ACTIVE',
         subscription_expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
-        boost_credits: 3,
+        boost_credits: 0,
         public_id: 1,
         social_media: {
           facebrowser: 'https://facebrowser.gtaw/apexmotors',
@@ -197,7 +197,7 @@ export async function reviewApplication(
         status: 'APPROVED',
         subscription_status: 'INACTIVE', // Requires activation/package purchase
         moderation_status: 'ACTIVE',
-        boost_credits: 3,
+        boost_credits: 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -206,7 +206,7 @@ export async function reviewApplication(
       store.status = 'APPROVED';
       store.subscription_status = store.subscription_status || 'INACTIVE';
       store.moderation_status = 'ACTIVE';
-      store.boost_credits = store.boost_credits ?? 3;
+      store.boost_credits = store.boost_credits ?? 0;
     }
 
     if (profile) {

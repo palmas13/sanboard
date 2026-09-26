@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from '@/lib/auth/session';
 import { getPersistedAuditRecords } from '@/lib/audit';
+import { resolveActiveAdmin } from '@/lib/auth/active-profile';
 
 /**
  * GET /api/admin/audit
@@ -10,43 +10,8 @@ import { getPersistedAuditRecords } from '@/lib/audit';
  * is the primary gatekeeper.
  */
 export async function GET(req: NextRequest) {
-  // 1. Verify signed server session and ADMIN role
-  const session = await getServerSession(req);
-  if (!session?.userId) {
-    return NextResponse.json(
-      { error: 'Yetkisiz erişim. Lütfen giriş yapın.' },
-      { status: 401 }
-    );
-  }
-
-  let isDbAdmin = false;
-  if (process.env.DATA_STORE === 'supabase') {
-    try {
-      const { getSupabaseAdminClient } = await import('@/lib/db/supabase-client');
-      const client = getSupabaseAdminClient();
-      if (client) {
-        const { data: dbUser } = await client
-          .from('users')
-          .select('role, status')
-          .eq('id', session.userId)
-          .maybeSingle();
-        isDbAdmin = Boolean(dbUser && dbUser.role === 'ADMIN' && dbUser.status === 'ACTIVE');
-      }
-    } catch {
-      // Fallback
-    }
-  } else {
-    const { db } = await import('@/lib/db/store');
-    const user = db.users.find((u) => u.id === session.userId);
-    isDbAdmin = Boolean(user && user.role === 'ADMIN' && user.status === 'ACTIVE');
-  }
-
-  if (!isDbAdmin) {
-    return NextResponse.json(
-      { error: 'Yetkisiz erişim. Denetim kayıtlarını yalnızca Sanboard yöneticileri görüntüleyebilir.' },
-      { status: 403 }
-    );
-  }
+  const actor = await resolveActiveAdmin(req);
+  if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
 
   const searchParams = req.nextUrl.searchParams;
   const limitParam = searchParams.get('limit');

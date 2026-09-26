@@ -493,7 +493,7 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
     );
 
     const res = await adminGet(spoofAdminReq);
-    assert.strictEqual(res.status, 403, 'Fake role cookie must be denied access to admin API (403)');
+    assert.strictEqual(res.status, 401, 'Unsigned role cookie must not create an authenticated admin session');
   });
 
   test('AUTH TEST 2: Zade cannot edit Mavis listing via PUT /api/user/listings/[id]', async () => {

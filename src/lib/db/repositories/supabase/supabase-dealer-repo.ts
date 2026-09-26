@@ -373,7 +373,7 @@ export class SupabaseDealerRepository implements IDealerRepository {
           status: 'APPROVED',
           subscription_status: 'INACTIVE',
           moderation_status: 'ACTIVE',
-          boost_credits: 3,
+          boost_credits: 0,
         })
         .select()
         .single();

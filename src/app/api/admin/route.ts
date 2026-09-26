@@ -20,32 +20,24 @@ import {
 } from '@/lib/db/dealers';
 import { getAllTicketsForAdmin, updateTicketStatus, addTicketMessage } from '@/lib/db/tickets';
 import { db } from '@/lib/db/store';
-import { getServerSession } from '@/lib/auth/session';
-import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
+import { resolveActiveAdmin } from '@/lib/auth/active-profile';
+import { getUserRepository } from '@/lib/db/repositories';
+import { recordAuditEvent } from '@/lib/audit';
+import type { TicketStatus } from '@/types';
 
-async function getAdminActorProfileId(req: NextRequest): Promise<string> {
-  const actor = await resolveOwnedActiveProfile(req);
-  return actor.ok ? actor.profileId : 'SYSTEM_ADMIN';
+function isSameOrigin(req: NextRequest): boolean {
+  const origin = req.headers.get('origin');
+  if (!origin) return true;
+  return origin === req.nextUrl.origin;
 }
 
-async function checkAdminAccess(req: NextRequest): Promise<boolean> {
-  // Internal secret header for backend service calls
-  const secretHeader = req.headers.get('x-sanboard-secret');
-  if (secretHeader && process.env.SUPABASE_SECRET_KEY && secretHeader === process.env.SUPABASE_SECRET_KEY) {
-    return true;
-  }
-
-  const actor = await resolveOwnedActiveProfile(req);
-  return actor.ok && actor.role === 'ADMIN';
+function safeMutationResult(result: { success: boolean; [key: string]: unknown }, error: string) {
+  return NextResponse.json(result.success ? result : { success: false, error }, { status: result.success ? 200 : 400 });
 }
 
 export async function GET(req: NextRequest) {
-  if (!(await checkAdminAccess(req))) {
-    return NextResponse.json(
-      { error: 'Yetkisiz erişim. Bu alana yalnızca Sanboard yöneticileri erişebilir.' },
-      { status: 403 }
-    );
-  }
+  const actor = await resolveActiveAdmin(req);
+  if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
 
   try {
     const [stats, listings, users, reports, rawDealers, rawApplications, tickets] = await Promise.all([
@@ -166,29 +158,28 @@ export async function GET(req: NextRequest) {
       payments,
       packagePrice,
     });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json(
-      { error: error?.message || 'Admin verileri getirilemedi.' },
+      { error: 'Admin verileri getirilemedi.' },
       { status: 500 }
     );
   }
 }
 
 export async function POST(req: NextRequest) {
-  if (!(await checkAdminAccess(req))) {
-    return NextResponse.json(
-      { error: 'Yetkisiz erişim. Bu alana yalnızca Sanboard yöneticileri erişebilir.' },
-      { status: 403 }
-    );
-  }
+  const actor = await resolveActiveAdmin(req);
+  if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+  if (!isSameOrigin(req)) return NextResponse.json({ error: 'Geçersiz istek kaynağı.' }, { status: 403 });
 
   try {
-    const { action, payload } = await req.json();
-    const adminActorProfileId = await getAdminActorProfileId(req);
+    const { action, payload = {} } = await req.json();
+    const adminActorProfileId = actor.profileId;
 
     switch (action) {
       case 'delist': {
+        if (!payload.listingId) return NextResponse.json({ error: 'listingId zorunludur.' }, { status: 400 });
         const success = await adminDelistListing(payload.listingId);
+        if (success) await recordAuditEvent({ eventType: 'ADMIN_LISTING_DELISTED', userId: actor.userId, profileId: adminActorProfileId, metadata: { targetType: 'listing', targetId: payload.listingId } });
         try {
           const { revalidatePath } = await import('next/cache');
           revalidatePath('/');
@@ -200,7 +191,9 @@ export async function POST(req: NextRequest) {
       }
 
       case 'toggleBan': {
+        if (!payload.userId) return NextResponse.json({ error: 'userId zorunludur.' }, { status: 400 });
         const success = await toggleUserBan(payload.userId);
+        if (success) await recordAuditEvent({ eventType: 'ADMIN_ACCOUNT_STATUS_CHANGED', userId: actor.userId, profileId: adminActorProfileId, metadata: { targetType: 'account', targetId: payload.userId } });
         return NextResponse.json({ success });
       }
 
@@ -209,14 +202,17 @@ export async function POST(req: NextRequest) {
           'STANDARD_7_DAY',
           Number(payload.newPrice)
         );
+        if (success) await recordAuditEvent({ eventType: 'ADMIN_PACKAGE_PRICE_CHANGED', userId: actor.userId, profileId: adminActorProfileId, metadata: { targetType: 'package', targetId: 'STANDARD_7_DAY', newPrice: Number(payload.newPrice) } });
         return NextResponse.json({ success });
       }
 
       case 'updateReport': {
+        if (!['RESOLVED', 'DISMISSED'].includes(payload.status)) return NextResponse.json({ error: 'Geçersiz rapor durumu.' }, { status: 400 });
         const success = await updateReportStatus(
           payload.reportId,
           payload.status
         );
+        if (success) await recordAuditEvent({ eventType: 'ADMIN_REPORT_STATUS_CHANGED', userId: actor.userId, profileId: adminActorProfileId, metadata: { targetType: 'report', targetId: payload.reportId, status: payload.status } });
         return NextResponse.json({ success });
       }
 
@@ -228,7 +224,8 @@ export async function POST(req: NextRequest) {
           undefined,
           adminActorProfileId
         );
-        return NextResponse.json(result);
+        if (result.success) await recordAuditEvent({ eventType: 'ADMIN_APPLICATION_REVIEWED', userId: actor.userId, profileId: adminActorProfileId, metadata: { targetType: 'corporate_application', targetId: payload.applicationId, status: 'APPROVED' } });
+        return safeMutationResult(result, 'Kurumsal başvuru onaylanamadı.');
       }
 
       // Application Review: Reject (requires reason)
@@ -242,7 +239,8 @@ export async function POST(req: NextRequest) {
           payload.rejectionReason,
           adminActorProfileId
         );
-        return NextResponse.json(result);
+        if (result.success) await recordAuditEvent({ eventType: 'ADMIN_APPLICATION_REVIEWED', userId: actor.userId, profileId: adminActorProfileId, metadata: { targetType: 'corporate_application', targetId: payload.applicationId, status: 'REJECTED', reason: payload.rejectionReason } });
+        return safeMutationResult(result, 'Kurumsal başvuru reddedilemedi.');
       }
 
       // Store Moderation: Suspend (Section 14 & 15)
@@ -267,7 +265,7 @@ export async function POST(req: NextRequest) {
             revalidatePath(`/premium/${payload.dealerId}`);
           }
         } catch {}
-        return NextResponse.json(result);
+        return safeMutationResult(result, 'Kurumsal mağaza askıya alınamadı.');
       }
 
       // Store Moderation: Reactivate (Section 15)
@@ -288,7 +286,7 @@ export async function POST(req: NextRequest) {
             revalidatePath(`/premium/${payload.dealerId}`);
           }
         } catch {}
-        return NextResponse.json(result);
+        return safeMutationResult(result, 'Kurumsal mağaza yeniden aktifleştirilemedi.');
       }
 
       // Store Moderation: Delete (Section 16 - soft delete & cache invalidation)
@@ -313,10 +311,11 @@ export async function POST(req: NextRequest) {
             revalidatePath(`/premium/${payload.dealerId}`);
           }
         } catch {}
-        return NextResponse.json(result);
+        return safeMutationResult(result, 'Kurumsal mağaza silinemedi.');
       }
 
       case 'updateDealer': {
+        if (!['APPROVED', 'REJECTED'].includes(payload.status)) return NextResponse.json({ error: 'Geçersiz mağaza durumu.' }, { status: 400 });
         const success = await updateDealerStatus(
           payload.dealerId,
           payload.status,
@@ -326,29 +325,36 @@ export async function POST(req: NextRequest) {
       }
 
       case 'updateTicket': {
+        const allowedStatuses: TicketStatus[] = ['OPEN', 'ANSWERED', 'CLOSED'];
+        if (!allowedStatuses.includes(payload.status)) return NextResponse.json({ error: 'Geçersiz ticket durumu.' }, { status: 400 });
         const success = await updateTicketStatus(
           payload.ticketId,
           payload.status
         );
+        if (success) await recordAuditEvent({ eventType: 'ADMIN_TICKET_STATUS_CHANGED', userId: actor.userId, profileId: adminActorProfileId, metadata: { targetType: 'ticket', targetId: payload.ticketId, status: payload.status } });
         return NextResponse.json({ success });
       }
 
       case 'adminReplyTicket': {
+        if (!payload.message?.trim()) return NextResponse.json({ error: 'Mesaj boş olamaz.' }, { status: 400 });
+        const adminProfile = await getUserRepository().getProfileById(adminActorProfileId);
+        if (!adminProfile) return NextResponse.json({ error: 'Aktif yönetici karakteri bulunamadı.' }, { status: 403 });
         const result = await addTicketMessage({
           ticketId: payload.ticketId,
           senderRole: 'ADMIN',
-          senderName: 'Sanboard Yönetimi',
-          message: payload.message,
+          senderName: adminProfile.full_name,
+          message: payload.message.trim(),
         });
-        return NextResponse.json(result);
+        if (result.success) await recordAuditEvent({ eventType: 'ADMIN_TICKET_REPLIED', userId: actor.userId, profileId: adminActorProfileId, metadata: { targetType: 'ticket', targetId: payload.ticketId } });
+        return safeMutationResult(result, 'Ticket yanıtı gönderilemedi.');
       }
 
       default:
         return NextResponse.json({ error: 'Geçersiz işlem.' }, { status: 400 });
     }
-  } catch (error: any) {
+  } catch {
     return NextResponse.json(
-      { error: error?.message || 'İşlem gerçekleştirilemedi.' },
+      { error: 'İşlem gerçekleştirilemedi.' },
       { status: 500 }
     );
   }
