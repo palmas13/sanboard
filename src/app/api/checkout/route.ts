@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPaymentRepository, getDealerRepository } from '@/lib/db/repositories';
 import { getFleecaPaymentProvider, validateExternalPayment } from '@/lib/integrations/fleeca';
-import { getServerSession } from '@/lib/auth/session';
+import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(req);
-    if (!session?.profileId) return NextResponse.json({ error: 'Yetkisiz erişim.' }, { status: 401 });
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
     const orderId = new URL(req.url).searchParams.get('orderId');
     if (!orderId) return NextResponse.json({ error: 'orderId zorunludur.' }, { status: 400 });
     const payment = await getPaymentRepository().getPaymentOrder(orderId);
     if (!payment) return NextResponse.json({ error: 'Ödeme kaydı bulunamadı.' }, { status: 404 });
-    if (payment.profile_id !== session.profileId && session.role !== 'ADMIN') {
+    if (payment.profile_id !== actor.profileId) {
       return NextResponse.json({ error: 'Bu ödeme siparişini görüntüleme yetkiniz yok.' }, { status: 403 });
     }
     return NextResponse.json({
@@ -19,6 +19,11 @@ export async function GET(req: NextRequest) {
       amount: payment.amount,
       status: payment.status,
       entitlementType: payment.entitlement_type || 'LISTING_CREDIT',
+      packageName: payment.entitlement_type === 'CORPORATE_SUBSCRIPTION'
+        ? '30 Günlük Kurumsal Üyelik'
+        : payment.corporate_profile_id
+          ? '14 Günlük Kurumsal İlan'
+          : '7 Günlük Standart İlan',
     });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Sipariş bilgisi alınamadı.' }, { status: 500 });
@@ -27,20 +32,14 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(req);
+    const actor = await resolveOwnedActiveProfile(req);
     const body = await req.json().catch(() => ({}));
     const requestedPackage = body.packageCode || 'STANDARD_7_DAY';
     const idempotencyKey = req.headers.get('idempotency-key') || body.idempotencyKey;
 
     // Do not trust raw profileId submitted from browser; resolve from signed session
-    const activeProfileId = session?.profileId;
-
-    if (!activeProfileId) {
-      return NextResponse.json(
-        { error: 'Ödeme işlemi için doğrulanmış bir oturum ve aktif karakter zorunludur.' },
-        { status: 401 }
-      );
-    }
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+    const activeProfileId = actor.profileId;
 
     let chargeProfileId = activeProfileId;
     let corporateProfileId: string | null = null;
@@ -107,10 +106,8 @@ export async function POST(req: NextRequest) {
 // Process / simulate payment endpoint
 export async function PUT(req: NextRequest) {
   try {
-    const session = await getServerSession(req);
-    if (!session?.profileId) {
-      return NextResponse.json({ error: 'Ödeme işlemi için doğrulanmış oturum gereklidir.' }, { status: 401 });
-    }
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
     const { orderId, simulateSuccess } = await req.json();
 
     if (!orderId) {
@@ -123,7 +120,7 @@ export async function PUT(req: NextRequest) {
     const repo = getPaymentRepository();
     const payment = await repo.getPaymentOrder(orderId);
     if (!payment) return NextResponse.json({ error: 'Ödeme kaydı bulunamadı.' }, { status: 404 });
-    if (payment.profile_id !== session.profileId && session.role !== 'ADMIN') {
+    if (payment.profile_id !== actor.profileId) {
       return NextResponse.json({ error: 'Bu ödeme siparişini tamamlama yetkiniz yok.' }, { status: 403 });
     }
 

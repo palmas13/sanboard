@@ -318,6 +318,8 @@ export interface DealerProfile {
   status: DealerStatus;
   subscription_status?: CorporateSubscriptionStatus;
   subscription_expires_at?: string | null;
+  current_period_start?: string | null;
+  current_period_end?: string | null;
   boost_credits?: number;
   social_media?: CorporateSocialMedia[] | CorporateSocialMedia | { [key: string]: any } | null;
   follower_count?: number;

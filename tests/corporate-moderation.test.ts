@@ -369,7 +369,7 @@ describe('Sanboard – Corporate Listing Seller Context & Admin Moderation', () 
     });
 
     it('rejects boosting an individual listing with corporate store boost rights', async () => {
-      const res = await boostListing('store-bum-01', 'list-personal-01');
+      const res = await boostListing(ZADE_CHAR_ID, 'list-personal-01');
       assert.strictEqual(res.success, false);
       assert.match(res.error || '', /kurumsal/i);
 
@@ -378,7 +378,7 @@ describe('Sanboard – Corporate Listing Seller Context & Admin Moderation', () 
     });
 
     it('allows boosting a corporate listing and decrements store boost credits by 1', async () => {
-      const res = await boostListing('store-bum-01', 'list-corp-01');
+      const res = await boostListing(ZADE_CHAR_ID, 'list-corp-01');
       assert.strictEqual(res.success, true);
 
       // Verify boost fields on listing
@@ -450,7 +450,7 @@ describe('Sanboard – Corporate Listing Seller Context & Admin Moderation', () 
       assert.strictEqual(eligibility.reason, 'STORE_SUSPENDED');
 
       // Boost blocked
-      const boostRes = await boostListing('store-bum-01', 'list-corp-01');
+      const boostRes = await boostListing(ZADE_CHAR_ID, 'list-corp-01');
       assert.strictEqual(boostRes.success, false);
       assert.match(boostRes.error || '', /askıya alınmış/i);
 

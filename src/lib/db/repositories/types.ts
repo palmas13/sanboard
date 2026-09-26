@@ -133,7 +133,7 @@ export interface IDealerRepository {
   createApplication(params: { profileId: string; companyName: string; purpose: string }): Promise<{ success: boolean; application?: CorporateApplication; error?: string }>;
   reviewApplication?(applicationId: string, status: 'APPROVED' | 'REJECTED', rejectionReason?: string, reviewerUserId?: string): Promise<{ success: boolean; error?: string }>;
   activateSubscription?(dealerId: string): Promise<{ success: boolean; dealer?: CorporateProfile; error?: string }>;
-  boostListing?(dealerId: string, listingId: string): Promise<{ success: boolean; error?: string; remainingBoosts?: number; featured_until?: string }>;
+  boostListing?(actorProfileId: string, listingId: string, now?: Date): Promise<{ success: boolean; error?: string; code?: string; remainingBoosts?: number; featured_until?: string }>;
   toggleFollow?(followerProfileId: string, corporateProfileId: string): Promise<{ isFollowing: boolean; count: number; followerCount?: number }>;
   setFollow?(followerProfileId: string, corporateProfileId: string, shouldFollow: boolean): Promise<{ isFollowing: boolean; count: number; followerCount?: number }>;
   getFollowers?(corporateProfileId: string): Promise<CharacterProfile[]>;

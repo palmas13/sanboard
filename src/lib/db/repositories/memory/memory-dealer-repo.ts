@@ -65,10 +65,11 @@ export class MemoryDealerRepository implements IDealerRepository {
   }
 
   async boostListing(
-    dealerId: string,
-    listingId: string
-  ): Promise<{ success: boolean; error?: string; remainingBoosts?: number; featured_until?: string }> {
-    return boostListing(dealerId, listingId);
+    actorProfileId: string,
+    listingId: string,
+    now?: Date
+  ): Promise<{ success: boolean; error?: string; code?: string; remainingBoosts?: number; featured_until?: string }> {
+    return boostListing(actorProfileId, listingId, now);
   }
 
   async toggleFollow(

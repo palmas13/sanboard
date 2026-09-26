@@ -307,14 +307,14 @@ describe('Sanboard – Individual vs Corporate System & Lifecycle', () => {
       db.listings.push(corpListing);
 
       // Boost the corporate listing
-      const boostRes = await boostListing(store.id, 'lst-boosted');
+      const boostRes = await boostListing(store.owner_profile_id || store.profile_id, 'lst-boosted');
       assert.strictEqual(boostRes.success, true);
       assert.strictEqual(store.boost_credits, 2);
       assert.strictEqual(corpListing.is_featured, true);
       assert.ok(corpListing.featured_until);
 
       // Cannot boost same listing again while active
-      const repeatBoost = await boostListing(store.id, 'lst-boosted');
+      const repeatBoost = await boostListing(store.owner_profile_id || store.profile_id, 'lst-boosted');
       assert.strictEqual(repeatBoost.success, false);
       assert.match(repeatBoost.error || '', /zaten aktif olarak öne çıkarılmış/);
 

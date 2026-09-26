@@ -29,7 +29,7 @@ export default function FleecaCheckoutPage() {
     transactionId?: string;
     error?: string;
   } | null>(null);
-  const [order, setOrder] = useState<{ amount: number; entitlementType: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' } | null>(null);
+  const [order, setOrder] = useState<{ amount: number; entitlementType: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION'; packageName: string } | null>(null);
 
   const amount = order?.amount || 0;
   const buyerName = currentProfile?.full_name || 'Sanboard Kullanıcısı';
@@ -39,7 +39,7 @@ export default function FleecaCheckoutPage() {
     fetch(`/api/checkout?orderId=${encodeURIComponent(orderId)}`)
       .then((response) => response.json().then((data) => ({ response, data })))
       .then(({ response, data }) => {
-        if (response.ok) setOrder({ amount: data.amount, entitlementType: data.entitlementType });
+        if (response.ok) setOrder({ amount: data.amount, entitlementType: data.entitlementType, packageName: data.packageName });
         else setResult({ success: false, error: data.error || 'Sipariş bilgisi alınamadı.' });
       })
       .catch(() => setResult({ success: false, error: 'Sipariş bilgisi alınamadı.' }));
@@ -105,7 +105,7 @@ export default function FleecaCheckoutPage() {
             </div>
             <div className="flex items-center justify-between text-xs text-[var(--text-dim)]">
               <span>Paket</span>
-              <span className="text-[var(--text-main)] font-semibold">7 Günlük Standart İlan</span>
+              <span className="text-[var(--text-main)] font-semibold">{order?.packageName || 'Paket bilgisi yükleniyor'}</span>
             </div>
             <div className="flex items-center justify-between text-xs text-[var(--text-dim)]">
               <span>Alıcı Karakter</span>

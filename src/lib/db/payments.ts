@@ -74,7 +74,7 @@ export async function createCheckoutOrder(
 
   // Create payment record in DB
   const payment: Payment = {
-    id: `pay-${Date.now()}`,
+    id: `pay-${orderId}`,
     order_id: orderId,
     profile_id: profileId,
     package_id: pkg.id,
@@ -112,7 +112,8 @@ export async function createCheckoutOrder(
  */
 export async function completePaymentOrder(
   orderId: string,
-  externalPaymentId?: string
+  externalPaymentId?: string,
+  completedAt = new Date()
 ): Promise<{ success: boolean; credit?: ListingCredit; error?: string }> {
   if (process.env.DATA_STORE === 'supabase') {
     const repo = getPaymentRepository();
@@ -133,18 +134,22 @@ export async function completePaymentOrder(
     return { success: true, credit: existingCredit };
   }
 
+  if (externalPaymentId && db.payments.some((item) => item.id !== payment.id && item.external_payment_id === externalPaymentId)) {
+    return { success: false, error: 'Bu sağlayıcı işlemi başka bir ödeme için kullanılmış.' };
+  }
+
   payment.status = 'SUCCESS';
-  payment.paid_at = new Date().toISOString();
+  payment.paid_at = completedAt.toISOString();
   payment.external_payment_id = externalPaymentId;
 
   const pkg = db.packages.find((p) => p.id === payment.package_id);
   if (
     payment.entitlement_type === 'CORPORATE_SUBSCRIPTION'
     && pkg?.code === 'CORPORATE_SUBSCRIPTION_30_DAY'
+    && pkg.active
     && pkg.seller_type === 'CORPORATE'
     && pkg.duration_days === 30
-    && pkg.price > 0
-    && payment.amount === pkg.price
+    && payment.amount > 0
   ) {
     const dealer = db.dealers.find((item) => item.id === payment.corporate_profile_id);
     if (!dealer || dealer.status !== 'APPROVED' || dealer.moderation_status === 'DELETED') {
@@ -153,12 +158,32 @@ export async function completePaymentOrder(
       payment.external_payment_id = undefined;
       return { success: false, error: 'Üyelik ödemesine bağlı kurumsal mağaza kullanılamıyor.' };
     }
-    const now = new Date();
+    const now = completedAt;
     const currentEnd = dealer.subscription_expires_at ? new Date(dealer.subscription_expires_at) : now;
     const base = currentEnd > now ? currentEnd : now;
+    const periodStart = dealer.current_period_start ? new Date(dealer.current_period_start) : null;
+    const periodEnd = dealer.current_period_end ? new Date(dealer.current_period_end) : null;
+    if ((periodStart === null) !== (periodEnd === null)
+      || Boolean(periodStart && periodEnd && periodStart >= periodEnd)) {
+      payment.status = 'PENDING';
+      payment.paid_at = undefined;
+      payment.external_payment_id = undefined;
+      return { success: false, error: 'Kurumsal üyelik dönemi tutarsızdır.' };
+    }
+    const wasActiveAndUnexpired = dealer.subscription_status === 'ACTIVE' && currentEnd > now;
+    const legacyPeriodMissing = !periodStart && !periodEnd && wasActiveAndUnexpired;
+    const startsNewPeriod = !wasActiveAndUnexpired || Boolean(periodEnd && periodEnd <= now);
     dealer.subscription_status = 'ACTIVE';
-    dealer.subscription_expires_at = new Date(base.getTime() + 30 * 86400000).toISOString();
-    dealer.boost_credits = 3;
+    const nextSubscriptionEnd = new Date(base.getTime() + 30 * 86400000);
+    dealer.subscription_expires_at = nextSubscriptionEnd.toISOString();
+    if (startsNewPeriod) {
+      dealer.current_period_start = now.toISOString();
+      dealer.current_period_end = new Date(Math.min(now.getTime() + 30 * 86400000, nextSubscriptionEnd.getTime())).toISOString();
+      dealer.boost_credits = 3;
+    } else if (legacyPeriodMissing) {
+      dealer.current_period_start = now.toISOString();
+      dealer.current_period_end = new Date(Math.min(now.getTime() + 30 * 86400000, currentEnd.getTime())).toISOString();
+    }
     dealer.updated_at = now.toISOString();
     payment.entitlement_applied_at = now.toISOString();
     return { success: true };
@@ -175,7 +200,7 @@ export async function completePaymentOrder(
   const validListingPackage = Boolean(pkg && (
     (pkg.code === 'STANDARD_7_DAY' && pkg.seller_type === 'INDIVIDUAL' && pkg.duration_days === 7)
     || (pkg.code === 'CORPORATE_14_DAY' && pkg.seller_type === 'CORPORATE' && pkg.duration_days === 14)
-  ) && pkg.price > 0 && payment.amount === pkg.price);
+  ) && pkg.active && payment.amount > 0);
   if (!pkg || !validListingPackage) {
     payment.status = 'PENDING';
     payment.paid_at = undefined;
@@ -211,11 +236,11 @@ export async function completePaymentOrder(
     corporate_profile_id: corporateProfileId,
     amount: payment.amount,
     status: 'AVAILABLE',
-    created_at: new Date().toISOString(),
+    created_at: completedAt.toISOString(),
   };
 
   db.credits.push(credit);
-  payment.entitlement_applied_at = new Date().toISOString();
+  payment.entitlement_applied_at = completedAt.toISOString();
 
   return { success: true, credit };
 }

@@ -446,53 +446,23 @@ export class SupabaseDealerRepository implements IDealerRepository {
   }
 
   async boostListing(
-    dealerId: string,
+    actorProfileId: string,
     listingId: string
-  ): Promise<{ success: boolean; error?: string; remainingBoosts?: number; featured_until?: string }> {
+  ): Promise<{ success: boolean; error?: string; code?: string; remainingBoosts?: number; featured_until?: string }> {
     const client = this.getAdminClient();
-
-    const dealer = await this.getDealerById(dealerId);
-    if (!dealer) return { success: false, error: 'Kurumsal mağaza bulunamadı.' };
-    if (dealer.moderation_status && dealer.moderation_status !== 'ACTIVE') {
-      return { success: false, error: 'Kurumsal mağazanız askıya alınmış veya pasif durumdadır.' };
-    }
-    if (dealer.subscription_status !== 'ACTIVE') {
-      return { success: false, error: 'Kurumsal üyeliğiniz aktif değil. Öne çıkarma hakkı kullanamazsınız.' };
-    }
-    if (!dealer.boost_credits || dealer.boost_credits <= 0) {
-      return { success: false, error: 'Bu abonelik dönemi için öne çıkarma hakkınız tükenmiştir.' };
-    }
-
-    const { data: listing, error: listErr } = await client
-      .from('listings')
-      .select('id, status, is_featured, featured_until, seller_type, corporate_profile_id')
-      .eq('id', listingId)
-      .maybeSingle();
-
-    if (listErr || !listing) return { success: false, error: 'İlan bulunamadı.' };
-    if (listing.status !== 'ACTIVE') {
-      return { success: false, error: 'Yalnızca aktif yayındaki ilanlar öne çıkarılabilir.' };
-    }
-
-    // STRICT: Corporate boost can ONLY boost corporate listings belonging to this store (Requirement 10 & 11)
-    if (listing.seller_type !== 'CORPORATE' || listing.corporate_profile_id !== dealerId) {
-      return { success: false, error: 'Bireysel ilanlar kurumsal öne çıkarma hakları ile öne çıkarılamaz.' };
-    }
-
-    const now = new Date();
-    if (listing.is_featured && listing.featured_until && new Date(listing.featured_until) > now) {
-      return { success: false, error: 'Bu ilan zaten aktif olarak öne çıkarılmış durumdadır.' };
-    }
-
-    const boostEnd = new Date(now.getTime() + 24 * 3600 * 1000).toISOString();
-    const newCredits = dealer.boost_credits - 1;
-
-    await Promise.all([
-      client.from('listings').update({ is_featured: true, featured_until: boostEnd }).eq('id', listingId),
-      client.from('corporate_profiles').update({ boost_credits: newCredits }).eq('id', dealerId),
-    ]);
-
-    return { success: true, remainingBoosts: newCredits, featured_until: boostEnd };
+    const { data, error } = await client.rpc('consume_corporate_boost', {
+      p_actor_profile_id: actorProfileId,
+      p_listing_id: listingId,
+    });
+    if (error) return { success: false, error: 'Öne çıkarma işlemi tamamlanamadı.' };
+    const result = Array.isArray(data) ? data[0] : data;
+    return {
+      success: Boolean(result?.success),
+      error: result?.error || undefined,
+      code: result?.code || undefined,
+      remainingBoosts: result?.remaining_boosts,
+      featured_until: result?.featured_until,
+    };
   }
 
   async toggleFollow(

@@ -264,43 +264,61 @@ export async function activateSubscription(dealerId: string): Promise<{ success:
 }
 
 export async function boostListing(
-  dealerId: string,
-  listingId: string
-): Promise<{ success: boolean; error?: string; remainingBoosts?: number; featured_until?: string }> {
+  actorProfileId: string,
+  listingId: string,
+  now = new Date()
+): Promise<{ success: boolean; error?: string; code?: string; remainingBoosts?: number; featured_until?: string }> {
   if (process.env.DATA_STORE === 'supabase') {
     const repo = getDealerRepository();
     if (typeof repo.boostListing === 'function') {
-      return repo.boostListing(dealerId, listingId);
+      return repo.boostListing(actorProfileId, listingId, now);
     }
   }
 
   ensureDealers();
-  const dealer = db.dealers.find((d) => d.id === dealerId);
-  if (!dealer) return { success: false, error: 'Kurumsal mağaza bulunamadı.' };
+  const dealer = db.dealers.find((d) => (d.owner_profile_id || d.profile_id) === actorProfileId);
+  if (!dealer) return { success: false, code: 'LISTING_NOT_OWNED', error: 'Aktif karaktere ait kurumsal mağaza bulunamadı.' };
   if (dealer.moderation_status && dealer.moderation_status !== 'ACTIVE') {
-    return { success: false, error: 'Kurumsal mağazanız askıya alınmış veya pasif durumdadır.' };
+    return { success: false, code: 'LISTING_NOT_ELIGIBLE', error: 'Kurumsal mağazanız askıya alınmış veya pasif durumdadır.' };
   }
   if (dealer.subscription_status !== 'ACTIVE') {
-    return { success: false, error: 'Kurumsal üyeliğiniz aktif değil. Öne çıkarma hakkı kullanamazsınız.' };
+    return { success: false, code: 'SUBSCRIPTION_INACTIVE', error: 'Kurumsal üyeliğiniz aktif değil. Öne çıkarma hakkı kullanamazsınız.' };
   }
-  if (!dealer.boost_credits || dealer.boost_credits <= 0) {
-    return { success: false, error: 'Bu abonelik dönemi için öne çıkarma hakkınız tükenmiştir.' };
+  const expiresAt = dealer.subscription_expires_at ? new Date(dealer.subscription_expires_at) : null;
+  if (!expiresAt || expiresAt <= now) {
+    return { success: false, code: 'SUBSCRIPTION_EXPIRED', error: 'Kurumsal üyeliğinizin süresi dolmuş. Öne çıkarma hakkı kullanamazsınız.' };
+  }
+  const periodStart = dealer.current_period_start ? new Date(dealer.current_period_start) : null;
+  const periodEnd = dealer.current_period_end ? new Date(dealer.current_period_end) : null;
+  if (!periodStart && !periodEnd) {
+    dealer.current_period_start = now.toISOString();
+    dealer.current_period_end = new Date(Math.min(now.getTime() + 30 * 86400000, expiresAt.getTime())).toISOString();
+  } else if (!periodStart || !periodEnd || periodStart >= periodEnd) {
+    return { success: false, code: 'LISTING_NOT_ELIGIBLE', error: 'Kurumsal üyelik dönemi tutarsızdır.' };
+  }
+  if (periodEnd && periodEnd <= now) {
+    const nextPeriodEnd = new Date(Math.min(now.getTime() + 30 * 86400000, expiresAt.getTime()));
+    dealer.current_period_start = now.toISOString();
+    dealer.current_period_end = nextPeriodEnd.toISOString();
+    dealer.boost_credits = 3;
+  }
+  if (dealer.boost_credits == null || dealer.boost_credits <= 0) {
+    return { success: false, code: 'NO_BOOST_CREDITS', error: 'Bu abonelik dönemi için öne çıkarma hakkınız tükenmiştir.' };
   }
 
   const listing = db.listings.find((l) => l.id === listingId);
   if (!listing) return { success: false, error: 'İlan bulunamadı.' };
   if (listing.status !== 'ACTIVE') {
-    return { success: false, error: 'Yalnızca aktif yayındaki ilanlar öne çıkarılabilir.' };
+    return { success: false, code: 'LISTING_NOT_ELIGIBLE', error: 'Yalnızca aktif yayındaki ilanlar öne çıkarılabilir.' };
   }
 
   // STRICT: Corporate boost can ONLY boost corporate listings belonging to this store (Requirement 10 & 11)
   if (listing.seller_type !== 'CORPORATE' || listing.corporate_profile_id !== dealer.id) {
-    return { success: false, error: 'Bireysel ilanlar kurumsal öne çıkarma hakları ile öne çıkarılamaz.' };
+    return { success: false, code: 'LISTING_NOT_OWNED', error: 'İlan aktif karakterin kurumsal mağazasına ait değil.' };
   }
 
-  const now = new Date();
   if (listing.is_featured && listing.featured_until && new Date(listing.featured_until) > now) {
-    return { success: false, error: 'Bu ilan zaten aktif olarak öne çıkarılmış durumdadır.' };
+    return { success: false, code: 'ALREADY_BOOSTED', error: 'Bu ilan zaten aktif olarak öne çıkarılmış durumdadır.' };
   }
 
   dealer.boost_credits -= 1;
