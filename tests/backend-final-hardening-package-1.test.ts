@@ -8,6 +8,7 @@ import { GET as getDealerListings } from '@/app/api/dealers/listings/route';
 import { GET as getBootstrap } from '@/app/api/account/bootstrap/route';
 import { POST as reportListing } from '@/app/api/reports/route';
 import { GET as getFavorites } from '@/app/api/user/favorites/route';
+import { GET as getUserListings } from '@/app/api/user/listings/route';
 import { POST as saveProfileOnboarding } from '@/app/api/user/profile/route';
 import { GET as getOwnListing, PUT as updateOwnListing, DELETE as deleteOwnListing } from '@/app/api/user/listings/[id]/route';
 import { readFileSync } from 'node:fs';
@@ -78,6 +79,21 @@ describe('SANBOARD backend final hardening package 1', () => {
     assert.doesNotMatch(timing, /dealer;dur=/);
     assert.doesNotMatch(timing, /db;dur=/);
     assert.doesNotMatch(timing, /enrich;dur=/);
+  });
+
+  test('user listings exposes real sub-stage timings without changing the response body', async () => {
+    db.listings.push({ id: 'personal-alex-active', listing_number: '#PA', seller_profile_id: alex, seller_type: 'INDIVIDUAL', category: 'vehicle', subcategory: 'Otomobil', title: 'Personal Active', description: '', price: 1, location: '', status: 'ACTIVE', created_at: '', updated_at: '' });
+
+    const response = await getUserListings(request('/api/user/listings', alex));
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).map((item: any) => item.id), ['personal-alex-active']);
+
+    const timing = response.headers.get('server-timing') || '';
+    for (const metric of ['actor', 'listings_query', 'listings_serialize', 'listings', 'total']) {
+      assert.match(timing, new RegExp(`(?:^|, )${metric};dur=\\d+\\.\\d`));
+    }
+    assert.doesNotMatch(timing, /listings_enrich;dur=/);
+    assert.doesNotMatch(timing, /listings_map;dur=/);
   });
 
   test('account bootstrap is active-character scoped, not sibling-account aggregated', async () => {

@@ -11,8 +11,18 @@ export async function GET(req: NextRequest) {
     if (!actor.ok) return timing.respond(NextResponse.json({ error: actor.error }, { status: actor.status }));
 
     const repo = getListingRepository();
-    const listings = await timing.measure('listings', () => repo.getUserListings(actor.profileId));
-    return timing.respond(NextResponse.json(listings));
+    const listingsStartedAt = performance.now();
+    try {
+      const listings = await repo.getUserListings(actor.profileId, (stage, duration) => {
+        timing.add(`listings_${stage}`, duration);
+      });
+      const response = timing.measureSync('listings_serialize', () => NextResponse.json(listings));
+      timing.add('listings', performance.now() - listingsStartedAt);
+      return timing.respond(response);
+    } catch (error) {
+      timing.add('listings', performance.now() - listingsStartedAt);
+      throw error;
+    }
   } catch (error: any) {
     return timing.respond(NextResponse.json(
       { error: error?.message || 'İlanlar getirilemedi.' },

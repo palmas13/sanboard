@@ -71,7 +71,10 @@ export interface IListingRepository {
   markListingAsSold(id: string, profileId: string): Promise<{ success: boolean; error?: string }>;
   republishListing(id: string, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   removeListing?(id: string, profileId: string): Promise<{ success: boolean; error?: string }>;
-  getUserListings(profileId: string): Promise<Listing[]>;
+  getUserListings(
+    profileId: string,
+    onTiming?: (stage: 'query' | 'enrich' | 'map', duration: number) => void
+  ): Promise<Listing[]>;
   getCorporateListings(
     corporateProfileId: string,
     onTiming?: (stage: 'db' | 'enrich', duration: number) => void

@@ -47,8 +47,18 @@ export class MemoryListingRepository implements IListingRepository {
     return republishListing(id, profileId);
   }
 
-  async getUserListings(profileId: string) {
-    return getUserListings(profileId);
+  async getUserListings(
+    profileId: string,
+    onTiming?: (stage: 'query' | 'enrich' | 'map', duration: number) => void
+  ) {
+    const queryStartedAt = performance.now();
+    let listings;
+    try {
+      listings = await getUserListings(profileId);
+    } finally {
+      onTiming?.('query', performance.now() - queryStartedAt);
+    }
+    return listings;
   }
 
   async getCorporateListings(
