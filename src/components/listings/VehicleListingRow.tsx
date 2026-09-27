@@ -6,6 +6,7 @@ import { FavoriteButton } from './FavoriteButton';
 import { CompareButton } from '@/components/compare/CompareButton';
 import { PublicListingSummary } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
+import { getListingUrl } from '@/lib/urls';
 
 interface VehicleListingRowProps {
   listing: PublicListingSummary;
@@ -25,7 +26,7 @@ export function VehicleListingRow({ listing, className = '' }: VehicleListingRow
       className={`group relative surface-card rounded-xl border border-[var(--border-app)] hover:border-[#FF8A1F]/40 hover:bg-[var(--bg-surface-secondary)]/50 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-lg overflow-hidden ${className}`}
     >
       <Link
-        href={`/ilan/${listing.id}`}
+        href={getListingUrl(listing)}
         className="absolute inset-0 z-0"
         aria-label={`${listing.title} ilanını aç`}
       />

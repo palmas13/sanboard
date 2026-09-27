@@ -21,6 +21,7 @@ import { CustomSelect } from '@/components/ui/CustomSelect';
 import { formatCurrency } from '@/lib/utils/format';
 import { getVehicleBrands, getModelsByBrand } from '@/lib/constants/vehicleCatalog';
 import { resolveMediaUrl } from '@/lib/media/url';
+import { getListingUrl } from '@/lib/urls';
 
 const TITLE_MAX = 60;
 const DESC_MAX = 100;
@@ -299,7 +300,7 @@ export default function YeniIlanOlusturPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'İlan yayınlanamadı.');
 
-      router.push(`/ilan/${data.listing.id}?success=true`);
+      router.push(`${getListingUrl(data.listing)}?success=true`);
     } catch (err: any) {
       setError(err.message || 'Bir hata oluştu.');
       setSubmitting(false);

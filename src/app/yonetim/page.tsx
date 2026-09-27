@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { getCorporateUrl } from '@/lib/urls';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useRouter } from 'next/navigation';
 import {
@@ -1587,7 +1588,7 @@ export default function AdminPage() {
             {/* Management Actions */}
             <div className="pt-2 border-t border-[var(--border-app)] flex flex-wrap items-center justify-between gap-2">
               <Link
-                href={`/premium/${selectedStore.public_id || selectedStore.id}`}
+                href={getCorporateUrl(selectedStore)}
                 target="_blank"
                 className="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5"
               >

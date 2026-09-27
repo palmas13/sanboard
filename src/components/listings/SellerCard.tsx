@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { CharacterProfile, DealerProfile } from '@/types';
 import { Phone, Mail, Copy, Check, ExternalLink, ShieldCheck, Crown, Building2 } from 'lucide-react';
 import { resolveAvatarUrl, resolveMediaUrl } from '@/lib/media/url';
+import { getCorporateUrl } from '@/lib/urls';
 
 interface SellerCardProps {
   seller?: CharacterProfile;
@@ -46,7 +47,7 @@ export function SellerCard({ seller, dealer }: SellerCardProps) {
     : seller?.sanmail_email || '';
 
   const publicUrl = isCorporate
-    ? `/premium/${dealer?.public_id || dealer?.id}`
+    ? getCorporateUrl(dealer!)
     : `/user/${seller?.public_id || seller?.id}`;
 
   const publicStoreUrl = isCorporate ? publicUrl : null;

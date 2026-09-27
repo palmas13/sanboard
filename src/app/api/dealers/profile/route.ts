@@ -29,7 +29,7 @@ export async function PUT(req: NextRequest) {
 
     const body = await req.json();
     // Ignore any client-sent identity IDs
-    const { dealerId: _d, profileId: _p, ownerId: _o, ...updateData } = body;
+    const { dealerId: _d, profileId: _p, ownerId: _o, slug: _slug, public_id: _publicId, ...updateData } = body;
 
     const result = await repo.updateDealerProfile(existingDealer.id, updateData);
     if (!result.success) {

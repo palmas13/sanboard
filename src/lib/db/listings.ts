@@ -17,6 +17,7 @@ import { resolveMockUserId } from '@/lib/integrations/gtaworld/mock-identities';
 import { isListingOwnedByActiveProfile } from '../dealers/eligibility';
 import { getEffectiveListingStatus, isPublicListingVisible } from '../listings/visibility';
 import { getListingCoverPath, sortListingImages } from '../listings/images';
+import { isListingPublicId } from '../urls';
 
 export interface ListingFilterParams {
   category?: ListingCategory;
@@ -60,6 +61,7 @@ export function sanitizeListingForPublic(listing: Listing): PublicListingSummary
 
   return {
     id: listing.id,
+    public_id: listing.public_id,
     listing_number: listing.listing_number,
     category: listing.category,
     subcategory: listing.subcategory,
@@ -477,6 +479,29 @@ export async function getListingById(
   };
 }
 
+export async function getListingByPublicId(
+  publicId: string,
+  viewerProfileId?: string,
+  viewerUserId?: string
+): Promise<{ listing: PublicListingSummary | MemberListingDetail | null; isLocked: boolean; isOwner: boolean }> {
+  if (!isListingPublicId(publicId)) return { listing: null, isLocked: false, isOwner: false };
+  if (isSupabaseConfiguredMode()) {
+    return getSupabaseRepo().getListingByPublicId(publicId, viewerProfileId, viewerUserId);
+  }
+  const listing = db.listings.find((item) => item.public_id === publicId);
+  return listing
+    ? getListingById(listing.id, viewerProfileId, viewerUserId)
+    : { listing: null, isLocked: false, isOwner: false };
+}
+
+function generateUniqueListingPublicId(): string {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const candidate = String(Math.floor(100000 + Math.random() * 900000));
+    if (!db.listings.some((listing) => listing.public_id === candidate)) return candidate;
+  }
+  throw new Error('Benzersiz ilan public ID üretilemedi.');
+}
+
 /**
  * Create listing and atomically consume 1 available credit.
  */
@@ -545,6 +570,7 @@ export async function createListingWithCredit(
 
   const newListing: Listing = {
     id: newId,
+    public_id: generateUniqueListingPublicId(),
     listing_number: listingNumber,
     seller_profile_id: sellerProfileId,
     corporate_profile_id: corporateProfileId,

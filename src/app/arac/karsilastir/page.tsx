@@ -8,6 +8,7 @@ import { VehicleComparisonTable } from '@/components/compare/VehicleComparisonTa
 import { Listing } from '@/types';
 import { formatCurrency } from '@/lib/utils/format';
 import { resolveMediaUrl } from '@/lib/media/url';
+import { getListingUrl } from '@/lib/urls';
 
 export default function VehicleComparisonPage() {
   const { compareIds, removeFromCompare, clearCompare } = useCompare();
@@ -189,7 +190,7 @@ export default function VehicleComparisonPage() {
         {/* Action Link to Listing Page */}
         <div className="p-4 pt-0">
           <Link
-            href={`/ilan/${listing.id}`}
+            href={getListingUrl(listing)}
             className="w-full btn-secondary text-xs py-2 flex items-center justify-center gap-1.5 font-semibold"
           >
             <span>İlana Git</span>

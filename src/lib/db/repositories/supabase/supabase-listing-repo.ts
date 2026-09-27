@@ -7,6 +7,7 @@ import { deleteMediaSafely } from '@/lib/storage/lifecycle';
 import { resolveUserId, resolveProfileId, isUuid } from '../../id-mapper';
 import { getEffectiveListingStatus } from '@/lib/listings/visibility';
 import { getListingCoverPath, sortListingImages } from '@/lib/listings/images';
+import { isListingPublicId } from '@/lib/urls';
 
 export function isPublicCorporateListingVisible(item: any): boolean {
   if (item.seller_type !== 'CORPORATE') return true;
@@ -114,6 +115,7 @@ export class SupabaseListingRepository implements IListingRepository {
       .from('listings')
       .select(`
         id,
+        public_id,
         listing_number,
         category,
         subcategory,
@@ -155,7 +157,7 @@ export class SupabaseListingRepository implements IListingRepository {
     let { data, error } = await query;
 
     // Defensive fallback if columns from pending migrations are not yet present on remote DB before migration execution
-    if (error && (error.message?.includes('is_featured') || error.message?.includes('seller_type') || error.message?.includes('moderation_status'))) {
+    if (error && (error.message?.includes('public_id') || error.message?.includes('is_featured') || error.message?.includes('seller_type') || error.message?.includes('moderation_status'))) {
       let fallbackQuery = client
         .from('listings')
         .select(`
@@ -259,6 +261,7 @@ export class SupabaseListingRepository implements IListingRepository {
 
       return {
         id: item.id,
+        public_id: item.public_id,
         listing_number: item.listing_number,
         category: item.category,
         subcategory: item.subcategory,
@@ -369,6 +372,7 @@ export class SupabaseListingRepository implements IListingRepository {
 
     const candidateSelect = `
         id,
+        public_id,
         listing_number,
         category,
         subcategory,
@@ -503,6 +507,7 @@ export class SupabaseListingRepository implements IListingRepository {
 
       return {
         id: cand.id,
+        public_id: cand.public_id,
         listing_number: cand.listing_number,
         category: cand.category,
         subcategory: cand.subcategory,
@@ -606,6 +611,7 @@ export class SupabaseListingRepository implements IListingRepository {
       return {
         listing: {
           id: listing.id,
+          public_id: listing.public_id,
           listing_number: listing.listing_number,
           category: listing.category,
           subcategory: listing.subcategory,
@@ -642,6 +648,20 @@ export class SupabaseListingRepository implements IListingRepository {
       isLocked: false,
       isOwner,
     };
+  }
+
+  async getListingByPublicId(
+    publicId: string,
+    viewerProfileId?: string,
+    viewerUserId?: string
+  ): Promise<{ listing: MemberListingDetail | PublicListingSummary | null; isLocked: boolean; isOwner: boolean }> {
+    if (!isListingPublicId(publicId)) return { listing: null, isLocked: false, isOwner: false };
+    const client = this.getAdminClient();
+    const { data, error } = await client.from('listings').select('id').eq('public_id', publicId).maybeSingle();
+    if (error) throw new Error(`Supabase error fetching listing by public_id: ${error.message}`);
+    return data?.id
+      ? this.getListingById(data.id, viewerProfileId, viewerUserId)
+      : { listing: null, isLocked: false, isOwner: false };
   }
 
   async createListing(input: CreateListingInput, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }> {

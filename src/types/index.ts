@@ -111,6 +111,7 @@ export interface PropertyDetails {
 
 export interface Listing {
   id: string;
+  public_id?: string;
   listing_number: string; // e.g. #SB-100028
   seller_profile_id: string;
   corporate_profile_id?: string;
@@ -143,6 +144,7 @@ export interface Listing {
 // Public-safe listing representation for unauthenticated visitors
 export interface PublicListingSummary {
   id: string;
+  public_id?: string;
   listing_number: string;
   corporate_profile_id?: string;
   seller_type?: SellerType;

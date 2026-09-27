@@ -4,6 +4,7 @@ import { Sparkles } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/format';
 import { PublicListingSummary } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
+import { getListingUrl } from '@/lib/urls';
 
 interface SimilarListingCardProps {
   listing: PublicListingSummary;
@@ -23,7 +24,7 @@ export function SimilarListingCard({ listing, className = '', style }: SimilarLi
       style={style}
       className={`group surface-card rounded-xl border border-[var(--border-app)] hover:border-[#FF8A1F]/40 hover:bg-[var(--bg-surface-secondary)]/50 transition-all duration-200 hover:-translate-y-1 hover:shadow-md overflow-hidden flex flex-col justify-between w-[240px] sm:w-[260px] shrink-0 ${className}`}
     >
-      <Link href={`/ilan/${listing.id}`} className="block flex-1 flex flex-col">
+      <Link href={getListingUrl(listing)} className="block flex-1 flex flex-col">
         {/* Cover Thumbnail */}
         <div className="relative aspect-[16/10] w-full overflow-hidden bg-[var(--bg-surface-secondary)]">
           <img

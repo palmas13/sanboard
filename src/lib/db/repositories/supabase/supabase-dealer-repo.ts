@@ -379,13 +379,11 @@ export class SupabaseDealerRepository implements IDealerRepository {
         .update({ status: 'APPROVED', reviewed_by: reviewerUserId, reviewed_at: new Date().toISOString() })
         .eq('id', applicationId);
 
-      const slug = app.company_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
       const { data: newStore } = await client
         .from('corporate_profiles')
         .insert({
           owner_profile_id: targetProfileId,
           company_name: app.company_name,
-          slug,
           description: app.purpose,
           status: 'APPROVED',
           subscription_status: 'INACTIVE',

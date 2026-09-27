@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
+import type { Metadata } from 'next';
 import {
   MapPin,
   Calendar,
@@ -21,12 +22,40 @@ import { SimilarListings } from '@/components/listings/SimilarListings';
 import { getOptionalSimilarListings } from '@/lib/db/optional-listing-data';
 import { MemberListingDetail } from '@/types';
 import { sortListingImages } from '@/lib/listings/images';
+import { getAbsoluteUrl, getListingUrl, parseListingRouteIdentifier } from '@/lib/urls';
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
 export const revalidate = 30;
+
+async function resolveListing(identifier: string, profileId?: string, userId?: string) {
+  const repo = getListingRepository();
+  const parsed = parseListingRouteIdentifier(identifier);
+  return parsed.publicId
+    ? repo.getListingByPublicId(parsed.publicId, profileId, userId)
+    : repo.getListingById(parsed.legacyId!, profileId, userId);
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const { listing } = await resolveListing(id);
+  if (!listing) return {};
+  const canonical = getAbsoluteUrl(getListingUrl(listing));
+  const image = 'cover_image' in listing
+    ? listing.cover_image
+    : 'images' in listing
+      ? listing.images?.[0]?.storage_path
+      : undefined;
+  const description = 'description' in listing ? listing.description : `${listing.title} ilanını Sanboard üzerinde inceleyin.`;
+  return {
+    title: listing.title,
+    description,
+    alternates: { canonical },
+    openGraph: { title: listing.title, description, url: canonical, images: image ? [image] : undefined },
+  };
+}
 
 function VehicleSpecSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -87,11 +116,14 @@ export default async function ListingDetailPage({ params }: PageProps) {
   const profileId = session?.profileId;
 
   const repo = getListingRepository();
-  const { listing, isLocked, isOwner } = await repo.getListingById(id, profileId, userId);
+  const { listing, isLocked, isOwner } = await resolveListing(id, profileId, userId);
 
   if (!listing) {
     notFound();
   }
+
+  const canonicalPath = getListingUrl(listing);
+  if (`/ilan/${id}` !== canonicalPath) permanentRedirect(canonicalPath);
 
   const isVehicle = listing.category === 'vehicle';
   const publicCoverImage = 'cover_image' in listing ? listing.cover_image : undefined;

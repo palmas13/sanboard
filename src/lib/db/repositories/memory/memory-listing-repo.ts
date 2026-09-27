@@ -11,6 +11,7 @@ import {
   getUserFavorites,
   ListingFilterParams,
 } from '../../listings';
+import { db } from '../../store';
 
 export class MemoryListingRepository implements IListingRepository {
   async getPublicListings(params?: ListingFilterParams) {
@@ -29,6 +30,13 @@ export class MemoryListingRepository implements IListingRepository {
 
   async getListingById(id: string, viewerProfileId?: string, viewerUserId?: string) {
     return getListingById(id, viewerProfileId, viewerUserId);
+  }
+
+  async getListingByPublicId(publicId: string, viewerProfileId?: string, viewerUserId?: string) {
+    const listing = db.listings.find((item) => item.public_id === publicId);
+    return listing
+      ? getListingById(listing.id, viewerProfileId, viewerUserId)
+      : { listing: null, isLocked: false, isOwner: false };
   }
 
   async createListing(input: CreateListingInput, profileId: string) {

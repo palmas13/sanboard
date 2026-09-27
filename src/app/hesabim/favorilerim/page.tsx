@@ -7,6 +7,7 @@ import { Heart, Loader2, MapPin, Calendar, Clock, AlertCircle } from 'lucide-rea
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { resolveMediaUrl } from '@/lib/media/url';
+import { getListingUrl } from '@/lib/urls';
 
 export default function HesabimFavorilerimPage() {
   const { user, currentProfile } = useAuth();
@@ -127,7 +128,7 @@ export default function HesabimFavorilerimPage() {
                     </div>
                   ) : (
                     <Link
-                      href={`/ilan/${listing.id}`}
+                      href={getListingUrl(listing)}
                       className="w-full btn-secondary text-xs py-2 block text-center"
                     >
                       İlan Detayına Git

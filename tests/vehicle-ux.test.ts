@@ -633,7 +633,7 @@ describe('Sanboard – Vehicle UX Overhaul, Similar Listings & Comparison Tests'
     const compareIndex = source.indexOf('<CompareButton');
     const favoriteIndex = source.indexOf('<FavoriteButton');
 
-    assert.ok(source.includes('href={`/ilan/${listing.id}`}'));
+    assert.ok(source.includes('href={getListingUrl(listing)}'));
     assert.ok(source.includes('className="absolute inset-0 z-0"'));
     assert.ok(linkCloseIndex > -1, 'Full-row navigation link must be self-closing');
     assert.ok(compareIndex > linkCloseIndex, 'CompareButton must be outside the navigation link');

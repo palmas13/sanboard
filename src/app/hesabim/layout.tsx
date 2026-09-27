@@ -21,6 +21,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { getCorporateSidebarLabel, resolveCorporateHeaderActions } from '@/lib/dealers/status';
+import { getCorporateUrl } from '@/lib/urls';
 
 export default function HesabimLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -171,7 +172,7 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           {canOpenStore && (
             <Link
-              href={`/premium/${corporateEligibility?.dealer?.public_id || corporateEligibility?.dealer?.id}`}
+              href={getCorporateUrl(corporateEligibility!.dealer!)}
               className="btn-secondary text-xs py-2.5 px-4 shadow-sm"
               target="_blank"
             >

@@ -5,6 +5,7 @@ import { normalizePhone } from '../utils/format';
 import { normalizeSocialMedia } from '../dealers/social';
 import { recordAuditEvent } from '../audit';
 import { notifyNewFollowerBestEffort } from './follow-notifications';
+import { slugify } from '../urls';
 
 export function ensureDealers() {
   if (!db.dealers) {
@@ -72,6 +73,17 @@ export async function getDealerBySlug(slug: string): Promise<DealerProfile | nul
   }
   ensureDealers();
   return db.dealers.find((d) => d.slug === slug) || null;
+}
+
+function generateUniqueCorporateSlug(companyName: string): string {
+  const base = slugify(companyName);
+  let candidate = base;
+  let suffix = 2;
+  while (db.dealers.some((dealer) => dealer.slug === candidate)) {
+    candidate = `${base}-${suffix}`;
+    suffix += 1;
+  }
+  return candidate;
 }
 
 export async function getApplicationByProfileId(profileId: string): Promise<CorporateApplication | null> {
@@ -187,7 +199,7 @@ export async function reviewApplication(
         profile_id: app.applicant_profile_id,
         owner_profile_id: app.applicant_profile_id,
         company_name: app.company_name,
-        slug: app.company_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+        slug: generateUniqueCorporateSlug(app.company_name),
         description: app.purpose,
         logo_url: profile?.avatar_url || '',
         banner_url: '',

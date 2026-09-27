@@ -18,6 +18,7 @@ import {
 import { formatCurrency, formatTimeRemaining, formatDate } from '@/lib/utils/format';
 import { Listing } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
+import { getListingUrl } from '@/lib/urls';
 
 export default function HesabimIlanlarimPage() {
   const { currentProfile } = useAuth();
@@ -198,7 +199,7 @@ export default function HesabimIlanlarimPage() {
                     </Link>
 
                     <Link
-                      href={`/ilan/${listing.id}`}
+                      href={getListingUrl(listing)}
                       className="flex-1 sm:flex-none btn-secondary text-xs py-2 px-3 flex items-center justify-center gap-1"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />

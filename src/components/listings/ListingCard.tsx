@@ -5,6 +5,7 @@ import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { FavoriteButton } from './FavoriteButton';
 import { PublicListingSummary } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
+import { getListingUrl } from '@/lib/urls';
 
 interface ListingCardProps {
   listing: PublicListingSummary;
@@ -23,7 +24,7 @@ export function ListingCard({ listing, className = '' }: ListingCardProps) {
     <div
       className={`group surface-card surface-card-hover overflow-hidden flex flex-col justify-between ${className}`}
     >
-      <Link href={`/ilan/${listing.id}`} className="block flex-1">
+      <Link href={getListingUrl(listing)} className="block flex-1">
         {/* Cover Photo & Badges */}
         <div className="relative aspect-[16/10] w-full overflow-hidden bg-[var(--bg-surface-secondary)]">
           <img

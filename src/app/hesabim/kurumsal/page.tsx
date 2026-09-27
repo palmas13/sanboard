@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
+import { getListingUrl } from '@/lib/urls';
 import {
   Building2,
   Crown,
@@ -947,7 +948,7 @@ export default function HesabimKurumsalPage() {
                             </button>
                           )}
 
-                          <Link href={`/ilan/${l.id}`} className="text-[var(--text-muted)] hover:text-[var(--text-main)]">
+                          <Link href={getListingUrl(l)} className="text-[var(--text-muted)] hover:text-[var(--text-main)]">
                             Gör
                           </Link>
                           <Link href={`/hesabim/ilanlarim/${l.id}/duzenle`} className="text-[#FF8A1F] hover:underline font-medium">

@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     const actor = await resolveOwnedActiveProfile(req);
     if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
     const body = await req.json();
-    const { sellerProfileId: _sellerProfileId, profileId: _profileId, userId: _userId, corporate, isCorporate, ...listingData } = body;
+    const { sellerProfileId: _sellerProfileId, profileId: _profileId, userId: _userId, public_id: _publicId, slug: _slug, corporate, isCorporate, ...listingData } = body;
     const trustedProfileId = actor.profileId;
 
     // Corporate Seller Authorization Check (Section 6 & 7)
