@@ -378,7 +378,6 @@ export default function AdminPage() {
     const q = searchListingQuery.toLowerCase();
     return (
       l.title?.toLowerCase().includes(q) ||
-      l.listing_number?.toLowerCase().includes(q) ||
       l.location?.toLowerCase().includes(q)
     );
   });
@@ -607,7 +606,6 @@ export default function AdminPage() {
             <table className="w-full text-left text-xs">
               <thead className="bg-[var(--bg-surface-secondary)] border-b border-[var(--border-app)] text-[var(--text-muted)] uppercase tracking-wider font-semibold">
                 <tr>
-                  <th className="py-3 px-4">İlan No</th>
                   <th className="py-3 px-4">Başlık</th>
                   <th className="py-3 px-4">Kategori</th>
                   <th className="py-3 px-4">Fiyat</th>
@@ -619,7 +617,6 @@ export default function AdminPage() {
               <tbody className="divide-y divide-[var(--border-app)]">
                 {filteredListings.map((l: any) => (
                   <tr key={l.id} className="hover:bg-[var(--bg-surface-secondary)]/30 transition-colors">
-                    <td className="py-3 px-4 font-mono font-semibold text-[var(--text-main)]">{l.listing_number}</td>
                     <td className="py-3 px-4 font-medium text-[var(--text-main)] max-w-xs truncate">{l.title}</td>
                     <td className="py-3 px-4">
                       <span className="badge-tag">{l.subcategory}</span>

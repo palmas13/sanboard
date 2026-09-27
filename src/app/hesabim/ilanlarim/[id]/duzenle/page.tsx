@@ -334,8 +334,6 @@ export default function IlanDuzenlePage({
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>İlanlarıma Dön</span>
             </Link>
-            <span className="text-[var(--text-dim)]">•</span>
-            <span className="badge-tag text-[10px] font-mono">{listingData?.listing_number}</span>
           </div>
           <h2 className="text-xl font-bold text-[var(--text-main)] flex items-center gap-2">
             {category === 'vehicle' ? <Car className="w-5 h-5 text-[#FF8A1F]" /> : <Home className="w-5 h-5 text-[#FF8A1F]" />}

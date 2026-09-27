@@ -162,8 +162,6 @@ export default async function ListingDetailPage({ params }: PageProps) {
         </Link>
         <span>/</span>
         <span className="text-[var(--text-muted)]">{listing.subcategory}</span>
-        <span>/</span>
-        <span className="text-[#FF8A1F] font-semibold">{listing.listing_number}</span>
       </nav>
 
       {/* SECTION A: INDEPENDENT LISTING HEADER */}
@@ -174,9 +172,6 @@ export default async function ListingDetailPage({ params }: PageProps) {
             <div className="flex items-center gap-2.5 flex-wrap">
               <span className="badge-tag badge-brand font-semibold text-xs">
                 {listing.subcategory}
-              </span>
-              <span className="text-xs font-mono font-medium text-[var(--text-dim)]">
-                {listing.listing_number}
               </span>
             </div>
 
@@ -296,13 +291,10 @@ export default async function ListingDetailPage({ params }: PageProps) {
             <>
               {/* Technical Specifications Compact Grid */}
               <div className="surface-card rounded-2xl border border-[var(--border-app)] overflow-hidden shadow-sm">
-                <div className="px-4 py-3 bg-[var(--bg-surface-secondary)] border-b border-[var(--border-app)] flex items-center justify-between">
+                <div className="px-4 py-3 bg-[var(--bg-surface-secondary)] border-b border-[var(--border-app)]">
                   <h3 className="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider">
                     {isVehicle ? 'Teknik Özellikler' : 'Mülk Özellikleri'}
                   </h3>
-                  <span className="text-[11px] font-mono text-[var(--text-dim)]">
-                    {listing.listing_number}
-                  </span>
                 </div>
 
                 <div className="p-4 sm:p-5 space-y-4">

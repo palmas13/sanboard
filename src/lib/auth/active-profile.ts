@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { getServerSession, getServerSessionWithTiming, SessionTimingStage } from '@/lib/auth/session';
 import { getUserRepository } from '@/lib/db/repositories';
 import { CharacterProfile } from '@/types';
+import { isTestExternalCharacterId, isTestLoginEnabled } from '@/lib/auth/test-login';
 
 export type ActiveProfileResolution =
   | { ok: true; profileId: string; userId: string; role: 'USER' | 'ADMIN'; profile: CharacterProfile }
@@ -46,6 +47,9 @@ export async function resolveOwnedActiveProfile(
   try {
     if (!profile || profile.user_id !== session.userId) {
       return { ok: false, status: 403, error: 'Aktif karakter profili bu hesaba ait değil.' };
+    }
+    if (isTestExternalCharacterId(profile.external_character_id) && !isTestLoginEnabled()) {
+      return { ok: false, status: 403, error: 'Test login devre dışı.' };
     }
 
     return {

@@ -85,7 +85,7 @@ export default function HesabimFavorilerimPage() {
                     ) : null}
                   </div>
                   <div className="min-w-0 space-y-1.5 py-1">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{listing.category === 'vehicle' ? 'Araç' : 'Mülk'} · {listing.listing_number}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{listing.category === 'vehicle' ? 'Araç' : 'Mülk'} · {listing.subcategory}</p>
                     <h3 className="truncate text-sm font-bold text-[var(--text-main)]">{listing.title}</h3>
                     <div className="flex items-baseline gap-2 flex-wrap">
                       {listing.previous_price && listing.previous_price !== listing.price && (

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { syncExternalGameAccount } from '@/lib/auth/gtaworld-sync';
 import { createCharacterSelectionToken, clearSessionCookieOnResponse, setCharacterSelectionCookieOnResponse } from '@/lib/auth/session';
-import { assertTestLoginAccountNamespace, isTestLoginEnabled } from '@/lib/auth/test-login';
+import { assertTestLoginAccountNamespace, isTestLoginEnabled, reconcileTestLoginRoles } from '@/lib/auth/test-login';
 import { MockGtaWorldAuthProvider } from '@/lib/integrations/gtaworld/mock-provider';
 import { recordAuditEvent } from '@/lib/audit';
 import { normalizeInternalRedirect } from '@/lib/auth/redirect';
@@ -15,7 +15,8 @@ export async function GET(req: NextRequest) {
     const provider = new MockGtaWorldAuthProvider();
     const externalAccount = await provider.fetchAccount('temporary-test-login');
     assertTestLoginAccountNamespace(externalAccount);
-    const { user, profiles } = await syncExternalGameAccount(externalAccount);
+    const { user, profiles: synchronizedProfiles } = await syncExternalGameAccount(externalAccount);
+    const profiles = await reconcileTestLoginRoles(user, synchronizedProfiles);
     if (user.status !== 'ACTIVE') return NextResponse.json({ error: 'Bu test hesabı ile oturum açılamaz.' }, { status: 403 });
 
     await recordAuditEvent({ eventType: 'AUTH_LOGIN_SUCCESS', userId: user.id, metadata: { provider: 'temporary-test-login', characterCount: profiles.length } });

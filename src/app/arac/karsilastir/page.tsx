@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeftRight, ArrowLeft, Trash2, ExternalLink, Sparkles, Building2, User, AlertCircle } from 'lucide-react';
+import { ArrowLeftRight, ArrowLeft, Trash2, ExternalLink, Sparkles, Building2, User, AlertCircle, Heart } from 'lucide-react';
 import { useCompare } from '@/components/compare/CompareContext';
 import { VehicleComparisonTable } from '@/components/compare/VehicleComparisonTable';
 import { Listing } from '@/types';
@@ -119,14 +119,14 @@ export default function VehicleComparisonPage() {
       listing.subcategory;
 
     return (
-      <div className="surface-card rounded-2xl border border-[var(--border-app)] overflow-hidden flex flex-col justify-between shadow-sm">
+      <article className="group overflow-hidden rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] shadow-[0_18px_55px_rgba(0,0,0,0.18)] transition-transform duration-300 hover:-translate-y-0.5">
         <div>
           {/* Cover Photo */}
           <div className="relative aspect-[16/10] w-full overflow-hidden bg-[var(--bg-surface-secondary)]">
             <img
               src={displayImg}
               alt={listing.title}
-              className="w-full h-full object-cover"
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
             />
             <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
               {listing.is_featured && (
@@ -151,7 +151,7 @@ export default function VehicleComparisonPage() {
           </div>
 
           {/* Details */}
-          <div className="p-4 sm:p-5 space-y-2">
+          <div className="space-y-3 p-4 sm:p-5">
             <div className="flex items-center gap-2">
               {isCorporate ? (
                 <span className="badge-tag bg-blue-500/15 text-blue-400 border-blue-500/30 text-[10px] font-semibold flex items-center gap-1">
@@ -164,8 +164,9 @@ export default function VehicleComparisonPage() {
                   Bireysel
                 </span>
               )}
-              <span className="font-mono text-[11px] text-[var(--text-dim)]">
-                {listing.listing_number}
+              <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--text-muted)]">
+                <Heart className="h-3.5 w-3.5 text-[#FF8A1F]" />
+                {listing.favorite_count || 0}
               </span>
             </div>
 
@@ -188,16 +189,24 @@ export default function VehicleComparisonPage() {
         </div>
 
         {/* Action Link to Listing Page */}
-        <div className="p-4 pt-0">
+        <div className="grid grid-cols-2 gap-2 border-t border-[var(--border-app)] p-4">
           <Link
             href={getListingUrl(listing)}
-            className="w-full btn-secondary text-xs py-2 flex items-center justify-center gap-1.5 font-semibold"
+            className="btn-primary flex items-center justify-center gap-1.5 py-2 text-xs font-semibold"
           >
             <span>İlana Git</span>
             <ExternalLink className="w-3.5 h-3.5" />
           </Link>
+          <button
+            type="button"
+            onClick={() => removeFromCompare(id)}
+            className="btn-secondary flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-[var(--text-muted)] hover:text-red-400"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span>Çıkar</span>
+          </button>
         </div>
-      </div>
+      </article>
     );
   };
 
@@ -227,8 +236,14 @@ export default function VehicleComparisonPage() {
       </div>
 
       {/* Page Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--border-app)]">
+      <div className="relative overflow-hidden rounded-2xl border border-[var(--border-app)] bg-gradient-to-br from-[#FF8A1F]/10 via-[var(--bg-surface)] to-[var(--bg-surface)] p-5 sm:p-7">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-52 w-52 rounded-full bg-[#FF8A1F]/10 blur-3xl" />
+        <div className="relative flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
+          <div className="mb-2 inline-flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#FF9D45]">
+            <Sparkles className="h-3.5 w-3.5" />
+            Sanboard araç kıyaslama
+          </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] flex items-center gap-3">
             <ArrowLeftRight className="w-7 h-7 text-[#FF8A1F]" />
             <span>İlanları Karşılaştır</span>
@@ -248,6 +263,7 @@ export default function VehicleComparisonPage() {
             <span>Karşılaştırmayı Sıfırla</span>
           </button>
         )}
+        </div>
       </div>
 
       {/* Loading Skeleton */}
@@ -272,7 +288,7 @@ export default function VehicleComparisonPage() {
       ) : (
         <div className="space-y-8">
           {/* Top 2 Vehicle Cards Side-by-Side */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+          <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 lg:gap-6">
             {renderTopCard(listingA, compareIds[0], 1)}
             {renderTopCard(listingB, compareIds[1], 2)}
           </div>
@@ -280,10 +296,16 @@ export default function VehicleComparisonPage() {
           {/* Technical Specs Comparison Table */}
           {listingA && (
             <div className="space-y-3">
-              <h2 className="text-base font-bold text-[var(--text-main)] flex items-center gap-2">
+              <div className="flex items-end justify-between gap-4">
+                <div>
+              <h2 className="flex items-center gap-2 text-base font-bold text-[var(--text-main)]">
                 <span className="w-2 h-2 rounded-full bg-[#FF8A1F]" />
                 <span>Teknik Özellik Kıyaslaması</span>
               </h2>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">Turuncu işaretli satırlar yalnızca değerlerin farklı olduğunu gösterir.</p>
+                </div>
+                <span className="hidden text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] sm:block">{listingB ? '2 araç seçildi' : '1 araç seçildi'}</span>
+              </div>
               <VehicleComparisonTable listingA={listingA} listingB={listingB} />
             </div>
           )}

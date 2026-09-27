@@ -166,9 +166,6 @@ export default function HesabimIlanlarimPage() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="badge-tag text-[10px]">{listing.subcategory}</span>
-                        <span className="text-[11px] font-mono text-[var(--text-dim)]">
-                          {listing.listing_number}
-                        </span>
                       </div>
                       <h3 className="font-bold text-sm text-[var(--text-main)] line-clamp-1">
                         {listing.title}
@@ -246,9 +243,6 @@ export default function HesabimIlanlarimPage() {
                 <div className="flex items-center gap-2">
                   <span className="badge-tag bg-[var(--color-danger-subtle)] text-[var(--color-danger)] font-bold text-[10px]">
                     SÜRESİ DOLDU
-                  </span>
-                  <span className="text-[11px] font-mono text-[var(--text-dim)]">
-                    {listing.listing_number}
                   </span>
                 </div>
                 <h3 className="font-bold text-sm text-[var(--text-main)]">{listing.title}</h3>

@@ -46,7 +46,7 @@ export default async function HomePage() {
               <span>İlan Ver</span>
               <span className="hero-cta-icon"><ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" /></span>
             </Link>
-            <Link href="/kesfet" className="hero-cta hero-cta-secondary group">
+            <Link href="/ilanlari-kesfet" className="hero-cta hero-cta-secondary group">
               <span>İlanları Keşfet</span>
               <ArrowUpRight className="h-4 w-4 text-[#FF9D45] transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
             </Link>

@@ -16,10 +16,10 @@ const navLinks = [
 ];
 
 const infoLinks = [
-  { href: '/sss', label: 'S.S.S', description: 'Sık sorulan sorulara hızlı yanıtlar.', icon: BadgeHelp },
-  { href: '/kullanim-kosullari', label: 'Kullanım Koşulları', description: 'Platform kuralları ve ilan esasları.', icon: FileCheck2 },
-  { href: '/gizlilik', label: 'Gizlilik', description: 'Veriler ve görünürlük politikamız.', icon: ShieldCheck },
-  { href: '/hakkimizda', label: 'Hakkımızda', description: 'Sanboard’un yaklaşımı ve platform mantığı.', icon: Info },
+  { href: '/kesfet?section=sss', label: 'S.S.S', description: 'Sık sorulan sorulara hızlı yanıtlar.', icon: BadgeHelp },
+  { href: '/kesfet?section=kullanim-kosullari', label: 'Kullanım Koşulları', description: 'Platform kuralları ve ilan esasları.', icon: FileCheck2 },
+  { href: '/kesfet?section=gizlilik', label: 'Gizlilik', description: 'Veriler ve görünürlük politikamız.', icon: ShieldCheck },
+  { href: '/kesfet?section=hakkimizda', label: 'Hakkımızda', description: 'Sanboard’un yaklaşımı ve platform mantığı.', icon: Info },
 ];
 
 const accountLinks = [
@@ -56,7 +56,7 @@ export function Navbar() {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  const isInfoActive = infoLinks.some((link) => pathname === link.href);
+  const isInfoActive = pathname === '/kesfet';
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-[color:var(--border-app)]/80 bg-[var(--bg-surface)]/88 shadow-[0_10px_30px_rgba(0,0,0,0.08)] backdrop-blur-xl transition-colors">

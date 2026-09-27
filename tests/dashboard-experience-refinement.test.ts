@@ -51,14 +51,16 @@ describe('dashboard experience refinement regressions', () => {
     const navbar = source('src/components/layout/Navbar.tsx');
     const home = source('src/app/page.tsx');
     const hero = source('src/components/home/HeroTypewriter.tsx');
-    const explore = source('src/app/kesfet/page.tsx');
+    const explore = source('src/app/ilanlari-kesfet/page.tsx');
+    const infoCenter = source('src/app/kesfet/page.tsx');
+    const footer = source('src/components/layout/Footer.tsx');
     const terms = source('src/app/kullanim-kosullari/page.tsx');
     assert.match(navbar, />Keşfet/);
     assert.doesNotMatch(navbar, />X</);
     assert.doesNotMatch(hero, /hero-caret/);
     assert.match(home, /max-w-4xl flex-col items-center text-center/);
     assert.match(home, /href="\/ilan-ver"/);
-    assert.match(home, /href="\/kesfet"/);
+    assert.match(home, /href="\/ilanlari-kesfet"/);
     assert.doesNotMatch(home, /Los Santos ilan deneyimi/);
     assert.match(home, /hero-eyebrow-label/);
     assert.match(hero, /justify-center/);
@@ -66,6 +68,12 @@ describe('dashboard experience refinement regressions', () => {
     assert.match(explore, /href: '\/mulk'/);
     assert.match(explore, /Araç mı arıyorsun\?/);
     assert.match(explore, /Mülk mü arıyorsun\?/);
+    for (const section of ['sss', 'kullanim-kosullari', 'gizlilik', 'hakkimizda']) {
+      assert.match(navbar, new RegExp(`/kesfet\\?section=${section}`));
+      assert.match(footer, new RegExp(`/kesfet\\?section=${section}`));
+      assert.match(infoCenter, new RegExp(`key: '${section}'`));
+    }
+    assert.match(infoCenter, /PageProps<'\/kesfet'>/);
     assert.match(terms, /IC · Los Santos/);
     assert.match(terms, /OOC · Platform sınırları/);
     assert.match(terms, /RMT/);

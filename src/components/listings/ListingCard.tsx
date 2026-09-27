@@ -84,11 +84,7 @@ export function ListingCard({ listing, className = '' }: ListingCardProps) {
                 <MapPin className="w-3.5 h-3.5 text-[#FF8A1F] shrink-0" />
                 <span className="truncate">{listing.location}</span>
               </div>
-            ) : (
-              <span className="font-mono text-[11px] text-[var(--text-dim)] font-medium">
-                {listing.listing_number}
-              </span>
-            )}
+            ) : <span className="text-[11px] font-medium text-[var(--text-dim)]">{listing.subcategory}</span>}
 
             <div className="flex items-center gap-1 shrink-0 text-[var(--text-dim)]">
               <Calendar className="w-3.5 h-3.5" />

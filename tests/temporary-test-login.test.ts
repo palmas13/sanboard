@@ -9,8 +9,9 @@ import { GET as startRealLogin } from '@/app/api/auth/gtaworld/login/route';
 import { POST as selectCharacter, DELETE as logout } from '@/app/api/auth/session/route';
 import { GET as listCharacters } from '@/app/api/user/characters/route';
 import { POST as setFavorite } from '@/app/api/favorites/route';
+import { GET as getAdmin } from '@/app/api/admin/route';
 import { CHARACTER_SELECTION_COOKIE, verifySessionToken } from '@/lib/auth/session';
-import { TEST_LOGIN_ACCOUNT_PREFIX, TEST_LOGIN_CHARACTER_PREFIX, isTestLoginEnabled } from '@/lib/auth/test-login';
+import { TEST_LOGIN_ACCOUNT_PREFIX, TEST_LOGIN_CHARACTER_PREFIX, TEST_LOGIN_MAVIS_CHARACTER_ID, isTestLoginEnabled } from '@/lib/auth/test-login';
 import CharacterSelectPage from '@/app/karakter-sec/page';
 import { CharacterSelectContent } from '@/app/karakter-sec/CharacterSelectContent';
 
@@ -61,7 +62,9 @@ describe('SANBOARD temporary test character login harness', () => {
     assert.equal(db.profiles.length, 3);
     assert.ok(db.users[0].external_user_id?.startsWith(TEST_LOGIN_ACCOUNT_PREFIX));
     assert.ok(db.profiles.every((profile) => profile.external_character_id?.startsWith(TEST_LOGIN_CHARACTER_PREFIX)));
-    assert.ok(db.profiles.every((profile) => profile.role === 'USER'));
+    const mavis = db.profiles.find((profile) => profile.external_character_id === TEST_LOGIN_MAVIS_CHARACTER_ID);
+    assert.equal(mavis?.role, 'ADMIN');
+    assert.ok(db.profiles.filter((profile) => profile.id !== mavis?.id).every((profile) => profile.role === 'USER'));
     assert.ok(db.profiles.every((profile) => profile.id !== profile.external_character_id));
     assert.equal(response.cookies.get('sanboard_session')?.value, '');
     assert.ok(response.cookies.get(CHARACTER_SELECTION_COOKIE)?.value);
@@ -109,7 +112,7 @@ describe('SANBOARD temporary test character login harness', () => {
     const sessionA = verifySessionToken(selectedA.cookies.get('sanboard_session')!.value)!;
     assert.equal(sessionA.userId, db.users[0].id);
     assert.equal(sessionA.profileId, profileA.id);
-    assert.equal(sessionA.role, 'USER');
+    assert.equal(sessionA.role, 'ADMIN');
 
     const listingId = db.listings.find((listing) => listing.seller_profile_id !== profileA.id)?.id;
     assert.ok(listingId);
@@ -124,6 +127,38 @@ describe('SANBOARD temporary test character login harness', () => {
     const sessionB = verifySessionToken(selectedB.cookies.get('sanboard_session')!.value)!;
     assert.equal(sessionB.profileId, profileB.id);
     assert.equal(db.favorites.some((favorite) => favorite.profile_id === profileB.id), false);
+  });
+
+  test('Mavis test ADMIN is server-authoritative, feature-flag scoped, and isolated from names and siblings', async () => {
+    process.env.ENABLE_TEST_LOGIN = 'true';
+    const start = await startTestLogin(new NextRequest('http://localhost/api/auth/test-login'));
+    const selectionToken = start.cookies.get(CHARACTER_SELECTION_COOKIE)!.value;
+    const selectionCookie = `${CHARACTER_SELECTION_COOKIE}=${selectionToken}`;
+    const mavis = db.profiles.find((profile) => profile.external_character_id === TEST_LOGIN_MAVIS_CHARACTER_ID)!;
+    const sibling = db.profiles.find((profile) => profile.id !== mavis.id)!;
+
+    const selectedMavis = await selectCharacter(new NextRequest('http://localhost/api/auth/session', { method: 'POST', headers: { cookie: selectionCookie, 'content-type': 'application/json' }, body: JSON.stringify({ characterId: mavis.id, role: 'USER' }) }));
+    assert.equal(selectedMavis.status, 200);
+    const mavisSession = selectedMavis.cookies.get('sanboard_session')!.value;
+    assert.equal(verifySessionToken(mavisSession)?.role, 'ADMIN');
+    assert.equal((await getAdmin(new NextRequest('http://localhost/api/admin', { headers: { cookie: `sanboard_session=${mavisSession}` } }))).status, 200);
+
+    const siblingSelected = await selectCharacter(new NextRequest('http://localhost/api/auth/session', { method: 'POST', headers: { cookie: `sanboard_session=${mavisSession}`, 'content-type': 'application/json' }, body: JSON.stringify({ characterId: sibling.id, role: 'ADMIN' }) }));
+    const siblingSession = siblingSelected.cookies.get('sanboard_session')!.value;
+    assert.equal(verifySessionToken(siblingSession)?.role, 'USER');
+    assert.equal((await getAdmin(new NextRequest('http://localhost/api/admin', { headers: { cookie: `sanboard_session=${siblingSession}; sanboard_role=ADMIN` } }))).status, 403);
+
+    db.users.push({ id: 'real-mavis-user', provider: 'GTAWORLD', external_user_id: 'real-mavis-account', role: 'USER', status: 'ACTIVE', created_at: '', updated_at: '' });
+    db.profiles.push({ id: 'real-mavis-profile', user_id: 'real-mavis-user', external_character_id: 'real-mavis-character', full_name: 'Mavis Pierce', avatar_url: '', sanmail_email: '', phone: '', role: 'USER', created_at: '', updated_at: '' });
+    const { createSessionToken } = await import('@/lib/auth/session');
+    const realNameSession = createSessionToken({ userId: 'real-mavis-user', profileId: 'real-mavis-profile', role: 'ADMIN' });
+    assert.equal((await getAdmin(new NextRequest('http://localhost/api/admin', { headers: { cookie: `sanboard_session=${realNameSession}` } }))).status, 403);
+
+    mavis.role = 'USER';
+    assert.equal((await getAdmin(new NextRequest('http://localhost/api/admin', { headers: { cookie: `sanboard_session=${mavisSession}` } }))).status, 403);
+    mavis.role = 'ADMIN';
+    delete process.env.ENABLE_TEST_LOGIN;
+    assert.equal((await getAdmin(new NextRequest('http://localhost/api/admin', { headers: { cookie: `sanboard_session=${mavisSession}` } }))).status, 403);
   });
 
   test('real login never falls back to mock and normal logout clears both auth cookies', async () => {
