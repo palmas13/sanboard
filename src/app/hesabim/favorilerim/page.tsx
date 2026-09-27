@@ -89,6 +89,7 @@ export default function HesabimFavorilerimPage() {
                           listingId={listing.id}
                           initialCount={listing.favorite_count}
                           initialIsFavorited={true}
+                          initialStateIsAuthoritative={true}
                           size="sm"
                           onToggle={(isFav) => {
                             if (!isFav) {

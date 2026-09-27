@@ -151,7 +151,7 @@ export class SupabasePaymentRepository implements IPaymentRepository {
 
     const { data, error } = await client
       .from('payments')
-      .select('*')
+      .select('id, order_id, amount, status, created_at')
       .eq('profile_id', safeProfileId)
       .order('created_at', { ascending: false });
 

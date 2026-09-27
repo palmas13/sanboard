@@ -10,6 +10,7 @@ interface FavoriteButtonProps {
   listingId: string;
   initialCount?: number;
   initialIsFavorited?: boolean;
+  initialStateIsAuthoritative?: boolean;
   size?: 'sm' | 'md';
   showCount?: boolean;
   proofText?: boolean;
@@ -88,6 +89,7 @@ export function FavoriteButton({
   listingId,
   initialCount = 0,
   initialIsFavorited = false,
+  initialStateIsAuthoritative = false,
   size = 'md',
   showCount = true,
   proofText = false,
@@ -108,6 +110,7 @@ export function FavoriteButton({
   const mutationVersionRef = useRef(0);
 
   // Public props provide aggregate count; authenticated membership is hydrated in one batch request.
+  // Private profile-scoped responses can explicitly mark both values authoritative and skip that request.
   useEffect(() => {
     const versionAtStart = mutationVersionRef.current;
     if (!cacheKey || !profileId || authStatus !== 'authenticated') {
@@ -130,13 +133,23 @@ export function FavoriteButton({
       setIsFavorited(state.isFavorited);
       setCount(state.count);
     });
+    if (initialStateIsAuthoritative) {
+      const authoritativeState = {
+        isFavorited: initialIsFavorited,
+        count: Math.max(0, Number(initialCount) || 0),
+      };
+      publishFavoriteState(cacheKey, authoritativeState);
+      setIsFavorited(authoritativeState.isFavorited);
+      setCount(authoritativeState.count);
+      return unsubscribe;
+    }
     queueFavoriteHydration(profileId, listingId, (state) => {
       if (mutationPendingRef.current || mutationVersionRef.current !== versionAtStart) return;
       setIsFavorited(state.isFavorited);
       setCount(state.count);
     });
     return unsubscribe;
-  }, [initialIsFavorited, initialCount, cacheKey, listingId, profileId, authStatus]);
+  }, [initialIsFavorited, initialCount, initialStateIsAuthoritative, cacheKey, listingId, profileId, authStatus]);
 
   const handleToggle = async (e: React.MouseEvent) => {
     e.preventDefault();

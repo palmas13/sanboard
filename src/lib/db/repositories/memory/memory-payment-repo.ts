@@ -26,7 +26,14 @@ export class MemoryPaymentRepository implements IPaymentRepository {
   async getUserPayments(profileId: string) {
     return db.payments
       .filter((p) => p.profile_id === profileId)
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .map(({ id, order_id, amount, status, created_at }) => ({
+        id,
+        order_id,
+        amount,
+        status,
+        created_at,
+      }));
   }
 
   async getPaymentOrder(orderId: string) {

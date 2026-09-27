@@ -1070,10 +1070,27 @@ export class SupabaseListingRepository implements IListingRepository {
     const { data, error } = await client
       .from('listings')
       .select(`
-        *,
-        vehicle_details (*),
-        property_details (*),
-        listing_images (*)
+        id,
+        listing_number,
+        seller_profile_id,
+        corporate_profile_id,
+        seller_type,
+        category,
+        subcategory,
+        title,
+        description,
+        price,
+        location,
+        status,
+        is_featured,
+        featured_until,
+        published_at,
+        expires_at,
+        created_at,
+        updated_at,
+        vehicle_details (listing_id, vehicle_category, brand, model, plate, mileage, engine_upgrade, transmission_upgrade, brake_upgrade, turbo, subwoofer, trade_available, lock_level, alarm_level, anti_theft_level, engine_health, suspension, fuel_type, factory_price),
+        property_details (listing_id, property_type, floor, room_count, furnished, building_type, balcony),
+        listing_images (id, listing_id, storage_path, sort_order, is_cover, size_bytes, created_at)
       `)
       .eq('seller_profile_id', safeProfileId)
       .eq('seller_type', 'INDIVIDUAL')
@@ -1376,10 +1393,27 @@ export class SupabaseListingRepository implements IListingRepository {
       .select(`
         listing_id,
         listings (
-          *,
-          vehicle_details (*),
-          property_details (*),
-          listing_images (*)
+          id,
+          listing_number,
+          seller_profile_id,
+          corporate_profile_id,
+          seller_type,
+          category,
+          subcategory,
+          title,
+          description,
+          price,
+          location,
+          status,
+          is_featured,
+          featured_until,
+          published_at,
+          expires_at,
+          created_at,
+          updated_at,
+          vehicle_details (listing_id, vehicle_category, brand, model, plate, mileage, engine_upgrade, transmission_upgrade, brake_upgrade, turbo, subwoofer, trade_available, lock_level, alarm_level, anti_theft_level, engine_health, suspension, fuel_type, factory_price),
+          property_details (listing_id, property_type, floor, room_count, furnished, building_type, balcony),
+          listing_images (id, listing_id, storage_path, sort_order, is_cover, size_bytes, created_at)
         )
       `)
       .eq('profile_id', safeProfileId);

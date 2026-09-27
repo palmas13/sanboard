@@ -380,12 +380,23 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
 
     assert.strictEqual(buttonSource.includes('favoriteStateCache.get(`anon:${listingId}`)'), false);
     assert.ok(buttonSource.includes('listingIds.join'));
+    assert.ok(buttonSource.includes('initialStateIsAuthoritative'));
+    assert.ok(buttonSource.includes('publishFavoriteState(cacheKey, authoritativeState)'));
     assert.ok(buttonSource.includes('mutationPendingRef.current'));
     assert.ok(buttonSource.includes('isFavorited: optimisticFavorited'));
     assert.ok(repoSource.includes(".select('listing_id, profile_id')"));
     assert.ok(repoSource.includes(".in('listing_id', ids)"));
     assert.ok(repoSource.includes('favorite_count: favoriteCountMap[listing.id] || 0'));
     assert.strictEqual(authSource.includes('db.favorites'), false, 'Logout must not delete favorite relations');
+  });
+
+  test('favorites page reuses its authoritative private membership response without a second hydration request', () => {
+    const pageSource = fs.readFileSync(
+      path.join(process.cwd(), 'src/app/hesabim/favorilerim/page.tsx'),
+      'utf8'
+    );
+    assert.ok(pageSource.includes('initialIsFavorited={true}'));
+    assert.ok(pageSource.includes('initialStateIsAuthoritative={true}'));
   });
 
   // =========================================================================

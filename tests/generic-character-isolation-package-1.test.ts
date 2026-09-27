@@ -46,7 +46,7 @@ describe('SANBOARD generic character isolation package 1', () => {
       { id: 'credit-B1', profile_id: jordanId, payment_id: 'payment-B', package_id: 'package-1', credit_type: 'INDIVIDUAL', amount: 2000, status: 'AVAILABLE', created_at: '2026-09-26T03:00:00.000Z' },
     ] as any;
     db.payments = [
-      { id: 'payment-A', order_id: 'ORDER-A', profile_id: alexId, package_id: 'package-1', provider: 'FLEECA', amount: 2000, status: 'SUCCESS', created_at: '2026-09-26T01:00:00.000Z' },
+      { id: 'payment-A', order_id: 'ORDER-A', profile_id: alexId, package_id: 'package-1', provider: 'FLEECA', external_payment_id: 'provider-secret-A', entitlement_applied_at: '2026-09-26T01:01:00.000Z', amount: 2000, status: 'SUCCESS', created_at: '2026-09-26T01:00:00.000Z' },
       { id: 'payment-B', order_id: 'ORDER-B', profile_id: jordanId, package_id: 'package-1', provider: 'FLEECA', amount: 2000, status: 'SUCCESS', created_at: '2026-09-26T02:00:00.000Z' },
     ] as any;
   });
@@ -68,7 +68,11 @@ describe('SANBOARD generic character isolation package 1', () => {
 
   test('payment history is scoped to signed active character and ignores query/cookie actor injection', async () => {
     const alexResponse = await getPayments(request(`/api/user/payments?profileId=${jordanId}`, alexId, jordanId));
-    assert.deepEqual((await alexResponse.json()).map((payment: { id: string }) => payment.id), ['payment-A']);
+    const alexPayments = await alexResponse.json();
+    assert.deepEqual(alexPayments.map((payment: { id: string }) => payment.id), ['payment-A']);
+    assert.deepEqual(Object.keys(alexPayments[0]).sort(), ['amount', 'created_at', 'id', 'order_id', 'status']);
+    assert.equal(alexPayments[0].external_payment_id, undefined);
+    assert.equal(alexPayments[0].entitlement_applied_at, undefined);
 
     const jordanResponse = await getPayments(request(`/api/user/payments?profileId=${alexId}`, jordanId, outsiderId));
     assert.deepEqual((await jordanResponse.json()).map((payment: { id: string }) => payment.id), ['payment-B']);

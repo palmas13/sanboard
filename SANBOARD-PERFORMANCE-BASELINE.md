@@ -300,3 +300,163 @@ Example expected header:
 `Server-Timing: actor;dur=180.0, store;dur=240.0, total;dur=425.0`
 
 Chrome Network Timing will show whether eligibility’s current ~1.9 s is dominated by `actor` or `store`, and whether bootstrap’s ~1.6 s is dominated by `actor`, the six-call `bootstrap` parallel group, or the trailing `favorites` count.
+
+## 15. Package 3 — listings, favorites, and payment history hot paths
+
+Date: 2026-09-27
+
+### Production baseline supplied for Package 3
+
+| Request | Observed production total |
+|---|---:|
+| `/api/user/listings` | ~690 ms–1.02 s |
+| `/api/user/favorites` | ~688 ms |
+| `/api/favorites?listingIds=...` | ~433 ms |
+| `/api/user/payments` | ~518 ms |
+
+Bootstrap is outside Package 3 scope. No local result below is presented as a production-latency claim; deployment and a new production capture are required to measure milliseconds.
+
+### Exact route and consumer inventory
+
+| Route | Consumer / page | Actor resolution | Repository purpose |
+|---|---|---|---|
+| `GET /api/user/listings` | `src/app/hesabim/ilanlarim/page.tsx` at `/hesabim/ilanlarim` | `resolveOwnedActiveProfile()` | Active character's individual listing history, including ACTIVE and EXPIRED UI tabs |
+| `GET /api/user/listings/[id]` | `src/app/hesabim/ilanlarim/[id]/duzenle/page.tsx` | `resolveOwnedActiveProfile()` plus repository ownership plus `seller_profile_id === actor.profileId` | One editable owned listing; SOLD/REMOVED remain non-editable |
+| `GET /api/user/favorites` | `src/app/hesabim/favorilerim/page.tsx` | `resolveOwnedActiveProfile()` | Active character's favorite listing cards and authoritative private membership |
+| `GET /api/favorites?listingIds=...` | batched `FavoriteButton` hydration on public listing cards/details | signed session supplies optional profile membership; aggregate count remains global | Up to 100 listing aggregate counts plus current-profile membership |
+| `GET /api/user/payments` | `src/app/hesabim/odemeler/page.tsx` | `resolveOwnedActiveProfile()` | Active character's ordered payment-history display DTO |
+| `GET /api/listings` | public listing/search consumers | no private actor for GET | Public listing dataset; not fetched by the audited account pages |
+
+### Page request graph and overlap
+
+- `/hesabim/ilanlarim`: account layout requests dealer eligibility; the page requests only `/api/user/listings`. It does not request public `/api/listings`, favorites, membership, or payments.
+- `/hesabim/favorilerim`: account layout requests dealer eligibility; the page requests `/api/user/favorites`. Its `FavoriteButton` children previously also queued `/api/favorites?listingIds=...` even though the private favorites response already contained `is_favorited: true` and the same global `favorite_count`.
+- `/hesabim/odemeler`: account layout requests dealer eligibility; the page requests only `/api/user/payments`.
+- `/hesabim/ilanlarim/[id]/duzenle`: account layout requests dealer eligibility; the page requests only `/api/user/listings/[id]`. It does not fetch the full private listing collection or public listing dataset.
+
+The only proven duplicate Package 3 request in one component tree was the favorites page's private list plus button membership hydration. No duplicate private/public listing dataset fetch was found on the audited account pages.
+
+### User listings query graph
+
+Base query:
+
+- table: `listings`
+- explicit selected columns: the existing `Listing` response fields used by the dashboard plus explicit `vehicle_details`, `property_details`, and `listing_images` fields
+- filters: `seller_profile_id = active profile`, `seller_type = INDIVIDUAL`, `corporate_profile_id IS NULL`
+- order: `created_at DESC`
+- limit: none
+- purpose: preserve the complete ACTIVE/EXPIRED history contract and listing card/edit navigation data
+
+Dependent parallel enrichment wave after listing IDs are known:
+
+1. `listing_price_history`: `listing_id, old_price, changed_at`; `listing_id IN (...)`; `changed_at DESC`; derives the latest previous price per listing.
+2. `favorites`: `listing_id`; `listing_id IN (...)`; derives the global aggregate favorite count per listing.
+
+Images and category details are PostgREST embedded relations in the base request, not per-row application queries. No seller/profile or corporate relation lookup is performed by this endpoint.
+
+Before:
+
+`actor 1 -> listings base 1 -> (price history 1 || favorite rows 1)` = **4 total remote calls including actor, 3 business calls, 3 sequential phases including actor**.
+
+After:
+
+`actor 1 -> narrower listings base 1 -> (price history 1 || favorite rows 1)` = **4 total remote calls including actor, 3 business calls, 3 sequential phases including actor**.
+
+Package 3 did not invent a query-count reduction where none existed. It reduced row width while retaining the already-batched enrichment wave. There was no `for await`, per-listing query, or `Promise.all(listing.map(query))` N+1 in the current implementation.
+
+Status behavior is unchanged: the repository still returns the active character's complete individual history and computes effective expiry; the UI still displays only ACTIVE and EXPIRED tabs. SOLD/REMOVED behavior was not redefined or filtered differently in this package.
+
+### Favorites query graph and frontend dedupe
+
+Base query:
+
+- table: `favorites`
+- selected favorite column: `listing_id`
+- filter: `profile_id = active canonical profile`
+- embedded listing projection: explicit existing listing/detail/image response fields
+- purpose: active-profile favorite listing cards and authoritative membership
+
+Dependent parallel enrichment wave after favorite listing IDs are known:
+
+1. `listing_price_history`: batch `listing_id IN (...)`, ordered by `changed_at DESC`.
+2. `favorites`: batch `listing_id IN (...)` for global aggregate counts.
+
+Before server graph:
+
+`actor 1 -> favorites/listings base 1 -> (price history 1 || favorite rows 1)` = **4 total remote calls including actor, 3 business calls, 3 sequential phases including actor**.
+
+After server graph:
+
+`actor 1 -> narrower favorites/listings base 1 -> (price history 1 || favorite rows 1)` = **4 total remote calls including actor, 3 business calls, 3 sequential phases including actor**.
+
+There was no per-favorite listing/image query N+1 in the current implementation; PostgREST returns the embedded listing relations in the base request and enrichment is already batched.
+
+Before favorites page lifecycle:
+
+1. `/api/user/favorites` returned the authoritative profile-scoped rows and global counts.
+2. Mounted `FavoriteButton`s queued `/api/favorites?listingIds=...` for the same IDs and membership/count values.
+
+After favorites page lifecycle:
+
+1. `/api/user/favorites` remains authoritative.
+2. The page marks its initial membership/count as authoritative, seeds the existing `profileId:listingId` cache, and skips only that redundant hydration request.
+
+Public listing cards and details still use `/api/favorites?listingIds=...` because public listing data does not authoritatively represent the current private profile. Global favorite count and profile-scoped `isFavorited` remain separate semantics. Cache isolation remains character-scoped through the existing `${profileId}:${listingId}` key; no cross-user/global membership cache was introduced.
+
+### Payment history query graph and response boundary
+
+Query:
+
+- table: `payments`
+- selected columns after Package 3: `id, order_id, amount, status, created_at`
+- filter: `profile_id = active canonical profile`
+- order: `created_at DESC`
+- limit: none
+- purpose: exactly the fields rendered by `/hesabim/odemeler`
+
+Before:
+
+`actor 1 -> payments select(*) 1` = **2 total remote calls including actor, 1 business call, 2 sequential phases**.
+
+After:
+
+`actor 1 -> payments narrow projection 1` = **2 total remote calls including actor, 1 business call, 2 sequential phases**.
+
+No per-payment package lookup or other payment N+1 existed. Package metadata is currently hard-coded by the UI and was not added as a new query. The narrowed DTO intentionally excludes `profile_id`, `package_id`, `provider`, `external_payment_id`, idempotency data, corporate entitlement internals, and completion/provider metadata. Payment order and displayed amount/status/date remain unchanged.
+
+### Server-Timing and security invariants
+
+- Existing allowlisted `actor`, `listings`, `favorites`, `payments`, and `total` metrics remain active and still measure real stages.
+- No fake zero-duration metric, identifier, email, SQL, token, secret, or provider payload was added to headers.
+- Signed `sanboard_session -> canonical session user/profile -> resolveOwnedActiveProfile() -> DB-fresh owned character profile` remains unchanged.
+- Query/body profile injection and writable legacy cookies remain non-authoritative.
+- Listing ownership, favorite profile scope, payment profile scope, aggregate-count semantics, and sibling-character isolation were not relaxed.
+
+### Index audit — report only
+
+Existing coverage verified in repository migrations/audit:
+
+- `listings(seller_profile_id, status, published_at DESC)` partial index for individual listings exists and is recorded as production-confirmed.
+- `favorites(profile_id, listing_id)` unique constraint/index supports profile membership lookup.
+- `favorites(listing_id)` supports aggregate count batches.
+- `listing_price_history(listing_id, changed_at DESC)` supports latest-history batches.
+- `vehicle_details.listing_id` and `property_details.listing_id` are primary keys.
+
+Unresolved candidates; no migration or SQL was created:
+
+| Table | Candidate columns | Query | Why / expected benefit |
+|---|---|---|---|
+| `listings` | `(seller_profile_id, created_at DESC)` partial where individual/non-corporate | private listings filter plus `created_at DESC` | Current confirmed index orders by `published_at`, while this endpoint orders by `created_at`; a matching index may avoid a scoped sort as history grows. Verify with production plan first. |
+| `listing_images` | `(listing_id)` | embedded listing image relation | No explicit audited index was found on the foreign key; may reduce relation lookup cost for listing/favorite collections. Verify PostgreSQL catalog/plan before adding. |
+| `payments` | `(profile_id, created_at DESC)` | active-profile payment history ordered newest-first | Existing audited payment index is `(status, created_at DESC)`, which does not match the profile-scoped history path. |
+
+### Pagination decision
+
+`/api/user/listings`, `/api/user/favorites`, and `/api/user/payments` remain unbounded. Their current pages have no pagination or load-more contract, so adding pagination here would change visible history and UI behavior. Cursor pagination remains a Package 4 candidate, together with explicit UX and response-contract work.
+
+### Package 3 regression coverage
+
+- Existing tests continue to cover active-character listing/favorite/payment isolation, sibling denial, actor injection rejection, idempotent favorite ADD, active-profile removal, aggregate-count separation, and private listing ownership.
+- Favorites tests now assert that the favorites page explicitly reuses authoritative private membership while the shared batch hydrator and profile-keyed cache remain present.
+- Payment tests now assert the exact five-field history DTO and verify that provider transaction and entitlement-internal fields do not leak.
+- No migration, SQL execution, RPC/view creation, Supabase Dashboard change, production DB connection, commit, or push was performed.
