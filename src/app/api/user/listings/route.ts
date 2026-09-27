@@ -7,7 +7,9 @@ import { ServerTiming } from '@/lib/performance/server-timing';
 export async function GET(req: NextRequest) {
   const timing = new ServerTiming();
   try {
-    const actor = await timing.measure('actor', () => resolveOwnedActiveProfile(req));
+    const actor = await timing.measure('actor', () => resolveOwnedActiveProfile(req, (stage, duration) => {
+      timing.add(stage, duration);
+    }));
     if (!actor.ok) return timing.respond(NextResponse.json({ error: actor.error }, { status: actor.status }));
 
     const repo = getListingRepository();

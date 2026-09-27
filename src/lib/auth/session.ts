@@ -18,6 +18,9 @@ export interface CharacterSelectionPayload {
   exp: number;
 }
 
+export type SessionTimingStage = 'session_parse' | 'session_verify';
+export type SessionTimingObserver = (stage: SessionTimingStage, duration: number) => void;
+
 const DEFAULT_EXPIRY_SECONDS = 7 * 24 * 60 * 60; // 7 days
 const CHARACTER_SELECTION_EXPIRY_SECONDS = 10 * 60;
 export const CHARACTER_SELECTION_COOKIE = 'sanboard_character_selection';
@@ -183,39 +186,50 @@ export function getCharacterSelectionContext(req: NextRequest | Request): Charac
  * Completely rejects plain/raw UUID cookies to eliminate cookie spoofing.
  */
 async function resolveServerSession(
-  req?: NextRequest | Request
+  req?: NextRequest | Request,
+  onTiming?: SessionTimingObserver
 ): Promise<SessionPayload | null> {
+  const parseStartedAt = performance.now();
   let rawToken: string | undefined;
 
-  if (req) {
-    if ('cookies' in req && typeof req.cookies?.get === 'function') {
-      rawToken = req.cookies.get('sanboard_session')?.value;
-    }
+  try {
+    if (req) {
+      if ('cookies' in req && typeof req.cookies?.get === 'function') {
+        rawToken = req.cookies.get('sanboard_session')?.value;
+      }
 
-    // Fallback to reading from standard Cookie header
-    if (!rawToken) {
-      const cookieHeader = req.headers.get('cookie') || '';
-      const match = cookieHeader.match(/(?:^|;\s*)sanboard_session=([^;]+)/);
-      if (match) {
-        rawToken = decodeURIComponent(match[1]);
+      // Fallback to reading from standard Cookie header
+      if (!rawToken) {
+        const cookieHeader = req.headers.get('cookie') || '';
+        const match = cookieHeader.match(/(?:^|;\s*)sanboard_session=([^;]+)/);
+        if (match) {
+          rawToken = decodeURIComponent(match[1]);
+        }
+      }
+    } else {
+      // Next.js App Router Server Component / Layout context
+      try {
+        const { cookies } = await import('next/headers');
+        const cookieStore = await cookies();
+        rawToken = cookieStore.get('sanboard_session')?.value;
+      } catch {
+        return null;
       }
     }
-  } else {
-    // Next.js App Router Server Component / Layout context
-    try {
-      const { cookies } = await import('next/headers');
-      const cookieStore = await cookies();
-      rawToken = cookieStore.get('sanboard_session')?.value;
-    } catch {
-      return null;
-    }
+  } finally {
+    onTiming?.('session_parse', performance.now() - parseStartedAt);
   }
 
   if (!rawToken) {
     return null;
   }
 
-  return verifySessionToken(rawToken);
+  const verifyStartedAt = performance.now();
+  try {
+    return verifySessionToken(rawToken);
+  } finally {
+    onTiming?.('session_verify', performance.now() - verifyStartedAt);
+  }
 }
 
 /**
@@ -223,7 +237,15 @@ async function resolveServerSession(
  * calls during the same Server Component render/request without persisting
  * user-specific data across requests.
  */
-export const getServerSession = cache(resolveServerSession);
+export const getServerSession = cache((req?: NextRequest | Request) => resolveServerSession(req));
+
+/** Resolves a session with request-local wall-clock observations, without changing verification behavior. */
+export function getServerSessionWithTiming(
+  req: NextRequest | Request,
+  onTiming: SessionTimingObserver
+): Promise<SessionPayload | null> {
+  return resolveServerSession(req, onTiming);
+}
 
 /**
  * Returns formatted Set-Cookie header string for the signed session cookie.

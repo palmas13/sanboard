@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getServerSession } from '@/lib/auth/session';
+import { getServerSession, getServerSessionWithTiming, SessionTimingStage } from '@/lib/auth/session';
 import { getUserRepository } from '@/lib/db/repositories';
 import { CharacterProfile } from '@/types';
 
@@ -8,15 +8,20 @@ export type ActiveProfileResolution =
   | { ok: false; status: 401 | 400 | 403; error: string };
 
 export type ActiveAdminResolution = ActiveProfileResolution;
+export type ActiveProfileTimingStage = SessionTimingStage | 'canonical_profile_lookup' | 'actor_map';
+export type ActiveProfileTimingObserver = (stage: ActiveProfileTimingStage, duration: number) => void;
 
 /**
  * Resolves the signed session profile to the canonical character_profiles.id
  * and verifies that it belongs to the signed-in account.
  */
 export async function resolveOwnedActiveProfile(
-  req: NextRequest
+  req: NextRequest,
+  onTiming?: ActiveProfileTimingObserver
 ): Promise<ActiveProfileResolution> {
-  const session = await getServerSession(req);
+  const session = onTiming
+    ? await getServerSessionWithTiming(req, onTiming)
+    : await getServerSession(req);
   if (!session?.userId) {
     return { ok: false, status: 401, error: 'Yetkisiz erişim. Lütfen giriş yapın.' };
   }
@@ -29,18 +34,30 @@ export async function resolveOwnedActiveProfile(
     };
   }
 
-  const profile = await getUserRepository().getCanonicalProfileById(session.profileId);
-  if (!profile || profile.user_id !== session.userId) {
-    return { ok: false, status: 403, error: 'Aktif karakter profili bu hesaba ait değil.' };
+  const canonicalLookupStartedAt = performance.now();
+  let profile: CharacterProfile | null;
+  try {
+    profile = await getUserRepository().getCanonicalProfileById(session.profileId);
+  } finally {
+    onTiming?.('canonical_profile_lookup', performance.now() - canonicalLookupStartedAt);
   }
 
-  return {
-    ok: true,
-    profileId: profile.id,
-    userId: session.userId,
-    role: profile.role || 'USER',
-    profile,
-  };
+  const actorMapStartedAt = performance.now();
+  try {
+    if (!profile || profile.user_id !== session.userId) {
+      return { ok: false, status: 403, error: 'Aktif karakter profili bu hesaba ait değil.' };
+    }
+
+    return {
+      ok: true,
+      profileId: profile.id,
+      userId: session.userId,
+      role: profile.role || 'USER',
+      profile,
+    };
+  } finally {
+    onTiming?.('actor_map', performance.now() - actorMapStartedAt);
+  }
 }
 
 /** Resolves a human admin strictly from the owned active character's DB-fresh role. */

@@ -89,9 +89,10 @@ describe('SANBOARD backend final hardening package 1', () => {
     assert.deepEqual((await response.json()).map((item: any) => item.id), ['personal-alex-active']);
 
     const timing = response.headers.get('server-timing') || '';
-    for (const metric of ['actor', 'listings_query', 'listings_serialize', 'listings', 'total']) {
+    for (const metric of ['session_parse', 'session_verify', 'canonical_profile_lookup', 'actor_map', 'actor', 'listings_query', 'listings_serialize', 'listings', 'total']) {
       assert.match(timing, new RegExp(`(?:^|, )${metric};dur=\\d+\\.\\d`));
     }
+    assert.doesNotMatch(timing, /user_lookup;dur=|active_profile_lookup;dur=/);
     assert.doesNotMatch(timing, /listings_enrich;dur=/);
     assert.doesNotMatch(timing, /listings_map;dur=/);
     assert.doesNotMatch(timing, /enrichment_query;dur=/);
