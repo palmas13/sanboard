@@ -1143,7 +1143,10 @@ export class SupabaseListingRepository implements IListingRepository {
     }));
   }
 
-  async getCorporateListings(corporateProfileId: string): Promise<Listing[]> {
+  async getCorporateListings(
+    corporateProfileId: string,
+    onTiming?: (stage: 'db' | 'enrich', duration: number) => void
+  ): Promise<Listing[]> {
     const client = this.getClient();
     const safeCorporateId = resolveProfileId(corporateProfileId);
 
@@ -1163,51 +1166,63 @@ export class SupabaseListingRepository implements IListingRepository {
       query = query.eq('seller_type', 'CORPORATE').or(`corporate_profile_id.eq.${corporateProfileId}`);
     }
 
-    const { data, error } = await query;
+    const dbStartedAt = performance.now();
+    let data;
+    let error;
+    try {
+      ({ data, error } = await query);
+    } finally {
+      onTiming?.('db', performance.now() - dbStartedAt);
+    }
     if (error) {
       throw new Error(`Supabase error fetching corporate listings: ${error.message}`);
     }
 
-    const rows = data || [];
-    const ids = rows.map((r: any) => r.id);
+    const enrichStartedAt = performance.now();
+    try {
+      const rows = data || [];
+      const ids = rows.map((r: any) => r.id);
 
-    const priceHistoryMap: Record<string, number> = {};
-    const favCountMap: Record<string, number> = {};
+      const priceHistoryMap: Record<string, number> = {};
+      const favCountMap: Record<string, number> = {};
 
-    if (ids.length > 0) {
-      const [historiesRes, favsRes] = await Promise.all([
-        client
-          .from('listing_price_history')
-          .select('listing_id, old_price, changed_at')
-          .in('listing_id', ids)
-          .order('changed_at', { ascending: false }),
-        this.getAdminClient()
-          .from('favorites')
-          .select('listing_id')
-          .in('listing_id', ids),
-      ]);
+      if (ids.length > 0) {
+        const [historiesRes, favsRes] = await Promise.all([
+          client
+            .from('listing_price_history')
+            .select('listing_id, old_price, changed_at')
+            .in('listing_id', ids)
+            .order('changed_at', { ascending: false }),
+          this.getAdminClient()
+            .from('favorites')
+            .select('listing_id')
+            .in('listing_id', ids),
+        ]);
 
-      if (historiesRes.data) {
-        for (const h of historiesRes.data) {
-          if (!priceHistoryMap[h.listing_id]) priceHistoryMap[h.listing_id] = h.old_price;
+        if (historiesRes.data) {
+          for (const h of historiesRes.data) {
+            if (!priceHistoryMap[h.listing_id]) priceHistoryMap[h.listing_id] = h.old_price;
+          }
+        }
+
+        if (favsRes.data) {
+          for (const f of favsRes.data) {
+            favCountMap[f.listing_id] = (favCountMap[f.listing_id] || 0) + 1;
+          }
         }
       }
 
-      if (favsRes.data) {
-        for (const f of favsRes.data) {
-          favCountMap[f.listing_id] = (favCountMap[f.listing_id] || 0) + 1;
-        }
-      }
+      return rows.map((item: any) => ({
+        ...item,
+        location: item.category === 'vehicle' ? null : item.location,
+        previous_price: priceHistoryMap[item.id] && priceHistoryMap[item.id] !== item.price ? priceHistoryMap[item.id] : undefined,
+        favorite_count: favCountMap[item.id] || 0,
+        images: item.listing_images || [],
+        status: getEffectiveListingStatus(item),
+      }));
+    } finally {
+      onTiming?.('enrich', performance.now() - enrichStartedAt);
     }
-
-    return rows.map((item: any) => ({
-      ...item,
-      location: item.category === 'vehicle' ? null : item.location,
-      previous_price: priceHistoryMap[item.id] && priceHistoryMap[item.id] !== item.price ? priceHistoryMap[item.id] : undefined,
-      favorite_count: favCountMap[item.id] || 0,
-      images: item.listing_images || [],
-      status: getEffectiveListingStatus(item),
-    }));
   }
 
   async toggleFavorite(listingId: string, profileId: string): Promise<{ isFavorited: boolean; count: number }> {

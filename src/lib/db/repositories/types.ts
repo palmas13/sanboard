@@ -72,7 +72,10 @@ export interface IListingRepository {
   republishListing(id: string, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   removeListing?(id: string, profileId: string): Promise<{ success: boolean; error?: string }>;
   getUserListings(profileId: string): Promise<Listing[]>;
-  getCorporateListings(corporateProfileId: string): Promise<Listing[]>;
+  getCorporateListings(
+    corporateProfileId: string,
+    onTiming?: (stage: 'db' | 'enrich', duration: number) => void
+  ): Promise<Listing[]>;
   toggleFavorite(listingId: string, profileId: string): Promise<{ isFavorited: boolean; count: number }>;
   setFavorite(listingId: string, profileId: string, isFavorited: boolean): Promise<{ isFavorited: boolean; count: number }>;
   removeFavorite(listingId: string, profileId: string): Promise<{ success: boolean; count: number }>;

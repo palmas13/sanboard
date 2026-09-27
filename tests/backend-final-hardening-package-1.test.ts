@@ -62,7 +62,22 @@ describe('SANBOARD backend final hardening package 1', () => {
     assert.equal((await profile.json()).dealer.id, 'store-alex');
     const listings = await getDealerListings(request(`/api/dealers/listings?profileId=${jordan}`, alex));
     assert.deepEqual((await listings.json()).listings.map((item: any) => item.id), ['listing-alex']);
+    const timing = listings.headers.get('server-timing') || '';
+    for (const metric of ['auth', 'dealer', 'db', 'enrich', 'serialize', 'total']) {
+      assert.match(timing, new RegExp(`(?:^|, )${metric};dur=\\d+\\.\\d`));
+    }
     assert.equal((await getDealerProfile(request('/api/dealers/profile'))).status, 401);
+  });
+
+  test('dealer listings errors retain completed Server-Timing metrics and total', async () => {
+    const response = await getDealerListings(request('/api/dealers/listings', undefined));
+    assert.equal(response.status, 401);
+    const timing = response.headers.get('server-timing') || '';
+    assert.match(timing, /auth;dur=\d+\.\d/);
+    assert.match(timing, /total;dur=\d+\.\d/);
+    assert.doesNotMatch(timing, /dealer;dur=/);
+    assert.doesNotMatch(timing, /db;dur=/);
+    assert.doesNotMatch(timing, /enrich;dur=/);
   });
 
   test('account bootstrap is active-character scoped, not sibling-account aggregated', async () => {

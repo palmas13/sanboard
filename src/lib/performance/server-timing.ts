@@ -1,6 +1,6 @@
 import type { NextResponse } from 'next/server';
 
-const SAFE_METRIC_NAME = /^(session|actor|profile|database|repository|serialize|total|store|application|subscription|listings|favorites|tickets|payments|notifications|bootstrap)$/;
+const SAFE_METRIC_NAME = /^(session|auth|actor|profile|dealer|db|database|enrich|repository|serialize|total|store|application|subscription|listings|favorites|tickets|payments|notifications|bootstrap)$/;
 
 export class ServerTiming {
   private readonly startedAt = performance.now();
@@ -10,6 +10,15 @@ export class ServerTiming {
     const startedAt = performance.now();
     try {
       return await operation();
+    } finally {
+      this.add(name, performance.now() - startedAt);
+    }
+  }
+
+  measureSync<T>(name: string, operation: () => T): T {
+    const startedAt = performance.now();
+    try {
+      return operation();
     } finally {
       this.add(name, performance.now() - startedAt);
     }

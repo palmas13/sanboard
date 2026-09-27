@@ -51,9 +51,24 @@ export class MemoryListingRepository implements IListingRepository {
     return getUserListings(profileId);
   }
 
-  async getCorporateListings(corporateProfileId: string) {
+  async getCorporateListings(
+    corporateProfileId: string,
+    onTiming?: (stage: 'db' | 'enrich', duration: number) => void
+  ) {
     const { getCorporateListings: fetchCorporate } = await import('../../listings');
-    return fetchCorporate(corporateProfileId);
+    const dbStartedAt = performance.now();
+    let listings;
+    try {
+      listings = await fetchCorporate(corporateProfileId);
+    } finally {
+      onTiming?.('db', performance.now() - dbStartedAt);
+    }
+    const enrichStartedAt = performance.now();
+    try {
+      return listings;
+    } finally {
+      onTiming?.('enrich', performance.now() - enrichStartedAt);
+    }
   }
 
   async toggleFavorite(listingId: string, profileId: string) {
