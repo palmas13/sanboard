@@ -1,9 +1,8 @@
 import React from 'react';
 import { getListingRepository } from '@/lib/db/repositories';
-import { ListingCard } from '@/components/listings/ListingCard';
 import { FilterSidebar } from '@/components/listings/FilterSidebar';
 import { MobileFilterDrawer } from '@/components/listings/MobileFilterDrawer';
-import { ListingSortBar } from '@/components/listings/ListingSortBar';
+import { PropertyListingsView } from '@/components/listings/PropertyListingsView';
 import { Home } from 'lucide-react';
 
 interface PageProps {
@@ -59,7 +58,7 @@ export default async function PropertyListingsPage({ searchParams }: PageProps) 
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] mt-1 flex items-center gap-2.5">
             <Home className="w-7 h-7 text-[#FF8A1F]" />
-            <span>Los Santos Mülk İlanları</span>
+            <span>Mülk İlanları</span>
           </h1>
         </div>
 
@@ -75,24 +74,7 @@ export default async function PropertyListingsPage({ searchParams }: PageProps) 
 
         {/* Results Column */}
         <div className="lg:col-span-3 space-y-6">
-          <ListingSortBar totalCount={listings.length} />
-
-          {listings.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-              {listings.map((listing) => (
-                <ListingCard key={listing.id} listing={listing} />
-              ))}
-            </div>
-          ) : (
-            <div className="surface-card p-12 text-center space-y-3">
-              <p className="text-base font-bold text-[var(--text-main)]">
-                Bu filtrelere uygun mülk ilanı bulunamadı.
-              </p>
-              <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
-                Filtre kriterlerinizi genişleterek veya arama kelimesini değiştirerek tekrar deneyebilirsiniz.
-              </p>
-            </div>
-          )}
+          <PropertyListingsView listings={listings} />
         </div>
       </div>
     </div>

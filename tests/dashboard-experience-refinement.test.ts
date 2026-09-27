@@ -87,4 +87,52 @@ describe('dashboard experience refinement regressions', () => {
     assert.match(terms, /7 gün/);
     assert.match(terms, /SanMail/);
   });
+
+  test('requested profile, discovery and listing copy regressions stay fixed', () => {
+    const profile = source('src/app/hesabim/profil/page.tsx');
+    const navbar = source('src/components/layout/Navbar.tsx');
+    const infoCenter = source('src/app/kesfet/page.tsx');
+    const vehicles = source('src/app/arac/page.tsx');
+    const properties = source('src/app/mulk/page.tsx');
+    const popular = source('src/components/home/PopularShowcase.tsx');
+    assert.doesNotMatch(profile, /<h3[^>]*>Kimlik<\/h3>/);
+    assert.doesNotMatch(profile, /<h3[^>]*>İletişim<\/h3>/);
+    assert.match(navbar, /Keşfet Akışı/);
+    assert.doesNotMatch(infoCenter, />Sanboard Rehberi</);
+    assert.match(vehicles, /<span>Araç İlanları<\/span>/);
+    assert.doesNotMatch(vehicles, /Los Santos Araç İlanları/);
+    assert.match(properties, /<span>Mülk İlanları<\/span>/);
+    assert.doesNotMatch(properties, /Los Santos Mülk İlanları/);
+    assert.doesNotMatch(popular, /Canlı Vitrin/);
+  });
+
+  test('property view switch preserves URL-owned filters and renders both modes', () => {
+    const page = source('src/app/mulk/page.tsx');
+    const view = source('src/components/listings/PropertyListingsView.tsx');
+    const sortBar = source('src/components/listings/ListingSortBar.tsx');
+    assert.match(page, /<PropertyListingsView listings=\{listings\} \/>/);
+    assert.match(view, /sanboard_property_view/);
+    assert.match(view, /viewMode === 'list'/);
+    assert.match(view, /data-testid="property-list-view"/);
+    assert.match(view, /data-testid="property-grid-view"/);
+    assert.match(view, /<ActiveFilterChips baseRoute="\/mulk" \/>/);
+    assert.doesNotMatch(view, /router\.push|URLSearchParams/);
+    assert.match(sortBar, /new URLSearchParams\(searchParams\.toString\(\)\)/);
+    assert.match(sortBar, /aria-pressed=\{viewMode === 'list'\}/);
+    assert.match(sortBar, /aria-pressed=\{viewMode === 'grid'\}/);
+  });
+
+  test('dashboard navigation uses accent icons, corporate styling and reduced motion', () => {
+    const layout = source('src/app/hesabim/layout.tsx');
+    const css = source('src/app/globals.css');
+    assert.doesNotMatch(layout, /badge: isCorporateIdentity \? 'PRO'/);
+    assert.match(layout, /data-corporate-item=\{item\.isCorporate/);
+    for (const accent of ['orange-400', 'blue-400', 'amber-400', 'rose-400', 'emerald-400', 'violet-400']) {
+      assert.match(layout, new RegExp(accent));
+    }
+    assert.match(layout, /dashboard-page-enter/);
+    assert.match(css, /dashboard-heading-enter/);
+    assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+    assert.match(css, /dashboard-page-enter > :first-child \{ animation: none; \}/);
+  });
 });

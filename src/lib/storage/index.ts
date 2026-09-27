@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import sharp from 'sharp';
 import { StorageProvider, StorageUploadResult } from './types';
 import { CloudflareR2StorageProvider } from './r2-provider';
 import { MockStorageProvider } from './mock-provider';
@@ -227,5 +228,28 @@ export async function uploadCorporateBanner(
       sizeBytes: fileBuffer.byteLength,
       error: err?.message || 'Kurumsal banner optimize edilemedi veya yüklenemedi.',
     };
+  }
+}
+
+/** Uploads a sanitized, square PNG favicon under a versioned immutable key. */
+export async function uploadSiteFavicon(fileBuffer: Buffer | Uint8Array): Promise<StorageUploadResult> {
+  const provider = getStorageProvider();
+  try {
+    if (fileBuffer.byteLength > 1024 * 1024) throw new Error('Favicon en fazla 1 MB olabilir.');
+    const image = sharp(fileBuffer, { failOn: 'error', limitInputPixels: 16_777_216 });
+    const metadata = await image.metadata();
+    if (!metadata.format || !['png', 'jpeg', 'webp'].includes(metadata.format)) {
+      throw new Error('Yalnızca PNG, JPEG veya WEBP görseli yüklenebilir.');
+    }
+    const output = await image.resize(512, 512, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+    const id = crypto.randomUUID();
+    const key = `site/favicon/${id}.png`;
+    const result = await provider.upload(output, {
+      fileName: `${id}.png`, contentType: 'image/png', category: 'site_favicon', folder: 'site/favicon', key,
+      maxSizeBytes: 2 * 1024 * 1024,
+    });
+    return { ...result, width: 512, height: 512, mimeType: 'image/png', sizeBytes: output.byteLength };
+  } catch (error: any) {
+    return { success: false, url: '', key: '', sizeBytes: fileBuffer.byteLength, error: error?.message || 'Favicon işlenemedi.' };
   }
 }

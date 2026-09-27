@@ -177,28 +177,30 @@ export async function reviewApplication(
   applicationId: string,
   status: 'APPROVED' | 'REJECTED',
   rejectionReason?: string,
-  reviewerUserId?: string
+  reviewerAccountId?: string
 ): Promise<{ success: boolean; error?: string }> {
   if (process.env.DATA_STORE === 'supabase') {
     const repo = getDealerRepository();
     if (typeof repo.reviewApplication === 'function') {
-      return repo.reviewApplication(applicationId, status, rejectionReason, reviewerUserId);
+      return repo.reviewApplication(applicationId, status, rejectionReason, reviewerAccountId);
     }
   }
 
   ensureDealers();
   const app = (db.applications || []).find((a) => a.id === applicationId);
   if (!app) return { success: false, error: 'Başvuru bulunamadı.' };
+  if (app.status !== 'PENDING') return { success: false, error: 'Başvuru daha önce değerlendirilmiş.' };
+  if (status === 'REJECTED' && !rejectionReason?.trim()) return { success: false, error: 'Red gerekçesi zorunludur.' };
 
   app.status = status;
-  app.reviewed_by = reviewerUserId;
+  app.reviewed_by = reviewerAccountId;
   app.reviewed_at = new Date().toISOString();
 
   const profile = db.profiles.find((p) => p.id === app.applicant_profile_id);
   const targetUserId = profile?.user_id;
 
   if (status === 'APPROVED') {
-    let store = db.dealers.find((d) => d.profile_id === app.applicant_profile_id);
+    let store = db.dealers.find((d) => (d.profile_id === app.applicant_profile_id || d.owner_profile_id === app.applicant_profile_id) && d.moderation_status !== 'DELETED');
     if (!store) {
       store = {
         id: `dealer-${Date.now()}`,

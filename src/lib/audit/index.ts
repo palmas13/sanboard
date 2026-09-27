@@ -20,7 +20,8 @@ export type AuditEventType =
   | 'ADMIN_REPORT_STATUS_CHANGED'
   | 'ADMIN_APPLICATION_REVIEWED'
   | 'ADMIN_TICKET_STATUS_CHANGED'
-  | 'ADMIN_TICKET_REPLIED';
+  | 'ADMIN_TICKET_REPLIED'
+  | 'ADMIN_FAVICON_UPDATED';
 
 export interface AuditEventPayload {
   eventType: AuditEventType;

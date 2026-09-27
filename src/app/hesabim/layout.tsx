@@ -101,20 +101,21 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
   });
 
   const menuItems = [
-    { href: '/hesabim', label: 'Genel Bakış', icon: LayoutDashboard },
-    { href: '/hesabim/profil', label: 'Profilim', icon: User },
-    { href: '/hesabim/ilanlarim', label: 'İlanlarım', icon: ListPlus },
-    { href: '/hesabim/favorilerim', label: 'Favorilerim', icon: Heart },
-    { href: '/hesabim/odemeler', label: 'Ödeme Geçmişim', icon: CreditCard },
-    { href: '/hesabim/destek', label: 'Destek', icon: LifeBuoy },
+    { href: '/hesabim', label: 'Genel Bakış', icon: LayoutDashboard, iconAccent: 'text-orange-400 bg-orange-400/10' },
+    { href: '/hesabim/profil', label: 'Profilim', icon: User, iconAccent: 'text-blue-400 bg-blue-400/10' },
+    { href: '/hesabim/ilanlarim', label: 'İlanlarım', icon: ListPlus, iconAccent: 'text-amber-400 bg-amber-400/10' },
+    { href: '/hesabim/favorilerim', label: 'Favorilerim', icon: Heart, iconAccent: 'text-rose-400 bg-rose-400/10' },
+    { href: '/hesabim/odemeler', label: 'Ödeme Geçmişim', icon: CreditCard, iconAccent: 'text-emerald-400 bg-emerald-400/10' },
+    { href: '/hesabim/destek', label: 'Destek', icon: LifeBuoy, iconAccent: 'text-violet-400 bg-violet-400/10' },
     {
       href: '/hesabim/kurumsal',
       label: corporateLabel,
       icon: isCorporateIdentity ? Crown : Building2,
-      badge: isCorporateIdentity ? 'PRO' : undefined,
+      iconAccent: 'text-amber-400 bg-amber-400/10',
+      isCorporate: true,
     },
     ...(isAdmin
-      ? [{ href: '/yonetim', label: 'Admin Panel', icon: Shield, badge: 'ADMİN' }]
+      ? [{ href: '/yonetim', label: 'Admin Panel', icon: Shield, iconAccent: 'text-red-400 bg-red-400/10', badge: 'ADMİN' }]
       : []),
   ];
 
@@ -211,14 +212,17 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                data-corporate-item={item.isCorporate ? 'true' : undefined}
+                className={`group relative flex items-center justify-between rounded-xl border px-3 py-2 text-xs font-semibold transition-[color,background-color,border-color,box-shadow,transform] duration-150 motion-reduce:transition-none ${
                   isActive
-                    ? 'text-[#FF8A1F] bg-[var(--brand-orange-subtle)] font-bold'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-surface-secondary)]'
+                    ? 'border-[#FF8A1F]/25 bg-[var(--brand-orange-subtle)] text-[#FF8A1F] shadow-[inset_3px_0_0_#FF8A1F]'
+                    : item.isCorporate
+                    ? 'border-amber-400/20 bg-amber-400/[0.055] text-[var(--text-main)] hover:border-amber-400/35 hover:bg-amber-400/[0.09]'
+                    : 'border-transparent text-[var(--text-muted)] hover:border-[var(--border-app)] hover:bg-[var(--bg-surface-secondary)]/65 hover:text-[var(--text-main)]'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <Icon className="w-4 h-4 shrink-0" />
+                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${item.iconAccent}`}><Icon className="h-4 w-4" /></span>
                   <span>{item.label}</span>
                 </div>
                 {item.badge && (

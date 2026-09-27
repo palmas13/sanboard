@@ -4,6 +4,7 @@ import './globals.css';
 import { AuthProvider } from '@/features/auth/AuthContext';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
+import { getFaviconSetting } from '@/lib/site-settings';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -18,12 +19,16 @@ const geistMono = Geist_Mono({
 import { CompareProvider } from '@/components/compare/CompareContext';
 import { CompareTray } from '@/components/compare/CompareTray';
 
-export const metadata: Metadata = {
-  title: 'Sanboard – Los Santos\'un İlan Platformu',
-  description:
-    'GTA World Los Santos araç ve mülk ilan platformu.',
-  keywords: ['GTA World', 'Sanboard', 'Los Santos', 'Araç İlanları', 'Mülk İlanları'],
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const favicon = await getFaviconSetting();
+  const iconUrl = favicon ? `${favicon.url}${favicon.url.includes('?') ? '&' : '?'}v=${encodeURIComponent(favicon.version)}` : '/favicon.ico';
+  return {
+    title: 'Sanboard – Los Santos\'un İlan Platformu',
+    description: 'GTA World Los Santos araç ve mülk ilan platformu.',
+    keywords: ['GTA World', 'Sanboard', 'Los Santos', 'Araç İlanları', 'Mülk İlanları'],
+    icons: { icon: [{ url: iconUrl, type: favicon?.mimeType || 'image/x-icon' }], shortcut: iconUrl },
+  };
+}
 
 export default function RootLayout({
   children,

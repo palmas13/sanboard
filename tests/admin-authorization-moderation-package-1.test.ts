@@ -147,7 +147,38 @@ describe('SANBOARD admin authorization and moderation package 1', () => {
     assert.equal(store.subscription_status, 'INACTIVE');
     assert.equal(store.subscription_expires_at, undefined);
     assert.equal(store.boost_credits, 0);
-    assert.equal(db.applications[0].reviewed_by, adminA);
+    assert.equal(db.applications[0].reviewed_by, accountX);
+  });
+
+  test('application review validates input and cannot review the same application twice', async () => {
+    const missingId = await mutateAdmin(request('/api/admin', adminA, 'USER', { action: 'approveApplication', payload: {} }));
+    assert.equal(missingId.status, 400);
+    const missingReason = await mutateAdmin(request('/api/admin', adminA, 'USER', { action: 'rejectApplication', payload: { applicationId: 'application-1', rejectionReason: '   ' } }));
+    assert.equal(missingReason.status, 400);
+    const approved = await mutateAdmin(request('/api/admin', adminA, 'USER', { action: 'approveApplication', payload: { applicationId: 'application-1' } }));
+    assert.equal(approved.status, 200);
+    const reviewedAgain = await mutateAdmin(request('/api/admin', adminA, 'USER', { action: 'rejectApplication', payload: { applicationId: 'application-1', rejectionReason: 'Duplicate' } }));
+    assert.equal(reviewedAgain.status, 400);
+    assert.equal(db.applications[0].status, 'APPROVED');
+  });
+
+  test('admin aggregate enriches users and reports from the same response source', async () => {
+    db.tickets.push({ id: 'ticket-answered', profile_id: outsiderC, creator_name: 'Character C', subject: 'Answered', status: 'ANSWERED', created_at: '', updated_at: '' });
+    const response = await getAdmin(request('/api/admin', adminA));
+    const body = await response.json();
+    assert.deepEqual(body.summary, body.stats);
+    assert.equal(body.stats.totalUsers, body.users.length);
+    assert.equal(body.summary.totalProfiles, 3);
+    assert.equal(body.summary.totalCharacters, 3);
+    assert.equal(body.summary.activeListings, 1);
+    assert.equal(body.summary.corporateProfiles, 1);
+    assert.equal(body.summary.pendingCorporateApplications, 1);
+    assert.equal(body.summary.openTickets, 1, 'ANSWERED waits on the requester and is not admin-open');
+    assert.equal(body.summary.openReports, 1);
+    assert.equal(body.users.find((item: any) => item.user.id === accountY).characters[0].full_name, 'Character C');
+    assert.equal(body.reports[0].reporter.full_name, 'Character C');
+    assert.equal(body.reports[0].listing.title, 'Listing');
+    assert.equal(body.reports[0].listing.owner.full_name, 'Character C');
   });
 
   test('admin mutations reject an explicit cross-origin request', async () => {

@@ -40,11 +40,12 @@ export function ListingSortBar({
       <div className="flex items-center gap-3 self-end sm:self-auto flex-wrap">
         {/* View mode toggle (List / Grid) */}
         {showViewToggle && onViewChange && (
-          <div className="flex items-center bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] rounded-lg p-0.5">
+          <div className="flex items-center bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] rounded-lg p-0.5" role="group" aria-label="İlan görünümü">
             <button
               type="button"
               onClick={() => onViewChange('list')}
               aria-label="Liste görünümü"
+              aria-pressed={viewMode === 'list'}
               className={`p-1.5 rounded-md text-xs flex items-center transition-all ${
                 viewMode === 'list'
                   ? 'bg-[#FF8A1F] text-white shadow-sm font-semibold'
@@ -57,6 +58,7 @@ export function ListingSortBar({
               type="button"
               onClick={() => onViewChange('grid')}
               aria-label="Kart görünümü"
+              aria-pressed={viewMode === 'grid'}
               className={`p-1.5 rounded-md text-xs flex items-center transition-all ${
                 viewMode === 'grid'
                   ? 'bg-[#FF8A1F] text-white shadow-sm font-semibold'

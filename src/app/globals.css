@@ -238,12 +238,14 @@ a {
 .explore-delay-3 { animation-delay: 270ms; }
 .explore-card { transition: transform 260ms cubic-bezier(.22,1,.36,1), border-color 260ms ease, box-shadow 260ms ease, background-color 260ms ease; }
 .explore-card:hover { transform: translateY(-6px); }
-.dashboard-page-enter { animation: dashboard-page-enter 190ms ease-out both; }
+.dashboard-page-enter { animation: dashboard-page-enter 180ms ease-out both; }
+.dashboard-page-enter > :first-child { animation: dashboard-heading-enter 160ms ease-out both; }
 @keyframes hero-reveal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes explore-reveal { from { opacity: 0; transform: translateY(16px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes dashboard-page-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes dashboard-heading-enter { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) {
-  .hero-reveal, .explore-reveal, .dashboard-page-enter { animation: none; }
+  .hero-reveal, .explore-reveal, .dashboard-page-enter, .dashboard-page-enter > :first-child { animation: none; }
   .hero-cta, .explore-card { transition: none; }
   .hero-cta:hover, .hero-cta:active, .explore-card:hover { transform: none; }
 }

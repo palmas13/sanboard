@@ -1,4 +1,4 @@
-export type StorageCategory = 'listing' | 'avatar' | 'corporate_logo' | 'corporate_banner';
+export type StorageCategory = 'listing' | 'avatar' | 'corporate_logo' | 'corporate_banner' | 'site_favicon';
 
 export interface StorageUploadOptions {
   fileName: string;

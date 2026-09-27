@@ -373,7 +373,7 @@ export class SupabaseDealerRepository implements IDealerRepository {
     applicationId: string,
     status: 'APPROVED' | 'REJECTED',
     rejectionReason?: string,
-    reviewerUserId?: string
+    reviewerAccountId?: string
   ): Promise<{ success: boolean; error?: string }> {
     const client = this.getAdminClient();
 
@@ -386,6 +386,8 @@ export class SupabaseDealerRepository implements IDealerRepository {
     if (appErr || !app) {
       return { success: false, error: 'Başvuru bulunamadı.' };
     }
+    if (app.status !== 'PENDING') return { success: false, error: 'Başvuru daha önce değerlendirilmiş.' };
+    if (status === 'REJECTED' && !rejectionReason?.trim()) return { success: false, error: 'Red gerekçesi zorunludur.' };
 
     const { data: profile } = await client
       .from('character_profiles')
@@ -408,16 +410,14 @@ export class SupabaseDealerRepository implements IDealerRepository {
         return { success: false, error: 'Bu karakterin zaten onaylanmış bir kurumsal mağazası bulunmaktadır.' };
       }
 
-      await client
-        .from('corporate_applications')
-        .update({ status: 'APPROVED', reviewed_by: reviewerUserId, reviewed_at: new Date().toISOString() })
-        .eq('id', applicationId);
-
-      const { data: newStore } = await client
+      const slugBase = app.company_name.toLocaleLowerCase('tr-TR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ı/g, 'i').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'kurumsal-magaza';
+      const slug = `${slugBase}-${applicationId.slice(0, 8)}`;
+      const { data: newStore, error: storeError } = await client
         .from('corporate_profiles')
         .insert({
           owner_profile_id: targetProfileId,
           company_name: app.company_name,
+          slug,
           description: app.purpose,
           phone: app.contact_phone,
           email: app.contact_email,
@@ -429,6 +429,20 @@ export class SupabaseDealerRepository implements IDealerRepository {
         })
         .select()
         .single();
+
+      if (storeError || !newStore) return { success: false, error: 'Kurumsal mağaza oluşturulamadı.' };
+
+      const { data: reviewed, error: reviewError } = await client
+        .from('corporate_applications')
+        .update({ status: 'APPROVED', rejection_reason: null, reviewed_by: reviewerAccountId, reviewed_at: new Date().toISOString() })
+        .eq('id', applicationId)
+        .eq('status', 'PENDING')
+        .select('id')
+        .maybeSingle();
+      if (reviewError || !reviewed) {
+        await client.from('corporate_profiles').delete().eq('id', newStore.id);
+        return { success: false, error: 'Başvuru durumu güncellenemedi.' };
+      }
 
       if (newStore) {
         await client
@@ -449,15 +463,19 @@ export class SupabaseDealerRepository implements IDealerRepository {
       });
     } else if (status === 'REJECTED') {
       const reason = rejectionReason || 'Fiziksel işletme bilgileri doğrulanamadığı için başvurunuz reddedildi.';
-      await client
+      const { data: reviewed, error: reviewError } = await client
         .from('corporate_applications')
         .update({
           status: 'REJECTED',
           rejection_reason: reason,
-          reviewed_by: reviewerUserId,
+          reviewed_by: reviewerAccountId,
           reviewed_at: new Date().toISOString(),
         })
-        .eq('id', applicationId);
+        .eq('id', applicationId)
+        .eq('status', 'PENDING')
+        .select('id')
+        .maybeSingle();
+      if (reviewError || !reviewed) return { success: false, error: 'Başvuru reddedilemedi.' };
 
       const { getNotificationRepository } = await import('../index');
       await getNotificationRepository().createNotification({

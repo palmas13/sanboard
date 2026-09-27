@@ -63,9 +63,9 @@ export class MemoryDealerRepository implements IDealerRepository {
     applicationId: string,
     status: 'APPROVED' | 'REJECTED',
     rejectionReason?: string,
-    reviewerUserId?: string
+    reviewerAccountId?: string
   ): Promise<{ success: boolean; error?: string }> {
-    return reviewApplication(applicationId, status, rejectionReason, reviewerUserId);
+    return reviewApplication(applicationId, status, rejectionReason, reviewerAccountId);
   }
 
   async activateSubscription(dealerId: string): Promise<{ success: boolean; dealer?: CorporateProfile; error?: string }> {

@@ -27,17 +27,11 @@ export function Footer() {
             <Link href="/kesfet?section=hakkimizda" className="hover:text-[var(--text-main)] transition-colors">
               Hakkımızda
             </Link>
-            <Link href="/kesfet?section=kullanim-kosullari" className="hover:text-[var(--text-main)] transition-colors">
-              Kullanım Koşulları
-            </Link>
-            <Link href="/kesfet?section=gizlilik" className="hover:text-[var(--text-main)] transition-colors">
-              Gizlilik
-            </Link>
           </nav>
         </div>
 
         <div className="flex flex-col items-center justify-between gap-4 pt-6 text-xs text-[var(--text-dim)] sm:flex-row">
-          <p>© 2026 Sanboard</p>
+          <p>© {new Date().getFullYear()} Sanboard</p>
           <div className="flex gap-5"><Link href="/kesfet?section=gizlilik" className="transition-colors hover:text-[#FF8A1F]">Gizlilik</Link><Link href="/kesfet?section=kullanim-kosullari" className="transition-colors hover:text-[#FF8A1F]">Kullanım Koşulları</Link></div>
         </div>
       </div>

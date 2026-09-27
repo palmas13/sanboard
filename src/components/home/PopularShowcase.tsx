@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, TrendingUp, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
 import { PublicListingSummary } from '@/types';
 import { ListingCard } from '@/components/listings/ListingCard';
 
@@ -67,16 +67,10 @@ export function PopularShowcase({ listings }: PopularShowcaseProps) {
       {/* Header with Title, Badge, and Manual Controls */}
       <div className="flex items-center justify-between pb-2 border-b border-[var(--border-app)]">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold text-[var(--text-main)] flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-[#FF8A1F]" />
-              <span>Popüler İlanlar</span>
-            </h2>
-            <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border border-[rgba(255,138,31,0.25)]">
-              <Sparkles className="w-3 h-3" />
-              Canlı Vitrin
-            </span>
-          </div>
+          <h2 className="text-xl font-bold text-[var(--text-main)] flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-[#FF8A1F]" />
+            <span>Popüler İlanlar</span>
+          </h2>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
             Topluluk tarafından en çok ilgi gören ve favorilenen vitrin ilanları
           </p>

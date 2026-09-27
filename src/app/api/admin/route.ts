@@ -148,6 +148,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
+      summary: stats,
       stats,
       listings,
       users,
@@ -198,15 +199,18 @@ export async function POST(req: NextRequest) {
       }
 
       case 'updatePrice': {
+        const newPrice = Number(payload.newPrice);
+        if (!Number.isSafeInteger(newPrice) || newPrice <= 0) return NextResponse.json({ error: 'Geçerli bir paket fiyatı zorunludur.' }, { status: 400 });
         const success = await updatePackagePrice(
           'STANDARD_7_DAY',
-          Number(payload.newPrice)
+          newPrice
         );
         if (success) await recordAuditEvent({ eventType: 'ADMIN_PACKAGE_PRICE_CHANGED', userId: actor.userId, profileId: adminActorProfileId, metadata: { targetType: 'package', targetId: 'STANDARD_7_DAY', newPrice: Number(payload.newPrice) } });
         return NextResponse.json({ success });
       }
 
       case 'updateReport': {
+        if (!payload.reportId || typeof payload.reportId !== 'string') return NextResponse.json({ error: 'reportId zorunludur.' }, { status: 400 });
         if (!['RESOLVED', 'DISMISSED'].includes(payload.status)) return NextResponse.json({ error: 'Geçersiz rapor durumu.' }, { status: 400 });
         const success = await updateReportStatus(
           payload.reportId,
@@ -218,11 +222,12 @@ export async function POST(req: NextRequest) {
 
       // Application Review: Approve
       case 'approveApplication': {
+        if (!payload.applicationId || typeof payload.applicationId !== 'string') return NextResponse.json({ error: 'applicationId zorunludur.' }, { status: 400 });
         const result = await reviewApplication(
           payload.applicationId,
           'APPROVED',
           undefined,
-          adminActorProfileId
+          actor.userId
         );
         if (result.success) await recordAuditEvent({ eventType: 'ADMIN_APPLICATION_REVIEWED', userId: actor.userId, profileId: adminActorProfileId, metadata: { targetType: 'corporate_application', targetId: payload.applicationId, status: 'APPROVED' } });
         return safeMutationResult(result, 'Kurumsal başvuru onaylanamadı.');
@@ -230,16 +235,18 @@ export async function POST(req: NextRequest) {
 
       // Application Review: Reject (requires reason)
       case 'rejectApplication': {
-        if (!payload.rejectionReason?.trim()) {
+        if (!payload.applicationId || typeof payload.applicationId !== 'string') return NextResponse.json({ error: 'applicationId zorunludur.' }, { status: 400 });
+        if (typeof payload.rejectionReason !== 'string' || !payload.rejectionReason.trim()) {
           return NextResponse.json({ error: 'Red gerekçesi zorunludur.' }, { status: 400 });
         }
+        if (payload.rejectionReason.trim().length > 500) return NextResponse.json({ error: 'Red gerekçesi en fazla 500 karakter olabilir.' }, { status: 400 });
         const result = await reviewApplication(
           payload.applicationId,
           'REJECTED',
-          payload.rejectionReason,
-          adminActorProfileId
+          payload.rejectionReason.trim(),
+          actor.userId
         );
-        if (result.success) await recordAuditEvent({ eventType: 'ADMIN_APPLICATION_REVIEWED', userId: actor.userId, profileId: adminActorProfileId, metadata: { targetType: 'corporate_application', targetId: payload.applicationId, status: 'REJECTED', reason: payload.rejectionReason } });
+        if (result.success) await recordAuditEvent({ eventType: 'ADMIN_APPLICATION_REVIEWED', userId: actor.userId, profileId: adminActorProfileId, metadata: { targetType: 'corporate_application', targetId: payload.applicationId, status: 'REJECTED', reason: payload.rejectionReason.trim() } });
         return safeMutationResult(result, 'Kurumsal başvuru reddedilemedi.');
       }
 

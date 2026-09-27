@@ -6,6 +6,7 @@ const ALLOWED_STORAGE_PREFIXES = [
   'listings/',
   'dealers/logos/',
   'dealers/banners/',
+  'site/favicon/',
 ];
 
 export class CloudflareR2StorageProvider implements StorageProvider {

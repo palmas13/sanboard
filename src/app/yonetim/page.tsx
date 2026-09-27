@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { getCorporateUrl } from '@/lib/urls';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -30,17 +30,32 @@ import {
   Check,
   User as UserIcon,
   Clock,
+  LayoutDashboard,
+  Menu,
 } from 'lucide-react';
 import { formatCurrency, formatDateTime, formatDate } from '@/lib/utils/format';
 import { resolveMediaUrl } from '@/lib/media/url';
+import { FaviconSettings } from '@/components/admin/FaviconSettings';
+import styles from './admin.module.css';
+
+type AdminTab = 'overview' | 'listings' | 'payments' | 'reports' | 'dealers' | 'tickets' | 'settings';
+
+const navItems: Array<{ id: AdminTab; label: string; icon: React.ComponentType<{ className?: string }> }> = [
+  { id: 'overview', label: 'Genel Bakış', icon: LayoutDashboard },
+  { id: 'listings', label: 'İlan Yönetimi', icon: ListFilter },
+  { id: 'tickets', label: 'Destek Talepleri', icon: LifeBuoy },
+  { id: 'dealers', label: 'Kurumsal Yönetim', icon: Building2 },
+  { id: 'payments', label: 'Ödemeler', icon: CreditCard },
+  { id: 'reports', label: 'Raporlar', icon: Flag },
+  { id: 'settings', label: 'Ayarlar', icon: Settings },
+];
 
 export default function AdminPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading, isAdmin } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<
-    'listings' | 'users' | 'payments' | 'reports' | 'dealers' | 'tickets' | 'settings'
-  >('listings');
+  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
@@ -74,6 +89,22 @@ export default function AdminPage() {
   const [suspendModalOpen, setSuspendModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [storeReasonInput, setStoreReasonInput] = useState('');
+  const [selectedReport, setSelectedReport] = useState<any | null>(null);
+  const modalCloseRef = useRef<HTMLButtonElement>(null);
+
+  const anyModalOpen = Boolean(selectedReport || selectedTicket || rejectModalOpen || storeManageModalOpen || suspendModalOpen || deleteModalOpen);
+  useEffect(() => {
+    if (!anyModalOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const timer = window.setTimeout(() => modalCloseRef.current?.focus(), 0);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setSelectedReport(null); setSelectedTicket(null); setRejectModalOpen(false);
+      setStoreManageModalOpen(false); setSuspendModalOpen(false); setDeleteModalOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => { window.clearTimeout(timer); document.removeEventListener('keydown', onKeyDown); previous?.focus(); };
+  }, [anyModalOpen]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -185,11 +216,13 @@ export default function AdminPage() {
   const handleReportAction = async (reportId: string, status: 'RESOLVED' | 'DISMISSED') => {
     setActionLoading(true);
     try {
-      await fetch('/api/admin', {
+      const response = await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'updateReport', payload: { reportId, status } }),
       });
+      if (!response.ok) return;
+      setSelectedReport(null);
       await fetchData();
     } finally {
       setActionLoading(false);
@@ -200,7 +233,7 @@ export default function AdminPage() {
   const handleApproveApplication = async (applicationId: string) => {
     setActionLoading(true);
     try {
-      await fetch('/api/admin', {
+      const response = await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -208,6 +241,7 @@ export default function AdminPage() {
           payload: { applicationId },
         }),
       });
+      if (!response.ok) return;
       await fetchData();
     } finally {
       setActionLoading(false);
@@ -219,7 +253,7 @@ export default function AdminPage() {
     if (!rejectTargetApp) return;
     setActionLoading(true);
     try {
-      await fetch('/api/admin', {
+      const response = await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -230,6 +264,7 @@ export default function AdminPage() {
           },
         }),
       });
+      if (!response.ok) return;
       setRejectModalOpen(false);
       setRejectTargetApp(null);
       await fetchData();
@@ -244,7 +279,7 @@ export default function AdminPage() {
     if (!selectedStore || !storeReasonInput.trim()) return;
     setActionLoading(true);
     try {
-      await fetch('/api/admin', {
+      const response = await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -255,6 +290,7 @@ export default function AdminPage() {
           },
         }),
       });
+      if (!response.ok) return;
       setSuspendModalOpen(false);
       setStoreManageModalOpen(false);
       setStoreReasonInput('');
@@ -267,7 +303,7 @@ export default function AdminPage() {
   const handleReactivateStore = async (dealerId: string) => {
     setActionLoading(true);
     try {
-      await fetch('/api/admin', {
+      const response = await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -275,6 +311,7 @@ export default function AdminPage() {
           payload: { dealerId },
         }),
       });
+      if (!response.ok) return;
       setStoreManageModalOpen(false);
       await fetchData();
     } finally {
@@ -287,7 +324,7 @@ export default function AdminPage() {
     if (!selectedStore || !storeReasonInput.trim()) return;
     setActionLoading(true);
     try {
-      await fetch('/api/admin', {
+      const response = await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -298,6 +335,7 @@ export default function AdminPage() {
           },
         }),
       });
+      if (!response.ok) return;
       setDeleteModalOpen(false);
       setStoreManageModalOpen(false);
       setStoreReasonInput('');
@@ -364,16 +402,27 @@ export default function AdminPage() {
     }
   };
 
-  const stats = data?.stats || {
+  const stats = data?.summary || data?.stats || {
     totalUsers: 0,
+    totalProfiles: 0,
+    totalCharacters: 0,
     activeListings: 0,
+    corporateProfiles: 0,
+    pendingCorporateApplications: 0,
+    openTickets: 0,
+    openReports: 0,
     expiredListings: 0,
     totalRevenue: 0,
     todayListings: 0,
     totalFavorites: 0,
   };
 
-  const filteredListings = (data?.listings || []).filter((l: any) => {
+  // Enriched payloads are preferred; legacy arrays remain supported during rollout.
+  const users = data?.users?.items || data?.users || [];
+  const reports = data?.reports?.items || data?.reports || [];
+  const listings = data?.listings?.items || data?.listings || [];
+
+  const filteredListings = listings.filter((l: any) => {
     if (!searchListingQuery) return true;
     const q = searchListingQuery.toLowerCase();
     return (
@@ -382,8 +431,8 @@ export default function AdminPage() {
     );
   });
 
-  const pendingAppsCount = (data?.applications || []).length;
-  const openTicketsCount = (data?.tickets || []).filter((t: any) => t.status === 'OPEN').length;
+  const pendingAppsCount = stats.pendingCorporateApplications;
+  const openTicketsCount = stats.openTickets;
 
   const filteredTickets = (data?.tickets || []).filter((t: any) => {
     if (ticketStatusFilter === 'ALL') return true;
@@ -391,33 +440,22 @@ export default function AdminPage() {
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Header */}
-      <div className="surface-card p-6 rounded-2xl border border-[var(--border-app)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="p-3 rounded-xl bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border border-[#FF8A1F]/30">
-            <Shield className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black text-[var(--text-main)]">
-              Sanboard Yönetim Paneli
-            </h1>
-            <p className="text-xs text-[var(--text-muted)] mt-0.5">
-              İlanları denetle, kullanıcıları yönet, kurumsal başvuruları onayla ve destek taleplerini yanıtla.
-            </p>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={fetchData}
-          disabled={loading || actionLoading}
-          className="btn-secondary text-xs py-2 px-3.5 flex items-center gap-1.5"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          <span>Yenile</span>
-        </button>
-      </div>
+    <div className={styles.dashboard}>
+      <button type="button" className={styles.mobileMenu} onClick={() => setSidebarOpen((value) => !value)} aria-expanded={sidebarOpen} aria-controls="admin-sidebar">
+        <Menu className="w-4 h-4" /> Yönetim menüsü
+      </button>
+      <aside id="admin-sidebar" className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`} aria-label="Yönetim bölümleri">
+        <div className={styles.brand}><Shield className="w-5 h-5" /><span>Sanboard</span><small>YÖNETİM</small></div>
+        <nav className={styles.nav}>
+          {navItems.map((item) => { const Icon = item.icon; return (
+            <button key={item.id} type="button" aria-current={activeTab === item.id ? 'page' : undefined} onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }} className={activeTab === item.id ? styles.navActive : ''}>
+              <Icon className="w-4 h-4" /><span>{item.label}</span>
+            </button>
+          ); })}
+        </nav>
+        <div className={styles.sidebarFoot}><span className="w-2 h-2 rounded-full bg-[var(--color-success)]" /> Sistem aktif</div>
+      </aside>
+      <main className={styles.content}>
 
       {/* Compact 4-KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -490,99 +528,14 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Tabs Navigation */}
-      <div className="flex border-b border-[var(--border-app)] gap-2 overflow-x-auto">
-        <button
-          type="button"
-          onClick={() => setActiveTab('users')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
-            activeTab === 'users'
-              ? 'border-[#FF8A1F] text-[#FF8A1F]'
-              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>Kullanıcılar ({data?.users?.length || 0})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('listings')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
-            activeTab === 'listings'
-              ? 'border-[#FF8A1F] text-[#FF8A1F]'
-              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'
-          }`}
-        >
-          <ListFilter className="w-4 h-4" />
-          <span>İlan Yönetimi ({data?.listings?.length || 0})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('tickets')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
-            activeTab === 'tickets'
-              ? 'border-[#FF8A1F] text-[#FF8A1F]'
-              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'
-          }`}
-        >
-          <LifeBuoy className="w-4 h-4" />
-          <span>Destek Talepleri {openTicketsCount > 0 && `(${openTicketsCount})`}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('dealers')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
-            activeTab === 'dealers'
-              ? 'border-[#FF8A1F] text-[#FF8A1F]'
-              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          <span>Kurumsal Yönetim {pendingAppsCount > 0 && `(${pendingAppsCount})`}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('payments')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
-            activeTab === 'payments'
-              ? 'border-[#FF8A1F] text-[#FF8A1F]'
-              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'
-          }`}
-        >
-          <CreditCard className="w-4 h-4" />
-          <span>Ödemeler</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('reports')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
-            activeTab === 'reports'
-              ? 'border-[#FF8A1F] text-[#FF8A1F]'
-              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'
-          }`}
-        >
-          <Flag className="w-4 h-4" />
-          <span>Raporlar ({data?.reports?.filter((r: any) => r.status === 'PENDING').length || 0})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('settings')}
-          className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
-            activeTab === 'settings'
-              ? 'border-[#FF8A1F] text-[#FF8A1F]'
-              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'
-          }`}
-        >
-          <Settings className="w-4 h-4" />
-          <span>Ayarlar</span>
-        </button>
-      </div>
+      {activeTab === 'overview' && (
+        <section className={styles.overviewGrid} aria-labelledby="overview-title">
+          <div className="surface-card p-5"><h2 id="overview-title" className="font-bold">Son kullanıcılar</h2><p className="text-xs text-[var(--text-muted)] mt-1 mb-3">Hesap ve aktif karakter eşlemesi</p>
+            <div className={styles.compactList}>{users.slice(0, 6).map((item: any) => { const account = item.user || item; const chars = item.characters || account.characters || []; return <div key={account.id}><div><strong>{account.display_name || account.username || chars[0]?.display_name || 'İsimsiz hesap'}</strong><small>{chars.length ? chars.map((c: any) => c.display_name || c.name).join(', ') : 'Karakter eşleşmesi yok'}</small></div><span>{account.status || 'ACTIVE'}</span></div>; })}</div>
+          </div>
+          <div className="surface-card p-5"><h2 className="font-bold">İş kuyruğu</h2><p className="text-xs text-[var(--text-muted)] mt-1 mb-3">Hızlı moderasyon özeti</p><div className={styles.queue}><button onClick={() => setActiveTab('reports')}><Flag />Bekleyen rapor <b>{stats.openReports}</b></button><button onClick={() => setActiveTab('dealers')}><Building2 />Kurumsal başvuru <b>{pendingAppsCount}</b></button><button onClick={() => setActiveTab('tickets')}><LifeBuoy />Açık destek <b>{openTicketsCount}</b></button></div></div>
+        </section>
+      )}
 
       {/* TAB CONTENT 1: İLAN YÖNETİMİ */}
       {activeTab === 'listings' && (
@@ -1032,122 +985,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* TAB CONTENT 4: KULLANICILAR */}
-      {activeTab === 'users' && (
-        <div className="surface-card rounded-2xl border border-[var(--border-app)] p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-bold text-base text-[var(--text-main)]">Kayıtlı Kullanıcılar</h3>
-              <p className="text-xs text-[var(--text-muted)] mt-0.5">Sistemde kayıtlı hesaplar, rolleri ve bağlı karakter profilleri</p>
-            </div>
-            <div className="text-xs text-[var(--text-muted)] font-medium">
-              Toplam: <span className="font-bold text-[var(--text-main)]">{data?.users?.length || 0}</span> hesap
-            </div>
-          </div>
-          <div className="overflow-x-auto rounded-xl border border-[var(--border-app)]">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[var(--bg-surface-secondary)] border-b border-[var(--border-app)] text-[var(--text-muted)] uppercase tracking-wider font-semibold">
-                <tr>
-                  <th className="py-3.5 px-4">Karakter / Hesap</th>
-                  <th className="py-3.5 px-4">Yetki (Rol)</th>
-                  <th className="py-3.5 px-4">Karakterler</th>
-                  <th className="py-3.5 px-4">Kayıt Tarihi</th>
-                  <th className="py-3.5 px-4">Durum</th>
-                  <th className="py-3.5 px-4 text-right">İşlem</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border-app)]">
-                {(data?.users || []).map((item: any) => {
-                  const mainChar = item.characters && item.characters.length > 0 ? item.characters[0] : null;
-                  const allChars = item.characters || [];
-                  const isAdminRole = item.user.role === 'ADMIN';
-
-                  return (
-                    <tr key={item.user.id} className="hover:bg-[var(--bg-surface-secondary)]/30 transition-colors">
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] flex items-center justify-center shrink-0 overflow-hidden text-[var(--text-muted)]">
-                            {mainChar?.avatar_path ? (
-                              <img
-                                src={resolveMediaUrl(mainChar.avatar_path)}
-                                alt={mainChar.full_name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <UserIcon className="w-4 h-4" />
-                            )}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-sm text-[var(--text-main)]">
-                              {mainChar?.full_name || 'İsimsiz Profil'}
-                            </div>
-                            <div className="font-mono text-[10px] text-[var(--text-dim)]">
-                              ID: {item.user.id.slice(0, 13)}...
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        {isAdminRole ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-[#FF8A1F]/15 text-[#FF8A1F] border border-[#FF8A1F]/30">
-                            <Shield className="w-3 h-3" />
-                            ADMIN
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-[var(--bg-surface-secondary)] text-[var(--text-muted)] border border-[var(--border-app)]">
-                            USER
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-semibold text-[var(--text-main)]">
-                            {item.profileCount} Karakter
-                          </span>
-                          {allChars.length > 0 && (
-                            <span className="text-[10px] text-[var(--text-muted)] truncate max-w-[180px]">
-                              {allChars.map((c: any) => c.full_name).join(', ')}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 text-[var(--text-muted)]">
-                        {item.user.created_at ? formatDateTime(item.user.created_at) : '—'}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            item.user.status === 'ACTIVE'
-                              ? 'bg-[var(--color-success-subtle)] text-[var(--color-success)]'
-                              : 'bg-[var(--color-danger-subtle)] text-[var(--color-danger)]'
-                          }`}
-                        >
-                          {item.user.status === 'ACTIVE' ? 'Aktif' : 'Engelli'}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleBan(item.user.id)}
-                          className={`text-[11px] py-1 px-2.5 rounded-lg font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors ${
-                            item.user.status === 'ACTIVE'
-                              ? 'bg-[var(--color-danger-subtle)] text-[var(--color-danger)] hover:bg-[var(--color-danger)] hover:text-white'
-                              : 'bg-[var(--color-success-subtle)] text-[var(--color-success)] hover:bg-[var(--color-success)] hover:text-white'
-                          }`}
-                        >
-                          <Ban className="w-3 h-3" />
-                          <span>{item.user.status === 'ACTIVE' ? 'Engelle (Ban)' : 'Engeli Kaldır'}</span>
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
       {/* TAB CONTENT 5: ÖDEMELER */}
       {activeTab === 'payments' && (
         <div className="surface-card rounded-2xl border border-[var(--border-app)] p-6 space-y-4">
@@ -1187,12 +1024,12 @@ export default function AdminPage() {
       {activeTab === 'reports' && (
         <div className="surface-card rounded-2xl border border-[var(--border-app)] p-6 space-y-4">
           <h3 className="font-bold text-base text-[var(--text-main)]">Kullanıcı Şikayetleri</h3>
-          {(data?.reports || []).length > 0 ? (
+          {reports.length > 0 ? (
             <div className="space-y-3">
-              {(data?.reports || []).map((rep: any) => (
+              {reports.map((rep: any) => (
                 <div
                   key={rep.id}
-                  className="p-4 rounded-xl bg-[var(--bg-surface-secondary)]/50 border border-[var(--border-app)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                  className="p-3 rounded-xl bg-[var(--bg-surface-secondary)]/50 border border-[var(--border-app)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
@@ -1217,7 +1054,7 @@ export default function AdminPage() {
                   </div>
 
                   {rep.status === 'PENDING' && (
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0"><button type="button" onClick={() => setSelectedReport(rep)} className="btn-secondary text-xs py-1.5 px-3">İncele</button>
                       <button
                         type="button"
                         onClick={() => handleReportAction(rep.id, 'RESOLVED')}
@@ -1248,7 +1085,8 @@ export default function AdminPage() {
 
       {/* TAB CONTENT 7: AYARLAR (Paket Fiyatı) */}
       {activeTab === 'settings' && (
-        <div className="surface-card rounded-2xl border border-[var(--border-app)] p-6 sm:p-8 space-y-6 max-w-xl">
+        <div className="space-y-6 max-w-xl">
+        <div className="surface-card rounded-2xl border border-[var(--border-app)] p-6 sm:p-8 space-y-6">
           <div>
             <h3 className="font-bold text-base text-[var(--text-main)]">Platform Ayarları</h3>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">
@@ -1293,6 +1131,19 @@ export default function AdminPage() {
               <span>Fiyatı Güncelle</span>
             </button>
           </form>
+        </div>
+        <FaviconSettings />
+        </div>
+      )}
+
+      {selectedReport && (
+        <div className={styles.modalBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedReport(null); }}>
+          <section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="report-dialog-title">
+            <div className={styles.modalHead}><div><span className="badge-tag">RAPOR</span><h2 id="report-dialog-title">Rapor ayrıntıları</h2></div><button ref={modalCloseRef} type="button" onClick={() => setSelectedReport(null)} aria-label="Rapor penceresini kapat"><X /></button></div>
+            <dl className={styles.detailGrid}><div><dt>Neden</dt><dd>{selectedReport.reason || 'Belirtilmedi'}</dd></div><div><dt>Durum</dt><dd>{selectedReport.status}</dd></div><div><dt>İlan</dt><dd>{selectedReport.listing?.title || selectedReport.listing_title || selectedReport.listing_id}</dd></div><div><dt>Bildiren</dt><dd>{selectedReport.reporter?.display_name || selectedReport.reporter_name || selectedReport.reporter_profile_id || 'Bilinmiyor'}</dd></div></dl>
+            <div className={styles.description}><strong>Açıklama</strong><p>{selectedReport.description || 'Açıklama eklenmemiş.'}</p></div>
+            {selectedReport.status === 'PENDING' && <div className={styles.modalActions}><button className="btn-secondary" onClick={() => handleReportAction(selectedReport.id, 'DISMISSED')}>Reddet</button><button className="btn-primary" onClick={() => handleReportAction(selectedReport.id, 'RESOLVED')}>Çözüldü olarak işaretle</button></div>}
+          </section>
         </div>
       )}
 
@@ -1430,17 +1281,17 @@ export default function AdminPage() {
 
       {/* Corporate Application Rejection Modal (Section 12A) */}
       {rejectModalOpen && rejectTargetApp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
-          <div className="surface-card w-full max-w-md rounded-2xl border border-[var(--border-app)] shadow-2xl p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in" role="presentation">
+          <div className="surface-card w-full max-w-md rounded-2xl border border-[var(--border-app)] shadow-2xl p-6 space-y-4" role="dialog" aria-modal="true" aria-labelledby="reject-application-title">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-app)]">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-red-400" />
-                <h3 className="font-bold text-sm text-[var(--text-main)]">Kurumsal Başvuruyu Reddet</h3>
+                <h3 id="reject-application-title" className="font-bold text-sm text-[var(--text-main)]">Kurumsal Başvuruyu Reddet</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setRejectModalOpen(false)}
-                className="p-1 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-main)]"
+                ref={modalCloseRef} aria-label="Başvuru reddetme penceresini kapat" className="p-1 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-main)]"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1487,22 +1338,22 @@ export default function AdminPage() {
 
       {/* Corporate Store Management Modal (Section 12B & 23) */}
       {storeManageModalOpen && selectedStore && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
-          <div className="surface-card w-full max-w-lg rounded-2xl border border-[var(--border-app)] shadow-2xl p-6 space-y-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in" role="presentation">
+          <div className="surface-card w-full max-w-lg rounded-2xl border border-[var(--border-app)] shadow-2xl p-6 space-y-5" role="dialog" aria-modal="true" aria-labelledby="store-manage-title">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-app)]">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-lg bg-[var(--brand-orange-subtle)] border border-[#FF8A1F]/30 text-[#FF8A1F] flex items-center justify-center font-bold text-xs shrink-0">
                   {selectedStore.company_name?.charAt(0) || 'K'}
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-[var(--text-main)]">{selectedStore.company_name}</h3>
+                  <h3 id="store-manage-title" className="font-bold text-sm text-[var(--text-main)]">{selectedStore.company_name}</h3>
                   <p className="text-[10px] text-[var(--text-dim)] font-mono">{selectedStore.public_id ? `#${selectedStore.public_id}` : selectedStore.id}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setStoreManageModalOpen(false)}
-                className="p-1 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-main)]"
+                ref={modalCloseRef} aria-label="Kurumsal mağaza penceresini kapat" className="p-1 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-main)]"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1772,6 +1623,7 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+      </main>
     </div>
   );
 }

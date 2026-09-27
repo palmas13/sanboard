@@ -1,14 +1,35 @@
 import { db } from './store';
-import { Listing, Report, User } from '@/types';
+import { CharacterProfile, Listing, Report, User } from '@/types';
 import { getSupabaseAdminClient } from './supabase-client';
 
 export interface AdminStats {
   totalUsers: number;
+  totalProfiles: number;
+  /** Compatibility alias for clients that label profiles as characters. */
+  totalCharacters: number;
   activeListings: number;
+  corporateProfiles: number;
+  pendingCorporateApplications: number;
+  /** Tickets awaiting an admin response. ANSWERED waits on the requester and is not open admin work. */
+  openTickets: number;
+  openReports: number;
   expiredListings: number;
   totalRevenue: number;
   todayListings: number;
   totalFavorites: number;
+}
+
+export interface AdminUserSummary {
+  user: User;
+  profileCount: number;
+  characters: Pick<CharacterProfile, 'id' | 'full_name' | 'avatar_path' | 'avatar_url' | 'public_id' | 'role' | 'created_at'>[];
+}
+
+export interface AdminReport extends Report {
+  reporter: Pick<CharacterProfile, 'id' | 'full_name' | 'avatar_path' | 'avatar_url' | 'public_id'> | null;
+  listing: (Pick<Listing, 'id' | 'public_id' | 'listing_number' | 'title' | 'status' | 'seller_profile_id'> & {
+    owner: Pick<CharacterProfile, 'id' | 'full_name' | 'avatar_path' | 'avatar_url' | 'public_id'> | null;
+  }) | null;
 }
 
 export async function getAdminStats(): Promise<AdminStats> {
@@ -23,14 +44,24 @@ export async function getAdminStats(): Promise<AdminStats> {
 
       const [
         usersRes,
+        profilesRes,
         activeListingsRes,
+        corporateProfilesRes,
+        pendingApplicationsRes,
+        openTicketsRes,
+        openReportsRes,
         expiredListingsRes,
         paymentsRes,
         todayListingsRes,
         favoritesRes,
       ] = await Promise.all([
         client.from('users').select('*', { count: 'exact', head: true }),
-        client.from('listings').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE').gt('expires_at', nowIso),
+        client.from('character_profiles').select('*', { count: 'exact', head: true }),
+        client.from('listings').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE').or(`expires_at.is.null,expires_at.gt.${nowIso}`),
+        client.from('corporate_profiles').select('*', { count: 'exact', head: true }),
+        client.from('corporate_applications').select('*', { count: 'exact', head: true }).eq('status', 'PENDING'),
+        client.from('support_tickets').select('*', { count: 'exact', head: true }).eq('status', 'OPEN'),
+        client.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'PENDING'),
         client.from('listings').select('*', { count: 'exact', head: true }).or(`status.eq.EXPIRED,expires_at.lte.${nowIso}`),
         client.from('payments').select('amount').eq('status', 'SUCCESS'),
         client.from('listings').select('*', { count: 'exact', head: true }).gte('created_at', startOfDayIso),
@@ -41,7 +72,13 @@ export async function getAdminStats(): Promise<AdminStats> {
 
       return {
         totalUsers: usersRes.count || 0,
+        totalProfiles: profilesRes.count || 0,
+        totalCharacters: profilesRes.count || 0,
         activeListings: activeListingsRes.count || 0,
+        corporateProfiles: corporateProfilesRes.count || 0,
+        pendingCorporateApplications: pendingApplicationsRes.count || 0,
+        openTickets: openTicketsRes.count || 0,
+        openReports: openReportsRes.count || 0,
         expiredListings: expiredListingsRes.count || 0,
         totalRevenue,
         todayListings: todayListingsRes.count || 0,
@@ -74,7 +111,13 @@ export async function getAdminStats(): Promise<AdminStats> {
 
   return {
     totalUsers: db.users.length,
+    totalProfiles: db.profiles.length,
+    totalCharacters: db.profiles.length,
     activeListings: activeCount,
+    corporateProfiles: db.dealers.length,
+    pendingCorporateApplications: db.applications.filter((application) => application.status === 'PENDING').length,
+    openTickets: db.tickets.filter((ticket) => ticket.status === 'OPEN').length,
+    openReports: db.reports.filter((report) => report.status === 'PENDING').length,
     expiredListings: expiredCount,
     totalRevenue,
     todayListings: todayCount,
@@ -119,7 +162,7 @@ export async function adminDelistListing(listingId: string): Promise<boolean> {
   return result.success;
 }
 
-export async function getAllUsersForAdmin(): Promise<{ user: User; profileCount: number }[]> {
+export async function getAllUsersForAdmin(): Promise<AdminUserSummary[]> {
   if (process.env.DATA_STORE === 'supabase') {
     const client = getSupabaseAdminClient();
     if (client) {
@@ -127,7 +170,7 @@ export async function getAllUsersForAdmin(): Promise<{ user: User; profileCount:
         .from('users')
         .select(`
           *,
-          character_profiles (id, full_name, avatar_path, public_id)
+          character_profiles (id, full_name, avatar_path, avatar_url, public_id, role, created_at)
         `)
         .order('created_at', { ascending: false });
 
@@ -202,23 +245,41 @@ export async function updatePackagePrice(packageCode: string, newPrice: number):
   return true;
 }
 
-export async function getReportsForAdmin(): Promise<Report[]> {
+export async function getReportsForAdmin(): Promise<AdminReport[]> {
   if (process.env.DATA_STORE === 'supabase') {
     const client = getSupabaseAdminClient();
     if (client) {
       const { data, error } = await client
         .from('reports')
-        .select('*')
+        .select(`
+          *,
+          reporter:character_profiles!reports_reporter_profile_id_fkey(id, full_name, avatar_path, avatar_url, public_id),
+          listing:listings!reports_listing_id_fkey(
+            id, public_id, listing_number, title, status, seller_profile_id,
+            owner:character_profiles!listings_seller_profile_id_fkey(id, full_name, avatar_path, avatar_url, public_id)
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (error) return [];
-      return (data || []) as Report[];
+      return (data || []) as AdminReport[];
     }
   }
 
-  return db.reports.sort(
+  return [...db.reports].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  );
+  ).map((report) => ({
+    ...report,
+    reporter: db.profiles.find((profile) => profile.id === report.reporter_profile_id) || null,
+    listing: (() => {
+      const listing = db.listings.find((item) => item.id === report.listing_id);
+      if (!listing) return null;
+      return {
+        ...listing,
+        owner: db.profiles.find((profile) => profile.id === listing.seller_profile_id) || null,
+      };
+    })(),
+  }));
 }
 
 export async function updateReportStatus(reportId: string, status: 'RESOLVED' | 'DISMISSED'): Promise<boolean> {
