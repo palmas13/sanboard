@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
         await timing.measure('bootstrap', () => Promise.all([
           client
             .from('listings')
-            .select('id, status')
+            .select('id, status, expires_at')
             .eq('seller_profile_id', profileId)
             .eq('seller_type', 'INDIVIDUAL')
             .is('corporate_profile_id', null),
@@ -57,8 +57,9 @@ export async function GET(req: NextRequest) {
         ]));
 
       const personalListings = listingsRes.data || [];
-      const activeListings = personalListings.filter((l) => l.status === 'ACTIVE').length;
-      const expiredListings = personalListings.filter((l) => l.status === 'EXPIRED').length;
+      const now = Date.now();
+      const activeListings = personalListings.filter((l) => l.status === 'ACTIVE' && (!l.expires_at || new Date(l.expires_at).getTime() > now)).length;
+      const expiredListings = personalListings.filter((l) => l.status === 'EXPIRED' || (l.status === 'ACTIVE' && Boolean(l.expires_at) && new Date(l.expires_at!).getTime() <= now)).length;
       
       let totalReceivedFavorites = 0;
       const personalListingIds = personalListings.map((l) => l.id);
@@ -103,8 +104,9 @@ export async function GET(req: NextRequest) {
     const personalListings = db.listings.filter(
       (l) => l.seller_profile_id === profileId && l.seller_type === 'INDIVIDUAL' && !l.corporate_profile_id
     );
-    const activeListings = personalListings.filter((l) => l.status === 'ACTIVE').length;
-    const expiredListings = personalListings.filter((l) => l.status === 'EXPIRED').length;
+    const now = Date.now();
+    const activeListings = personalListings.filter((l) => l.status === 'ACTIVE' && (!l.expires_at || new Date(l.expires_at).getTime() > now)).length;
+    const expiredListings = personalListings.filter((l) => l.status === 'EXPIRED' || (l.status === 'ACTIVE' && Boolean(l.expires_at) && new Date(l.expires_at!).getTime() <= now)).length;
     const personalListingIds = new Set(personalListings.map((l) => l.id));
     const totalReceivedFavorites = db.favorites.filter((f) => personalListingIds.has(f.listing_id)).length;
 

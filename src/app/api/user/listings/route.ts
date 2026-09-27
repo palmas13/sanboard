@@ -41,7 +41,7 @@ export async function PATCH(req: NextRequest) {
   try {
     const actor = await resolveOwnedActiveProfile(req);
     if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
-    const { listingId, action = 'SOLD' } = await req.json();
+    const { listingId, action } = await req.json();
 
     if (!listingId) {
       return NextResponse.json(
@@ -51,9 +51,12 @@ export async function PATCH(req: NextRequest) {
     }
 
     const repo = getListingRepository();
+    if (!['SOLD', 'REMOVED', 'REPUBLISH'].includes(action)) {
+      return NextResponse.json({ error: 'Geçersiz ilan işlemi.' }, { status: 400 });
+    }
     const result = action === 'REPUBLISH'
       ? await repo.republishListing(listingId, actor.profileId)
-      : await repo.markListingAsSold(listingId, actor.profileId);
+      : await repo.closeListing(listingId, actor.profileId, action);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
@@ -65,7 +68,7 @@ export async function PATCH(req: NextRequest) {
     revalidatePath('/hesabim/ilanlarim');
     return NextResponse.json({
       success: true,
-      listing: action === 'REPUBLISH' && 'listing' in result ? result.listing : undefined,
+      listing: 'listing' in result ? result.listing : undefined,
     });
   } catch (error: any) {
     return NextResponse.json(

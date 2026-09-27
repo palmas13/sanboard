@@ -9,6 +9,7 @@ import {
   LogIn,
   Heart,
   ArrowRight,
+  CircleOff,
 } from 'lucide-react';
 import { getListingRepository } from '@/lib/db/repositories';
 import { getServerSession } from '@/lib/auth/session';
@@ -19,6 +20,8 @@ import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { ReportModal } from '@/components/listings/ReportModal';
 import { CompareButton } from '@/components/compare/CompareButton';
 import { SimilarListings } from '@/components/listings/SimilarListings';
+import { CopyListingLinkButton } from '@/components/listings/CopyListingLinkButton';
+import { PropertyCompareButton } from '@/components/compare/PropertyCompareButton';
 import { getOptionalSimilarListings } from '@/lib/db/optional-listing-data';
 import { MemberListingDetail } from '@/types';
 import { sortListingImages } from '@/lib/listings/images';
@@ -43,17 +46,31 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { listing } = await resolveListing(id);
   if (!listing) return {};
   const canonical = getAbsoluteUrl(getListingUrl(listing));
-  const image = 'cover_image' in listing
+  const rawImage = 'cover_image' in listing
     ? listing.cover_image
     : 'images' in listing
       ? listing.images?.[0]?.storage_path
       : undefined;
+  const image = rawImage ? getAbsoluteUrl(rawImage) : undefined;
   const description = 'description' in listing ? listing.description : `${listing.title} ilanını Sanboard üzerinde inceleyin.`;
   return {
     title: listing.title,
     description,
     alternates: { canonical },
-    openGraph: { title: listing.title, description, url: canonical, images: image ? [image] : undefined },
+    openGraph: {
+      title: listing.title,
+      description,
+      url: canonical,
+      siteName: 'Sanboard',
+      type: 'website',
+      images: image ? [{ url: image, alt: listing.title }] : undefined,
+    },
+    twitter: {
+      card: image ? 'summary_large_image' : 'summary',
+      title: listing.title,
+      description,
+      images: image ? [image] : undefined,
+    },
   };
 }
 
@@ -148,6 +165,8 @@ export default async function ListingDetailPage({ params }: PageProps) {
   const similarListings = isVehicle
     ? await getOptionalSimilarListings(repo, id, 6)
     : [];
+  const status = 'status' in listing ? listing.status : undefined;
+  const closedLabel = status === 'SOLD' ? 'Bu ilan satıldı' : status === 'REMOVED' ? 'Bu ilan yayından kaldırıldı' : null;
 
   return (
     <div className="max-w-7xl xl:max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
@@ -163,6 +182,13 @@ export default async function ListingDetailPage({ params }: PageProps) {
         <span>/</span>
         <span className="text-[var(--text-muted)]">{listing.subcategory}</span>
       </nav>
+
+      {closedLabel ? (
+        <div role="status" className="surface-card flex items-center gap-3 rounded-2xl border border-amber-500/35 bg-amber-500/10 p-4 text-sm font-semibold text-amber-200">
+          <CircleOff className="h-5 w-5 shrink-0" />
+          <div><p>{closedLabel}</p><p className="mt-0.5 text-xs font-normal text-[var(--text-muted)]">İlan bilgileri arşiv amacıyla görüntüleniyor; satıcıyla iletişim ve yeni favori işlemleri kapalıdır.</p></div>
+        </div>
+      ) : null}
 
       {/* SECTION A: INDEPENDENT LISTING HEADER */}
       <section className="surface-card p-5 sm:p-6 rounded-2xl border border-[var(--border-app)] shadow-sm">
@@ -215,11 +241,11 @@ export default async function ListingDetailPage({ params }: PageProps) {
               </div>
             </div>
 
-            {isVehicle && (
-              <div className="pt-2 sm:pt-2.5 flex md:justify-end">
-                <CompareButton listing={listing} />
-              </div>
-            )}
+            <div className="flex flex-wrap gap-2 pt-2 sm:pt-2.5 md:justify-end">
+              {isVehicle && <CompareButton listing={listing} />}
+              {!isVehicle && !closedLabel && <PropertyCompareButton listing={listing} />}
+              <CopyListingLinkButton path={canonicalPath} />
+            </div>
           </div>
         </div>
       </section>
@@ -236,13 +262,13 @@ export default async function ListingDetailPage({ params }: PageProps) {
 
           {/* Social Proof Favorite Counter & İlan Açıklaması Kartı */}
           <div className="surface-card p-4 sm:p-5 rounded-2xl border border-[var(--border-app)] space-y-4 shadow-sm">
-            <FavoriteButton
+            {!closedLabel ? <FavoriteButton
               listingId={listing.id}
               initialCount={listing.favorite_count}
               initialIsFavorited={(listing as MemberListingDetail).is_favorited}
               proofText={true}
               showCount={false}
-            />
+            /> : null}
 
             {!isLocked && (
               <>

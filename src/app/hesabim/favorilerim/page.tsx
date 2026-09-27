@@ -59,13 +59,19 @@ export default function HesabimFavorilerimPage() {
               listing.images?.[0]?.storage_path;
             const coverImg = resolveMediaUrl(rawCover);
 
-            const isExpired = listing.isExpired || listing.status === 'EXPIRED';
+            const closedLabel = listing.status === 'SOLD'
+              ? 'Satıldı'
+              : listing.status === 'REMOVED'
+                ? 'Yayından kaldırıldı'
+                : (listing.isExpired || listing.status === 'EXPIRED')
+                  ? 'Süresi doldu'
+                  : null;
 
             return (
               <article
                 key={listing.id}
                 className={`group grid grid-cols-[88px_minmax(0,1fr)] gap-4 p-3 transition-colors sm:grid-cols-[112px_minmax(0,1fr)_auto] sm:items-center sm:p-4 ${
-                  isExpired ? 'opacity-65 grayscale-[30%]' : 'hover:bg-[var(--bg-surface-secondary)]/35'
+                  closedLabel ? 'opacity-65 grayscale-[30%]' : 'hover:bg-[var(--bg-surface-secondary)]/35'
                 }`}
               >
                   <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-black/40">
@@ -75,11 +81,11 @@ export default function HesabimFavorilerimPage() {
                       className="w-full h-full object-cover"
                     />
 
-                    {isExpired ? (
+                    {closedLabel ? (
                       <div className="absolute inset-0 bg-black/60 flex items-center justify-center p-2 text-center">
                         <div className="rounded-lg bg-[var(--color-danger)]/90 px-2 py-1 text-[9px] font-bold text-white">
                           <Clock className="w-3.5 h-3.5" />
-                          <span>Bu ilan artık yayında değil</span>
+                           <span>{closedLabel}</span>
                         </div>
                       </div>
                     ) : null}
@@ -99,17 +105,14 @@ export default function HesabimFavorilerimPage() {
                     </div>
                   </div>
                 <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1">
-                  {!isExpired && <FavoriteButton listingId={listing.id} initialCount={listing.favorite_count} initialIsFavorited={true} initialStateIsAuthoritative={true} size="sm" onToggle={(isFav) => { if (!isFav) setFavorites((prev) => prev.filter((f) => f.id !== listing.id)); }} />}
-                  {isExpired ? (
-                    <span className="text-[11px] font-medium text-[var(--text-dim)]">Yayında değil</span>
-                  ) : (
+                  <FavoriteButton listingId={listing.id} initialCount={listing.favorite_count} initialIsFavorited={true} initialStateIsAuthoritative={true} size="sm" onToggle={(isFav) => { if (!isFav) setFavorites((prev) => prev.filter((f) => f.id !== listing.id)); }} />
+                  {closedLabel ? <span className="text-[11px] font-medium text-[var(--text-dim)]">{closedLabel}</span> : null}
                     <Link
                       href={getListingUrl(listing)}
                       className="btn-secondary inline-flex items-center gap-1.5 px-3 py-2 text-xs"
                     >
                       Detay <ArrowUpRight className="h-3.5 w-3.5" />
                     </Link>
-                  )}
                 </div>
               </article>
             );

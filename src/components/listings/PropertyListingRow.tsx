@@ -6,6 +6,7 @@ import { FavoriteButton } from './FavoriteButton';
 import type { PublicListingSummary } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { getListingUrl } from '@/lib/urls';
+import { PropertyCompareButton } from '@/components/compare/PropertyCompareButton';
 
 export function PropertyListingRow({ listing }: { listing: PublicListingSummary }) {
   const displayImage = resolveMediaUrl(listing.cover_image) || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&auto=format&fit=crop&q=80';
@@ -25,7 +26,7 @@ export function PropertyListingRow({ listing }: { listing: PublicListingSummary 
         </div>
         <div className="flex items-center justify-between gap-3 border-t border-[var(--border-app)] pt-3 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
           <div className="text-xl font-black tracking-tight text-[#FF8A1F] lg:text-2xl">{formatCurrency(listing.price)}</div>
-          <div className="pointer-events-auto relative z-20"><FavoriteButton listingId={listing.id} initialCount={listing.favorite_count} initialIsFavorited={listing.is_favorited} size="sm" /></div>
+          <div className="pointer-events-auto relative z-20 flex items-center gap-2"><PropertyCompareButton listing={listing} /><FavoriteButton listingId={listing.id} initialCount={listing.favorite_count} initialIsFavorited={listing.is_favorited} size="sm" /></div>
         </div>
       </div>
     </article>

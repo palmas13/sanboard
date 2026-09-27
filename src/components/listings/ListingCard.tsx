@@ -6,6 +6,7 @@ import { FavoriteButton } from './FavoriteButton';
 import { PublicListingSummary } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { getListingUrl } from '@/lib/urls';
+import { PropertyCompareButton } from '@/components/compare/PropertyCompareButton';
 
 interface ListingCardProps {
   listing: PublicListingSummary;
@@ -93,6 +94,11 @@ export function ListingCard({ listing, className = '' }: ListingCardProps) {
           </div>
         </div>
       </Link>
+      {listing.category === 'property' && (
+        <div className="absolute bottom-[4.35rem] right-2.5 z-10">
+          <PropertyCompareButton listing={listing} compact />
+        </div>
+      )}
     </div>
   );
 }

@@ -80,6 +80,7 @@ export function sanitizeListingForPublic(listing: Listing): PublicListingSummary
     corporate_profile_id: listing.corporate_profile_id,
     brand: listing.vehicle_details?.brand,
     model: listing.vehicle_details?.model,
+    status: getEffectiveListingStatus(listing),
   };
 }
 
@@ -381,6 +382,29 @@ export async function getCompareListings(ids: string[]): Promise<(Listing | null
   });
 }
 
+/** Fetches only currently public property listings for comparison. */
+export async function getPropertyCompareListings(ids: string[]): Promise<(Listing | null)[]> {
+  if (isSupabaseConfiguredMode()) {
+    return getSupabaseRepo().getPropertyCompareListings(ids);
+  }
+
+  const now = new Date();
+  return ids.map((id) => {
+    const listing = db.listings.find((item) => item.id === id);
+    if (!listing || listing.category !== 'property') return null;
+    const store = listing.seller_type === 'CORPORATE' && listing.corporate_profile_id
+      ? (db.dealers || []).find((dealer) => dealer.id === listing.corporate_profile_id)
+      : null;
+    if (!isPublicListingVisible(listing, store, now)) return null;
+
+    return {
+      ...listing,
+      seller: db.profiles.find((profile) => profile.id === listing.seller_profile_id),
+      dealer: store || undefined,
+    };
+  });
+}
+
 /**
  * Get single listing by ID with public/member data separation.
  */
@@ -412,8 +436,9 @@ export async function getListingById(
     }
   }
 
-  // If expired or sold and not owner, it should not be accessible
-  if ((isExpired || listing.status === 'SOLD') && !isOwner) {
+  // Draft and naturally expired listings remain private. Terminal listings keep a
+  // stable public detail page so old links and favorites explain what happened.
+  if ((listing.status === 'DRAFT' || (isExpired && listing.status === 'ACTIVE') || listing.status === 'EXPIRED') && !isOwner) {
     return { listing: null, isLocked: false, isOwner: false };
   }
 
@@ -754,7 +779,7 @@ export async function updateListing(
 
 /**
  * Mark listing as SOLD.
- * De-lists immediately, purges images, removes favorites, stores audit record.
+ * De-lists immediately while preserving the detail record.
  */
 export async function markListingAsSold(
   id: string,
@@ -770,13 +795,14 @@ export async function markListingAsSold(
     return { success: false, error: 'Bu işlem için yetkiniz yok.' };
   }
 
-  listing.status = 'SOLD';
-  const mediaKeys = [...(listing.images || [])];
-  listing.images = []; // Purge images from listing
-  listing.updated_at = new Date().toISOString();
+  if (getEffectiveListingStatus(listing) !== 'ACTIVE') {
+    return { success: false, error: 'Yalnızca yayındaki ilanlar kapatılabilir.' };
+  }
 
-  // Clean up favorites
-  db.favorites = db.favorites.filter((f) => f.listing_id !== id);
+  listing.status = 'SOLD';
+  listing.updated_at = new Date().toISOString();
+  listing.images = [];
+  db.favorites = db.favorites.filter((favorite) => favorite.listing_id !== id);
 
   // Store audit record
   db.soldAudits.push({
@@ -786,23 +812,12 @@ export async function markListingAsSold(
     sold_at: new Date().toISOString(),
   });
 
-  // Clean up media through lifecycle with retry queue
-  for (const imgItem of mediaKeys) {
-    try {
-      const imgUrl = (imgItem as any)?.storage_path || (typeof imgItem === 'string' ? imgItem : '');
-      const key = extractMediaKey(imgUrl);
-      if (key) {
-        await deleteMediaSafely(key, listing.category === 'vehicle' ? 'VEHICLE_IMAGE' : 'PROPERTY_IMAGE', 'LISTING_SOLD');
-      }
-    } catch {}
-  }
-
   return { success: true };
 }
 
 /**
  * Remove listing (User delete or Admin delist).
- * Parity with SOLD media lifecycle cleanup.
+ * Closes the listing without destroying its historical public detail.
  */
 export async function removeListing(
   id: string,
@@ -818,24 +833,14 @@ export async function removeListing(
     return { success: false, error: 'Bu işlem için yetkiniz yok.' };
   }
 
-  listing.status = 'REMOVED';
-  const mediaKeys = [...(listing.images || [])];
-  listing.images = [];
-  listing.updated_at = new Date().toISOString();
-
-  // Clean up favorites
-  db.favorites = db.favorites.filter((f) => f.listing_id !== id);
-
-  // Clean up media through lifecycle with retry queue (REMOVED flow parity)
-  for (const imgItem of mediaKeys) {
-    try {
-      const imgUrl = (imgItem as any)?.storage_path || (typeof imgItem === 'string' ? imgItem : '');
-      const key = extractMediaKey(imgUrl);
-      if (key) {
-        await deleteMediaSafely(key, listing.category === 'vehicle' ? 'VEHICLE_IMAGE' : 'PROPERTY_IMAGE', 'LISTING_REMOVED');
-      }
-    } catch {}
+  if (listing.status === 'SOLD' || listing.status === 'REMOVED') {
+    return { success: false, error: 'İlan zaten kapatılmış.' };
   }
+
+  listing.status = 'REMOVED';
+  listing.updated_at = new Date().toISOString();
+  listing.images = [];
+  db.favorites = db.favorites.filter((favorite) => favorite.listing_id !== id);
 
   return { success: true };
 }

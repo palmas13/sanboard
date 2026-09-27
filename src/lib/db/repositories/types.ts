@@ -65,10 +65,12 @@ export interface IListingRepository {
   getPublicListings(params?: ListingFilterParams): Promise<PublicListingSummary[]>;
   getSimilarListings?(currentListingId: string, limit?: number): Promise<PublicListingSummary[]>;
   getCompareListings?(ids: string[]): Promise<(Listing | null)[]>;
+  getPropertyCompareListings?(ids: string[]): Promise<(Listing | null)[]>;
   getListingById(id: string, viewerProfileId?: string, viewerUserId?: string): Promise<{ listing: MemberListingDetail | PublicListingSummary | null; isLocked: boolean; isOwner: boolean }>;
   getListingByPublicId(publicId: string, viewerProfileId?: string, viewerUserId?: string): Promise<{ listing: MemberListingDetail | PublicListingSummary | null; isLocked: boolean; isOwner: boolean }>;
   createListing(input: CreateListingInput, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   updateListing(id: string, input: Partial<CreateListingInput>, profileId: string, userId?: string, role?: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
+  closeListing(id: string, profileId: string, status: 'SOLD' | 'REMOVED'): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   markListingAsSold(id: string, profileId: string): Promise<{ success: boolean; error?: string }>;
   republishListing(id: string, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   removeListing?(id: string, profileId: string): Promise<{ success: boolean; error?: string }>;

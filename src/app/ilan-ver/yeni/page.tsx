@@ -15,6 +15,8 @@ import {
   MapPin,
   Calendar,
   Crown,
+  Save,
+  Trash2,
 } from 'lucide-react';
 import { PhotoUploader, UploadedImage } from '@/components/forms/PhotoUploader';
 import { CustomSelect } from '@/components/ui/CustomSelect';
@@ -25,6 +27,7 @@ import { getListingUrl } from '@/lib/urls';
 
 const TITLE_MAX = 60;
 const DESC_MAX = 100;
+const DRAFT_VERSION = 1;
 
 export default function YeniIlanOlusturPage() {
   const router = useRouter();
@@ -84,6 +87,93 @@ export default function YeniIlanOlusturPage() {
 
   // Photos - Truly EMPTY initially, no default/dummy images!
   const [images, setImages] = useState<UploadedImage[]>([]);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+
+  const draftStorageKey = currentProfile
+    ? `sanboard_listing_draft_v${DRAFT_VERSION}_${currentProfile.id}_${isCorporate ? 'corporate' : 'individual'}`
+    : null;
+
+  useEffect(() => {
+    if (!draftStorageKey) return;
+    setDraftReady(false);
+    try {
+      const raw = localStorage.getItem(draftStorageKey);
+      if (raw) {
+        const draft = JSON.parse(raw);
+        setStep(draft.step || 1);
+        setCategory(draft.category || 'vehicle');
+        setSubcategory(draft.subcategory || 'Otomobil');
+        setTitle(draft.title || '');
+        setDescription(draft.description || '');
+        setPrice(draft.price || '');
+        setLocation(draft.location || '');
+        setBrand(draft.brand || '');
+        setModel(draft.model || '');
+        setPlate(draft.plate || '');
+        setMileage(draft.mileage || '');
+        setEngineUpgrade(draft.engineUpgrade || '0');
+        setTransmissionUpgrade(draft.transmissionUpgrade || '0');
+        setBrakeUpgrade(draft.brakeUpgrade || '0');
+        setTurbo(Boolean(draft.turbo));
+        setSubwoofer(Boolean(draft.subwoofer));
+        setTradeAvailable(Boolean(draft.tradeAvailable));
+        setLockLevel(draft.lockLevel || '');
+        setAlarmLevel(draft.alarmLevel || '');
+        setAntiTheftLevel(draft.antiTheftLevel || '');
+        setEngineHealth(draft.engineHealth || '');
+        setSuspension(draft.suspension || '');
+        setFuelType(draft.fuelType || 'BENZIN');
+        setFactoryPrice(draft.factoryPrice || '');
+        setFloor(draft.floor || '1');
+        setRoomCount(draft.roomCount || '2+1');
+        setFurnished(Boolean(draft.furnished));
+        setBuildingType(draft.buildingType || 'Normal');
+        setBalcony(Boolean(draft.balcony));
+        setImages(Array.isArray(draft.images) ? draft.images : []);
+        setDraftSavedAt(draft.savedAt || null);
+      }
+    } catch {
+      localStorage.removeItem(draftStorageKey);
+    } finally {
+      setDraftReady(true);
+    }
+  }, [draftStorageKey]);
+
+  useEffect(() => {
+    if (!draftStorageKey || !draftReady) return;
+    const draft = {
+      step, category, subcategory, title, description, price, location, brand, model, plate,
+      mileage, engineUpgrade, transmissionUpgrade, brakeUpgrade, turbo, subwoofer,
+      tradeAvailable, lockLevel, alarmLevel, antiTheftLevel, engineHealth, suspension,
+      fuelType, factoryPrice, floor, roomCount, furnished, buildingType, balcony, images,
+      savedAt: new Date().toISOString(),
+    };
+    const timer = window.setTimeout(() => {
+      try {
+        localStorage.setItem(draftStorageKey, JSON.stringify(draft));
+      } catch {
+        localStorage.setItem(draftStorageKey, JSON.stringify({ ...draft, images: [] }));
+      }
+      setDraftSavedAt(draft.savedAt);
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [draftStorageKey, draftReady, step, category, subcategory, title, description, price, location, brand, model, plate, mileage, engineUpgrade, transmissionUpgrade, brakeUpgrade, turbo, subwoofer, tradeAvailable, lockLevel, alarmLevel, antiTheftLevel, engineHealth, suspension, fuelType, factoryPrice, floor, roomCount, furnished, buildingType, balcony, images]);
+
+  const clearDraft = () => {
+    if (draftStorageKey) localStorage.removeItem(draftStorageKey);
+    setDraftSavedAt(null);
+    setStep(1);
+    setTitle('');
+    setDescription('');
+    setPrice('');
+    setLocation('');
+    setBrand('');
+    setModel('');
+    setPlate('');
+    setMileage('');
+    setImages([]);
+  };
 
   // Auth guard & Credit check
   useEffect(() => {
@@ -300,6 +390,7 @@ export default function YeniIlanOlusturPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'İlan yayınlanamadı.');
 
+      if (draftStorageKey) localStorage.removeItem(draftStorageKey);
       router.push(`${getListingUrl(data.listing)}?success=true`);
     } catch (err: any) {
       setError(err.message || 'Bir hata oluştu.');
@@ -327,6 +418,19 @@ export default function YeniIlanOlusturPage() {
             ? `${dealer?.company_name ? `${dealer.company_name} kurumsal` : 'Kurumsal'} vitrininize özel 14 günlük ilanınızı oluşturun.`
             : '7 Günlük Standart İlan hakkını kullanarak ilanını Los Santos\'a duyur.'}
         </p>
+
+        <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] text-[var(--text-muted)]">
+          <span className="inline-flex items-center gap-1.5">
+            <Save className="h-3.5 w-3.5 text-[#FF8A1F]" />
+            {draftSavedAt ? `Taslak otomatik kaydedildi (${new Date(draftSavedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })})` : 'Taslak otomatik kaydedilir'}
+          </span>
+          {draftSavedAt && (
+            <button type="button" onClick={clearDraft} className="inline-flex items-center gap-1 font-semibold text-[var(--color-danger)] hover:underline">
+              <Trash2 className="h-3.5 w-3.5" />
+              Taslağı temizle
+            </button>
+          )}
+        </div>
 
         {/* Stepper pills */}
         <div className="flex items-center justify-center gap-2 sm:gap-4 pt-4 text-xs font-bold text-[var(--text-dim)]">

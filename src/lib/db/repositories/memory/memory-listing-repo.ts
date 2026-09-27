@@ -28,6 +28,11 @@ export class MemoryListingRepository implements IListingRepository {
     return fetchCompare(ids);
   }
 
+  async getPropertyCompareListings(ids: string[]) {
+    const { getPropertyCompareListings: fetchCompare } = await import('../../listings');
+    return fetchCompare(ids);
+  }
+
   async getListingById(id: string, viewerProfileId?: string, viewerUserId?: string) {
     return getListingById(id, viewerProfileId, viewerUserId);
   }
@@ -49,6 +54,14 @@ export class MemoryListingRepository implements IListingRepository {
 
   async markListingAsSold(id: string, profileId: string) {
     return markListingAsSold(id, profileId);
+  }
+
+  async closeListing(id: string, profileId: string, status: 'SOLD' | 'REMOVED') {
+    const result = status === 'SOLD'
+      ? await markListingAsSold(id, profileId)
+      : await (await import('../../listings')).removeListing(id, profileId);
+    const listing = result.success ? db.listings.find((item) => item.id === id) : undefined;
+    return { ...result, listing };
   }
 
   async republishListing(id: string, profileId: string) {

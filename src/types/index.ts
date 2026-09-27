@@ -167,6 +167,8 @@ export interface PublicListingSummary {
   is_locked: true;
   brand?: string;
   model?: string;
+  /** Effective lifecycle state. Detail responses may expose terminal states. */
+  status?: ListingStatus;
 }
 
 // Member-accessible full listing representation

@@ -338,6 +338,41 @@ export class SupabaseListingRepository implements IListingRepository {
     return ids.map((id) => listingMap.get(id) || null);
   }
 
+  async getPropertyCompareListings(ids: string[]): Promise<(Listing | null)[]> {
+    if (!ids.length) return [];
+    const validUuids = ids.filter(isUuid);
+    if (!validUuids.length) return ids.map(() => null);
+
+    const { data, error } = await this.getClient()
+      .from('listings')
+      .select(`
+        *,
+        property_details (*),
+        listing_images (*),
+        seller:character_profiles (id, full_name, avatar_url),
+        corporate:corporate_profiles (*)
+      `)
+      .in('id', validUuids)
+      .eq('status', 'ACTIVE')
+      .gt('expires_at', new Date().toISOString())
+      .eq('category', 'property');
+
+    if (error) throw new Error(`Supabase error fetching property compare listings: ${error.message}`);
+
+    const listingMap = new Map<string, Listing>();
+    for (const item of data || []) {
+      if (!this.isPublicCorporateListingVisible(item)) continue;
+      listingMap.set(item.id, {
+        ...item,
+        property_details: Array.isArray(item.property_details) ? item.property_details[0] : item.property_details,
+        images: item.listing_images || [],
+        seller: Array.isArray(item.seller) ? item.seller[0] : item.seller,
+        dealer: Array.isArray(item.corporate) ? item.corporate[0] : item.corporate,
+      });
+    }
+    return ids.map((id) => listingMap.get(id) || null);
+  }
+
   async getSimilarListings(currentListingId: string, limit: number = 4): Promise<PublicListingSummary[]> {
     if (!isUuid(currentListingId)) return [];
 
@@ -624,6 +659,7 @@ export class SupabaseListingRepository implements IListingRepository {
           cover_image: cover,
           favorite_count: favoriteCount,
           is_locked: true,
+          status: getEffectiveListingStatus(listing),
         },
         isLocked: true,
         isOwner: false,
@@ -1020,6 +1056,11 @@ export class SupabaseListingRepository implements IListingRepository {
   }
 
   async markListingAsSold(id: string, profileId: string): Promise<{ success: boolean; error?: string }> {
+    const result = await this.closeListing(id, profileId, 'SOLD');
+    return { success: result.success, error: result.error };
+  }
+
+  async closeListing(id: string, profileId: string, status: 'SOLD' | 'REMOVED'): Promise<{ success: boolean; listing?: Listing; error?: string }> {
     if (!isUuid(id)) {
       return { success: false, error: 'Geçersiz ilan ID formatı.' };
     }
@@ -1034,54 +1075,35 @@ export class SupabaseListingRepository implements IListingRepository {
 
     if (fetchErr || !listing) return { success: false, error: 'İlan bulunamadı.' };
     if (listing.seller_profile_id !== safeProfileId) return { success: false, error: 'Bu işlem için yetkiniz yok.' };
+    if (getEffectiveListingStatus(listing) !== 'ACTIVE') return { success: false, error: 'Yalnızca yayındaki ilanlar kapatılabilir.' };
 
     const { error: updateErr } = await client
       .from('listings')
-      .update({ status: 'SOLD', updated_at: new Date().toISOString() })
+      .update({ status, updated_at: new Date().toISOString() })
       .eq('id', id);
 
     if (updateErr) return { success: false, error: updateErr.message };
 
-    // Clean up media through lifecycle with retry queue
-    await this.cleanupListingMedia(id, listing.category, 'LISTING_SOLD');
+    if (status === 'SOLD') {
+      await client.from('sold_listing_audit').insert({
+        original_listing_id: id,
+        seller_profile_id: safeProfileId,
+        sold_at: new Date().toISOString(),
+      });
+    }
 
-    // Audit log
-    await client.from('sold_listing_audit').insert({
-      original_listing_id: id,
-      seller_profile_id: safeProfileId,
-      sold_at: new Date().toISOString(),
-    });
+    await this.cleanupListingMedia(
+      id,
+      listing.category,
+      status === 'SOLD' ? 'LISTING_SOLD' : 'LISTING_REMOVED'
+    );
 
-    return { success: true };
+    return { success: true, listing: { ...listing, status, images: [], updated_at: new Date().toISOString() } };
   }
 
   async removeListing(id: string, profileId: string): Promise<{ success: boolean; error?: string }> {
-    if (!isUuid(id)) {
-      return { success: false, error: 'Geçersiz ilan ID formatı.' };
-    }
-    const client = this.getAdminClient();
-    const safeProfileId = resolveProfileId(profileId);
-
-    const { data: listing, error: fetchErr } = await client
-      .from('listings')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (fetchErr || !listing) return { success: false, error: 'İlan bulunamadı.' };
-    if (listing.seller_profile_id !== safeProfileId) return { success: false, error: 'Bu işlem için yetkiniz yok.' };
-
-    const { error: updateErr } = await client
-      .from('listings')
-      .update({ status: 'REMOVED', updated_at: new Date().toISOString() })
-      .eq('id', id);
-
-    if (updateErr) return { success: false, error: updateErr.message };
-
-    // Clean up media through lifecycle with retry queue (REMOVED flow parity)
-    await this.cleanupListingMedia(id, listing.category, 'LISTING_REMOVED');
-
-    return { success: true };
+    const result = await this.closeListing(id, profileId, 'REMOVED');
+    return { success: result.success, error: result.error };
   }
 
   async getUserListings(

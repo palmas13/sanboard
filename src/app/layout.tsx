@@ -18,6 +18,8 @@ const geistMono = Geist_Mono({
 
 import { CompareProvider } from '@/components/compare/CompareContext';
 import { CompareTray } from '@/components/compare/CompareTray';
+import { PropertyCompareProvider } from '@/components/compare/PropertyCompareContext';
+import { PropertyCompareTray } from '@/components/compare/PropertyCompareTray';
 
 export async function generateMetadata(): Promise<Metadata> {
   const favicon = await getFaviconSetting();
@@ -62,10 +64,13 @@ export default function RootLayout({
       >
         <AuthProvider>
           <CompareProvider>
-            <Navbar />
-            <main className="flex-1 w-full">{children}</main>
-            <Footer />
-            <CompareTray />
+            <PropertyCompareProvider>
+              <Navbar />
+              <main className="flex-1 w-full">{children}</main>
+              <Footer />
+              <CompareTray />
+              <PropertyCompareTray />
+            </PropertyCompareProvider>
           </CompareProvider>
         </AuthProvider>
       </body>

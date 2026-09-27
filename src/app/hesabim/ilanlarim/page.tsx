@@ -26,9 +26,9 @@ export default function HesabimIlanlarimPage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Mark as sold modal state
-  const [soldModalListing, setSoldModalListing] = useState<Listing | null>(null);
-  const [isProcessingSold, setIsProcessingSold] = useState(false);
+  const [closeModalListing, setCloseModalListing] = useState<Listing | null>(null);
+  const [closeReason, setCloseReason] = useState<'SOLD' | 'CANCELLED' | 'OTHER'>('SOLD');
+  const [isProcessingClose, setIsProcessingClose] = useState(false);
   const [republishingId, setRepublishingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
 
@@ -55,28 +55,29 @@ export default function HesabimIlanlarimPage() {
   const activeListings = listings.filter((l) => l.status === 'ACTIVE');
   const expiredListings = listings.filter((l) => l.status === 'EXPIRED');
 
-  const handleConfirmSold = async () => {
-    if (!soldModalListing || !currentProfile) return;
-    setIsProcessingSold(true);
+  const handleConfirmClose = async () => {
+    if (!closeModalListing || !currentProfile) return;
+    setIsProcessingClose(true);
+    setActionError('');
 
     try {
       const res = await fetch('/api/user/listings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          listingId: soldModalListing.id,
-          action: 'SOLD',
+          listingId: closeModalListing.id,
+          action: closeReason === 'SOLD' ? 'SOLD' : 'REMOVED',
         }),
       });
 
-      if (res.ok) {
-        setSoldModalListing(null);
-        await fetchListings();
-      }
-    } catch {
-      // Ignore
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'İlan kapatılamadı.');
+      setCloseModalListing(null);
+      await fetchListings();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'İlan kapatılamadı.');
     } finally {
-      setIsProcessingSold(false);
+      setIsProcessingClose(false);
     }
   };
 
@@ -205,11 +206,14 @@ export default function HesabimIlanlarimPage() {
 
                     <button
                       type="button"
-                      onClick={() => setSoldModalListing(listing)}
+                      onClick={() => {
+                        setCloseReason('SOLD');
+                        setCloseModalListing(listing);
+                      }}
                       className="flex-1 sm:flex-none btn-danger text-xs py-2 px-3 flex items-center justify-center gap-1 cursor-pointer"
                     >
                       <CheckCircle className="w-3.5 h-3.5" />
-                      <span>Satıldı Olarak İşaretle</span>
+                      <span>İlanı Kapat</span>
                     </button>
                   </div>
                 </div>
@@ -286,8 +290,7 @@ export default function HesabimIlanlarimPage() {
         </div>
       )}
 
-      {/* SATILDI OLARAK İŞARETLE CONFIRMATION MODAL */}
-      {soldModalListing && (
+      {closeModalListing && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="max-w-md w-full surface-card rounded-2xl border-2 border-[var(--color-danger)]/40 p-6 shadow-2xl space-y-5">
             <div className="flex items-start gap-3">
@@ -296,39 +299,52 @@ export default function HesabimIlanlarimPage() {
               </div>
               <div className="space-y-1">
                 <h3 className="font-extrabold text-base text-[var(--text-main)]">
-                  İlanı satıldı olarak işaretlemek istediğine emin misin?
+                  İlanı hangi nedenle kapatmak istiyorsun?
                 </h3>
                 <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                  Bu işlemden sonra ilan yayından kalıcı olarak kaldırılacak, fotoğrafları sistemden silinecek ve favori listelerinden temizlenecektir. <strong className="text-[var(--color-danger)]">Bu işlem geri alınamaz.</strong>
+                  İlan yayından kalıcı olarak kaldırılacak, fotoğrafları ve favorileri temizlenecektir. <strong className="text-[var(--color-danger)]">Bu işlem geri alınamaz.</strong>
                 </p>
               </div>
             </div>
 
             <div className="p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] text-xs text-[var(--text-main)] font-semibold truncate">
-              {soldModalListing.title}
+              {closeModalListing.title}
+            </div>
+
+            <div className="grid gap-2">
+              {([
+                ['SOLD', 'Satıldı'],
+                ['CANCELLED', 'Satıştan vazgeçildi'],
+                ['OTHER', 'Diğer nedenle kapat'],
+              ] as const).map(([value, label]) => (
+                <label key={value} className="flex cursor-pointer items-center gap-2 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] p-3 text-xs font-semibold text-[var(--text-main)]">
+                  <input type="radio" name="closeReason" value={value} checked={closeReason === value} onChange={() => setCloseReason(value)} className="accent-[#FF8A1F]" />
+                  {label}
+                </label>
+              ))}
             </div>
 
             <div className="flex justify-end gap-2.5 pt-2 border-t border-[var(--border-app)]">
               <button
                 type="button"
-                onClick={() => setSoldModalListing(null)}
-                disabled={isProcessingSold}
+                onClick={() => setCloseModalListing(null)}
+                disabled={isProcessingClose}
                 className="btn-secondary text-xs py-2 px-4"
               >
                 Vazgeç
               </button>
               <button
                 type="button"
-                onClick={handleConfirmSold}
-                disabled={isProcessingSold}
+                onClick={handleConfirmClose}
+                disabled={isProcessingClose}
                 className="btn-danger text-xs py-2 px-4 flex items-center gap-1.5"
               >
-                {isProcessingSold ? (
+                {isProcessingClose ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : (
                   <CheckCircle className="w-3.5 h-3.5" />
                 )}
-                <span>Evet, Satıldı</span>
+                <span>İlanı Kapat</span>
               </button>
             </div>
           </div>
