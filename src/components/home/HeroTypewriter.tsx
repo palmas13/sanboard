@@ -60,9 +60,9 @@ export function HeroTypewriter() {
   }, [text, isDeleting, wordIndex, reducedMotion]);
 
   return (
-    <h1 className="mx-auto max-w-4xl text-center text-[clamp(2.75rem,7vw,4.75rem)] font-black leading-[0.98] tracking-[-0.045em] text-[var(--text-main)] select-none">
-      <span className="block">Los Santos&apos;ta</span>
-      <span className="mt-2 flex min-h-[1.04em] items-center justify-center text-[#FF8A1F]">
+    <h1 className="mx-auto max-w-4xl select-none text-center text-[clamp(2.8rem,7vw,5rem)] font-black leading-[0.94] tracking-[-0.052em] text-[var(--text-main)]">
+      <span className="block text-balance">Los Santos&apos;ta</span>
+      <span className="mt-3 flex min-h-[1.04em] items-center justify-center bg-gradient-to-r from-[#FFB267] via-[#FF8A1F] to-[#E66F00] bg-clip-text text-transparent">
         <span className="inline-block w-[15ch] text-center sm:w-[16ch]">{reducedMotion ? PHRASES[0] : text}</span>
       </span>
     </h1>

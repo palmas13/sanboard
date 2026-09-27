@@ -4,7 +4,7 @@ import {
   Car,
   Home,
   ArrowRight,
-  Sparkles,
+  ArrowUpRight,
 } from 'lucide-react';
 import { getListingRepository } from '@/lib/db/repositories';
 import { ListingCard } from '@/components/listings/ListingCard';
@@ -28,20 +28,28 @@ export default async function HomePage() {
   return (
     <div className="space-y-12 pb-20">
       {/* 1. HERO SECTION */}
-      <section className="hero-shell relative overflow-hidden border-b border-[var(--border-app)] px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(255,138,31,0.12),transparent_38%)]" />
+      <section className="hero-shell relative isolate overflow-hidden border-b border-[var(--border-app)] px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
+        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 mx-auto h-[440px] max-w-5xl bg-[radial-gradient(ellipse_at_top,rgba(255,138,31,0.16),transparent_64%)]" />
+        <div className="pointer-events-none absolute left-1/2 top-16 -z-10 h-52 w-52 -translate-x-1/2 rounded-full border border-[#FF8A1F]/10 bg-[#FF8A1F]/5 blur-3xl" />
         <div className="relative mx-auto flex max-w-4xl flex-col items-center text-center">
-          <div className="hero-reveal inline-flex items-center gap-2 rounded-full border border-[#FF8A1F]/25 bg-[var(--brand-orange-subtle)] px-3.5 py-1.5 text-xs font-semibold text-[#FF8A1F]">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Los Santos ilan deneyimi</span>
+          <div className="hero-reveal hero-eyebrow" aria-label="Keşfet">
+            <span className="hero-eyebrow-line" aria-hidden="true" />
+            <span className="hero-eyebrow-label">Keşfet</span>
+            <span className="hero-eyebrow-dot" aria-hidden="true" />
           </div>
-          <div className="hero-reveal hero-delay-1 mt-7"><HeroTypewriter /></div>
-          <p className="hero-reveal hero-delay-2 mt-6 max-w-2xl text-base leading-7 text-[var(--text-muted)] sm:text-lg">
+          <div className="hero-reveal hero-delay-1 mt-8"><HeroTypewriter /></div>
+          <p className="hero-reveal hero-delay-2 mt-6 max-w-xl text-base leading-7 text-[var(--text-muted)] sm:text-lg sm:leading-8">
             Los Santos&apos;taki araç ve mülk ilanlarını keşfet, ilanını yayınla ve doğru alıcıyla buluş.
           </p>
-          <div className="hero-reveal hero-delay-3 mt-8 flex w-full max-w-md flex-col justify-center gap-3 sm:w-auto sm:max-w-none sm:flex-row">
-            <Link href="/ilan-ver" className="btn-primary min-h-12 px-7 transition-transform duration-150 hover:-translate-y-0.5">İlan Ver <ArrowRight className="h-4 w-4" /></Link>
-            <Link href="/arac" className="btn-secondary min-h-12 px-7">İlanları Keşfet</Link>
+          <div className="hero-reveal hero-delay-3 mt-9 flex w-full max-w-sm flex-col justify-center gap-3 sm:w-auto sm:max-w-none sm:flex-row">
+            <Link href="/ilan-ver" className="hero-cta hero-cta-primary group">
+              <span>İlan Ver</span>
+              <span className="hero-cta-icon"><ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" /></span>
+            </Link>
+            <Link href="/kesfet" className="hero-cta hero-cta-secondary group">
+              <span>İlanları Keşfet</span>
+              <ArrowUpRight className="h-4 w-4 text-[#FF9D45] transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </Link>
           </div>
         </div>
       </section>
