@@ -28,20 +28,20 @@ export default async function HomePage() {
   return (
     <div className="space-y-12 pb-20">
       {/* 1. HERO SECTION */}
-      <section className="hero-shell relative overflow-hidden border-b border-[var(--border-app)] px-4 py-20 sm:px-6 sm:py-24 lg:px-8 lg:py-28">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_72%_28%,rgba(255,138,31,0.105),transparent_34%)]" />
-        <div className="relative mx-auto max-w-7xl">
+      <section className="hero-shell relative overflow-hidden border-b border-[var(--border-app)] px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(255,138,31,0.12),transparent_38%)]" />
+        <div className="relative mx-auto flex max-w-4xl flex-col items-center text-center">
           <div className="hero-reveal inline-flex items-center gap-2 rounded-full border border-[#FF8A1F]/25 bg-[var(--brand-orange-subtle)] px-3.5 py-1.5 text-xs font-semibold text-[#FF8A1F]">
             <Sparkles className="w-3.5 h-3.5" />
             <span>Los Santos ilan deneyimi</span>
           </div>
           <div className="hero-reveal hero-delay-1 mt-7"><HeroTypewriter /></div>
-          <p className="hero-reveal hero-delay-2 mt-7 max-w-xl text-base leading-7 text-[var(--text-muted)] sm:text-lg">
+          <p className="hero-reveal hero-delay-2 mt-6 max-w-2xl text-base leading-7 text-[var(--text-muted)] sm:text-lg">
             Los Santos&apos;taki araç ve mülk ilanlarını keşfet, ilanını yayınla ve doğru alıcıyla buluş.
           </p>
-          <div className="hero-reveal hero-delay-3 mt-9 flex flex-col gap-3 sm:flex-row">
-            <Link href="/ilan-ver" className="btn-primary min-h-12 px-6 transition-transform duration-150 hover:-translate-y-0.5">İlan Ver <ArrowRight className="h-4 w-4" /></Link>
-            <Link href="/arac" className="btn-secondary min-h-12 px-6">İlanları Keşfet</Link>
+          <div className="hero-reveal hero-delay-3 mt-8 flex w-full max-w-md flex-col justify-center gap-3 sm:w-auto sm:max-w-none sm:flex-row">
+            <Link href="/ilan-ver" className="btn-primary min-h-12 px-7 transition-transform duration-150 hover:-translate-y-0.5">İlan Ver <ArrowRight className="h-4 w-4" /></Link>
+            <Link href="/arac" className="btn-secondary min-h-12 px-7">İlanları Keşfet</Link>
           </div>
         </div>
       </section>

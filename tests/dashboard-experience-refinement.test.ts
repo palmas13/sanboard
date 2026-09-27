@@ -49,13 +49,25 @@ describe('dashboard experience refinement regressions', () => {
 
   test('discovery navigation, hero and terms experience stay polished', () => {
     const navbar = source('src/components/layout/Navbar.tsx');
+    const home = source('src/app/page.tsx');
     const hero = source('src/components/home/HeroTypewriter.tsx');
     const terms = source('src/app/kullanim-kosullari/page.tsx');
     assert.match(navbar, />Keşfet/);
     assert.doesNotMatch(navbar, />X</);
     assert.doesNotMatch(hero, /hero-caret/);
+    assert.match(home, /max-w-4xl flex-col items-center text-center/);
+    assert.match(hero, /justify-center/);
     assert.match(terms, /IC · Los Santos/);
     assert.match(terms, /OOC · Platform sınırları/);
     assert.match(terms, /RMT/);
+    assert.match(terms, /Platform ve Hesaplar/);
+    assert.match(terms, /İlan Yayınlama Kuralları/);
+    assert.match(terms, /İletişim ve Satış/);
+    assert.match(terms, /Kurumsal Hesaplar/);
+    assert.match(terms, /Ücretler ve Süreler/);
+    assert.match(terms, /Yaptırımlar ve İhlaller/);
+    assert.match(terms, /\$2\.000/);
+    assert.match(terms, /7 gün/);
+    assert.match(terms, /SanMail/);
   });
 });
