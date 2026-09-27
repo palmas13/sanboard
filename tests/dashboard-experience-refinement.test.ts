@@ -126,7 +126,8 @@ describe('dashboard experience refinement regressions', () => {
     const layout = source('src/app/hesabim/layout.tsx');
     const css = source('src/app/globals.css');
     assert.doesNotMatch(layout, /badge: isCorporateIdentity \? 'PRO'/);
-    assert.match(layout, /data-corporate-item=\{item\.isCorporate/);
+    assert.match(layout, /data-corporate-item="true"/);
+    assert.match(layout, /data-sidebar-footer="corporate"/);
     for (const accent of ['orange-400', 'blue-400', 'amber-400', 'rose-400', 'emerald-400', 'violet-400']) {
       assert.match(layout, new RegExp(accent));
     }

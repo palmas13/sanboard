@@ -181,12 +181,12 @@ export default function TicketDetailPage() {
                   {isAdmin ? (
                     <div className="flex items-center gap-1 text-[#FF8A1F] font-bold">
                       <Shield className="w-3.5 h-3.5" />
-                      <span>{msg.sender_name}</span>
+                      <span>{msg.display_author || 'Sanboard Yönetim'}</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-1 text-[var(--text-main)] font-bold">
                       <User className="w-3.5 h-3.5 text-[var(--text-dim)]" />
-                      <span>{msg.sender_name}</span>
+                      <span>{msg.display_author || msg.sender_name}</span>
                     </div>
                   )}
                 </div>

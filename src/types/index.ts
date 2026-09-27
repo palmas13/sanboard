@@ -384,6 +384,10 @@ export interface TicketMessage {
   ticket_id: string;
   sender_role: 'USER' | 'ADMIN';
   sender_name: string;
+  /** Server-derived presentation identity. Never accepted from the client. */
+  author_type?: 'USER' | 'ADMIN';
+  /** Safe author label for user-facing and admin-facing conversation views. */
+  display_author?: string;
   message: string;
   created_at: string;
 }

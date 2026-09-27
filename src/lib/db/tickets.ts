@@ -39,6 +39,7 @@ function ensureTickets() {
 }
 
 import { getTicketRepository } from './repositories';
+import { normalizeTicketConversation } from '@/lib/tickets/presentation';
 
 export async function getUserTickets(profileId: string): Promise<SupportTicket[]> {
   if (process.env.DATA_STORE === 'supabase') {
@@ -61,14 +62,10 @@ export async function getTicketById(
   const ticket = db.tickets.find((t) => t.id === ticketId);
   if (!ticket) return null;
 
-  const messages = db.ticketMessages
-    .filter((m) => m.ticket_id === ticketId)
-    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-
-  return {
+  return normalizeTicketConversation({
     ...ticket,
-    messages,
-  };
+    messages: db.ticketMessages.filter((m) => m.ticket_id === ticketId),
+  });
 }
 
 export async function createTicket(params: {
@@ -175,15 +172,19 @@ export async function updateTicketStatus(
   return true;
 }
 
-export async function getAllTicketsForAdmin(): Promise<SupportTicket[]> {
+export async function getAllTicketsForAdmin(): Promise<Array<SupportTicket & { messages: TicketMessage[] }>> {
   if (process.env.DATA_STORE === 'supabase') {
     const repo = getTicketRepository();
     if (typeof (repo as any).getAllTickets === 'function') {
-      return (repo as any).getAllTickets();
+      const tickets = await (repo as any).getAllTickets();
+      return tickets.map(normalizeTicketConversation);
     }
   }
   ensureTickets();
   return [...db.tickets].sort(
     (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-  );
+  ).map((ticket) => normalizeTicketConversation({
+    ...ticket,
+    messages: db.ticketMessages.filter((message) => message.ticket_id === ticket.id),
+  }));
 }

@@ -130,7 +130,7 @@ export interface ITicketRepository {
   createTicket(params: { profileId: string; creatorName: string; subject: string; message: string }): Promise<{ success: boolean; ticket?: SupportTicket; error?: string }>;
   addTicketMessage(params: { ticketId: string; senderRole: 'USER' | 'ADMIN'; senderName: string; message: string }): Promise<{ success: boolean; message?: TicketMessage; error?: string }>;
   updateTicketStatus(id: string, status: TicketStatus): Promise<boolean>;
-  getAllTickets(): Promise<SupportTicket[]>;
+  getAllTickets(): Promise<Array<SupportTicket & { messages: TicketMessage[] }>>;
 }
 
 export interface IDealerRepository {

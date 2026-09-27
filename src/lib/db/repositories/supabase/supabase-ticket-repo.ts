@@ -3,6 +3,7 @@ import { getSupabaseClient, getSupabaseAdminClient } from '../../supabase-client
 import { SupportTicket, TicketMessage, TicketStatus } from '@/types';
 
 import { resolveProfileId, isUuid } from '../../id-mapper';
+import { normalizeTicketConversation } from '@/lib/tickets/presentation';
 
 export class SupabaseTicketRepository implements ITicketRepository {
   private getClient() {
@@ -55,12 +56,10 @@ export class SupabaseTicketRepository implements ITicketRepository {
 
     if (!ticket) return null;
 
-    return {
+    return normalizeTicketConversation({
       ...ticket,
-      messages: (ticket.ticket_messages || []).sort(
-        (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      ),
-    };
+      messages: ticket.ticket_messages || [],
+    });
   }
 
   async createTicket(params: { profileId: string; creatorName: string; subject: string; message: string }) {
@@ -172,17 +171,20 @@ export class SupabaseTicketRepository implements ITicketRepository {
     return !error;
   }
 
-  async getAllTickets(): Promise<SupportTicket[]> {
+  async getAllTickets(): Promise<Array<SupportTicket & { messages: TicketMessage[] }>> {
     const client = this.getAdminClient();
     const { data, error } = await client
       .from('support_tickets')
-      .select('*')
+      .select('*, ticket_messages (*)')
       .order('updated_at', { ascending: false });
 
     if (error) {
       throw new Error(`Supabase error fetching all tickets: ${error.message}`);
     }
 
-    return (data || []) as SupportTicket[];
+    return (data || []).map((ticket: any) => normalizeTicketConversation({
+      ...ticket,
+      messages: ticket.ticket_messages || [],
+    }));
   }
 }

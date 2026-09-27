@@ -349,6 +349,7 @@ export async function POST(req: NextRequest) {
         const result = await addTicketMessage({
           ticketId: payload.ticketId,
           senderRole: 'ADMIN',
+          // Keep the canonical actor name internally; API presentation masks ADMIN authors server-side.
           senderName: adminProfile.full_name,
           message: payload.message.trim(),
         });

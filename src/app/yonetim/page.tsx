@@ -1149,8 +1149,8 @@ export default function AdminPage() {
 
       {/* TICKET DETAIL & REPLY MODAL */}
       {selectedTicket && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="surface-card w-full max-w-3xl rounded-2xl border border-[var(--border-app)] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" role="presentation">
+          <div className="surface-card w-full max-w-3xl rounded-2xl border border-[var(--border-app)] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-150" role="dialog" aria-modal="true" aria-labelledby="ticket-dialog-title">
             {/* Modal Header */}
             <div className="p-5 border-b border-[var(--border-app)] flex items-center justify-between gap-4 bg-[var(--bg-surface)]">
               <div>
@@ -1172,9 +1172,11 @@ export default function AdminPage() {
                       : 'Kapatıldı'}
                   </span>
                 </div>
-                <h3 className="font-black text-lg text-[var(--text-main)] mt-0.5">{selectedTicket.subject}</h3>
+                <h3 id="ticket-dialog-title" className="font-black text-lg text-[var(--text-main)] mt-0.5">{selectedTicket.subject}</h3>
                 <p className="text-xs text-[var(--text-muted)]">
                   Kullanıcı: <strong className="text-[var(--text-main)]">{selectedTicket.creator_name}</strong>
+                  <span className="mx-1.5">•</span>
+                  {formatDateTime(selectedTicket.created_at)}
                 </p>
               </div>
 
@@ -1199,6 +1201,8 @@ export default function AdminPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedTicket(null)}
+                  ref={modalCloseRef}
+                  aria-label="Destek talebi penceresini kapat"
                   className="p-1.5 rounded-lg border border-[var(--border-app)] hover:bg-[var(--bg-surface-secondary)] text-[var(--text-muted)]"
                 >
                   <X className="w-5 h-5" />
@@ -1219,12 +1223,12 @@ export default function AdminPage() {
                       {isAdminMsg ? (
                         <>
                           <Shield className="w-3 h-3 text-[#FF8A1F]" />
-                          <span className="font-bold text-[#FF8A1F]">{msg.sender_name} (Yönetim)</span>
+                          <span className="font-bold text-[#FF8A1F]">{msg.display_author || 'Sanboard Yönetim'}</span>
                         </>
                       ) : (
                         <>
                           <UserIcon className="w-3 h-3 text-[var(--text-muted)]" />
-                          <span className="font-semibold text-[var(--text-main)]">{msg.sender_name}</span>
+                          <span className="font-semibold text-[var(--text-main)]">{msg.display_author || msg.sender_name}</span>
                         </>
                       )}
                       <span>•</span>

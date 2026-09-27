@@ -11,7 +11,6 @@ import {
   Heart,
   User,
   CreditCard,
-  LogOut,
   PlusCircle,
   Building2,
   LifeBuoy,
@@ -25,7 +24,7 @@ import { getCorporateUrl } from '@/lib/urls';
 export default function HesabimLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentProfile, isAuthenticated, isLoading, isAdmin, logout } = useAuth();
+  const { currentProfile, isAuthenticated, isLoading, isAdmin } = useAuth();
 
   const [headerImgError, setHeaderImgError] = useState(false);
   const [corporateEligibility, setCorporateEligibility] = useState<{
@@ -78,7 +77,8 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
     corporateReason === 'SUBSCRIPTION_EXPIRED' ||
     corporateReason === 'SUBSCRIPTION_INACTIVE';
 
-  const corporateLabel = getCorporateSidebarLabel({
+  const corporateResolved = corporateEligibility !== null;
+  const corporateLabel = corporateResolved ? getCorporateSidebarLabel({
     hasApprovedStore: hasApprovedCorporate,
     subscriptionStatus:
       corporateEligibility?.dealer?.subscription_status || (hasApprovedCorporate ? 'ACTIVE' : null),
@@ -88,10 +88,10 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
       ? 'SUSPENDED'
       : corporateEligibility?.dealer?.moderation_status,
     isDealer: Boolean(hasApprovedCorporate),
-  });
+  }) : null;
 
   const isCorporateIdentity = corporateLabel === 'Kurumsal Profil';
-  const isKurumsalPage = pathname === '/hesabim/kurumsal';
+  const isKurumsalPage = pathname === '/hesabim/kurumsal' || pathname.startsWith('/hesabim/kurumsal/');
 
   // Section 7, 8, 9: Canonical eligibility resolver for header actions
   const { canOpenStore, canCreateCorporateListing } = resolveCorporateHeaderActions({
@@ -107,13 +107,6 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
     { href: '/hesabim/favorilerim', label: 'Favorilerim', icon: Heart, iconAccent: 'text-rose-400 bg-rose-400/10' },
     { href: '/hesabim/odemeler', label: 'Ödeme Geçmişim', icon: CreditCard, iconAccent: 'text-emerald-400 bg-emerald-400/10' },
     { href: '/hesabim/destek', label: 'Destek', icon: LifeBuoy, iconAccent: 'text-violet-400 bg-violet-400/10' },
-    {
-      href: '/hesabim/kurumsal',
-      label: corporateLabel,
-      icon: isCorporateIdentity ? Crown : Building2,
-      iconAccent: 'text-amber-400 bg-amber-400/10',
-      isCorporate: true,
-    },
     ...(isAdmin
       ? [{ href: '/yonetim', label: 'Admin Panel', icon: Shield, iconAccent: 'text-red-400 bg-red-400/10', badge: 'ADMİN' }]
       : []),
@@ -212,12 +205,9 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
               <Link
                 key={item.href}
                 href={item.href}
-                data-corporate-item={item.isCorporate ? 'true' : undefined}
                 className={`group relative flex items-center justify-between rounded-xl border px-3 py-2 text-xs font-semibold transition-[color,background-color,border-color,box-shadow,transform] duration-150 motion-reduce:transition-none ${
                   isActive
                     ? 'border-[#FF8A1F]/25 bg-[var(--brand-orange-subtle)] text-[#FF8A1F] shadow-[inset_3px_0_0_#FF8A1F]'
-                    : item.isCorporate
-                    ? 'border-amber-400/20 bg-amber-400/[0.055] text-[var(--text-main)] hover:border-amber-400/35 hover:bg-amber-400/[0.09]'
                     : 'border-transparent text-[var(--text-muted)] hover:border-[var(--border-app)] hover:bg-[var(--bg-surface-secondary)]/65 hover:text-[var(--text-main)]'
                 }`}
               >
@@ -234,14 +224,32 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
             );
           })}
 
-          <div className="pt-2 border-t border-[var(--border-app)] mt-2">
-            <button
-              onClick={() => logout()}
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-[var(--color-danger)] hover:bg-[var(--color-danger-subtle)] transition-colors text-left"
-            >
-              <LogOut className="w-4 h-4 shrink-0" />
-              <span>Çıkış Yap</span>
-            </button>
+          <div data-sidebar-footer="corporate" className="pt-3 border-t border-[var(--border-app)] mt-3">
+            {corporateResolved && corporateLabel ? (
+              <Link
+                href="/hesabim/kurumsal"
+                data-corporate-item="true"
+                aria-current={isKurumsalPage ? 'page' : undefined}
+                className={`group relative flex items-center justify-between rounded-xl border px-3 py-2 text-xs font-semibold transition-[color,background-color,border-color,box-shadow] duration-150 motion-reduce:transition-none ${
+                  isKurumsalPage
+                    ? 'border-[#FF8A1F]/25 bg-[var(--brand-orange-subtle)] text-[#FF8A1F] shadow-[inset_3px_0_0_#FF8A1F]'
+                    : 'border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/30 text-[var(--text-main)] hover:border-[#FF8A1F]/25 hover:bg-[var(--bg-surface-secondary)]/60'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#FF8A1F]/10 text-[#FF9D45]">
+                    {isCorporateIdentity ? <Crown className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
+                  </span>
+                  <span>{corporateLabel}</span>
+                </div>
+                <ArrowRight className="h-3.5 w-3.5 text-[var(--text-dim)] transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            ) : (
+              <div data-corporate-loading="true" aria-label="Kurumsal durum yükleniyor" className="flex items-center gap-3 rounded-xl border border-[var(--border-app)] px-3 py-2">
+                <span className="h-8 w-8 animate-pulse rounded-lg bg-[var(--bg-surface-secondary)]" />
+                <span className="h-3 w-28 animate-pulse rounded bg-[var(--bg-surface-secondary)]" />
+              </div>
+            )}
           </div>
         </aside>
 
