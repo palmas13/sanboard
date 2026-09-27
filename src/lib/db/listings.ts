@@ -6,19 +6,21 @@ import {
   PublicListingSummary,
   VehicleCategory,
   PropertyType,
+  ReportReason,
 } from '@/types';
 import { generateListingNumber } from '../utils/format';
 import { createNotification } from './notifications';
 import { SupabaseListingRepository } from './repositories/supabase/supabase-listing-repo';
 import { deleteMediaSafely } from '../storage/lifecycle';
 import { extractMediaKey } from '../media/url';
-import { resolveUserId } from './id-mapper';
+import { isUuid, resolveUserId } from './id-mapper';
 import { resolveMockUserId } from '@/lib/integrations/gtaworld/mock-identities';
 import { isListingOwnedByActiveProfile } from '../dealers/eligibility';
 import { getEffectiveListingStatus, isPublicListingVisible } from '../listings/visibility';
 import { getListingCoverPath, sortListingImages } from '../listings/images';
 import { isListingPublicId } from '../urls';
 import { redactPrivateContact } from '../profiles/contact-privacy';
+import { getSupabaseAdminClient } from './supabase-client';
 
 export interface ListingFilterParams {
   category?: ListingCategory;
@@ -1045,9 +1047,61 @@ export async function getUserFavorites(
 export async function reportListing(
   reporterProfileId: string,
   listingId: string,
-  reason: any,
+  reason: ReportReason,
   description: string
 ): Promise<{ success: boolean; error?: string }> {
+  if (isSupabaseConfiguredMode()) {
+    if (!isUuid(reporterProfileId) || !isUuid(listingId)) {
+      return { success: false, error: 'Geçersiz profil veya ilan kimliği.' };
+    }
+
+    const client = getSupabaseAdminClient();
+    if (!client) {
+      return { success: false, error: 'Şikayet servisi yapılandırılmamış.' };
+    }
+
+    const { data: listing, error: listingError } = await client
+      .from('listings')
+      .select('id')
+      .eq('id', listingId)
+      .maybeSingle();
+
+    if (listingError) {
+      return { success: false, error: listingError.message || 'İlan doğrulanamadı.' };
+    }
+    if (!listing) {
+      return { success: false, error: 'Şikayet edilecek ilan bulunamadı.' };
+    }
+
+    const { data, error } = await client
+      .from('reports')
+      .insert({
+        reporter_profile_id: reporterProfileId,
+        listing_id: listing.id,
+        reason,
+        description,
+        status: 'PENDING',
+      })
+      .select('id, reporter_profile_id, listing_id, reason, description, status, created_at')
+      .single();
+
+    if (error) {
+      return { success: false, error: error.message || 'Şikayet kaydedilemedi.' };
+    }
+    if (!data?.id) {
+      return { success: false, error: 'Şikayet kaydı doğrulanamadı.' };
+    }
+
+    return { success: true };
+  }
+
+  if (!db.profiles.some((profile) => profile.id === reporterProfileId)) {
+    return { success: false, error: 'Aktif karakter profili bulunamadı.' };
+  }
+  if (!db.listings.some((listing) => listing.id === listingId)) {
+    return { success: false, error: 'Şikayet edilecek ilan bulunamadı.' };
+  }
+
   db.reports.push({
     id: `rep-${Date.now()}`,
     reporter_profile_id: reporterProfileId,

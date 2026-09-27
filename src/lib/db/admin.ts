@@ -261,7 +261,7 @@ export async function getReportsForAdmin(): Promise<AdminReport[]> {
         `)
         .order('created_at', { ascending: false });
 
-      if (error) return [];
+      if (error) throw new Error(`Raporlar alınamadı: ${error.message}`);
       return (data || []) as AdminReport[];
     }
   }

@@ -22,7 +22,7 @@ export function PropertyCompareButton({ listing, compact = false }: { listing: L
     addToCompare({ id: listing.id, title: listing.title, image: resolveMediaUrl(rawImage), price: listing.price, subcategory: listing.subcategory });
   };
 
-  return <button type="button" onClick={toggle} className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${added ? 'border-[#FF8A1F]/40 bg-[#FF8A1F]/15 text-[#FF8A1F]' : 'border-[var(--border-app)] bg-[var(--bg-surface-secondary)] text-[var(--text-main)] hover:border-[#FF8A1F]/50 hover:text-[#FF8A1F]'}`} aria-label={added ? 'Mülkü karşılaştırmadan çıkar' : 'Mülkü karşılaştırmaya ekle'} title={added ? 'Karşılaştırmadan çıkar' : 'Karşılaştır'}>
+  return <button type="button" onClick={toggle} data-testid="property-compare-button" className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF8A1F]/70 ${added ? 'border-[#FF8A1F]/40 bg-[#FF8A1F]/15 text-[#FF8A1F]' : 'border-[var(--border-app)] bg-[var(--bg-surface-secondary)] text-[var(--text-main)] hover:border-[#FF8A1F]/50 hover:text-[#FF8A1F]'}`} aria-label={added ? 'Mülkü karşılaştırmadan çıkar' : 'Mülkü karşılaştırmaya ekle'} title={added ? 'Karşılaştırmadan çıkar' : 'Karşılaştır'}>
     {added ? <Check className="h-3.5 w-3.5" /> : <ArrowLeftRight className="h-3.5 w-3.5" />}
     {!compact && <span>{added ? 'Eklendi' : 'Karşılaştır'}</span>}
   </button>;

@@ -23,6 +23,7 @@ export function ListingCard({ listing, className = '' }: ListingCardProps) {
 
   return (
     <div
+      data-testid="listing-card"
       className={`group surface-card surface-card-hover overflow-hidden flex flex-col justify-between ${className}`}
     >
       <Link href={getListingUrl(listing)} className="block flex-1">
@@ -95,7 +96,7 @@ export function ListingCard({ listing, className = '' }: ListingCardProps) {
         </div>
       </Link>
       {listing.category === 'property' && (
-        <div className="absolute bottom-[4.35rem] right-2.5 z-10">
+        <div data-testid="property-compare-action-slot" className="flex justify-end border-t border-[var(--border-app)] px-4 py-3">
           <PropertyCompareButton listing={listing} compact />
         </div>
       )}

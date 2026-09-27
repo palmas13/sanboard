@@ -12,7 +12,7 @@ export function PropertyListingRow({ listing }: { listing: PublicListingSummary 
   const displayImage = resolveMediaUrl(listing.cover_image) || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&auto=format&fit=crop&q=80';
 
   return (
-    <article className="group relative overflow-hidden rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface)] transition-[border-color,background-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-[#FF8A1F]/40 hover:bg-[var(--bg-surface-secondary)]/50 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:transform-none">
+    <article data-testid="property-listing-row" className="group relative overflow-hidden rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface)] transition-[border-color,background-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-[#FF8A1F]/40 hover:bg-[var(--bg-surface-secondary)]/50 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:transform-none">
       <Link href={getListingUrl(listing)} className="absolute inset-0 z-0" aria-label={`${listing.title} ilanını aç`} />
       <div className="relative z-10 flex flex-col gap-4 p-3 pointer-events-none sm:min-h-[135px] sm:flex-row sm:items-center">
         <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden rounded-lg bg-[var(--bg-surface-secondary)] sm:h-[115px] sm:w-[180px] lg:w-[200px]">
@@ -26,7 +26,7 @@ export function PropertyListingRow({ listing }: { listing: PublicListingSummary 
         </div>
         <div className="flex items-center justify-between gap-3 border-t border-[var(--border-app)] pt-3 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
           <div className="text-xl font-black tracking-tight text-[#FF8A1F] lg:text-2xl">{formatCurrency(listing.price)}</div>
-          <div className="pointer-events-auto relative z-20 flex items-center gap-2"><PropertyCompareButton listing={listing} /><FavoriteButton listingId={listing.id} initialCount={listing.favorite_count} initialIsFavorited={listing.is_favorited} size="sm" /></div>
+          <div data-testid="property-compare-action-slot" className="pointer-events-auto relative z-20 flex shrink-0 flex-wrap items-center justify-end gap-2"><PropertyCompareButton listing={listing} /><FavoriteButton listingId={listing.id} initialCount={listing.favorite_count} initialIsFavorited={listing.is_favorited} size="sm" /></div>
         </div>
       </div>
     </article>

@@ -195,8 +195,8 @@ describe('SANBOARD backend final hardening package 1', () => {
   });
 
   test('reporter actor is signed active character despite body and cookie injection', async () => {
-    const response = await reportListing(request('/api/reports', alex, { reporterProfileId: jordan, listingId: 'listing-jordan', reason: 'Diğer' }));
-    assert.equal(response.status, 200);
+    const response = await reportListing(request('/api/reports', alex, { reporterProfileId: jordan, listingId: 'listing-jordan', reason: 'Diğer', description: 'Test açıklaması' }));
+    assert.equal(response.status, 201);
     assert.equal(db.reports[0].reporter_profile_id, alex);
     assert.equal((await reportListing(request('/api/reports', undefined, { reporterProfileId: jordan, listingId: 'listing-jordan', reason: 'Diğer' }))).status, 401);
   });

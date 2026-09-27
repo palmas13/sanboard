@@ -113,7 +113,7 @@ export default function AdminPage() {
     setLoading(true);
     setFetchError(false);
     try {
-      const res = await fetch('/api/admin');
+      const res = await fetch('/api/admin', { cache: 'no-store' });
       if (!res.ok) throw new Error('Yüklenemedi');
       const json = await res.json();
       setData(json);
@@ -1053,7 +1053,7 @@ export default function AdminPage() {
                         {rep.reason}
                       </span>
                       <span className="text-[11px] font-mono text-[var(--text-dim)]">
-                        İlan: {rep.listing_id}
+                        İlan: {rep.listing?.title || rep.listing_id}
                       </span>
                       <span
                         className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -1066,6 +1066,9 @@ export default function AdminPage() {
                       </span>
                     </div>
                     <p className="text-xs text-[var(--text-main)] font-medium">{rep.description}</p>
+                    <p className="text-[10px] text-[var(--text-muted)]">
+                      Bildiren: {rep.reporter?.full_name || 'Bilinmiyor'} · İlan sahibi: {rep.listing?.owner?.full_name || 'Bilinmiyor'}
+                    </p>
                     <p className="text-[10px] text-[var(--text-dim)]">{formatDateTime(rep.created_at)}</p>
                   </div>
 

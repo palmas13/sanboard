@@ -92,4 +92,22 @@ describe('property comparison', () => {
     assert.doesNotMatch(source, /<table|overflow-x-auto|min-w-\[/);
     assert.doesNotMatch(source, /winner|score/i);
   });
+
+  test('grid and list property compare actions stay inside a shared normal-flow action slot', () => {
+    const gridCard = readFileSync(join(process.cwd(), 'src/components/listings/ListingCard.tsx'), 'utf8');
+    const listRow = readFileSync(join(process.cwd(), 'src/components/listings/PropertyListingRow.tsx'), 'utf8');
+    const button = readFileSync(join(process.cwd(), 'src/components/compare/PropertyCompareButton.tsx'), 'utf8');
+
+    assert.match(gridCard, /data-testid="listing-card"/);
+    assert.match(gridCard, /data-testid="property-compare-action-slot"/);
+    assert.match(gridCard, /flex justify-end border-t/);
+    assert.doesNotMatch(gridCard, /absolute bottom-\[4\.35rem\]/);
+    assert.match(listRow, /data-testid="property-listing-row"/);
+    assert.match(listRow, /data-testid="property-compare-action-slot"/);
+    assert.match(listRow, /flex shrink-0 flex-wrap items-center justify-end/);
+    assert.match(button, /data-testid="property-compare-button"/);
+    assert.match(button, /shrink-0/);
+    assert.match(button, /Karşılaştırmadan çıkar/);
+    assert.match(button, /added \? 'border/);
+  });
 });

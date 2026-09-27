@@ -48,7 +48,10 @@ export function ReportModal({ listingId }: ReportModalProps) {
         }),
       });
 
-      if (!res.ok) throw new Error('Şikayet iletilemedi.');
+      const body = await res.json().catch(() => null);
+      if (!res.ok || !body?.success) {
+        throw new Error(body?.error || 'Şikayet iletilemedi.');
+      }
 
       setSuccess(true);
       setTimeout(() => {
