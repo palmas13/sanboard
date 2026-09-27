@@ -3,6 +3,7 @@ import { getUserRepository } from '@/lib/db/repositories';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { recordAuditEvent } from '@/lib/audit';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
+import { ServerTiming } from '@/lib/performance/server-timing';
 
 function toPrivateProfileDto(profile: Awaited<ReturnType<ReturnType<typeof getUserRepository>['getProfileById']>>) {
   if (!profile) return null;
@@ -22,29 +23,30 @@ function toPrivateProfileDto(profile: Awaited<ReturnType<ReturnType<typeof getUs
 }
 
 export async function GET(req: NextRequest) {
+  const timing = new ServerTiming();
   try {
-    const actor = await resolveOwnedActiveProfile(req);
-    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+    const actor = await timing.measure('actor', () => resolveOwnedActiveProfile(req));
+    if (!actor.ok) return timing.respond(NextResponse.json({ error: actor.error }, { status: actor.status }));
 
     const repo = getUserRepository();
-    const profile = await repo.getProfileById(actor.profileId);
+    const profile = await timing.measure('profile', () => repo.getProfileById(actor.profileId));
 
     if (!profile) {
-      return NextResponse.json(
+      return timing.respond(NextResponse.json(
         { error: 'Karakter profili bulunamadı.' },
         { status: 404 }
-      );
+      ));
     }
 
-    return NextResponse.json({
+    return timing.respond(NextResponse.json({
       success: true,
       profile: toPrivateProfileDto(profile),
-    });
+    }));
   } catch (error: any) {
-    return NextResponse.json(
+    return timing.respond(NextResponse.json(
       { error: error?.message || 'Profil yüklenemedi.' },
       { status: 500 }
-    );
+    ));
   }
 }
 

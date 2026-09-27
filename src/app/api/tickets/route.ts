@@ -2,17 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTicketRepository } from '@/lib/db/repositories';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { getUserRepository } from '@/lib/db/repositories';
+import { ServerTiming } from '@/lib/performance/server-timing';
 
 export async function GET(req: NextRequest) {
+  const timing = new ServerTiming();
   try {
-    const actor = await resolveOwnedActiveProfile(req);
-    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+    const actor = await timing.measure('actor', () => resolveOwnedActiveProfile(req));
+    if (!actor.ok) return timing.respond(NextResponse.json({ error: actor.error }, { status: actor.status }));
 
     const repo = getTicketRepository();
-    const tickets = await repo.getUserTickets(actor.profileId);
-    return NextResponse.json(tickets);
+    const tickets = await timing.measure('tickets', () => repo.getUserTickets(actor.profileId));
+    return timing.respond(NextResponse.json(tickets));
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Talepler getirilemedi.' }, { status: 500 });
+    return timing.respond(NextResponse.json({ error: error?.message || 'Talepler getirilemedi.' }, { status: 500 }));
   }
 }
 

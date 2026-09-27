@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { getSupabaseAdminClient } from '@/lib/db/supabase-client';
 import { db } from '@/lib/db/store';
+import { ServerTiming } from '@/lib/performance/server-timing';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,20 +12,21 @@ export const dynamic = 'force-dynamic';
  * Resolves session once and fetches profile, stats, credits, corporate, and support in parallel.
  */
 export async function GET(req: NextRequest) {
+  const timing = new ServerTiming();
   try {
-    const actor = await resolveOwnedActiveProfile(req);
-    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+    const actor = await timing.measure('actor', () => resolveOwnedActiveProfile(req));
+    if (!actor.ok) return timing.respond(NextResponse.json({ error: actor.error }, { status: actor.status }));
     const profileId = actor.profileId;
 
     if (process.env.DATA_STORE === 'supabase') {
       const client = getSupabaseAdminClient();
       if (!client) {
-        return NextResponse.json({ error: 'Veritabanı bağlantısı kurulamadı.' }, { status: 500 });
+        return timing.respond(NextResponse.json({ error: 'Veritabanı bağlantısı kurulamadı.' }, { status: 500 }));
       }
 
       // Parallel execution of all independent metrics
       const [profileRes, listingsRes, favsCountRes, creditRes, corpRes, ticketCountRes] =
-        await Promise.all([
+        await timing.measure('bootstrap', () => Promise.all([
           client.from('character_profiles').select('*').eq('id', profileId).maybeSingle(),
           client
             .from('listings')
@@ -53,7 +55,7 @@ export async function GET(req: NextRequest) {
             .select('*', { count: 'exact', head: true })
             .eq('profile_id', profileId)
             .eq('status', 'OPEN'),
-        ]);
+        ]));
 
       const personalListings = listingsRes.data || [];
       const activeListings = personalListings.filter((l) => l.status === 'ACTIVE').length;
@@ -62,10 +64,12 @@ export async function GET(req: NextRequest) {
       let totalReceivedFavorites = 0;
       const personalListingIds = personalListings.map((l) => l.id);
       if (personalListingIds.length > 0) {
-        const { count } = await client
-          .from('favorites')
-          .select('*', { count: 'exact', head: true })
-          .in('listing_id', personalListingIds);
+        const { count } = await timing.measure('favorites', async () => {
+          return await client
+            .from('favorites')
+            .select('*', { count: 'exact', head: true })
+            .in('listing_id', personalListingIds);
+        });
         totalReceivedFavorites = count || 0;
       }
 
@@ -73,7 +77,7 @@ export async function GET(req: NextRequest) {
       const favoritesCount = favsCountRes.count || 0;
       const openTickets = ticketCountRes.count || 0;
 
-      return NextResponse.json({
+      return timing.respond(NextResponse.json({
         success: true,
         profile: profileRes.data || null,
         stats: {
@@ -93,7 +97,7 @@ export async function GET(req: NextRequest) {
         support: {
           openTickets,
         },
-      });
+      }));
     }
 
     // Memory Store Implementation
@@ -118,7 +122,7 @@ export async function GET(req: NextRequest) {
       (t) => t.profile_id === profileId && t.status === 'OPEN'
     ).length;
 
-    return NextResponse.json({
+    return timing.respond(NextResponse.json({
       success: true,
       profile: memProfile || null,
       stats: {
@@ -138,11 +142,11 @@ export async function GET(req: NextRequest) {
       support: {
         openTickets,
       },
-    });
+    }));
   } catch (error: any) {
-    return NextResponse.json(
+    return timing.respond(NextResponse.json(
       { error: error?.message || 'Hesap verileri yüklenemedi.' },
       { status: 500 }
-    );
+    ));
   }
 }

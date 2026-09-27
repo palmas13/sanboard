@@ -2,20 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getListingRepository } from '@/lib/db/repositories';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { revalidatePath } from 'next/cache';
+import { ServerTiming } from '@/lib/performance/server-timing';
 
 export async function GET(req: NextRequest) {
+  const timing = new ServerTiming();
   try {
-    const actor = await resolveOwnedActiveProfile(req);
-    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+    const actor = await timing.measure('actor', () => resolveOwnedActiveProfile(req));
+    if (!actor.ok) return timing.respond(NextResponse.json({ error: actor.error }, { status: actor.status }));
 
     const repo = getListingRepository();
-    const listings = await repo.getUserListings(actor.profileId);
-    return NextResponse.json(listings);
+    const listings = await timing.measure('listings', () => repo.getUserListings(actor.profileId));
+    return timing.respond(NextResponse.json(listings));
   } catch (error: any) {
-    return NextResponse.json(
+    return timing.respond(NextResponse.json(
       { error: error?.message || 'İlanlar getirilemedi.' },
       { status: 500 }
-    );
+    ));
   }
 }
 
