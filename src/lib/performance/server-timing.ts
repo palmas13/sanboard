@@ -1,6 +1,6 @@
 import type { NextResponse } from 'next/server';
 
-const SAFE_METRIC_NAME = /^(session|auth|actor|profile|dealer|db|database|enrich|repository|serialize|total|store|application|subscription|listings|listings_query|price_history_query|favorites_query|enrich_map|listings_enrich|listings_map|listings_serialize|favorites|tickets|payments|notifications|bootstrap)$/;
+const SAFE_METRIC_NAME = /^(session|auth|actor|profile|dealer|db|database|enrich|repository|serialize|total|store|application|subscription|listings|listings_query|enrichment_query|enrich_map|listings_enrich|listings_map|listings_serialize|favorites|tickets|payments|notifications|bootstrap)$/;
 
 export class ServerTiming {
   private readonly startedAt = performance.now();

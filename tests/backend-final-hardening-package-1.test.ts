@@ -94,16 +94,35 @@ describe('SANBOARD backend final hardening package 1', () => {
     }
     assert.doesNotMatch(timing, /listings_enrich;dur=/);
     assert.doesNotMatch(timing, /listings_map;dur=/);
-    assert.doesNotMatch(timing, /price_history_query;dur=/);
-    assert.doesNotMatch(timing, /favorites_query;dur=/);
+    assert.doesNotMatch(timing, /enrichment_query;dur=/);
     assert.doesNotMatch(timing, /enrich_map;dur=/);
   });
 
-  test('Supabase user-listing enrichment keeps parallel queries and reports only real sub-stages', () => {
+  test('Supabase user-listing enrichment uses one set-based RPC and reports only real sub-stages', () => {
     const repository = readFileSync(join(process.cwd(), 'src/lib/db/repositories/supabase/supabase-listing-repo.ts'), 'utf8');
-    assert.match(repository, /Promise\.all\(\[\s*\(async \(\) => \{[\s\S]*?'price_history_query'[\s\S]*?\}\)\(\),\s*\(async \(\) => \{[\s\S]*?'favorites_query'[\s\S]*?\}\)\(\),\s*\]\)/);
+    const userListingsStart = repository.indexOf('async getUserListings');
+    const corporateListingsStart = repository.indexOf('async getCorporateListings', userListingsStart);
+    const userListingsSource = repository.slice(userListingsStart, corporateListingsStart);
+    assert.match(userListingsSource, /\.rpc\('get_user_listing_enrichment', \{[\s\S]*?p_seller_profile_id: safeProfileId,[\s\S]*?p_listing_ids: ids/);
+    assert.doesNotMatch(userListingsSource, /from\('listing_price_history'\)|from\('favorites'\)|Promise\.all/);
+    assert.match(userListingsSource, /onTiming\?\.\('enrichment_query', performance\.now\(\) - enrichmentQueryStartedAt\)/);
     assert.match(repository, /const enrichMapStartedAt = performance\.now\(\);[\s\S]*?onTiming\?\.\('enrich_map', performance\.now\(\) - enrichMapStartedAt\)/);
-    assert.doesNotMatch(repository, /onTiming\?\.\('(price_history_query|favorites_query|enrich_map)', 0\)/);
+    assert.doesNotMatch(repository, /onTiming\?\.\('(enrichment_query|enrich_map)', 0\)/);
+  });
+
+  test('user-listing enrichment RPC is set-based, owner-scoped and service-role only', () => {
+    const migration = readFileSync(join(process.cwd(), 'supabase/migrations/20260927000000_user_listing_enrichment_rpc.sql'), 'utf8');
+    assert.match(migration, /CREATE OR REPLACE FUNCTION public\.get_user_listing_enrichment/);
+    assert.match(migration, /SECURITY INVOKER/);
+    assert.match(migration, /SET search_path = pg_catalog/);
+    assert.match(migration, /l\.seller_profile_id = p_seller_profile_id/);
+    assert.match(migration, /l\.seller_type = 'INDIVIDUAL'/);
+    assert.match(migration, /l\.corporate_profile_id IS NULL/);
+    assert.match(migration, /SELECT DISTINCT ON \(h\.listing_id\)[\s\S]*ORDER BY h\.listing_id, h\.changed_at DESC/);
+    assert.match(migration, /COUNT\(\*\)::BIGINT AS favorite_count[\s\S]*GROUP BY f\.listing_id/);
+    assert.match(migration, /REVOKE ALL ON FUNCTION public\.get_user_listing_enrichment\(UUID, UUID\[\]\) FROM PUBLIC, anon, authenticated/);
+    assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.get_user_listing_enrichment\(UUID, UUID\[\]\) TO service_role/);
+    assert.doesNotMatch(migration, /SECURITY DEFINER/);
   });
 
   test('account bootstrap is active-character scoped, not sibling-account aggregated', async () => {

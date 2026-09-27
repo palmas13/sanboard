@@ -74,7 +74,7 @@ export interface IListingRepository {
   getUserListings(
     profileId: string,
     onTiming?: (
-      stage: 'query' | 'price_history_query' | 'favorites_query' | 'enrich_map' | 'enrich' | 'map',
+      stage: 'query' | 'enrichment_query' | 'enrich_map' | 'enrich' | 'map',
       duration: number
     ) => void
   ): Promise<Listing[]>;

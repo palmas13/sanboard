@@ -1065,7 +1065,7 @@ export class SupabaseListingRepository implements IListingRepository {
   async getUserListings(
     profileId: string,
     onTiming?: (
-      stage: 'query' | 'price_history_query' | 'favorites_query' | 'enrich_map' | 'enrich' | 'map',
+      stage: 'query' | 'enrichment_query' | 'enrich_map' | 'enrich' | 'map',
       duration: number
     ) => void
   ): Promise<Listing[]> {
@@ -1123,44 +1123,25 @@ export class SupabaseListingRepository implements IListingRepository {
     const enrichStartedAt = performance.now();
     try {
       if (ids.length > 0) {
-        const [historiesRes, favsRes] = await Promise.all([
-          (async () => {
-            const startedAt = performance.now();
-            try {
-              return await client
-                .from('listing_price_history')
-                .select('listing_id, old_price, changed_at')
-                .in('listing_id', ids)
-                .order('changed_at', { ascending: false });
-            } finally {
-              onTiming?.('price_history_query', performance.now() - startedAt);
-            }
-          })(),
-          (async () => {
-            const startedAt = performance.now();
-            try {
-              return await this.getAdminClient()
-                .from('favorites')
-                .select('listing_id')
-                .in('listing_id', ids);
-            } finally {
-              onTiming?.('favorites_query', performance.now() - startedAt);
-            }
-          })(),
-        ]);
+        const enrichmentQueryStartedAt = performance.now();
+        let enrichmentRows;
+        try {
+          const { data: enrichmentData } = await this.getAdminClient().rpc('get_user_listing_enrichment', {
+            p_seller_profile_id: safeProfileId,
+            p_listing_ids: ids,
+          });
+          enrichmentRows = enrichmentData || [];
+        } finally {
+          onTiming?.('enrichment_query', performance.now() - enrichmentQueryStartedAt);
+        }
 
         const enrichMapStartedAt = performance.now();
         try {
-          if (historiesRes.data) {
-            for (const h of historiesRes.data) {
-              if (!priceHistoryMap[h.listing_id]) priceHistoryMap[h.listing_id] = h.old_price;
+          for (const enrichment of enrichmentRows) {
+            if (enrichment.previous_price !== null) {
+              priceHistoryMap[enrichment.listing_id] = Number(enrichment.previous_price);
             }
-          }
-
-          if (favsRes.data) {
-            for (const f of favsRes.data) {
-              favCountMap[f.listing_id] = (favCountMap[f.listing_id] || 0) + 1;
-            }
+            favCountMap[enrichment.listing_id] = Number(enrichment.favorite_count);
           }
         } finally {
           onTiming?.('enrich_map', performance.now() - enrichMapStartedAt);
