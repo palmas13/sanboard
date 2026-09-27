@@ -126,7 +126,7 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
     assert.strictEqual(favRow.user_id, zadeUserId);
   });
 
-  test('TEST 3B: external character session ID resolves to canonical profile for favorite mutation', async () => {
+  test('TEST 3B: external character ID in a legacy full session is rejected for favorite mutation', async () => {
     const profile = db.profiles.find((item) => item.id === 'char-zade-02');
     assert.ok(profile);
     const previousExternalId = profile.external_character_id;
@@ -140,11 +140,8 @@ describe('Sanboard Favorite & Session Security Hardening Tests', () => {
         { listingId: testListingId, isFavorited: true }
       );
       const res = await toggleFavoritePost(req);
-      const data = await res.json();
-
-      assert.strictEqual(res.status, 200);
-      assert.strictEqual(data.isFavorited, true);
-      assert.ok(db.favorites.some((favorite) => favorite.profile_id === profile.id));
+      assert.strictEqual(res.status, 403);
+      assert.equal(db.favorites.some((favorite) => favorite.profile_id === profile.id), false);
     } finally {
       profile.external_character_id = previousExternalId;
     }

@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server';
 import { getServerSession } from '@/lib/auth/session';
 import { getUserRepository } from '@/lib/db/repositories';
+import { CharacterProfile } from '@/types';
 
 export type ActiveProfileResolution =
-  | { ok: true; profileId: string; userId: string; role: 'USER' | 'ADMIN' }
+  | { ok: true; profileId: string; userId: string; role: 'USER' | 'ADMIN'; profile: CharacterProfile }
   | { ok: false; status: 401 | 400 | 403; error: string };
 
 export type ActiveAdminResolution = ActiveProfileResolution;
@@ -28,7 +29,7 @@ export async function resolveOwnedActiveProfile(
     };
   }
 
-  const profile = await getUserRepository().getProfileById(session.profileId);
+  const profile = await getUserRepository().getCanonicalProfileById(session.profileId);
   if (!profile || profile.user_id !== session.userId) {
     return { ok: false, status: 403, error: 'Aktif karakter profili bu hesaba ait değil.' };
   }
@@ -38,6 +39,7 @@ export async function resolveOwnedActiveProfile(
     profileId: profile.id,
     userId: session.userId,
     role: profile.role || 'USER',
+    profile,
   };
 }
 

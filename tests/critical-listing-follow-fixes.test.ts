@@ -81,18 +81,15 @@ describe('Critical listing image and corporate follow regressions', () => {
     assert.equal(removed.followerCount, 0);
   });
 
-  test('follow canonicalizes an external character session ID before mutation', async () => {
+  test('actor rejects a legacy full session containing an external character ID', async () => {
     const params = { params: Promise.resolve({ id: storeId }) };
     const response = await setFollow(request(externalMavisId, 'POST', { isFollowing: true }), params);
-    const data = await response.json();
 
-    assert.equal(response.status, 200);
-    assert.equal(data.isFollowing, true);
-    assert.equal(data.followerCount, 1);
-    assert.equal(db.followers[0].follower_profile_id, mavisId);
+    assert.equal(response.status, 403);
+    assert.equal(db.followers.length, 0);
   });
 
-  test('UUID-shaped external character ID resolves to Ravi canonical profile for active profile, favorite and follow', async () => {
+  test('UUID-shaped external character ID remains supported only by generic identity resolution', async () => {
     const repo = new MemoryUserRepository();
     assert.equal((await repo.getProfileById(raviId))?.id, raviId);
     assert.equal((await repo.getProfileById(externalRaviId))?.id, raviId);
@@ -101,8 +98,8 @@ describe('Critical listing image and corporate follow regressions', () => {
 
     const staleSessionRequest = request(externalRaviId, 'POST', { isFollowing: true });
     const resolved = await resolveOwnedActiveProfile(staleSessionRequest);
-    assert.equal(resolved.ok, true);
-    if (resolved.ok) assert.equal(resolved.profileId, raviId);
+    assert.equal(resolved.ok, false);
+    if (!resolved.ok) assert.equal(resolved.status, 403);
 
     const listingId = db.listings[0]?.id;
     assert.ok(listingId);
@@ -114,14 +111,14 @@ describe('Critical listing image and corporate follow regressions', () => {
       },
       body: JSON.stringify({ listingId, isFavorited: true, profileId: mavisId }),
     }));
-    assert.equal(favoriteResponse.status, 200);
-    assert.ok(db.favorites.some((favorite) => favorite.profile_id === raviId));
+    assert.equal(favoriteResponse.status, 403);
+    assert.equal(db.favorites.some((favorite) => favorite.profile_id === raviId), false);
     assert.equal(db.favorites.some((favorite) => favorite.profile_id === mavisId), false);
 
     const params = { params: Promise.resolve({ id: storeId }) };
     const followResponse = await setFollow(staleSessionRequest, params);
-    assert.equal(followResponse.status, 200);
-    assert.ok(db.followers.some((follow) => follow.follower_profile_id === raviId));
+    assert.equal(followResponse.status, 403);
+    assert.equal(db.followers.some((follow) => follow.follower_profile_id === raviId), false);
     assert.equal(db.followers.some((follow) => follow.follower_profile_id === mavisId), false);
   });
 
@@ -194,6 +191,53 @@ describe('Critical listing image and corporate follow regressions', () => {
       () => repo.getProfileById(externalRaviId),
       /Character profile identifier collision/
     );
+  });
+
+  test('canonical profile lookup queries only the canonical id namespace', async () => {
+    const queriedColumns: string[] = [];
+    const fakeClient = {
+      from: () => ({
+        select: () => ({
+          eq: (column: string, value: string) => ({
+            maybeSingle: async () => {
+              queriedColumns.push(column);
+              return { data: db.profiles.find((profile) => profile.id === value) || null, error: null };
+            },
+          }),
+        }),
+      }),
+    };
+    const repo = new SupabaseUserRepository();
+    (repo as any).getAdminClient = () => fakeClient;
+
+    assert.equal((await repo.getCanonicalProfileById(raviId))?.id, raviId);
+    assert.deepEqual(queriedColumns, ['id']);
+    assert.equal(await repo.getCanonicalProfileById(externalRaviId), null);
+    assert.deepEqual(queriedColumns, ['id', 'id']);
+  });
+
+  test('owned active profile uses canonical lookup, retains ownership and DB-fresh role', async () => {
+    db.profiles.find((profile) => profile.id === raviId)!.role = 'ADMIN';
+
+    const actor = await resolveOwnedActiveProfile(new NextRequest('http://localhost/api/test?profileId=attacker', {
+      headers: { cookie: `sanboard_session=${createSessionToken({ userId: accountId, profileId: raviId, role: 'USER' })}; sanboard_profile_id=${outsiderId}` },
+    }));
+    assert.equal(actor.ok, true);
+    if (actor.ok) {
+      assert.equal(actor.profileId, raviId);
+      assert.equal(actor.profile.id, raviId);
+      assert.equal(actor.role, 'ADMIN');
+    }
+
+    const denied = await resolveOwnedActiveProfile(new NextRequest('http://localhost/api/test', {
+      headers: { cookie: `sanboard_session=${createSessionToken({ userId: 'other-account', profileId: raviId, role: 'ADMIN' })}` },
+    }));
+    assert.equal(denied.ok, false);
+    if (!denied.ok) assert.equal(denied.status, 403);
+
+    const source = readFileSync(join(process.cwd(), 'src/lib/auth/active-profile.ts'), 'utf8');
+    assert.match(source, /getCanonicalProfileById\(session\.profileId\)/);
+    assert.doesNotMatch(source, /getProfileById\(session\.profileId\)/);
   });
 
   test('character switch signs the resolved canonical profile id', () => {

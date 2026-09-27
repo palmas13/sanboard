@@ -218,6 +218,62 @@ Candidates to verify against the actually applied production schema:
 - No account-scoped admin inheritance, global actor cache, public caching of private responses, or removed security check.
 - Server-Timing contains only allowlisted generic stage names and numeric durations; no IDs, email, tokens, SQL, secrets or provider payloads.
 
+## 14. Package 2 — canonical actor and bootstrap waterfall
+
+Date: 2026-09-27
+
+### Production timing before Package 2
+
+| Endpoint / stage | Observed server timing |
+|---|---:|
+| eligibility `actor` | ~465 ms |
+| eligibility total server | ~1.15 s |
+| bootstrap `actor` | ~910.8 ms |
+| bootstrap business | ~612.2 ms |
+| bootstrap trailing `favorites` | ~673.3 ms |
+| bootstrap total server | ~2.20 s |
+
+These are pre-change production observations. No post-optimization millisecond claim is made until the package is deployed and measured again.
+
+### Signed-session canonical guarantee
+
+- OAuth sync returns persisted `character_profiles` rows with canonical database `id` values.
+- Single-character OAuth login signs `selectedProfile.id`.
+- Multi-character OAuth login and temporary test login create only a signed character-selection context; the selection/switch endpoint resolves the submitted identifier with the generic collision-safe resolver, verifies `profile.user_id === authenticatedUserId`, then signs `profile.id`.
+- Therefore normal full sessions contain canonical `character_profiles.id`, while generic external-ID resolution remains available only at identity-selection boundaries.
+
+### Architecture and round trips
+
+| Path | Before | After Package 2 |
+|---|---|---|
+| `resolveOwnedActiveProfile` | canonical query + external-ID query: 2 remote calls for UUID session IDs | explicit canonical `id` query: 1 remote call |
+| eligibility | actor 2 calls, then store + application parallel | actor 1 call, then the existing store + canonical application parallel wave |
+| bootstrap without personal listings | actor 2 + 6-query business wave = 8 calls | actor 1 + 5-query business wave = 6 calls |
+| bootstrap with personal listings | actor 2 + 6-query business wave + trailing favorites = 9 calls | actor 1 + 5-query business wave + trailing favorites = 7 calls |
+
+The actor result now carries its DB-fresh verified profile internally. Bootstrap reuses it and no longer re-queries `character_profiles`; the API profile response shape is unchanged.
+
+### Received-favorites decision
+
+`stats.totalReceivedFavorites` is the exact total number of favorite rows attached to the active character's individual listings. The account overview reads it as a summary value; no per-listing values are required. The current schema/repository has no audited owner-scoped aggregation RPC/view, and the exact query currently depends on listing IDs returned by the personal-listings query. Package 2 therefore retains the separate `favorites` stage rather than approximating, loading all favorites, or introducing an unreviewed database object.
+
+Unresolved controlled DB candidate:
+
+| Table | Columns / query | Expected benefit |
+|---|---|---|
+| `favorites` joined to `listings` | exact `COUNT(favorites.id)` where `listings.seller_profile_id = profileId`, `seller_type = 'INDIVIDUAL'`, and `corporate_profile_id IS NULL`; verify/add `favorites(listing_id)` if absent | allows owner-scoped exact aggregate to start in the main bootstrap parallel wave and removes the trailing network phase |
+
+No migration or SQL was created or applied in this package.
+
+### Security invariants retained
+
+- Signed `sanboard_session` remains authoritative; plain cookies and body/query profile or role values remain non-authoritative.
+- Actor ownership remains `profile.user_id === session.userId`.
+- Actor role remains DB-fresh `character_profiles.role`; stale signed role is not trusted.
+- Generic `getProfileById()` still supports canonical IDs, external IDs, UUID-looking external IDs, and fail-safe namespace collision detection.
+- Admin resolution still additionally requires DB-fresh active account status and the active profile's DB-fresh `ADMIN` role.
+- No global actor cache, shared private-data cache, migration, SQL execution, or production DB access was introduced.
+
 ## 14. Package 2 priority order
 
 1. **P0 / HIGH benefit / MEDIUM risk:** introduce a canonical-ID-only DB-fresh actor lookup or return/reuse the loaded profile, removing the unconditional second external-ID query while preserving ownership and role checks.

@@ -25,9 +25,8 @@ export async function GET(req: NextRequest) {
       }
 
       // Parallel execution of all independent metrics
-      const [profileRes, listingsRes, favsCountRes, creditRes, corpRes, ticketCountRes] =
+      const [listingsRes, favsCountRes, creditRes, corpRes, ticketCountRes] =
         await timing.measure('bootstrap', () => Promise.all([
-          client.from('character_profiles').select('*').eq('id', profileId).maybeSingle(),
           client
             .from('listings')
             .select('id, status')
@@ -79,7 +78,7 @@ export async function GET(req: NextRequest) {
 
       return timing.respond(NextResponse.json({
         success: true,
-        profile: profileRes.data || null,
+        profile: actor.profile,
         stats: {
           activeListings,
           expiredListings,
@@ -101,8 +100,6 @@ export async function GET(req: NextRequest) {
     }
 
     // Memory Store Implementation
-    const memProfile = db.profiles.find((p) => p.id === profileId);
-
     const personalListings = db.listings.filter(
       (l) => l.seller_profile_id === profileId && l.seller_type === 'INDIVIDUAL' && !l.corporate_profile_id
     );
@@ -124,7 +121,7 @@ export async function GET(req: NextRequest) {
 
     return timing.respond(NextResponse.json({
       success: true,
-      profile: memProfile || null,
+      profile: actor.profile,
       stats: {
         activeListings,
         expiredListings,

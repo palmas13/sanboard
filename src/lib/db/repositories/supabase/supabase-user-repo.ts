@@ -71,6 +71,28 @@ export class SupabaseUserRepository implements IUserRepository {
     return profile;
   }
 
+  async getCanonicalProfileById(id: string): Promise<CharacterProfile | null> {
+    const client = this.getAdminClient();
+    const profileId = String(id || '').trim();
+    if (!isUuid(profileId)) return null;
+
+    const { data, error } = await client
+      .from('character_profiles')
+      .select('*')
+      .eq('id', profileId)
+      .maybeSingle();
+    if (error) {
+      throw new Error(`Supabase error fetching character profile by canonical id: ${error.message}`);
+    }
+    if (!data) return null;
+
+    const profile = data as CharacterProfile;
+    if (!profile.avatar_path && profile.avatar_url) {
+      profile.avatar_path = profile.avatar_url;
+    }
+    return profile;
+  }
+
   async getProfileByPublicId(publicId: number): Promise<CharacterProfile | null> {
     const client = this.getAdminClient();
     if (!publicId || isNaN(publicId)) return null;

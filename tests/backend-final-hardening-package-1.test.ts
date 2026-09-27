@@ -66,11 +66,30 @@ describe('SANBOARD backend final hardening package 1', () => {
   });
 
   test('account bootstrap is active-character scoped, not sibling-account aggregated', async () => {
+    db.listings.push(
+      { id: 'personal-alex-active', listing_number: '#PA', seller_profile_id: alex, seller_type: 'INDIVIDUAL', category: 'vehicle', subcategory: 'Otomobil', title: 'Personal Active', description: '', price: 1, location: '', status: 'ACTIVE', created_at: '', updated_at: '' },
+      { id: 'personal-alex-expired', listing_number: '#PE', seller_profile_id: alex, seller_type: 'INDIVIDUAL', category: 'vehicle', subcategory: 'Otomobil', title: 'Personal Expired', description: '', price: 1, location: '', status: 'EXPIRED', created_at: '', updated_at: '' },
+      { id: 'personal-jordan-active', listing_number: '#PJ', seller_profile_id: jordan, seller_type: 'INDIVIDUAL', category: 'vehicle', subcategory: 'Otomobil', title: 'Sibling Personal', description: '', price: 1, location: '', status: 'ACTIVE', created_at: '', updated_at: '' },
+    );
+    db.favorites = [
+      { id: 'alex-given', profile_id: alex, listing_id: 'listing-jordan', created_at: '' },
+      { id: 'received-one', profile_id: jordan, listing_id: 'personal-alex-active', created_at: '' },
+      { id: 'received-sibling', profile_id: alex, listing_id: 'personal-jordan-active', created_at: '' },
+    ];
+    db.credits = [{ id: 'credit-alex', profile_id: alex, status: 'AVAILABLE', created_at: '', updated_at: '' } as any];
+    db.tickets.push({ id: 'ticket-alex', profile_id: alex, subject: 'Own', status: 'OPEN', creator_name: 'Alex', created_at: '', updated_at: '', messages: [] });
     const response = await getBootstrap(request('/api/account/bootstrap', alex));
     const body = await response.json();
     assert.equal(body.profile.id, alex);
+    assert.equal(body.stats.activeListings, 1);
+    assert.equal(body.stats.expiredListings, 1);
+    assert.equal(body.stats.favoritesCount, 2);
+    assert.equal(body.stats.favorites, 2);
+    assert.equal(body.stats.totalReceivedFavorites, 1);
+    assert.equal(body.credits.availableCredits, 1);
     assert.equal(body.corporate.dealerProfile.id, 'store-alex');
-    assert.equal(body.support.openTickets, 0);
+    assert.equal(body.support.openTickets, 1);
+    assert.equal((await getBootstrap(request('/api/account/bootstrap'))).status, 401);
   });
 
   test('favorites are active-character scoped despite query and legacy cookie injection', async () => {
