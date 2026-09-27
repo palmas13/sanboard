@@ -80,7 +80,7 @@ describe('SANBOARD generic character isolation package 2', () => {
     assert.deepEqual((await list.json()).map((ticket: any) => ticket.id), ['ticket-alex']);
     assert.equal((await getTicket(request('/api/tickets/ticket-jordan', alex), { params: Promise.resolve({ id: 'ticket-jordan' }) })).status, 403);
 
-    const created = await createTicket(request('/api/tickets', alex, json({ profileId: jordan, creatorName: 'Fake', subject: 'Subject', message: 'Message' }), jordan));
+    const created = await createTicket(request('/api/tickets', alex, json({ profileId: jordan, creatorName: 'Fake', category: 'ACCOUNT_CHARACTER', subject: 'Subject', message: 'Message' }), jordan));
     const createdBody = await created.json();
     assert.equal(createdBody.ticket.profile_id, alex);
     assert.equal(createdBody.ticket.creator_name, 'Alex Stone');

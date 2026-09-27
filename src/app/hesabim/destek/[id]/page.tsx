@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils/format';
 import { SupportTicket, TicketMessage } from '@/types';
+import { getTicketCategoryLabel } from '@/lib/tickets/categories';
 
 export default function TicketDetailPage() {
   const params = useParams();
@@ -148,6 +149,7 @@ export default function TicketDetailPage() {
           <p className="text-xs text-[var(--text-dim)]">
             Referans: {ticket.id} • Oluşturulma: {formatDateTime(ticket.created_at)}
           </p>
+          <p className="text-xs text-[var(--text-muted)]">Kategori: <strong className="text-[#FF8A1F]">{getTicketCategoryLabel(ticket.category)}</strong></p>
         </div>
 
         {!isClosed && (

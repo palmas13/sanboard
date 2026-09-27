@@ -10,6 +10,7 @@ import {
   SupportTicket,
   TicketMessage,
   TicketStatus,
+  TicketCategory,
   User,
 } from '@/types';
 import { ListingFilterParams } from '../listings';
@@ -129,7 +130,7 @@ export interface IUserRepository {
 export interface ITicketRepository {
   getUserTickets(profileId: string): Promise<SupportTicket[]>;
   getTicketById(id: string): Promise<(SupportTicket & { messages: TicketMessage[] }) | null>;
-  createTicket(params: { profileId: string; creatorName: string; subject: string; message: string }): Promise<{ success: boolean; ticket?: SupportTicket; error?: string }>;
+  createTicket(params: { profileId: string; creatorName: string; category: TicketCategory; subject: string; message: string }): Promise<{ success: boolean; ticket?: SupportTicket; error?: string }>;
   addTicketMessage(params: { ticketId: string; senderRole: 'USER' | 'ADMIN'; senderName: string; message: string }): Promise<{ success: boolean; message?: TicketMessage; error?: string }>;
   updateTicketStatus(id: string, status: TicketStatus): Promise<boolean>;
   getAllTickets(): Promise<Array<SupportTicket & { messages: TicketMessage[] }>>;

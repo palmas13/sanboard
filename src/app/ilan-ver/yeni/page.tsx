@@ -24,6 +24,8 @@ import { formatCurrency } from '@/lib/utils/format';
 import { getVehicleBrands, getModelsByBrand } from '@/lib/constants/vehicleCatalog';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { getListingUrl } from '@/lib/urls';
+import { calculateListingQuality } from '@/lib/listings/quality';
+import { ListingQualityIndicator } from '@/components/listings/ListingQualityIndicator';
 
 const TITLE_MAX = 60;
 const DESC_MAX = 100;
@@ -399,6 +401,13 @@ export default function YeniIlanOlusturPage() {
   };
 
   const coverImage = images.find((i) => i.is_cover)?.storage_path || images[0]?.storage_path;
+  const listingQuality = calculateListingQuality({
+    category, subcategory, title, description, price, location, imageCount: images.length,
+    hasContact: Boolean(currentProfile?.phone?.trim() || currentProfile?.sanmail_email?.trim()),
+    brand, model, mileage, fuelType, engineHealth, plate,
+    propertyType: category === 'property' ? subcategory : undefined,
+    roomCount, floor, buildingType,
+  });
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -451,6 +460,8 @@ export default function YeniIlanOlusturPage() {
           </span>
         </div>
       </div>
+
+      <ListingQualityIndicator quality={listingQuality} compact />
 
       {/* ERROR SUMMARY BOX (with ref for smooth scroll) */}
       {errorSummary.length > 0 && (
@@ -1055,6 +1066,7 @@ export default function YeniIlanOlusturPage() {
       {/* STEP 4: PREVIEW & PUBLISH */}
       {step === 4 && (
         <div className="space-y-6">
+          <ListingQualityIndicator quality={listingQuality} />
           <div className="surface-card p-6 rounded-2xl space-y-4">
             <h2 className="text-lg font-bold text-[var(--text-main)] flex items-center gap-2">
               <Eye className="w-5 h-5 text-[#FF8A1F]" />

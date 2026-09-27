@@ -1,6 +1,6 @@
 import { ITicketRepository } from '../types';
 import { getSupabaseClient, getSupabaseAdminClient } from '../../supabase-client';
-import { SupportTicket, TicketMessage, TicketStatus } from '@/types';
+import { SupportTicket, TicketCategory, TicketMessage, TicketStatus } from '@/types';
 
 import { resolveProfileId, isUuid } from '../../id-mapper';
 import { normalizeTicketConversation } from '@/lib/tickets/presentation';
@@ -62,7 +62,7 @@ export class SupabaseTicketRepository implements ITicketRepository {
     });
   }
 
-  async createTicket(params: { profileId: string; creatorName: string; subject: string; message: string }) {
+  async createTicket(params: { profileId: string; creatorName: string; category: TicketCategory; subject: string; message: string }) {
     const client = this.getAdminClient();
 
     const { data: newTicket, error } = await client
@@ -70,6 +70,7 @@ export class SupabaseTicketRepository implements ITicketRepository {
       .insert({
         profile_id: params.profileId,
         creator_name: params.creatorName,
+        category: params.category,
         subject: params.subject,
         status: 'OPEN',
       })

@@ -1,5 +1,5 @@
 import { db } from './store';
-import { SupportTicket, TicketMessage, TicketStatus } from '@/types';
+import { SupportTicket, TicketCategory, TicketMessage, TicketStatus } from '@/types';
 import { createNotification } from './notifications';
 
 function ensureTickets() {
@@ -71,6 +71,7 @@ export async function getTicketById(
 export async function createTicket(params: {
   profileId: string;
   creatorName: string;
+  category: TicketCategory;
   subject: string;
   message: string;
 }): Promise<{ success: boolean; ticket?: SupportTicket; error?: string }> {
@@ -78,8 +79,8 @@ export async function createTicket(params: {
     return getTicketRepository().createTicket(params);
   }
   ensureTickets();
-  if (!params.subject.trim() || !params.message.trim()) {
-    return { success: false, error: 'Başlık ve mesaj alanları zorunludur.' };
+  if (!params.category || !params.subject.trim() || !params.message.trim()) {
+    return { success: false, error: 'Kategori, başlık ve mesaj alanları zorunludur.' };
   }
 
   const now = new Date().toISOString();
@@ -89,6 +90,7 @@ export async function createTicket(params: {
     id: ticketId,
     profile_id: params.profileId,
     creator_name: params.creatorName,
+    category: params.category,
     subject: params.subject.trim(),
     status: 'OPEN',
     created_at: now,

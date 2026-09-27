@@ -369,12 +369,14 @@ export interface CorporateApplication {
 }
 
 export type TicketStatus = 'OPEN' | 'ANSWERED' | 'CLOSED';
+export type TicketCategory = 'LISTING' | 'PAYMENT' | 'CORPORATE' | 'ACCOUNT_CHARACTER' | 'REPORT_MODERATION' | 'OTHER';
 
 export interface SupportTicket {
   id: string;
   profile_id: string;
   creator_name: string;
   subject: string;
+  category?: TicketCategory | null;
   status: TicketStatus;
   created_at: string;
   updated_at: string;

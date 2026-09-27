@@ -17,7 +17,8 @@ import {
   X,
 } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils/format';
-import { SupportTicket } from '@/types';
+import { SupportTicket, TicketCategory } from '@/types';
+import { getTicketCategoryLabel, TICKET_CATEGORIES } from '@/lib/tickets/categories';
 
 export default function HesabimDestekPage() {
   const { currentProfile } = useAuth();
@@ -28,6 +29,7 @@ export default function HesabimDestekPage() {
   const [error, setError] = useState('');
 
   // New ticket fields
+  const [category, setCategory] = useState<TicketCategory | ''>('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
 
@@ -55,8 +57,8 @@ export default function HesabimDestekPage() {
     e.preventDefault();
     if (!currentProfile) return;
 
-    if (!subject.trim() || !message.trim()) {
-      setError('Lütfen konu başlığı ve mesajınızı giriniz.');
+    if (!category || !subject.trim() || !message.trim()) {
+      setError('Lütfen kategori, konu başlığı ve mesajınızı giriniz.');
       return;
     }
 
@@ -68,6 +70,7 @@ export default function HesabimDestekPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          category,
           subject: subject.trim(),
           message: message.trim(),
         }),
@@ -77,6 +80,7 @@ export default function HesabimDestekPage() {
       if (!res.ok) throw new Error(data.error || 'Talep oluşturulamadı.');
 
       setModalOpen(false);
+      setCategory('');
       setSubject('');
       setMessage('');
       await fetchTickets();
@@ -125,6 +129,9 @@ export default function HesabimDestekPage() {
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono font-semibold text-[var(--text-dim)]">
                     {t.id}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full border border-[#FF8A1F]/25 bg-[var(--brand-orange-subtle)] text-[10px] font-semibold text-[#FF8A1F]">
+                    {getTicketCategoryLabel(t.category)}
                   </span>
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -195,6 +202,13 @@ export default function HesabimDestekPage() {
             )}
 
             <form onSubmit={handleCreateTicket} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Kategori</label>
+                <select value={category} onChange={(e) => setCategory(e.target.value as TicketCategory)} required className="form-input text-sm">
+                  <option value="" disabled>Kategori seçin</option>
+                  {TICKET_CATEGORIES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                </select>
+              </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-[var(--text-muted)]">Konu Başlığı</label>
                 <input

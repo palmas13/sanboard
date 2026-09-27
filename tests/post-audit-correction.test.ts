@@ -257,6 +257,7 @@ describe('Sanboard Post-Audit Correction Pass: Sections 36-47', () => {
     const ticketRes = await createTicket({
       profileId: mavisProfileId,
       creatorName: 'Mavis Pierce',
+      category: 'PAYMENT',
       subject: 'Ödeme Sorunu',
       message: 'Faturam ile ilgili yardım rica ediyorum.',
     });

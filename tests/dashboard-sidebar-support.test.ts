@@ -70,7 +70,7 @@ describe('dashboard sidebar and support conversation regressions', () => {
   });
 
   test('ticket initial message and replies are chronological with server-derived display authors', async () => {
-    const created = await createUserTicket(request('/api/tickets', userId, userProfileId, 'USER', { subject: 'Deneme', message: 'Deneme1.' }));
+    const created = await createUserTicket(request('/api/tickets', userId, userProfileId, 'USER', { category: 'OTHER', subject: 'Deneme', message: 'Deneme1.' }));
     assert.equal(created.status, 200);
     const ticketId = (await created.json()).ticket.id;
     assert.equal(db.ticketMessages.filter((message) => message.ticket_id === ticketId).length, 1);

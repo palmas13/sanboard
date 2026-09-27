@@ -7,7 +7,7 @@ import {
   updateTicketStatus,
   getAllTicketsForAdmin,
 } from '../../tickets';
-import { TicketStatus } from '@/types';
+import { TicketCategory, TicketStatus } from '@/types';
 
 export class MemoryTicketRepository implements ITicketRepository {
   async getUserTickets(profileId: string) {
@@ -18,7 +18,7 @@ export class MemoryTicketRepository implements ITicketRepository {
     return getTicketById(id);
   }
 
-  async createTicket(params: { profileId: string; creatorName: string; subject: string; message: string }) {
+  async createTicket(params: { profileId: string; creatorName: string; category: TicketCategory; subject: string; message: string }) {
     return createTicket(params);
   }
 

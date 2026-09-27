@@ -111,6 +111,7 @@ async function runAcceptanceChecks() {
   const ticketRes = await ticketRepo.createTicket({
     profileId: createdProfileId,
     creatorName: 'Ravi Blumon',
+    category: 'OTHER',
     subject: 'LFM Test Ticket',
     message: 'Test message from user',
   });

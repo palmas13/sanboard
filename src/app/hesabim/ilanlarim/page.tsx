@@ -19,6 +19,9 @@ import { formatCurrency, formatTimeRemaining, formatDate } from '@/lib/utils/for
 import { Listing } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { getListingUrl } from '@/lib/urls';
+import { calculateListingQuality, ListingQualityInput } from '@/lib/listings/quality';
+
+type SavedListingDraft = ListingQualityInput & { savedAt?: string; images?: unknown[] };
 
 export default function HesabimIlanlarimPage() {
   const { currentProfile } = useAuth();
@@ -31,6 +34,7 @@ export default function HesabimIlanlarimPage() {
   const [isProcessingClose, setIsProcessingClose] = useState(false);
   const [republishingId, setRepublishingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  const [savedDraft, setSavedDraft] = useState<{ quality: number; savedAt?: string; href: string } | null>(null);
 
   const fetchListings = async () => {
     if (!currentProfile) return;
@@ -50,6 +54,21 @@ export default function HesabimIlanlarimPage() {
 
   useEffect(() => {
     fetchListings();
+  }, [currentProfile]);
+
+  useEffect(() => {
+    if (!currentProfile) return;
+    const keys = [`sanboard_listing_draft_v1_${currentProfile.id}_individual`, `sanboard_listing_draft_v1_${currentProfile.id}_corporate`];
+    const drafts = keys.flatMap((key) => {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return [];
+        const draft = JSON.parse(raw) as SavedListingDraft;
+        const result = calculateListingQuality({ ...draft, imageCount: Array.isArray(draft.images) ? draft.images.length : 0, hasContact: Boolean(currentProfile.phone?.trim() || currentProfile.sanmail_email?.trim()) });
+        return [{ quality: result.percentage, savedAt: draft.savedAt, href: key.endsWith('_corporate') ? '/ilan-ver/yeni?corporate=true' : '/ilan-ver/yeni' }];
+      } catch { return []; }
+    });
+    setSavedDraft(drafts.sort((a, b) => new Date(b.savedAt || 0).getTime() - new Date(a.savedAt || 0).getTime())[0] || null);
   }, [currentProfile]);
 
   const activeListings = listings.filter((l) => l.status === 'ACTIVE');
@@ -137,6 +156,13 @@ export default function HesabimIlanlarimPage() {
           </button>
         </div>
       </div>
+
+      {savedDraft && (
+        <div className="surface-card rounded-2xl border border-[#FF8A1F]/25 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div><p className="text-sm font-bold text-[var(--text-main)]">Kaydedilmiş ilan taslağın var</p><p className="text-xs text-[var(--text-muted)]">%{savedDraft.quality} tamamlandı{savedDraft.savedAt ? ` • ${formatDate(savedDraft.savedAt)}` : ''}</p></div>
+          <Link href={savedDraft.href} className="btn-primary text-xs py-2 px-4 inline-flex items-center justify-center gap-1.5"><Edit3 className="w-3.5 h-3.5" />Düzenlemeye Devam Et</Link>
+        </div>
+      )}
 
       {loading ? (
         <div className="surface-card p-12 text-center text-xs text-[var(--text-muted)] flex items-center justify-center gap-2">

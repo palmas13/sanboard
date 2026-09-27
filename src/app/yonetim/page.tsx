@@ -37,6 +37,8 @@ import { formatCurrency, formatDateTime, formatDate } from '@/lib/utils/format';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { FaviconSettings } from '@/components/admin/FaviconSettings';
 import styles from './admin.module.css';
+import type { TicketCategory } from '@/types';
+import { getTicketCategoryLabel, normalizeTicketCategory, TICKET_CATEGORIES } from '@/lib/tickets/categories';
 
 type AdminTab = 'overview' | 'listings' | 'payments' | 'reports' | 'dealers' | 'tickets' | 'settings';
 
@@ -70,6 +72,7 @@ export default function AdminPage() {
 
   // Ticket filter & detail modal state
   const [ticketStatusFilter, setTicketStatusFilter] = useState<'ALL' | 'OPEN' | 'ANSWERED' | 'CLOSED'>('ALL');
+  const [ticketCategoryFilter, setTicketCategoryFilter] = useState<'ALL' | TicketCategory>('ALL');
   const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
   const [adminReplyMessage, setAdminReplyMessage] = useState('');
   const [ticketReplying, setTicketReplying] = useState(false);
@@ -435,9 +438,15 @@ export default function AdminPage() {
   const openTicketsCount = stats.openTickets;
 
   const filteredTickets = (data?.tickets || []).filter((t: any) => {
-    if (ticketStatusFilter === 'ALL') return true;
-    return t.status === ticketStatusFilter;
+    const matchesStatus = ticketStatusFilter === 'ALL' || t.status === ticketStatusFilter;
+    const matchesCategory = ticketCategoryFilter === 'ALL' || normalizeTicketCategory(t.category) === ticketCategoryFilter;
+    return matchesStatus && matchesCategory;
   });
+  const workQueue = [
+    { id: 'dealers' as const, icon: Building2, title: 'Bekleyen Kurumsal Başvurular', count: pendingAppsCount, description: `${pendingAppsCount} başvuru inceleme bekliyor`, action: 'İncele' },
+    { id: 'tickets' as const, icon: LifeBuoy, title: 'Destek Talepleri', count: openTicketsCount, description: `${openTicketsCount} açık talep yanıt bekliyor`, action: 'Görüntüle' },
+    { id: 'reports' as const, icon: Flag, title: 'Raporlar', count: stats.openReports, description: `${stats.openReports} rapor inceleme bekliyor`, action: 'İncele' },
+  ].filter((item) => item.count > 0);
 
   return (
     <div className={styles.dashboard}>
@@ -533,7 +542,7 @@ export default function AdminPage() {
           <div className="surface-card p-5"><h2 id="overview-title" className="font-bold">Son kullanıcılar</h2><p className="text-xs text-[var(--text-muted)] mt-1 mb-3">Hesap ve aktif karakter eşlemesi</p>
             <div className={styles.compactList}>{users.slice(0, 6).map((item: any) => { const account = item.user || item; const chars = item.characters || account.characters || []; return <div key={account.id}><div><strong>{account.display_name || account.username || chars[0]?.display_name || 'İsimsiz hesap'}</strong><small>{chars.length ? chars.map((c: any) => c.display_name || c.name).join(', ') : 'Karakter eşleşmesi yok'}</small></div><span>{account.status || 'ACTIVE'}</span></div>; })}</div>
           </div>
-          <div className="surface-card p-5"><h2 className="font-bold">İş kuyruğu</h2><p className="text-xs text-[var(--text-muted)] mt-1 mb-3">Hızlı moderasyon özeti</p><div className={styles.queue}><button onClick={() => setActiveTab('reports')}><Flag />Bekleyen rapor <b>{stats.openReports}</b></button><button onClick={() => setActiveTab('dealers')}><Building2 />Kurumsal başvuru <b>{pendingAppsCount}</b></button><button onClick={() => setActiveTab('tickets')}><LifeBuoy />Açık destek <b>{openTicketsCount}</b></button></div></div>
+          <div className="surface-card p-5 border border-[#FF8A1F]/20"><h2 className="font-bold">İlgilenmeniz Gerekenler</h2><p className="text-xs text-[var(--text-muted)] mt-1 mb-3">Admin aksiyonu bekleyen işlemler</p>{workQueue.length > 0 ? <div className="space-y-2">{workQueue.map((item) => { const Icon = item.icon; return <button key={item.id} type="button" onClick={() => { setActiveTab(item.id); if (item.id === 'dealers') setCorporateSubTab('applications'); }} className="w-full flex items-center gap-3 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/40 p-3 text-left hover:border-[#FF8A1F]/35 transition-colors"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--brand-orange-subtle)] text-[#FF8A1F]"><Icon className="h-4 w-4" /></span><span className="min-w-0 flex-1"><strong className="block text-xs text-[var(--text-main)]">{item.title}</strong><small className="block truncate text-[11px] text-[var(--text-muted)]">{item.description}</small></span><b className="rounded-full bg-[#FF8A1F] px-2 py-0.5 text-[11px] text-black">{item.count}</b><span className="text-[11px] font-bold text-[#FF8A1F]">{item.action}</span></button>; })}</div> : <div className="rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/30 p-4 text-xs text-[var(--text-muted)]"><CheckCircle className="mb-2 h-5 w-5 text-[var(--color-success)]" />Şu an ilgilenmeniz gereken bir işlem yok.</div>}</div>
         </section>
       )}
 
@@ -896,7 +905,7 @@ export default function AdminPage() {
               </p>
             </div>
 
-            {/* Filter Pills */}
+            <div className="flex flex-col sm:items-end gap-2">
             <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)]">
               {(['ALL', 'OPEN', 'ANSWERED', 'CLOSED'] as const).map((st) => (
                 <button
@@ -919,6 +928,11 @@ export default function AdminPage() {
                 </button>
               ))}
             </div>
+            <select value={ticketCategoryFilter} onChange={(e) => setTicketCategoryFilter(e.target.value as 'ALL' | TicketCategory)} className="form-input py-1.5 text-xs sm:w-48" aria-label="Destek kategorisi filtresi">
+              <option value="ALL">Tüm kategoriler</option>
+              {TICKET_CATEGORIES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select>
+            </div>
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-[var(--border-app)]">
@@ -927,6 +941,7 @@ export default function AdminPage() {
                 <tr>
                   <th className="py-3 px-4">Ticket No</th>
                   <th className="py-3 px-4">Konu Başlığı</th>
+                  <th className="py-3 px-4">Kategori</th>
                   <th className="py-3 px-4">Talep Eden</th>
                   <th className="py-3 px-4">Son Güncelleme</th>
                   <th className="py-3 px-4">Durum</th>
@@ -939,6 +954,7 @@ export default function AdminPage() {
                     <tr key={t.id} className="hover:bg-[var(--bg-surface-secondary)]/30 transition-colors">
                       <td className="py-3 px-4 font-mono font-semibold text-[var(--text-main)]">{t.id}</td>
                       <td className="py-3 px-4 font-bold text-[var(--text-main)] max-w-sm truncate">{t.subject}</td>
+                      <td className="py-3 px-4"><span className="px-2 py-0.5 rounded-full border border-[#FF8A1F]/25 bg-[var(--brand-orange-subtle)] text-[10px] font-semibold text-[#FF8A1F]">{getTicketCategoryLabel(t.category)}</span></td>
                       <td className="py-3 px-4 text-[var(--text-dim)]">{t.creator_name || t.profile_id}</td>
                       <td className="py-3 px-4 text-[var(--text-dim)] whitespace-nowrap">
                         {formatDateTime(t.updated_at || t.created_at)}
@@ -974,7 +990,7 @@ export default function AdminPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-xs text-[var(--text-muted)]">
+                    <td colSpan={7} className="py-8 text-center text-xs text-[var(--text-muted)]">
                       Kayıtlı destek talebi bulunmuyor.
                     </td>
                   </tr>
@@ -1178,6 +1194,7 @@ export default function AdminPage() {
                   <span className="mx-1.5">•</span>
                   {formatDateTime(selectedTicket.created_at)}
                 </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">Kategori: <strong className="text-[#FF8A1F]">{getTicketCategoryLabel(selectedTicket.category)}</strong></p>
               </div>
 
               <div className="flex items-center gap-2">

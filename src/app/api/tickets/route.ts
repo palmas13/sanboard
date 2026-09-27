@@ -3,6 +3,7 @@ import { getTicketRepository } from '@/lib/db/repositories';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { getUserRepository } from '@/lib/db/repositories';
 import { ServerTiming } from '@/lib/performance/server-timing';
+import { isTicketCategory } from '@/lib/tickets/categories';
 
 export async function GET(req: NextRequest) {
   const timing = new ServerTiming();
@@ -22,10 +23,10 @@ export async function POST(req: NextRequest) {
   try {
     const actor = await resolveOwnedActiveProfile(req);
     if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
-    const { subject, message } = await req.json();
+    const { category, subject, message } = await req.json();
     const profile = await getUserRepository().getProfileById(actor.profileId);
 
-    if (!profile || !subject || !message) {
+    if (!profile || !isTicketCategory(category) || !subject?.trim() || !message?.trim()) {
       return NextResponse.json(
         { error: 'Tüm alanların doldurulması zorunludur.' },
         { status: 400 }
@@ -36,8 +37,9 @@ export async function POST(req: NextRequest) {
     const result = await repo.createTicket({
       profileId: actor.profileId,
       creatorName: profile.full_name,
-      subject,
-      message,
+      category,
+      subject: subject.trim(),
+      message: message.trim(),
     });
 
     if (!result.success) {
