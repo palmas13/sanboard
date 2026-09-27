@@ -1,6 +1,5 @@
 import { CorporateApplication, DealerProfile } from '@/types';
 import { getDealerRepository } from '@/lib/db/repositories';
-import { db } from '@/lib/db/store';
 
 export type CorporateEligibilityReason =
   | 'NO_STORE'
@@ -57,21 +56,11 @@ export async function resolveCorporateEligibility(profileId: string): Promise<Co
 
   const dealerRepo = getDealerRepository();
 
-  // 1. Fetch store by profileId (owner_profile_id or profile_id)
-  let dealer = typeof (dealerRepo as any).getDealerByProfileId === 'function'
-    ? await (dealerRepo as any).getDealerByProfileId(profileId, true)
-    : await dealerRepo.getDealerByProfileId(profileId);
-
-  // 2. Fetch application history for profile if available
-  let application: CorporateApplication | null = null;
-  if (typeof dealerRepo.getApplicationByProfileId === 'function') {
-    application = await dealerRepo.getApplicationByProfileId(profileId);
-  } else {
-    const apps = (db.applications || [])
-      .filter((a) => a.applicant_profile_id === profileId)
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    application = apps[0] || null;
-  }
+  // Store history and canonical application history are independent lookups.
+  const [dealer, application] = await Promise.all([
+    dealerRepo.getDealerByProfileId(profileId, true),
+    dealerRepo.getApplicationByCanonicalProfileId(profileId),
+  ]);
 
   // Case A: No store exists
   if (!dealer) {

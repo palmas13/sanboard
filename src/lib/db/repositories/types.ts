@@ -129,6 +129,7 @@ export interface IDealerRepository {
   getDealerByProfileId(profileId: string, includeDeleted?: boolean): Promise<CorporateProfile | null>;
   getAllDealers?(): Promise<CorporateProfile[]>;
   getApplicationByProfileId?(profileId: string): Promise<CorporateApplication | null>;
+  getApplicationByCanonicalProfileId(profileId: string): Promise<CorporateApplication | null>;
   getAllApplications?(): Promise<CorporateApplication[]>;
   createApplication(params: { profileId: string; companyName: string; purpose: string }): Promise<{ success: boolean; application?: CorporateApplication; error?: string }>;
   reviewApplication?(applicationId: string, status: 'APPROVED' | 'REJECTED', rejectionReason?: string, reviewerUserId?: string): Promise<{ success: boolean; error?: string }>;

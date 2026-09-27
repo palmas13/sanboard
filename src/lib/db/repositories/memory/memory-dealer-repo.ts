@@ -20,6 +20,7 @@ import {
   deleteCorporateStore,
 } from '../../dealers';
 import { CorporateApplication, CorporateProfile, CharacterProfile } from '@/types';
+import { db } from '../../store';
 
 export class MemoryDealerRepository implements IDealerRepository {
   async getDealerById(id: string): Promise<CorporateProfile | null> {
@@ -40,6 +41,13 @@ export class MemoryDealerRepository implements IDealerRepository {
 
   async getApplicationByProfileId(profileId: string): Promise<CorporateApplication | null> {
     return getApplicationByProfileId(profileId);
+  }
+
+  async getApplicationByCanonicalProfileId(profileId: string): Promise<CorporateApplication | null> {
+    const applications = (db.applications || [])
+      .filter((application) => application.applicant_profile_id === profileId)
+      .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime());
+    return applications[0] || null;
   }
 
   async getAllApplications(): Promise<CorporateApplication[]> {

@@ -307,6 +307,23 @@ export class SupabaseDealerRepository implements IDealerRepository {
     return app as CorporateApplication | null;
   }
 
+  async getApplicationByCanonicalProfileId(profileId: string): Promise<CorporateApplication | null> {
+    const client = this.getAdminClient();
+    const { data, error } = await client
+      .from('corporate_applications')
+      .select('*')
+      .eq('applicant_profile_id', profileId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error('Kurumsal başvuru bilgisi alınamadı.');
+    }
+
+    return data as CorporateApplication | null;
+  }
+
   async getAllApplications(): Promise<CorporateApplication[]> {
     const client = this.getAdminClient();
     const { data, error } = await client
