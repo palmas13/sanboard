@@ -212,3 +212,18 @@ a {
 .form-input::placeholder {
   color: var(--text-dim);
 }
+
+.hero-shell { background: linear-gradient(180deg, color-mix(in srgb, var(--bg-surface) 78%, var(--bg-app)), var(--bg-app)); }
+.hero-reveal { animation: hero-reveal 440ms cubic-bezier(.22,1,.36,1) both; }
+.hero-delay-1 { animation-delay: 70ms; }
+.hero-delay-2 { animation-delay: 140ms; }
+.hero-delay-3 { animation-delay: 210ms; }
+.hero-caret { animation: caret-blink 900ms steps(1,end) infinite; }
+.dashboard-page-enter { animation: dashboard-page-enter 190ms ease-out both; }
+@keyframes hero-reveal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes caret-blink { 0%, 48% { opacity: 1; } 49%, 100% { opacity: .15; } }
+@keyframes dashboard-page-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .hero-reveal, .dashboard-page-enter { animation: none; }
+  .hero-caret { animation: none; opacity: .65; }
+}

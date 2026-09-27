@@ -5,7 +5,6 @@ import {
   Home,
   ArrowRight,
   Sparkles,
-  PlusCircle,
 } from 'lucide-react';
 import { getListingRepository } from '@/lib/db/repositories';
 import { ListingCard } from '@/components/listings/ListingCard';
@@ -29,44 +28,25 @@ export default async function HomePage() {
   return (
     <div className="space-y-12 pb-20">
       {/* 1. HERO SECTION */}
-      <section className="relative pt-14 pb-16 px-4 sm:px-6 lg:px-8 border-b border-[var(--border-app)] bg-gradient-to-b from-[var(--bg-surface)] via-[var(--bg-surface)]/80 to-[var(--bg-app)] overflow-hidden">
-        {/* Subtle background glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-64 bg-radial from-[#FF8A1F]/10 via-transparent to-transparent pointer-events-none blur-3xl" />
-
-        <div className="relative max-w-5xl mx-auto text-center space-y-5">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[var(--brand-orange-subtle)] border border-[rgba(255,138,31,0.25)] text-[#FF8A1F] text-xs font-semibold shadow-sm">
+      <section className="hero-shell relative overflow-hidden border-b border-[var(--border-app)] px-4 py-20 sm:px-6 sm:py-24 lg:px-8 lg:py-28">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_72%_28%,rgba(255,138,31,0.105),transparent_34%)]" />
+        <div className="relative mx-auto max-w-7xl">
+          <div className="hero-reveal inline-flex items-center gap-2 rounded-full border border-[#FF8A1F]/25 bg-[var(--brand-orange-subtle)] px-3.5 py-1.5 text-xs font-semibold text-[#FF8A1F]">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>GTA World Roleplay İlan Platformu</span>
+            <span>Los Santos ilan deneyimi</span>
           </div>
-
-          <HeroTypewriter />
-
-          <p className="text-sm sm:text-base text-[var(--text-muted)] max-w-2xl mx-auto leading-relaxed">
-            Araç ve mülk ilanlarını incele, kendi ilanını oluştur ve Los Santos&apos;ta alıcılarla satıcıları güvenli şekilde buluştur.
+          <div className="hero-reveal hero-delay-1 mt-7"><HeroTypewriter /></div>
+          <p className="hero-reveal hero-delay-2 mt-7 max-w-xl text-base leading-7 text-[var(--text-muted)] sm:text-lg">
+            Los Santos&apos;taki araç ve mülk ilanlarını keşfet, ilanını yayınla ve doğru alıcıyla buluş.
           </p>
+          <div className="hero-reveal hero-delay-3 mt-9 flex flex-col gap-3 sm:flex-row">
+            <Link href="/ilan-ver" className="btn-primary min-h-12 px-6 transition-transform duration-150 hover:-translate-y-0.5">İlan Ver <ArrowRight className="h-4 w-4" /></Link>
+            <Link href="/arac" className="btn-secondary min-h-12 px-6">İlanları Keşfet</Link>
+          </div>
         </div>
       </section>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-14">
-        {/* 2. CTA BANNER (IMMEDIATELY AFTER HERO) */}
-        <section className="surface-card p-5 sm:p-6 md:p-7 rounded-2xl border border-[rgba(255,138,31,0.25)] bg-gradient-to-r from-[var(--bg-surface)] via-[var(--brand-orange-subtle)]/15 to-[var(--bg-surface)] flex flex-col md:flex-row items-center justify-between gap-5 shadow-sm">
-          <div className="space-y-1 text-center md:text-left">
-            <h2 className="text-lg sm:text-xl font-bold text-[var(--text-main)] tracking-tight">
-              Aracını ya da mülkünü dakikalar içinde ilana ver
-            </h2>
-            <p className="text-xs sm:text-sm text-[var(--text-muted)]">
-              Los Santos’un dört bir yanına ulaş.
-            </p>
-          </div>
-          <Link
-            href="/ilan-ver"
-            className="btn-primary text-sm py-2.5 px-6 shrink-0 shadow-md flex items-center gap-2 font-medium hover:opacity-95 transition-all w-full md:w-auto justify-center"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>İlan Ver</span>
-          </Link>
-        </section>
-
         {/* 3. POPÜLER İLANLAR (Animated Carousel Showcase) */}
         <PopularShowcase listings={popularFeed} />
 

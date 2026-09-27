@@ -4,25 +4,22 @@ import { SanboardLogo } from '../common/SanboardLogo';
 
 export function Footer() {
   return (
-    <footer className="mt-auto border-t border-[color:var(--border-app)]/80 bg-[var(--bg-surface)] transition-colors">
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="flex flex-col items-start justify-between gap-7 border-b border-[color:var(--border-app)]/70 pb-8 md:flex-row md:items-center">
-          <div className="max-w-md space-y-3">
+    <footer className="mt-auto px-4 pb-4 pt-12 sm:px-6 sm:pb-6 lg:px-8">
+      <div className="mx-auto max-w-7xl rounded-[2rem] border border-[var(--border-app)] bg-[var(--bg-surface)] px-6 py-10 shadow-[0_24px_80px_rgba(0,0,0,0.22)] sm:px-10 sm:py-12">
+        <div className="flex flex-col items-center border-b border-[var(--border-app)] pb-9 text-center">
+          <div className="max-w-xl space-y-4">
             <SanboardLogo size="md" />
             <p className="text-sm leading-relaxed text-[var(--text-muted)]">
               Los Santos'ta araç ve mülk alım satımının buluşma noktası. İlan ver, keşfet, iletişime geç.
             </p>
           </div>
 
-          <div className="flex max-w-xl flex-wrap items-center gap-x-6 gap-y-3 text-sm text-[var(--text-muted)]">
+          <nav aria-label="Footer" className="mt-8 flex max-w-3xl flex-wrap items-center justify-center gap-x-7 gap-y-3 text-sm text-[var(--text-muted)]">
             <Link href="/arac" className="transition-colors hover:text-[#FF8A1F]">
-              Araç İlanları
+              Araçlar
             </Link>
             <Link href="/mulk" className="transition-colors hover:text-[#FF8A1F]">
-              Mülk İlanları
-            </Link>
-            <Link href="/ilan-ver" className="hover:text-[#FF8A1F] transition-colors font-medium">
-              İlan Ver
+              Mülkler
             </Link>
             <Link href="/sss" className="transition-colors hover:text-[var(--text-main)]">
               S.S.S
@@ -36,14 +33,12 @@ export function Footer() {
             <Link href="/gizlilik" className="hover:text-[var(--text-main)] transition-colors">
               Gizlilik
             </Link>
-            <Link href="/iletisim" className="hover:text-[var(--text-main)] transition-colors">
-              İletişim
-            </Link>
-          </div>
+          </nav>
         </div>
 
-        <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-dim)]">
-          <p>© 2026 Sanboard.</p>
+        <div className="flex flex-col items-center justify-between gap-4 pt-6 text-xs text-[var(--text-dim)] sm:flex-row">
+          <p>© 2026 Sanboard</p>
+          <div className="flex gap-5"><Link href="/gizlilik" className="transition-colors hover:text-[#FF8A1F]">Gizlilik</Link><Link href="/kullanim-kosullari" className="transition-colors hover:text-[#FF8A1F]">Kullanım Koşulları</Link></div>
         </div>
       </div>
     </footer>

@@ -47,7 +47,6 @@ export default function HesabimKurumsalPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [isReapplying, setIsReapplying] = useState(false);
 
   // Subview toggle: Editing vs Main Dashboard
   const [isEditingStore, setIsEditingStore] = useState(false);
@@ -58,10 +57,6 @@ export default function HesabimKurumsalPage() {
   });
   const [followerCount, setFollowerCount] = useState<number>(0);
   const [storeListings, setStoreListings] = useState<any[]>([]);
-
-  // Application form fields
-  const [companyName, setCompanyName] = useState('');
-  const [purpose, setPurpose] = useState('');
 
   // Edit profile fields (for approved dealers)
   const [editCompanyName, setEditCompanyName] = useState('');
@@ -199,43 +194,6 @@ export default function HesabimKurumsalPage() {
   useEffect(() => {
     fetchDealer();
   }, [currentProfile]);
-
-  const handleApply = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentProfile) return;
-
-    if (!companyName.trim() || !purpose.trim()) {
-      setError('Lütfen tüm alanları doldurunuz.');
-      return;
-    }
-
-    setActionLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      const res = await fetch('/api/dealers/apply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyName: companyName.trim(),
-          company_name: companyName.trim(),
-          purpose: purpose.trim(),
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Başvuru gönderilemedi.');
-
-      setSuccess('Kurumsal başvurunuz başarıyla alındı. Yönetim onayından sonra aktif edilecektir.');
-      setIsReapplying(false);
-      await fetchDealer();
-    } catch (err: any) {
-      setError(err.message || 'Bir hata oluştu.');
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   const handleActivateSubscription = async () => {
     if (!dealer || !currentProfile) return;
@@ -1038,7 +996,7 @@ export default function HesabimKurumsalPage() {
             &ldquo;{application?.company_name || dealer?.company_name}&rdquo; adıyla yaptığınız başvuru kaydı sistemimizde güvenle saklanmaktadır. Başvuru sonucunuz karakterinize bildirim olarak iletilecektir.
           </p>
         </div>
-      ) : !isReapplying && (dealer?.status === 'REJECTED' || application?.status === 'REJECTED') ? (
+      ) : dealer?.status === 'REJECTED' || application?.status === 'REJECTED' ? (
         /* CASE 4: REJECTED */
         <div className="surface-card p-8 rounded-2xl border border-red-500/30 text-center space-y-5 max-w-lg mx-auto">
           <div className="w-12 h-12 mx-auto rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
@@ -1061,23 +1019,18 @@ export default function HesabimKurumsalPage() {
           </div>
 
           <div className="pt-2">
-            <button
-              type="button"
-              onClick={() => {
-                setCompanyName(application?.company_name || '');
-                setPurpose('');
-                setIsReapplying(true);
-              }}
+            <Link
+              href="/hesabim/kurumsal/basvuru"
               className="btn-primary text-xs py-2.5 px-6 inline-flex items-center gap-2 shadow-md cursor-pointer"
             >
               <RefreshCw className="w-4 h-4" />
               <span>Tekrar Başvuru Yap</span>
-            </button>
+            </Link>
           </div>
         </div>
       ) : (
-        /* CASE 5: NEW APPLICATION FORM */
-        <div className="surface-card p-6 sm:p-8 rounded-2xl border border-[var(--border-app)] space-y-6 max-w-2xl mx-auto">
+        /* CASE 5: NEW APPLICATION */
+        <div className="surface-card p-8 rounded-2xl border border-[var(--border-app)] space-y-5 max-w-2xl mx-auto text-center">
           <div className="text-center space-y-2">
             <div className="w-12 h-12 mx-auto rounded-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] flex items-center justify-center">
               <Building2 className="w-6 h-6" />
@@ -1088,55 +1041,7 @@ export default function HesabimKurumsalPage() {
             </p>
           </div>
 
-          <form onSubmit={handleApply} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--text-muted)]">Şirket / Galeri Adı</label>
-              <input
-                type="text"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                placeholder="Örn: Apex Motors, Vinewood Real Estate..."
-                required
-                className="form-input text-xs font-bold"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--text-muted)]">Faaliyet Amacı & Detaylar</label>
-              <textarea
-                rows={4}
-                value={purpose}
-                onChange={(e) => setPurpose(e.target.value)}
-                placeholder="İşletmenizin rolü, Los Santos'taki konumu ve faaliyetleri hakkında kısa bilgi..."
-                required
-                className="form-input text-xs resize-none"
-              />
-            </div>
-
-            <div className="pt-2 flex items-center justify-between gap-3">
-              {isReapplying && (
-                <button
-                  type="button"
-                  onClick={() => setIsReapplying(false)}
-                  className="btn-secondary text-xs py-2.5 px-4"
-                >
-                  Geri
-                </button>
-              )}
-              <button
-                type="submit"
-                disabled={actionLoading}
-                className="flex-1 btn-primary text-xs py-2.5 flex items-center justify-center gap-2 shadow-md cursor-pointer"
-              >
-                {actionLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Building2 className="w-4 h-4" />
-                )}
-                <span>Başvuruyu Gönder</span>
-              </button>
-            </div>
-          </form>
+          <Link href="/hesabim/kurumsal/basvuru" className="btn-primary inline-flex items-center gap-2 px-6 py-3 text-xs"><Building2 className="h-4 w-4" />Başvuruyu Başlat</Link>
         </div>
       )}
     </div>

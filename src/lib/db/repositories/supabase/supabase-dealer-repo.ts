@@ -101,16 +101,21 @@ export class SupabaseDealerRepository implements IDealerRepository {
     })) as CorporateProfile[];
   }
 
-  async createApplication(params: { profileId: string; companyName: string; purpose: string }): Promise<{ success: boolean; application?: CorporateApplication; error?: string }> {
+  async createApplication(params: { profileId: string; companyName: string; contactPhone?: string; contactEmail?: string; location?: string; purpose: string }): Promise<{ success: boolean; application?: CorporateApplication; error?: string }> {
     if (!params.profileId) {
       return { success: false, error: 'Karakter profili zorunludur.' };
     }
 
-    if (!params.companyName || !params.companyName.trim() || !params.purpose || !params.purpose.trim()) {
+    if (!params.companyName.trim() || !params.purpose.trim()) {
       return { success: false, error: 'Şirket adı ve başvuru amacı alanları zorunludur.' };
     }
 
     const client = this.getAdminClient();
+    const { data: applicantProfile } = await client
+      .from('character_profiles')
+      .select('phone, sanmail_email')
+      .eq('id', params.profileId)
+      .maybeSingle();
 
     // 1. Check if user has an active or suspended store (Requirement 2 B)
     const { data: existingStore } = await client
@@ -145,6 +150,9 @@ export class SupabaseDealerRepository implements IDealerRepository {
       .insert({
         applicant_profile_id: params.profileId,
         company_name: params.companyName,
+        contact_phone: normalizePhone(params.contactPhone || applicantProfile?.phone || ''),
+        contact_email: (params.contactEmail || applicantProfile?.sanmail_email || '').trim(),
+        location: (params.location || 'Los Santos, San Andreas').trim(),
         purpose: params.purpose,
         status: 'PENDING',
       })
@@ -385,6 +393,9 @@ export class SupabaseDealerRepository implements IDealerRepository {
           owner_profile_id: targetProfileId,
           company_name: app.company_name,
           description: app.purpose,
+          phone: app.contact_phone,
+          email: app.contact_email,
+          address: app.location,
           status: 'APPROVED',
           subscription_status: 'INACTIVE',
           moderation_status: 'ACTIVE',

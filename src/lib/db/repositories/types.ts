@@ -142,7 +142,7 @@ export interface IDealerRepository {
   getApplicationByProfileId?(profileId: string): Promise<CorporateApplication | null>;
   getApplicationByCanonicalProfileId(profileId: string): Promise<CorporateApplication | null>;
   getAllApplications?(): Promise<CorporateApplication[]>;
-  createApplication(params: { profileId: string; companyName: string; purpose: string }): Promise<{ success: boolean; application?: CorporateApplication; error?: string }>;
+  createApplication(params: { profileId: string; companyName: string; contactPhone?: string; contactEmail?: string; location?: string; purpose: string }): Promise<{ success: boolean; application?: CorporateApplication; error?: string }>;
   reviewApplication?(applicationId: string, status: 'APPROVED' | 'REJECTED', rejectionReason?: string, reviewerUserId?: string): Promise<{ success: boolean; error?: string }>;
   activateSubscription?(dealerId: string): Promise<{ success: boolean; dealer?: CorporateProfile; error?: string }>;
   boostListing?(actorProfileId: string, listingId: string, now?: Date): Promise<{ success: boolean; error?: string; code?: string; remainingBoosts?: number; featured_until?: string }>;
@@ -162,6 +162,7 @@ export interface IPaymentRepository {
   completePayment(orderId: string, externalPaymentId?: string): Promise<{ success: boolean; credit?: any; error?: string }>;
   getPaymentOrder(orderId: string): Promise<any | null>;
   getUserPayments(profileId: string): Promise<any[]>;
+  clearUserPaymentHistory(profileId: string): Promise<{ success: boolean; clearedAt?: string; error?: string }>;
 }
 
 export interface AuditRecord {

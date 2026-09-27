@@ -21,3 +21,14 @@ export async function GET(req: NextRequest) {
     ));
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+    const result = await getPaymentRepository().clearUserPaymentHistory(actor.profileId);
+    return NextResponse.json(result.success ? result : { error: result.error }, { status: result.success ? 200 : 400 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error?.message || 'Ödeme geçmişi temizlenemedi.' }, { status: 500 });
+  }
+}

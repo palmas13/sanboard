@@ -10,7 +10,6 @@ import {
   ListPlus,
   Heart,
   User,
-  Phone,
   CreditCard,
   LogOut,
   PlusCircle,
@@ -104,7 +103,6 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
   const menuItems = [
     { href: '/hesabim', label: 'Genel Bakış', icon: LayoutDashboard },
     { href: '/hesabim/profil', label: 'Profilim', icon: User },
-    { href: '/hesabim/iletisim', label: 'İletişim Bilgilerim', icon: Phone },
     { href: '/hesabim/ilanlarim', label: 'İlanlarım', icon: ListPlus },
     { href: '/hesabim/favorilerim', label: 'Favorilerim', icon: Heart },
     { href: '/hesabim/odemeler', label: 'Ödeme Geçmişim', icon: CreditCard },
@@ -158,7 +156,7 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
               <p className="text-xs font-medium text-[#FF8A1F]">{currentProfile.sanmail_email}</p>
             ) : (
               <Link
-                href="/hesabim/iletisim"
+                href="/hesabim/profil"
                 className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[#FF8A1F] transition-colors"
               >
                 <span>İletişim bilgilerini tamamla</span>
@@ -244,7 +242,7 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
         </aside>
 
         {/* Main Content Area */}
-        <main className="lg:col-span-9 min-w-0">
+        <main key={pathname} className="dashboard-page-enter lg:col-span-9 min-w-0">
           {children}
         </main>
       </div>

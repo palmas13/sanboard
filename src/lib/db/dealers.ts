@@ -116,6 +116,9 @@ export async function getAllApplications(): Promise<CorporateApplication[]> {
 export async function applyForDealer(params: {
   profileId: string;
   companyName: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  location?: string;
   purpose: string;
 }): Promise<{ success: boolean; application?: CorporateApplication; error?: string }> {
   if (process.env.DATA_STORE === 'supabase') {
@@ -127,7 +130,7 @@ export async function applyForDealer(params: {
     return { success: false, error: 'Karakter profili zorunludur.' };
   }
 
-  if (!params.companyName || !params.companyName.trim() || !params.purpose || !params.purpose.trim()) {
+  if (!params.companyName.trim() || !params.purpose.trim()) {
     return { success: false, error: 'Şirket adı ve başvuru amacı alanları zorunludur.' };
   }
 
@@ -158,6 +161,9 @@ export async function applyForDealer(params: {
     id: `app-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     applicant_profile_id: params.profileId,
     company_name: params.companyName.trim(),
+    contact_phone: normalizePhone(params.contactPhone || profile.phone || ''),
+    contact_email: (params.contactEmail || profile.sanmail_email || '').trim(),
+    location: (params.location || 'Los Santos, San Andreas').trim(),
     purpose: params.purpose.trim(),
     status: 'PENDING',
     created_at: new Date().toISOString(),
@@ -203,9 +209,9 @@ export async function reviewApplication(
         description: app.purpose,
         logo_url: profile?.avatar_url || '',
         banner_url: '',
-        address: 'Los Santos, San Andreas',
-        phone: profile?.phone,
-        sanmail_email: profile?.sanmail_email,
+        address: app.location || 'Los Santos, San Andreas',
+        phone: app.contact_phone || profile?.phone,
+        sanmail_email: app.contact_email || profile?.sanmail_email,
         status: 'APPROVED',
         subscription_status: 'INACTIVE', // Requires activation/package purchase
         moderation_status: 'ACTIVE',

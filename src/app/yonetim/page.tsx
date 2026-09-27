@@ -714,6 +714,7 @@ export default function AdminPage() {
                     <tr>
                       <th className="py-3 px-4">Talep Edilen Şirket</th>
                       <th className="py-3 px-4">Başvuran Karakter</th>
+                      <th className="py-3 px-4">İletişim & Konum</th>
                       <th className="py-3 px-4">Faaliyet Amacı</th>
                       <th className="py-3 px-4">Başvuru Tarihi</th>
                       <th className="py-3 px-4 text-right">İşlemler</th>
@@ -722,7 +723,7 @@ export default function AdminPage() {
                   <tbody className="divide-y divide-[var(--border-app)]">
                     {loading ? (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-xs text-[var(--text-muted)]">
+                        <td colSpan={6} className="py-8 text-center text-xs text-[var(--text-muted)]">
                           <div className="flex items-center justify-center gap-2">
                             <Loader2 className="w-4 h-4 animate-spin text-[#FF8A1F]" />
                             <span>Başvurular yükleniyor...</span>
@@ -738,6 +739,9 @@ export default function AdminPage() {
                           <td className="py-3 px-4">
                             <div className="font-semibold text-[var(--text-main)]">{app.applicant_name || 'Bilinmeyen'}</div>
                             <div className="font-mono text-[10px] text-[var(--text-dim)]">{app.applicant_profile_id}</div>
+                          </td>
+                          <td className="py-3 px-4 min-w-48">
+                            <div className="space-y-1 text-[11px]"><p className="font-semibold text-[var(--text-main)]">{app.contact_phone || 'Telefon yok'}</p><p className="text-[var(--text-muted)]">{app.contact_email || 'SanMail/e-posta yok'}</p><p className="text-[var(--text-dim)]">{app.location || 'Konum yok'}</p></div>
                           </td>
                           <td className="py-3 px-4 text-[var(--text-main)] max-w-sm">
                             <p className="line-clamp-2">{app.purpose}</p>
@@ -774,7 +778,7 @@ export default function AdminPage() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-xs text-[var(--text-muted)]">
+                        <td colSpan={6} className="py-8 text-center text-xs text-[var(--text-muted)]">
                           Onay bekleyen kurumsal başvuru bulunmamaktadır.
                         </td>
                       </tr>

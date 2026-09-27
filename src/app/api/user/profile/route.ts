@@ -4,6 +4,7 @@ import { resolveMediaUrl } from '@/lib/media/url';
 import { recordAuditEvent } from '@/lib/audit';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { ServerTiming } from '@/lib/performance/server-timing';
+import { normalizeContactVisibility } from '@/lib/profiles/contact-privacy';
 
 function toPrivateProfileDto(profile: Awaited<ReturnType<ReturnType<typeof getUserRepository>['getProfileById']>>) {
   if (!profile) return null;
@@ -15,6 +16,8 @@ function toPrivateProfileDto(profile: Awaited<ReturnType<ReturnType<typeof getUs
     avatar_url: resolveMediaUrl(avatarPath),
     sanmail_email: profile.sanmail_email,
     phone: profile.phone,
+    phone_visibility: profile.phone_visibility || 'PUBLIC',
+    sanmail_visibility: profile.sanmail_visibility || 'PUBLIC',
     role: profile.role || 'USER',
     is_dealer: profile.is_dealer,
     dealer_id: profile.dealer_id,
@@ -119,6 +122,11 @@ export async function PUT(req: NextRequest) {
     if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
 
     const body = await req.json().catch(() => ({}));
+    const phoneVisibility = body.phone_visibility === undefined ? undefined : normalizeContactVisibility(body.phone_visibility);
+    const sanmailVisibility = body.sanmail_visibility === undefined ? undefined : normalizeContactVisibility(body.sanmail_visibility);
+    if (phoneVisibility === null || sanmailVisibility === null) {
+      return NextResponse.json({ error: 'Geçersiz iletişim görünürlüğü.' }, { status: 400 });
+    }
 
     // Avatar validation: Reject SVG
     const incomingAvatar = body.avatar_path || body.avatar_url;
@@ -145,6 +153,8 @@ export async function PUT(req: NextRequest) {
       ...(body.avatar_path !== undefined ? { avatar_path: body.avatar_path } : {}),
       ...(body.sanmail_email !== undefined ? { sanmail_email: body.sanmail_email } : {}),
       ...(body.phone !== undefined ? { phone: body.phone } : {}),
+      ...(phoneVisibility ? { phone_visibility: phoneVisibility } : {}),
+      ...(sanmailVisibility ? { sanmail_visibility: sanmailVisibility } : {}),
       ...(body.full_name !== undefined ? { full_name: body.full_name } : {}),
     };
     const result = await repo.updateProfile(actor.profileId, editableFields);

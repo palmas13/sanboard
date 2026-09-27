@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/features/auth/AuthContext';
-import { Heart, Loader2, MapPin, Calendar, Clock, AlertCircle } from 'lucide-react';
-import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { Heart, Loader2, Clock, ArrowUpRight } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils/format';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { getListingUrl } from '@/lib/urls';
@@ -52,7 +52,7 @@ export default function HesabimFavorilerimPage() {
           <span>Favoriler yükleniyor...</span>
         </div>
       ) : favorites.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="overflow-hidden rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] divide-y divide-[var(--border-app)]">
           {favorites.map((listing) => {
             const rawCover =
               listing.images?.find((i: any) => i.is_cover)?.storage_path ||
@@ -62,15 +62,13 @@ export default function HesabimFavorilerimPage() {
             const isExpired = listing.isExpired || listing.status === 'EXPIRED';
 
             return (
-              <div
+              <article
                 key={listing.id}
-                className={`surface-card rounded-2xl overflow-hidden border border-[var(--border-app)] flex flex-col justify-between ${
-                  isExpired ? 'opacity-65 grayscale-[30%] bg-[var(--bg-surface-secondary)]/50' : 'surface-card-hover'
+                className={`group grid grid-cols-[88px_minmax(0,1fr)] gap-4 p-3 transition-colors sm:grid-cols-[112px_minmax(0,1fr)_auto] sm:items-center sm:p-4 ${
+                  isExpired ? 'opacity-65 grayscale-[30%]' : 'hover:bg-[var(--bg-surface-secondary)]/35'
                 }`}
               >
-                <div>
-                  {/* Photo area */}
-                  <div className="relative aspect-[16/10] w-full overflow-hidden bg-black/40">
+                  <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-black/40">
                     <img
                       src={coverImg}
                       alt={listing.title}
@@ -78,64 +76,42 @@ export default function HesabimFavorilerimPage() {
                     />
 
                     {isExpired ? (
-                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center p-3 text-center">
-                        <div className="px-3 py-1.5 rounded-lg bg-[var(--color-danger)]/90 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg">
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center p-2 text-center">
+                        <div className="rounded-lg bg-[var(--color-danger)]/90 px-2 py-1 text-[9px] font-bold text-white">
                           <Clock className="w-3.5 h-3.5" />
                           <span>Bu ilan artık yayında değil</span>
                         </div>
                       </div>
-                    ) : (
-                      <div className="absolute top-2.5 right-2.5">
-                        <FavoriteButton
-                          listingId={listing.id}
-                          initialCount={listing.favorite_count}
-                          initialIsFavorited={true}
-                          initialStateIsAuthoritative={true}
-                          size="sm"
-                          onToggle={(isFav) => {
-                            if (!isFav) {
-                              setFavorites((prev) => prev.filter((f) => f.id !== listing.id));
-                            }
-                          }}
-                        />
-                      </div>
-                    )}
+                    ) : null}
                   </div>
-
-                  {/* Body */}
-                  <div className="p-4 space-y-2">
+                  <div className="min-w-0 space-y-1.5 py-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{listing.category === 'vehicle' ? 'Araç' : 'Mülk'} · {listing.listing_number}</p>
+                    <h3 className="truncate text-sm font-bold text-[var(--text-main)]">{listing.title}</h3>
                     <div className="flex items-baseline gap-2 flex-wrap">
                       {listing.previous_price && listing.previous_price !== listing.price && (
                         <span className="text-xs font-semibold text-[var(--text-muted)] line-through">
                           {formatCurrency(listing.previous_price)}
                         </span>
                       )}
-                      <span className="text-lg font-black text-[#FF8A1F]">
+                      <span className="text-base font-black text-[#FF8A1F]">
                         {formatCurrency(listing.price)}
                       </span>
                     </div>
-                    <h3 className="text-sm font-semibold text-[var(--text-main)] line-clamp-2">
-                      {listing.title}
-                    </h3>
                   </div>
-                </div>
-
-                {/* Footer Link / Info */}
-                <div className="p-4 pt-0">
+                <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1">
+                  {!isExpired && <FavoriteButton listingId={listing.id} initialCount={listing.favorite_count} initialIsFavorited={true} initialStateIsAuthoritative={true} size="sm" onToggle={(isFav) => { if (!isFav) setFavorites((prev) => prev.filter((f) => f.id !== listing.id)); }} />}
                   {isExpired ? (
-                    <div className="p-2.5 rounded-xl bg-[var(--bg-surface-secondary)] text-[11px] text-[var(--text-dim)] text-center font-medium">
-                      İlan süresi dolduğu için detaylar görüntülenemiyor.
-                    </div>
+                    <span className="text-[11px] font-medium text-[var(--text-dim)]">Yayında değil</span>
                   ) : (
                     <Link
                       href={getListingUrl(listing)}
-                      className="w-full btn-secondary text-xs py-2 block text-center"
+                      className="btn-secondary inline-flex items-center gap-1.5 px-3 py-2 text-xs"
                     >
-                      İlan Detayına Git
+                      Detay <ArrowUpRight className="h-3.5 w-3.5" />
                     </Link>
                   )}
                 </div>
-              </div>
+              </article>
             );
           })}
         </div>

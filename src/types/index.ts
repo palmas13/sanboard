@@ -27,6 +27,7 @@ export type ListingStatus = 'DRAFT' | 'ACTIVE' | 'EXPIRED' | 'SOLD' | 'REMOVED';
 
 export type UserRole = 'USER' | 'ADMIN';
 export type UserStatus = 'ACTIVE' | 'BANNED';
+export type ContactVisibility = 'PUBLIC' | 'PRIVATE';
 
 export interface User {
   id: string;
@@ -47,6 +48,9 @@ export interface CharacterProfile {
   avatar_path?: string;
   sanmail_email: string;
   phone: string;
+  phone_visibility?: ContactVisibility;
+  sanmail_visibility?: ContactVisibility;
+  payment_history_cleared_at?: string | null;
   role?: UserRole;
   is_dealer?: boolean;
   dealer_id?: string;
@@ -351,6 +355,9 @@ export interface CorporateApplication {
   id: string;
   applicant_profile_id: string;
   company_name: string;
+  contact_phone?: string;
+  contact_email?: string;
+  location?: string;
   purpose: string;
   status: DealerStatus;
   rejection_reason?: string;

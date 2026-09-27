@@ -98,7 +98,7 @@ describe('SANBOARD generic character isolation package 2', () => {
     assert.equal((await alexApp.json()).application.id, 'app-alex');
     const jordanApp = await getApplication(request(`/api/dealers/apply?profileId=${alex}`, jordan, {}, alex));
     assert.equal((await jordanApp.json()).application, null);
-    const applied = await apply(request('/api/dealers/apply', jordan, json({ applicantProfileId: alex, profileId: alex, companyName: 'Jordan Corp', purpose: 'Trade' }), alex));
+    const applied = await apply(request('/api/dealers/apply', jordan, json({ applicantProfileId: alex, profileId: alex, companyName: 'Jordan Corp', contactPhone: '555123', contactEmail: 'jordan@sanmail.com', location: 'Downtown, Los Santos', purpose: 'Vehicle sales and verified physical dealership operations in Los Santos.' }), alex));
     assert.equal((await applied.json()).application.applicant_profile_id, jordan);
     assert.equal((await getEligibility(request(`/api/dealers/eligibility?profileId=${alex}`, jordan, {}, alex))).status, 200);
     assert.equal((await getEligibility(request('/api/dealers/eligibility'))).status, 401);

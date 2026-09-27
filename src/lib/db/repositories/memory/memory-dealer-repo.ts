@@ -54,7 +54,7 @@ export class MemoryDealerRepository implements IDealerRepository {
     return getAllApplications();
   }
 
-  async createApplication(params: { profileId: string; companyName: string; purpose: string }) {
+  async createApplication(params: { profileId: string; companyName: string; contactPhone?: string; contactEmail?: string; location?: string; purpose: string }) {
     const res = await applyForDealer(params);
     return res;
   }

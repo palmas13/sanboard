@@ -149,6 +149,8 @@ export class MemoryUserRepository implements IUserRepository {
       avatar_url: data.avatarData || '',
       sanmail_email: data.sanmailEmail || '',
       phone: normalizedPhone,
+      phone_visibility: 'PUBLIC',
+      sanmail_visibility: 'PUBLIC',
       role: data.role || 'USER',
       is_dealer: false,
       created_at: now,

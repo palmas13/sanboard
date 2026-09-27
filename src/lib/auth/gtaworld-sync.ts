@@ -55,7 +55,7 @@ export async function syncExternalGameAccount(account: ExternalGameAccount): Pro
         const updated = await client.from('character_profiles').update({ full_name: fullName, updated_at: now }).eq('id', profile.id).eq('user_id', user.id).select().single();
         if (updated.error || !updated.data) throw new Error(`Failed to update GTA World character ${externalCharacterId}: ${updated.error?.message}`);
       } else {
-        const inserted = await client.from('character_profiles').insert({ user_id: user.id, external_character_id: externalCharacterId, full_name: fullName, role: 'USER', avatar_path: null, avatar_url: character.avatarUrl || null, sanmail_email: null, phone: null, created_at: now, updated_at: now }).select().single();
+        const inserted = await client.from('character_profiles').insert({ user_id: user.id, external_character_id: externalCharacterId, full_name: fullName, role: 'USER', avatar_path: null, avatar_url: character.avatarUrl || null, sanmail_email: null, phone: null, phone_visibility: 'PUBLIC', sanmail_visibility: 'PUBLIC', created_at: now, updated_at: now }).select().single();
         if (inserted.error) {
           if (!isUniqueViolation(inserted.error)) throw new Error(`Failed to create GTA World character ${externalCharacterId}: ${inserted.error.message}`);
           profile = await findProfile();
@@ -86,7 +86,7 @@ export async function syncExternalGameAccount(account: ExternalGameAccount): Pro
       profile.full_name = fullName;
       profile.updated_at = now;
     } else {
-      profile = { id: randomUUID(), user_id: user.id, external_character_id: externalCharacterId, full_name: fullName, role: 'USER', avatar_path: '', avatar_url: character.avatarUrl || '', sanmail_email: '', phone: '', created_at: now, updated_at: now };
+      profile = { id: randomUUID(), user_id: user.id, external_character_id: externalCharacterId, full_name: fullName, role: 'USER', avatar_path: '', avatar_url: character.avatarUrl || '', sanmail_email: '', phone: '', phone_visibility: 'PUBLIC', sanmail_visibility: 'PUBLIC', created_at: now, updated_at: now };
       db.profiles.push(profile);
     }
   }

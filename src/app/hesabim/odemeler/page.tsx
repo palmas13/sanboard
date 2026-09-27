@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
-import { CreditCard, CheckCircle2, Clock, XCircle, Loader2 } from 'lucide-react';
+import { CreditCard, CheckCircle2, Clock, XCircle, Loader2, Trash2, ShieldCheck } from 'lucide-react';
 import { formatCurrency, formatDateTime } from '@/lib/utils/format';
 import { Payment } from '@/types';
 
@@ -10,6 +10,20 @@ export default function HesabimOdemelerPage() {
   const { currentProfile } = useAuth();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clearModalOpen, setClearModalOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [clearError, setClearError] = useState('');
+
+  const clearHistory = async () => {
+    setClearing(true); setClearError('');
+    try {
+      const res = await fetch('/api/user/payments', { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || 'Geçmiş temizlenemedi.');
+      setPayments([]); setClearModalOpen(false);
+    } catch (error: any) { setClearError(error.message || 'Geçmiş temizlenemedi.'); }
+    finally { setClearing(false); }
+  };
 
   useEffect(() => {
     if (!currentProfile) return;
@@ -33,11 +47,12 @@ export default function HesabimOdemelerPage() {
 
   return (
     <div className="surface-card p-6 sm:p-8 rounded-2xl border border-[var(--border-app)] space-y-6">
-      <div className="pb-4 border-b border-[var(--border-app)]">
-        <h2 className="text-xl font-bold text-[var(--text-main)]">Ödeme Geçmişim</h2>
+      <div className="flex items-start justify-between gap-4 border-b border-[var(--border-app)] pb-4">
+        <div><h2 className="text-xl font-bold text-[var(--text-main)]">Ödeme Geçmişim</h2>
         <p className="text-xs text-[var(--text-muted)] mt-0.5">
           Fleeca Bank üzerinden gerçekleştirdiğiniz paket satın alma işlemlerinin dökümü.
-        </p>
+        </p></div>
+        {payments.length > 0 && <button type="button" onClick={() => setClearModalOpen(true)} className="btn-secondary inline-flex items-center gap-2 px-3 py-2 text-xs text-[var(--color-danger)]"><Trash2 className="h-3.5 w-3.5" />Geçmişi Temizle</button>}
       </div>
 
       {loading ? (
@@ -110,6 +125,7 @@ export default function HesabimOdemelerPage() {
           </p>
         </div>
       )}
+      {clearModalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="clear-payment-title"><div className="surface-card w-full max-w-md rounded-2xl border border-[var(--border-app)] p-6 shadow-2xl"><div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--brand-orange-subtle)] text-[#FF8A1F]"><ShieldCheck className="h-5 w-5" /></div><h3 id="clear-payment-title" className="text-lg font-bold text-[var(--text-main)]">Ödeme geçmişini görünümden kaldır?</h3><p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">İşlem kayıtları güvenlik, finansal denetim ve hak doğrulama amacıyla korunur. Bu işlem yalnızca geçmişi bu karakter profilinin görünümünden kaldırır.</p>{clearError && <p className="mt-3 text-xs font-semibold text-[var(--color-danger)]">{clearError}</p>}<div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setClearModalOpen(false)} disabled={clearing} className="btn-secondary px-4 py-2 text-xs">Vazgeç</button><button type="button" onClick={clearHistory} disabled={clearing} className="btn-primary px-4 py-2 text-xs">{clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Görünümden Kaldır'}</button></div></div></div>}
     </div>
   );
 }

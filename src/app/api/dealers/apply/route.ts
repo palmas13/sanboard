@@ -10,10 +10,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const companyName = (body.companyName || body.company_name || '').trim();
     const purpose = (body.purpose || body.applicationPurpose || body.business_purpose || '').trim();
+    const contactPhone = String(body.contactPhone || body.contact_phone || '').trim();
+    const contactEmail = String(body.contactEmail || body.contact_email || '').trim();
+    const location = String(body.location || '').trim();
 
-    if (!companyName || !purpose) {
+    if (!companyName || !contactPhone || !contactEmail || !location || purpose.length < 40 || purpose.length > 1000) {
       return NextResponse.json(
-        { error: 'Şirket adı ve başvuru amacı alanları zorunludur.' },
+        { error: 'İşletme adı, iletişim, konum ve 40–1000 karakter faaliyet amacı zorunludur.' },
         { status: 400 }
       );
     }
@@ -22,6 +25,9 @@ export async function POST(req: NextRequest) {
     const result = await repo.createApplication({
       profileId: actor.profileId,
       companyName,
+      contactPhone,
+      contactEmail,
+      location,
       purpose,
     });
 

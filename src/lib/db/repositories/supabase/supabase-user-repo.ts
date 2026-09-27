@@ -196,6 +196,9 @@ export class SupabaseUserRepository implements IUserRepository {
     };
 
     if (data.sanmail_email !== undefined) updatePayload.sanmail_email = data.sanmail_email;
+    if (data.phone_visibility !== undefined) updatePayload.phone_visibility = data.phone_visibility;
+    if (data.sanmail_visibility !== undefined) updatePayload.sanmail_visibility = data.sanmail_visibility;
+    if (data.payment_history_cleared_at !== undefined) updatePayload.payment_history_cleared_at = data.payment_history_cleared_at;
     if (data.full_name !== undefined) updatePayload.full_name = data.full_name;
 
     if (data.phone !== undefined) {
@@ -349,6 +352,8 @@ export class SupabaseUserRepository implements IUserRepository {
       phone: normalizedPhone || null,
       role: 'USER',
       is_dealer: false,
+      phone_visibility: 'PUBLIC',
+      sanmail_visibility: 'PUBLIC',
     };
 
     let { data: created, error: insertErr } = await client

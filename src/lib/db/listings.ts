@@ -18,6 +18,7 @@ import { isListingOwnedByActiveProfile } from '../dealers/eligibility';
 import { getEffectiveListingStatus, isPublicListingVisible } from '../listings/visibility';
 import { getListingCoverPath, sortListingImages } from '../listings/images';
 import { isListingPublicId } from '../urls';
+import { redactPrivateContact } from '../profiles/contact-privacy';
 
 export interface ListingFilterParams {
   category?: ListingCategory;
@@ -465,7 +466,7 @@ export async function getListingById(
   const memberListing: MemberListingDetail = {
     ...listing,
     images: sortListingImages(listing.images),
-    seller,
+    seller: redactPrivateContact(seller),
     dealer,
     favorite_count: favoriteCount,
     is_favorited: isFavorited,

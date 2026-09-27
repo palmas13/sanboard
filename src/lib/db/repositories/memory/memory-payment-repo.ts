@@ -24,8 +24,9 @@ export class MemoryPaymentRepository implements IPaymentRepository {
   }
 
   async getUserPayments(profileId: string) {
+    const clearedAt = db.profiles.find((profile) => profile.id === profileId)?.payment_history_cleared_at;
     return db.payments
-      .filter((p) => p.profile_id === profileId)
+      .filter((p) => p.profile_id === profileId && (!clearedAt || new Date(p.created_at) > new Date(clearedAt)))
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .map(({ id, order_id, amount, status, created_at }) => ({
         id,
@@ -34,6 +35,15 @@ export class MemoryPaymentRepository implements IPaymentRepository {
         status,
         created_at,
       }));
+  }
+
+  async clearUserPaymentHistory(profileId: string) {
+    const profile = db.profiles.find((item) => item.id === profileId);
+    if (!profile) return { success: false, error: 'Profil bulunamadı.' };
+    const clearedAt = new Date().toISOString();
+    profile.payment_history_cleared_at = clearedAt;
+    profile.updated_at = clearedAt;
+    return { success: true, clearedAt };
   }
 
   async getPaymentOrder(orderId: string) {

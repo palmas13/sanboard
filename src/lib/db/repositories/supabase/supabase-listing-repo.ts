@@ -8,6 +8,7 @@ import { resolveUserId, resolveProfileId, isUuid } from '../../id-mapper';
 import { getEffectiveListingStatus } from '@/lib/listings/visibility';
 import { getListingCoverPath, sortListingImages } from '@/lib/listings/images';
 import { isListingPublicId } from '@/lib/urls';
+import { redactPrivateContact } from '@/lib/profiles/contact-privacy';
 
 export function isPublicCorporateListingVisible(item: any): boolean {
   if (item.seller_type !== 'CORPORATE') return true;
@@ -632,6 +633,7 @@ export class SupabaseListingRepository implements IListingRepository {
     return {
       listing: {
         ...listing,
+        seller: redactPrivateContact(listing.seller),
         dealer: listing.corporate
           ? {
               ...listing.corporate,

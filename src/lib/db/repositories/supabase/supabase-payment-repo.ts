@@ -149,16 +149,40 @@ export class SupabasePaymentRepository implements IPaymentRepository {
     const safeProfileId = resolveProfileId(profileId);
     if (!isUuid(safeProfileId)) return [];
 
-    const { data, error } = await client
+    const { data: profile } = await client
+      .from('character_profiles')
+      .select('payment_history_cleared_at')
+      .eq('id', safeProfileId)
+      .maybeSingle();
+
+    let query = client
       .from('payments')
       .select('id, order_id, amount, status, created_at')
-      .eq('profile_id', safeProfileId)
-      .order('created_at', { ascending: false });
+      .eq('profile_id', safeProfileId);
+    if (profile?.payment_history_cleared_at) {
+      query = query.gt('created_at', profile.payment_history_cleared_at);
+    }
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
       throw new Error(`Supabase error fetching payments: ${error.message}`);
     }
     return data || [];
+  }
+
+  async clearUserPaymentHistory(profileId: string) {
+    const client = this.getAdminClient();
+    const safeProfileId = resolveProfileId(profileId);
+    if (!isUuid(safeProfileId)) return { success: false, error: 'Geçersiz profil.' };
+    const clearedAt = new Date().toISOString();
+    const { data, error } = await client
+      .from('character_profiles')
+      .update({ payment_history_cleared_at: clearedAt, updated_at: clearedAt })
+      .eq('id', safeProfileId)
+      .select('id')
+      .maybeSingle();
+    if (error || !data) return { success: false, error: error?.message || 'Ödeme geçmişi temizlenemedi.' };
+    return { success: true, clearedAt };
   }
 
   async getPaymentOrder(orderId: string): Promise<any | null> {

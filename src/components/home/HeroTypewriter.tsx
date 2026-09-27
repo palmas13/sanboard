@@ -2,33 +2,30 @@
 
 import React, { useState, useEffect } from 'react';
 
-const WORDS = ['aradığını', 'aracını', 'evini', 'hayalini'];
-const TYPE_SPEED = 90;
-const DELETE_SPEED = 50;
-const HOLD_VISIBLE_MS = 2200;
-const HOLD_EMPTY_MS = 350;
+const PHRASES = ['hayalini bul', 'aracını keşfet', 'mülkünü bul', 'ilanını yayınla'];
+const TYPE_SPEED = 72;
+const DELETE_SPEED = 38;
+const HOLD_VISIBLE_MS = 1900;
+const HOLD_EMPTY_MS = 260;
 
 export function HeroTypewriter() {
   const [wordIndex, setWordIndex] = useState(0);
-  const [text, setText] = useState(WORDS[0]);
+  const [text, setText] = useState(PHRASES[0]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
-    // Check prefers-reduced-motion
-    if (typeof window !== 'undefined') {
-      const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-      if (mediaQuery.matches) {
-        setReducedMotion(true);
-        return;
-      }
-    }
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const updatePreference = () => setReducedMotion(mediaQuery.matches);
+    updatePreference();
+    mediaQuery.addEventListener('change', updatePreference);
+    return () => mediaQuery.removeEventListener('change', updatePreference);
   }, []);
 
   useEffect(() => {
     if (reducedMotion) return;
 
-    const currentTarget = WORDS[wordIndex];
+    const currentTarget = PHRASES[wordIndex];
 
     if (!isDeleting) {
       // Typing phase
@@ -55,7 +52,7 @@ export function HeroTypewriter() {
         // Fully deleted, short pause then move to next word
         const timeout = setTimeout(() => {
           setIsDeleting(false);
-          setWordIndex((prev) => (prev + 1) % WORDS.length);
+          setWordIndex((prev) => (prev + 1) % PHRASES.length);
         }, HOLD_EMPTY_MS);
         return () => clearTimeout(timeout);
       }
@@ -63,16 +60,15 @@ export function HeroTypewriter() {
   }, [text, isDeleting, wordIndex, reducedMotion]);
 
   return (
-    <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-[var(--text-main)] flex flex-wrap items-center justify-center gap-x-3 gap-y-1 select-none">
-      <span>Los Santos&apos;da</span>
-      <span className="inline-flex items-center text-left text-transparent bg-clip-text bg-gradient-to-r from-[#FF8A1F] via-[#FFA347] to-[#FF8A1F] min-w-[5.2ch] sm:min-w-[5.4ch]">
-        <span>{text}</span>
+    <h1 className="max-w-5xl text-[clamp(3rem,7vw,4.75rem)] font-black leading-[0.98] tracking-[-0.045em] text-[var(--text-main)] select-none">
+      <span className="block">Los Santos&apos;ta</span>
+      <span className="mt-2 inline-flex min-h-[1.04em] items-center text-left text-[#FF8A1F]">
+        <span className="inline-block min-w-[15ch] sm:min-w-[16ch]">{reducedMotion ? PHRASES[0] : text}</span>
         <span
-          className="inline-block w-[2px] h-[1em] bg-[#FF8A1F] ml-0.5 rounded-full animate-pulse"
+          className="hero-caret ml-1 inline-block h-[0.88em] w-[3px] rounded-full bg-[#FF8A1F]"
           aria-hidden="true"
         />
       </span>
-      <span>bul!</span>
     </h1>
   );
 }
