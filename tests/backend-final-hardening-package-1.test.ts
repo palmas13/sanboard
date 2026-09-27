@@ -94,6 +94,16 @@ describe('SANBOARD backend final hardening package 1', () => {
     }
     assert.doesNotMatch(timing, /listings_enrich;dur=/);
     assert.doesNotMatch(timing, /listings_map;dur=/);
+    assert.doesNotMatch(timing, /price_history_query;dur=/);
+    assert.doesNotMatch(timing, /favorites_query;dur=/);
+    assert.doesNotMatch(timing, /enrich_map;dur=/);
+  });
+
+  test('Supabase user-listing enrichment keeps parallel queries and reports only real sub-stages', () => {
+    const repository = readFileSync(join(process.cwd(), 'src/lib/db/repositories/supabase/supabase-listing-repo.ts'), 'utf8');
+    assert.match(repository, /Promise\.all\(\[\s*\(async \(\) => \{[\s\S]*?'price_history_query'[\s\S]*?\}\)\(\),\s*\(async \(\) => \{[\s\S]*?'favorites_query'[\s\S]*?\}\)\(\),\s*\]\)/);
+    assert.match(repository, /const enrichMapStartedAt = performance\.now\(\);[\s\S]*?onTiming\?\.\('enrich_map', performance\.now\(\) - enrichMapStartedAt\)/);
+    assert.doesNotMatch(repository, /onTiming\?\.\('(price_history_query|favorites_query|enrich_map)', 0\)/);
   });
 
   test('account bootstrap is active-character scoped, not sibling-account aggregated', async () => {

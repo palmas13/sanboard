@@ -73,7 +73,10 @@ export interface IListingRepository {
   removeListing?(id: string, profileId: string): Promise<{ success: boolean; error?: string }>;
   getUserListings(
     profileId: string,
-    onTiming?: (stage: 'query' | 'enrich' | 'map', duration: number) => void
+    onTiming?: (
+      stage: 'query' | 'price_history_query' | 'favorites_query' | 'enrich_map' | 'enrich' | 'map',
+      duration: number
+    ) => void
   ): Promise<Listing[]>;
   getCorporateListings(
     corporateProfileId: string,

@@ -49,7 +49,10 @@ export class MemoryListingRepository implements IListingRepository {
 
   async getUserListings(
     profileId: string,
-    onTiming?: (stage: 'query' | 'enrich' | 'map', duration: number) => void
+    onTiming?: (
+      stage: 'query' | 'price_history_query' | 'favorites_query' | 'enrich_map' | 'enrich' | 'map',
+      duration: number
+    ) => void
   ) {
     const queryStartedAt = performance.now();
     let listings;

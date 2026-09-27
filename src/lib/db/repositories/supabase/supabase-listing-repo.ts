@@ -1064,7 +1064,10 @@ export class SupabaseListingRepository implements IListingRepository {
 
   async getUserListings(
     profileId: string,
-    onTiming?: (stage: 'query' | 'enrich' | 'map', duration: number) => void
+    onTiming?: (
+      stage: 'query' | 'price_history_query' | 'favorites_query' | 'enrich_map' | 'enrich' | 'map',
+      duration: number
+    ) => void
   ): Promise<Listing[]> {
     const client = this.getClient();
     const safeProfileId = resolveProfileId(profileId);
@@ -1121,27 +1124,46 @@ export class SupabaseListingRepository implements IListingRepository {
     try {
       if (ids.length > 0) {
         const [historiesRes, favsRes] = await Promise.all([
-          client
-            .from('listing_price_history')
-            .select('listing_id, old_price, changed_at')
-            .in('listing_id', ids)
-            .order('changed_at', { ascending: false }),
-          this.getAdminClient()
-            .from('favorites')
-            .select('listing_id')
-            .in('listing_id', ids),
+          (async () => {
+            const startedAt = performance.now();
+            try {
+              return await client
+                .from('listing_price_history')
+                .select('listing_id, old_price, changed_at')
+                .in('listing_id', ids)
+                .order('changed_at', { ascending: false });
+            } finally {
+              onTiming?.('price_history_query', performance.now() - startedAt);
+            }
+          })(),
+          (async () => {
+            const startedAt = performance.now();
+            try {
+              return await this.getAdminClient()
+                .from('favorites')
+                .select('listing_id')
+                .in('listing_id', ids);
+            } finally {
+              onTiming?.('favorites_query', performance.now() - startedAt);
+            }
+          })(),
         ]);
 
-        if (historiesRes.data) {
-          for (const h of historiesRes.data) {
-            if (!priceHistoryMap[h.listing_id]) priceHistoryMap[h.listing_id] = h.old_price;
+        const enrichMapStartedAt = performance.now();
+        try {
+          if (historiesRes.data) {
+            for (const h of historiesRes.data) {
+              if (!priceHistoryMap[h.listing_id]) priceHistoryMap[h.listing_id] = h.old_price;
+            }
           }
-        }
 
-        if (favsRes.data) {
-          for (const f of favsRes.data) {
-            favCountMap[f.listing_id] = (favCountMap[f.listing_id] || 0) + 1;
+          if (favsRes.data) {
+            for (const f of favsRes.data) {
+              favCountMap[f.listing_id] = (favCountMap[f.listing_id] || 0) + 1;
+            }
           }
+        } finally {
+          onTiming?.('enrich_map', performance.now() - enrichMapStartedAt);
         }
       }
     } finally {

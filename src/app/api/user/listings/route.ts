@@ -14,7 +14,10 @@ export async function GET(req: NextRequest) {
     const listingsStartedAt = performance.now();
     try {
       const listings = await repo.getUserListings(actor.profileId, (stage, duration) => {
-        timing.add(`listings_${stage}`, duration);
+        const metricName = stage === 'query' || stage === 'enrich' || stage === 'map'
+          ? `listings_${stage}`
+          : stage;
+        timing.add(metricName, duration);
       });
       const response = timing.measureSync('listings_serialize', () => NextResponse.json(listings));
       timing.add('listings', performance.now() - listingsStartedAt);
