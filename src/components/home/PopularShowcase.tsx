@@ -122,7 +122,7 @@ export function PopularShowcase({ listings }: PopularShowcaseProps) {
               key={`${listing.id}-${index}`}
               className="w-[280px] sm:w-[310px] shrink-0 transform transition-transform duration-200 hover:-translate-y-1"
             >
-              <ListingCard listing={listing} className="h-full shadow-md" />
+              <ListingCard listing={listing} className="h-full shadow-md" showCompare={false} />
             </div>
           ))}
         </div>

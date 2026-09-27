@@ -82,7 +82,7 @@ export default async function HomePage() {
           {latestVehicles.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {latestVehicles.map((listing) => (
-                <ListingCard key={listing.id} listing={listing} />
+                <ListingCard key={listing.id} listing={listing} showCompare={false} />
               ))}
             </div>
           ) : (
@@ -116,7 +116,7 @@ export default async function HomePage() {
           {latestProperties.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {latestProperties.map((listing) => (
-                <ListingCard key={listing.id} listing={listing} />
+                <ListingCard key={listing.id} listing={listing} showCompare={false} />
               ))}
             </div>
           ) : (

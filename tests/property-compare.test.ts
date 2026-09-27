@@ -110,4 +110,17 @@ describe('property comparison', () => {
     assert.match(button, /Karşılaştırmadan çıkar/);
     assert.match(button, /added \? 'border/);
   });
+
+  test('home listing cards hide compare actions while property listings keep the default action', () => {
+    const homePage = readFileSync(join(process.cwd(), 'src/app/page.tsx'), 'utf8');
+    const popularShowcase = readFileSync(join(process.cwd(), 'src/components/home/PopularShowcase.tsx'), 'utf8');
+    const listingCard = readFileSync(join(process.cwd(), 'src/components/listings/ListingCard.tsx'), 'utf8');
+    const propertyListings = readFileSync(join(process.cwd(), 'src/components/listings/PropertyListingsView.tsx'), 'utf8');
+
+    assert.equal((homePage.match(/showCompare=\{false\}/g) || []).length, 2);
+    assert.match(popularShowcase, /<ListingCard[^>]+showCompare=\{false\}/);
+    assert.match(listingCard, /showCompare = true/);
+    assert.match(listingCard, /showCompare && listing\.category === 'property'/);
+    assert.doesNotMatch(propertyListings, /showCompare=\{false\}/);
+  });
 });

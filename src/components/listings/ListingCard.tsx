@@ -11,9 +11,10 @@ import { PropertyCompareButton } from '@/components/compare/PropertyCompareButto
 interface ListingCardProps {
   listing: PublicListingSummary;
   className?: string;
+  showCompare?: boolean;
 }
 
-export function ListingCard({ listing, className = '' }: ListingCardProps) {
+export function ListingCard({ listing, className = '', showCompare = true }: ListingCardProps) {
   const fallbackImage =
     listing.category === 'vehicle'
       ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=600&auto=format&fit=crop&q=80'
@@ -95,7 +96,7 @@ export function ListingCard({ listing, className = '' }: ListingCardProps) {
           </div>
         </div>
       </Link>
-      {listing.category === 'property' && (
+      {showCompare && listing.category === 'property' && (
         <div data-testid="property-compare-action-slot" className="flex justify-end border-t border-[var(--border-app)] px-4 py-3">
           <PropertyCompareButton listing={listing} compact />
         </div>
