@@ -39,4 +39,23 @@ describe('dashboard experience refinement regressions', () => {
     assert.match(source('src/app/hesabim/odemeler/page.tsx'), /method: 'DELETE'/);
     assert.match(source('src/app/hesabim/kurumsal/basvuru/page.tsx'), /const steps = \['İşletme', 'İletişim', 'Faaliyet', 'Onay'\]/);
   });
+
+  test('corporate applications tolerate the pre-migration production schema', () => {
+    const repo = source('src/lib/db/repositories/supabase/supabase-dealer-repo.ts');
+    assert.match(repo, /missingContactColumns/);
+    assert.match(repo, /PGRST204/);
+    assert.match(repo, /legacyResult/);
+  });
+
+  test('discovery navigation, hero and terms experience stay polished', () => {
+    const navbar = source('src/components/layout/Navbar.tsx');
+    const hero = source('src/components/home/HeroTypewriter.tsx');
+    const terms = source('src/app/kullanim-kosullari/page.tsx');
+    assert.match(navbar, />Keşfet/);
+    assert.doesNotMatch(navbar, />X</);
+    assert.doesNotMatch(hero, /hero-caret/);
+    assert.match(terms, /IC · Los Santos/);
+    assert.match(terms, /OOC · Platform sınırları/);
+    assert.match(terms, /RMT/);
+  });
 });

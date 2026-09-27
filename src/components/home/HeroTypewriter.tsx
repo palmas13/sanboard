@@ -64,10 +64,6 @@ export function HeroTypewriter() {
       <span className="block">Los Santos&apos;ta</span>
       <span className="mt-2 inline-flex min-h-[1.04em] items-center text-left text-[#FF8A1F]">
         <span className="inline-block min-w-[15ch] sm:min-w-[16ch]">{reducedMotion ? PHRASES[0] : text}</span>
-        <span
-          className="hero-caret ml-1 inline-block h-[0.88em] w-[3px] rounded-full bg-[#FF8A1F]"
-          aria-hidden="true"
-        />
       </span>
     </h1>
   );

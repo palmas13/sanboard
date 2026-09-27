@@ -145,19 +145,45 @@ export class SupabaseDealerRepository implements IDealerRepository {
       return { success: false, error: 'Zaten beklemede olan bir kurumsal başvurunuz bulunmaktadır.' };
     }
 
-    const { data, error } = await client
+    const applicationPayload = {
+      applicant_profile_id: params.profileId,
+      company_name: params.companyName,
+      contact_phone: normalizePhone(params.contactPhone || applicantProfile?.phone || ''),
+      contact_email: (params.contactEmail || applicantProfile?.sanmail_email || '').trim(),
+      location: (params.location || 'Los Santos, San Andreas').trim(),
+      purpose: params.purpose,
+      status: 'PENDING',
+    };
+
+    let { data, error } = await client
       .from('corporate_applications')
-      .insert({
-        applicant_profile_id: params.profileId,
-        company_name: params.companyName,
-        contact_phone: normalizePhone(params.contactPhone || applicantProfile?.phone || ''),
-        contact_email: (params.contactEmail || applicantProfile?.sanmail_email || '').trim(),
-        location: (params.location || 'Los Santos, San Andreas').trim(),
-        purpose: params.purpose,
-        status: 'PENDING',
-      })
+      .insert(applicationPayload)
       .select()
       .single();
+
+    const missingContactColumns = error && (
+      error.code === '42703' ||
+      error.code === 'PGRST204' ||
+      /contact_phone|contact_email|location|schema cache/i.test(error.message || '')
+    );
+
+    if (missingContactColumns) {
+      const legacyResult = await client
+        .from('corporate_applications')
+        .insert({
+          applicant_profile_id: applicationPayload.applicant_profile_id,
+          company_name: applicationPayload.company_name,
+          purpose: applicationPayload.purpose,
+          status: applicationPayload.status,
+        })
+        .select()
+        .single();
+
+      data = legacyResult.data
+        ? { ...legacyResult.data, contact_phone: applicationPayload.contact_phone, contact_email: applicationPayload.contact_email, location: applicationPayload.location }
+        : null;
+      error = legacyResult.error;
+    }
 
     if (error || !data) {
       return { success: false, error: error?.message || 'Kurumsal başvuru oluşturulamadı.' };
