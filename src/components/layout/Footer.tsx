@@ -4,25 +4,28 @@ import { SanboardLogo } from '../common/SanboardLogo';
 
 export function Footer() {
   return (
-    <footer className="mt-auto border-t border-[var(--border-app)] bg-[var(--bg-surface)] transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-8 border-b border-[var(--border-app)]">
-          <div className="space-y-2 max-w-sm">
+    <footer className="mt-auto border-t border-[color:var(--border-app)]/80 bg-[var(--bg-surface)] transition-colors">
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <div className="flex flex-col items-start justify-between gap-7 border-b border-[color:var(--border-app)]/70 pb-8 md:flex-row md:items-center">
+          <div className="max-w-md space-y-3">
             <SanboardLogo size="md" />
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-              Los Santos'un en kapsamlı roleplay ilan platformu. Araç ve mülk alım satımında güvenilir buluşma noktası.
+            <p className="text-sm leading-relaxed text-[var(--text-muted)]">
+              Los Santos'ta araç ve mülk alım satımının buluşma noktası. İlan ver, keşfet, iletişime geç.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-[var(--text-muted)]">
-            <Link href="/arac" className="hover:text-[var(--text-main)] transition-colors">
+          <div className="flex max-w-xl flex-wrap items-center gap-x-6 gap-y-3 text-sm text-[var(--text-muted)]">
+            <Link href="/arac" className="transition-colors hover:text-[#FF8A1F]">
               Araç İlanları
             </Link>
-            <Link href="/mulk" className="hover:text-[var(--text-main)] transition-colors">
+            <Link href="/mulk" className="transition-colors hover:text-[#FF8A1F]">
               Mülk İlanları
             </Link>
             <Link href="/ilan-ver" className="hover:text-[#FF8A1F] transition-colors font-medium">
               İlan Ver
+            </Link>
+            <Link href="/sss" className="transition-colors hover:text-[var(--text-main)]">
+              S.S.S
             </Link>
             <Link href="/hakkimizda" className="hover:text-[var(--text-main)] transition-colors">
               Hakkımızda
