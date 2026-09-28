@@ -62,6 +62,10 @@ export interface CreateListingInput {
   balcony?: boolean;
 }
 
+export interface ListingPublishOptions {
+  paymentMode?: 'REQUIRE_CREDIT' | 'TEST_BYPASS';
+}
+
 export interface IListingRepository {
   getPublicListings(params?: ListingFilterParams): Promise<PublicListingSummary[]>;
   getSimilarListings?(currentListingId: string, limit?: number): Promise<PublicListingSummary[]>;
@@ -69,7 +73,7 @@ export interface IListingRepository {
   getPropertyCompareListings?(ids: string[]): Promise<(Listing | null)[]>;
   getListingById(id: string, viewerProfileId?: string, viewerUserId?: string): Promise<{ listing: MemberListingDetail | PublicListingSummary | null; isLocked: boolean; isOwner: boolean }>;
   getListingByPublicId(publicId: string, viewerProfileId?: string, viewerUserId?: string): Promise<{ listing: MemberListingDetail | PublicListingSummary | null; isLocked: boolean; isOwner: boolean }>;
-  createListing(input: CreateListingInput, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
+  createListing(input: CreateListingInput, profileId: string, options?: ListingPublishOptions): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   updateListing(id: string, input: Partial<CreateListingInput>, profileId: string, userId?: string, role?: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   closeListing(id: string, profileId: string, status: 'SOLD' | 'REMOVED'): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   markListingAsSold(id: string, profileId: string): Promise<{ success: boolean; error?: string }>;

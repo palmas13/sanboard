@@ -19,6 +19,25 @@ export function isTestExternalCharacterId(value: string | null | undefined): boo
   return typeof value === 'string' && value.startsWith(TEST_LOGIN_CHARACTER_PREFIX);
 }
 
+export function isTestLoginAccount(user: Pick<User, 'provider' | 'external_user_id'> | null | undefined): boolean {
+  return Boolean(
+    isTestLoginEnabled()
+    && user?.provider === 'GTAWORLD'
+    && isTestExternalAccountId(user.external_user_id)
+  );
+}
+
+export async function isCanonicalTestLoginActor(params: {
+  userId: string;
+  profile: CharacterProfile;
+}): Promise<boolean> {
+  if (!isTestLoginEnabled() || params.profile.user_id !== params.userId) return false;
+  if (!isTestExternalCharacterId(params.profile.external_character_id)) return false;
+
+  const user = await getUserRepository().getUserById(params.userId);
+  return Boolean(user && user.id === params.userId && user.status === 'ACTIVE' && isTestLoginAccount(user));
+}
+
 export function assertTestLoginAccountNamespace(account: ExternalGameAccount): void {
   if (!isTestExternalAccountId(account.externalAccountId)) {
     throw new Error('Test login provider returned an account outside the test namespace.');

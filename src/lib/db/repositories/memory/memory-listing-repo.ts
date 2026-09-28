@@ -1,4 +1,4 @@
-import { IListingRepository, CreateListingInput } from '../types';
+import { IListingRepository, CreateListingInput, ListingPublishOptions } from '../types';
 import {
   getPublicListings,
   getListingById,
@@ -44,8 +44,8 @@ export class MemoryListingRepository implements IListingRepository {
       : { listing: null, isLocked: false, isOwner: false };
   }
 
-  async createListing(input: CreateListingInput, profileId: string) {
-    return createListingWithCredit(input as any, profileId);
+  async createListing(input: CreateListingInput, profileId: string, options?: ListingPublishOptions) {
+    return createListingWithCredit(input as any, profileId, options);
   }
 
   async updateListing(id: string, input: Partial<CreateListingInput>, profileId: string, userId?: string, role?: string) {

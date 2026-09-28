@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getListingRepository, getDealerRepository } from '@/lib/db/repositories';
+import { getListingRepository, getDealerRepository, getAuditRepository } from '@/lib/db/repositories';
 import { listingUnionSchema } from '@/lib/validations/listing';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { revalidatePath } from 'next/cache';
+import { isCanonicalTestLoginActor } from '@/lib/auth/test-login';
 
 // Public listings search endpoint
 export async function GET(req: NextRequest) {
@@ -87,11 +88,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: firstError }, { status: 400 });
     }
 
+    const testPublishBypass = await isCanonicalTestLoginActor({ userId: actor.userId, profile: actor.profile });
     const repo = getListingRepository();
-    const result = await repo.createListing(parsed.data, trustedProfileId);
+    const result = await repo.createListing(parsed.data, trustedProfileId, {
+      paymentMode: testPublishBypass ? 'TEST_BYPASS' : 'REQUIRE_CREDIT',
+    });
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+
+    if (testPublishBypass && result.listing) {
+      try {
+        await getAuditRepository().recordEvent({
+          eventType: 'TEST_LISTING_PAYMENT_BYPASS',
+          userId: actor.userId,
+          profileId: actor.profileId,
+          metadata: {
+            listingId: result.listing.id,
+            sellerType: result.listing.seller_type,
+            paymentSource: 'TEST_BYPASS',
+            charged: false,
+          },
+        });
+      } catch (auditError) {
+        console.error('Failed to record test listing payment bypass audit:', auditError);
+      }
     }
 
     // Corporate Follower Notification (Section 18)

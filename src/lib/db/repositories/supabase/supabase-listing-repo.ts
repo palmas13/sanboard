@@ -1,4 +1,4 @@
-import { IListingRepository, CreateListingInput } from '../types';
+import { IListingRepository, CreateListingInput, ListingPublishOptions } from '../types';
 import { getSupabaseClient, getSupabaseAdminClient } from '../../supabase-client';
 import { Listing, MemberListingDetail, PublicListingSummary } from '@/types';
 import { ListingFilterParams } from '../../listings';
@@ -702,7 +702,7 @@ export class SupabaseListingRepository implements IListingRepository {
       : { listing: null, isLocked: false, isOwner: false };
   }
 
-  async createListing(input: CreateListingInput, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }> {
+  async createListing(input: CreateListingInput, profileId: string, options: ListingPublishOptions = {}): Promise<{ success: boolean; listing?: Listing; error?: string }> {
     const client = getSupabaseAdminClient();
     if (!client) return { success: false, error: 'Güvenilir ilan işlemi için sunucu Supabase anahtarı yapılandırılmamış.' };
     const safeProfileId = resolveProfileId(profileId);
@@ -757,6 +757,48 @@ export class SupabaseListingRepository implements IListingRepository {
       property_type: input.subcategory, floor: input.floor || 1, room_count: input.room_count || '1+1',
       furnished: Boolean(input.furnished), building_type: input.building_type || 'Normal', balcony: Boolean(input.balcony),
     };
+
+    if (options.paymentMode === 'TEST_BYPASS') {
+      const now = new Date();
+      const durationDays = sellerType === 'CORPORATE' ? 14 : 7;
+      const { data: listing, error: listingError } = await client
+        .from('listings')
+        .insert({
+          listing_number: rpcListingNumber,
+          seller_profile_id: safeProfileId,
+          seller_type: sellerType,
+          corporate_profile_id: sellerType === 'CORPORATE' ? corporateProfileId : null,
+          category: input.category,
+          subcategory: input.subcategory,
+          title: input.title,
+          description: input.description,
+          price: input.price,
+          location: input.category === 'vehicle' ? null : (input.location?.trim() || null),
+          status: 'ACTIVE',
+          published_at: now.toISOString(),
+          expires_at: new Date(now.getTime() + durationDays * 86400000).toISOString(),
+        })
+        .select()
+        .single();
+      if (listingError || !listing) {
+        return { success: false, error: listingError?.message || 'Test ilanı oluşturulamadı.' };
+      }
+
+      const detailsTable = input.category === 'vehicle' ? 'vehicle_details' : 'property_details';
+      const { error: detailsError } = await client.from(detailsTable).insert({ listing_id: listing.id, ...details });
+      const { error: imagesError } = detailsError || processedImages.length === 0
+        ? { error: null }
+        : await client.from('listing_images').insert(
+            processedImages.map((image) => ({ listing_id: listing.id, ...image }))
+          );
+
+      if (detailsError || imagesError) {
+        await client.from('listings').delete().eq('id', listing.id);
+        return { success: false, error: detailsError?.message || imagesError?.message || 'Test ilanı tamamlanamadı.' };
+      }
+
+      return { success: true, listing: listing as Listing };
+    }
 
     const { data: rpcData, error: rpcError } = await client.rpc('create_listing_with_credit', {
       p_profile_id: targetCreditOwnerId,

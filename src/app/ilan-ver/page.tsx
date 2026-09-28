@@ -23,7 +23,7 @@ export default function IlanVerRouterPage() {
         const res = await fetch('/api/credits');
         const data = await res.json();
 
-        if (data.availableCredits > 0) {
+        if (data.testPublishBypass === true || data.availableCredits > 0) {
           router.replace('/ilan-ver/yeni');
         } else {
           router.replace('/ilan-ver/paket');

@@ -40,6 +40,7 @@ export default function YeniIlanOlusturPage() {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [testPublishBypass, setTestPublishBypass] = useState(false);
   const [errorSummary, setErrorSummary] = useState<string[]>([]);
   const [invalidFields, setInvalidFields] = useState<Record<string, boolean>>({});
 
@@ -214,11 +215,13 @@ export default function YeniIlanOlusturPage() {
     fetch('/api/credits')
       .then((res) => res.json())
       .then((data) => {
+        const canBypassPayment = data.testPublishBypass === true;
+        setTestPublishBypass(canBypassPayment);
         const hasNeededCredit = corpParam
           ? (data.corporateCredits !== undefined ? data.corporateCredits > 0 : data.availableCredits > 0)
           : (data.individualCredits !== undefined ? data.individualCredits > 0 : data.availableCredits > 0);
 
-        if (!hasNeededCredit) {
+        if (!hasNeededCredit && !canBypassPayment) {
           router.replace(corpParam ? '/hesabim/kurumsal' : '/ilan-ver/paket');
         }
       })
@@ -462,6 +465,12 @@ export default function YeniIlanOlusturPage() {
       </div>
 
       <ListingQualityIndicator quality={listingQuality} compact />
+
+      {testPublishBypass && (
+        <div className="rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] px-4 py-3 text-center text-xs font-semibold text-[var(--text-muted)]">
+          Test hesabı: ödeme doğrulaması atlandı.
+        </div>
+      )}
 
       {/* ERROR SUMMARY BOX (with ref for smooth scroll) */}
       {errorSummary.length > 0 && (

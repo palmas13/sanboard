@@ -11,6 +11,7 @@ import {
 import { generateListingNumber } from '../utils/format';
 import { createNotification } from './notifications';
 import { SupabaseListingRepository } from './repositories/supabase/supabase-listing-repo';
+import type { ListingPublishOptions } from './repositories/types';
 import { deleteMediaSafely } from '../storage/lifecycle';
 import { extractMediaKey } from '../media/url';
 import { isUuid, resolveUserId } from './id-mapper';
@@ -535,10 +536,11 @@ function generateUniqueListingPublicId(): string {
  */
 export async function createListingWithCredit(
   input: any,
-  sellerProfileId: string
+  sellerProfileId: string,
+  options: ListingPublishOptions = {}
 ): Promise<{ success: boolean; listing?: Listing; error?: string }> {
   if (isSupabaseConfiguredMode()) {
-    return getSupabaseRepo().createListing(input, sellerProfileId);
+    return getSupabaseRepo().createListing(input, sellerProfileId, options);
   }
   if (input.category !== 'vehicle' && input.category !== 'property') {
     return { success: false, error: 'Desteklenmeyen ilan kategorisi.' };
@@ -587,7 +589,8 @@ export async function createListingWithCredit(
     }
   });
 
-  if (!credit) {
+  const testBypass = options.paymentMode === 'TEST_BYPASS';
+  if (!credit && !testBypass) {
     return {
       success: false,
       error: `${sellerType === 'CORPORATE' ? 'Kurumsal ($1.750)' : 'Bireysel ($2.000)'} ilan yayınlamak için uygun bir ilan hakkınız (krediniz) bulunmuyor.`,
@@ -648,9 +651,11 @@ export async function createListingWithCredit(
   };
 
   // Atomic consumption of credit
-  credit.status = 'USED';
-  credit.used_listing_id = newId;
-  credit.used_at = now.toISOString();
+  if (credit) {
+    credit.status = 'USED';
+    credit.used_listing_id = newId;
+    credit.used_at = now.toISOString();
+  }
 
   db.listings.unshift(newListing);
 
