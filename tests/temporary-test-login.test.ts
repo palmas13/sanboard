@@ -11,7 +11,7 @@ import { GET as listCharacters } from '@/app/api/user/characters/route';
 import { POST as setFavorite } from '@/app/api/favorites/route';
 import { GET as getAdmin } from '@/app/api/admin/route';
 import { CHARACTER_SELECTION_COOKIE, verifySessionToken } from '@/lib/auth/session';
-import { TEST_LOGIN_ACCOUNT_PREFIX, TEST_LOGIN_CHARACTER_PREFIX, TEST_LOGIN_MAVIS_CHARACTER_ID, isTestLoginEnabled } from '@/lib/auth/test-login';
+import { TEST_LOGIN_ACCOUNT_PREFIX, TEST_LOGIN_CHARACTER_PREFIX, TEST_LOGIN_FIXTURE_ACCOUNT_ID, TEST_LOGIN_JANE_CHARACTER_ID, TEST_LOGIN_JOHN_CHARACTER_ID, TEST_LOGIN_MAVIS_CHARACTER_ID, TEST_LOGIN_SECONDARY_ACCOUNT_ID, isTestLoginEnabled } from '@/lib/auth/test-login';
 import CharacterSelectPage from '@/app/karakter-sec/page';
 import { CharacterSelectContent } from '@/app/karakter-sec/CharacterSelectContent';
 
@@ -68,6 +68,57 @@ describe('SANBOARD temporary test character login harness', () => {
     assert.ok(db.profiles.every((profile) => profile.id !== profile.external_character_id));
     assert.equal(response.cookies.get('sanboard_session')?.value, '');
     assert.ok(response.cookies.get(CHARACTER_SELECTION_COOKIE)?.value);
+  });
+
+  test('secondary account is canonical, defaults to John, switches to Jane, and cannot inject accounts or profiles', async () => {
+    process.env.ENABLE_TEST_LOGIN = 'true';
+    const accountAStart = await startTestLogin(new NextRequest('http://localhost/api/auth/test-login'));
+    assert.ok(accountAStart.cookies.get(CHARACTER_SELECTION_COOKIE)?.value);
+
+    const invalid = await startTestLogin(new NextRequest(`http://localhost/api/auth/test-login?account=${encodeURIComponent(TEST_LOGIN_SECONDARY_ACCOUNT_ID)}`));
+    assert.equal(invalid.status, 400);
+
+    const accountBStart = await startTestLogin(new NextRequest('http://localhost/api/auth/test-login?account=secondary&redirect=%2Farac'));
+    assert.equal(accountBStart.status, 307);
+    assert.match(accountBStart.headers.get('location') || '', /\/arac$/);
+    assert.equal(db.users.length, 2);
+    assert.equal(db.profiles.length, 5);
+
+    const accountA = db.users.find((user) => user.external_user_id === TEST_LOGIN_FIXTURE_ACCOUNT_ID)!;
+    const accountB = db.users.find((user) => user.external_user_id === TEST_LOGIN_SECONDARY_ACCOUNT_ID)!;
+    assert.ok(accountA);
+    assert.ok(accountB);
+    assert.notEqual(accountA.id, accountB.id);
+
+    const john = db.profiles.find((profile) => profile.external_character_id === TEST_LOGIN_JOHN_CHARACTER_ID)!;
+    const jane = db.profiles.find((profile) => profile.external_character_id === TEST_LOGIN_JANE_CHARACTER_ID)!;
+    assert.equal(john.full_name, 'John Doe');
+    assert.equal(jane.full_name, 'Jane Doe');
+    assert.equal(john.user_id, accountB.id);
+    assert.equal(jane.user_id, accountB.id);
+    assert.equal(john.role, 'USER');
+    assert.equal(jane.role, 'USER');
+    assert.ok(db.profiles.filter((profile) => profile.user_id === accountA.id).every((profile) => ![john.id, jane.id].includes(profile.id)));
+
+    const johnToken = accountBStart.cookies.get('sanboard_session')!.value;
+    const johnSession = verifySessionToken(johnToken)!;
+    assert.equal(johnSession.userId, accountB.id);
+    assert.equal(johnSession.profileId, john.id);
+    assert.equal(johnSession.role, 'USER');
+
+    const accountBCharacters = await listCharacters(new NextRequest('http://localhost/api/user/characters', { headers: { cookie: `sanboard_session=${johnToken}` } }));
+    const accountBBody = await accountBCharacters.json();
+    assert.deepEqual(accountBBody.characters.map((character: { displayName: string }) => character.displayName), ['John Doe', 'Jane Doe']);
+
+    const mavis = db.profiles.find((profile) => profile.external_character_id === TEST_LOGIN_MAVIS_CHARACTER_ID)!;
+    const crossAccountInjection = await selectCharacter(new NextRequest('http://localhost/api/auth/session', { method: 'POST', headers: { cookie: `sanboard_session=${johnToken}`, 'content-type': 'application/json' }, body: JSON.stringify({ characterId: mavis.id, userId: accountA.id }) }));
+    assert.equal(crossAccountInjection.status, 403);
+
+    const switched = await selectCharacter(new NextRequest('http://localhost/api/auth/session', { method: 'POST', headers: { cookie: `sanboard_session=${johnToken}`, 'content-type': 'application/json' }, body: JSON.stringify({ characterId: jane.id }) }));
+    assert.equal(switched.status, 200);
+    const janeSession = verifySessionToken(switched.cookies.get('sanboard_session')!.value)!;
+    assert.equal(janeSession.userId, accountB.id);
+    assert.equal(janeSession.profileId, jane.id);
   });
 
   test('character picker resolves test and normal UI from server search params without client URL branching', async () => {

@@ -5,7 +5,10 @@ import { getUserRepository } from '@/lib/db/repositories';
 export const TEST_LOGIN_ACCOUNT_PREFIX = 'test-login:account:';
 export const TEST_LOGIN_CHARACTER_PREFIX = 'test-login:character:';
 export const TEST_LOGIN_FIXTURE_ACCOUNT_ID = `${TEST_LOGIN_ACCOUNT_PREFIX}fixtures`;
+export const TEST_LOGIN_SECONDARY_ACCOUNT_ID = `${TEST_LOGIN_ACCOUNT_PREFIX}secondary`;
 export const TEST_LOGIN_MAVIS_CHARACTER_ID = `${TEST_LOGIN_CHARACTER_PREFIX}mavis-pierce`;
+export const TEST_LOGIN_JOHN_CHARACTER_ID = `${TEST_LOGIN_CHARACTER_PREFIX}john-doe`;
+export const TEST_LOGIN_JANE_CHARACTER_ID = `${TEST_LOGIN_CHARACTER_PREFIX}jane-doe`;
 
 export function isTestLoginEnabled(): boolean {
   return process.env.ENABLE_TEST_LOGIN === 'true';
@@ -56,17 +59,19 @@ export async function reconcileTestLoginRoles(
   user: User,
   profiles: CharacterProfile[]
 ): Promise<CharacterProfile[]> {
-  if (!isTestLoginEnabled() || user.external_user_id !== TEST_LOGIN_FIXTURE_ACCOUNT_ID) {
-    throw new Error('Test role reconciliation requires the enabled fixture account.');
+  if (!isTestLoginEnabled() || !isTestLoginAccount(user)) {
+    throw new Error('Test role reconciliation requires an enabled canonical test account.');
   }
 
-  const mavisProfiles = profiles.filter(
-    (profile) =>
-      profile.user_id === user.id &&
-      profile.external_character_id === TEST_LOGIN_MAVIS_CHARACTER_ID
-  );
-  if (mavisProfiles.length !== 1) {
-    throw new Error('Reserved Mavis test character could not be resolved unambiguously.');
+  if (user.external_user_id === TEST_LOGIN_FIXTURE_ACCOUNT_ID) {
+    const mavisProfiles = profiles.filter(
+      (profile) =>
+        profile.user_id === user.id &&
+        profile.external_character_id === TEST_LOGIN_MAVIS_CHARACTER_ID
+    );
+    if (mavisProfiles.length !== 1) {
+      throw new Error('Reserved Mavis test character could not be resolved unambiguously.');
+    }
   }
 
   const repo = getUserRepository();
@@ -74,7 +79,10 @@ export async function reconcileTestLoginRoles(
     if (profile.user_id !== user.id || !isTestExternalCharacterId(profile.external_character_id)) {
       throw new Error('Test role reconciliation encountered an out-of-scope profile.');
     }
-    const role = profile.external_character_id === TEST_LOGIN_MAVIS_CHARACTER_ID ? 'ADMIN' : 'USER';
+    const role = user.external_user_id === TEST_LOGIN_FIXTURE_ACCOUNT_ID
+      && profile.external_character_id === TEST_LOGIN_MAVIS_CHARACTER_ID
+      ? 'ADMIN'
+      : 'USER';
     const updated = await repo.updateProfile(profile.id, { role });
     if (!updated.success) throw new Error(updated.error || 'Test character role could not be synchronized.');
   }
