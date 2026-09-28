@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { BadgeHelp, Building2, CarFront, FileCheck2, Info, LockKeyhole, Mail, ShieldCheck, Sparkles } from 'lucide-react';
+import { BadgeHelp, FileCheck2, Info, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
 import { FaqAccordion } from '@/components/faq/FaqAccordion';
 
 export const metadata: Metadata = {
@@ -18,18 +18,34 @@ const sections = [
 type SectionKey = (typeof sections)[number]['key'];
 
 const faqGroups = [
-  { title: 'Genel', items: [['Sanboard nedir?', 'Sanboard, Los Santos içindeki araç ve mülk ilanlarını alıcılarla buluşturan bir ilan platformudur.'], ['Sanboard üzerinden doğrudan satın alma yapılır mı?', 'Hayır. Pazarlık, inceleme, ödeme ve devir işlemleri oyun içinde taraflar arasında gerçekleştirilir.']] },
-  { title: 'İlanlar ve hesap', items: [['İlanlar ne kadar süre yayında kalır?', 'Bireysel ilan paketleri mevcut kullanım koşullarına göre 7 gün geçerlidir. Süresi dolan ilanlar genel aramalardan kaldırılır.'], ['Araç veya mülk ilanı nasıl verilir?', 'İlan Ver adımından uygun kategoriyi seçip bilgileri ve görselleri tamamlayarak ilanınızı yayınlayabilirsiniz.'], ['Profil bilgilerimi nereden düzenleyebilirim?', 'Hesabım içindeki Profil Ayarları sayfasından iletişim bilgilerinizi, profil görselinizi ve görünürlük tercihlerinizi yönetebilirsiniz.']] },
-  { title: 'İletişim ve güvenlik', items: [['Satıcıyla nasıl iletişime geçebilirim?', 'Satıcının herkese açık olarak seçtiği telefon ve SanMail bilgileri ilan detayında gösterilir.'], ['Gizli iletişim bilgileri tarayıcıya gönderilir mi?', 'Hayır. Gizli telefon ve SanMail değerleri sunucu yanıtı hazırlanırken maskelenir.']] },
+  { title: 'Genel', items: [['Sanboard nedir?', 'Sanboard; araç ve mülk sahiplerinin ilanlarını yayınlayabildiği, kullanıcıların ilanları inceleyip karşılaştırabildiği ve satıcılarla doğrudan iletişim kurabildiği dijital bir ilan platformudur.']] },
+  { title: 'Platform', items: [['Sanboard üzerinden doğrudan satın alma yapılır mı?', 'Sanboard satışın gerçekleştiği yer değil, alıcıyla satıcının buluştuğu platformdur. İlan üzerinden satıcıya ulaşabilir veya teklif verebilirsin; anlaşma sonrasındaki ödeme ve devir işlemleri tarafların kendi arasında tamamlanır.'], ['Sanboard’da hangi tür ilanlar yayınlanabilir?', 'Sanboard, araç ve mülk ilanlarına odaklanır. Otomobil ve diğer desteklenen araç türlerinin yanı sıra ev ve benzeri mülkler, uygun kategori ve bilgilerle platformda yayınlanabilir.'], ['Sanboard’da teklif sistemi nasıl çalışır?', 'Bir ilana teklif gönderdiğinde, ilan sahibi teklifini görüntüleyebilir ve kabul, ret veya karşı teklif seçeneklerinden biriyle yanıt verebilir. Teklif kabul edildiğinde taraflara gerekli iletişim bilgileri gösterilir; ancak satış ve devir işlemleri Sanboard dışında taraflar arasında tamamlanır.'], ['Kurumsal profil nedir?', 'Kurumsal hesap; bireysel kullanıcı profilinden farklı olarak bir işletmeyi temsil eden satıcı hesabıdır. Başvuru sırasında şirket adı ve kullanım amacı gibi bilgiler değerlendirilir. Onaylanan hesaplar, ilanlarını kurumsal satıcı kimliği altında yayınlayabilir ve kendilerine ait satıcı profiline sahip olur.']] },
+  { title: 'Gizlilik & Güvenlik', items: [['Bilgilerim güvende mi?', 'Evet. Sanboard, kullanıcı bilgilerini yalnızca platformun işleyişi için gerekli ölçüde kullanır ve özel iletişim bilgilerini izinsiz olarak diğer kullanıcılara göstermez.'], ['Ödemeler güvenli mi?', 'Sanboard’daki ilan yayınlama ve benzeri platform ödemeleri Fleeca ödeme sistemi üzerinden işlenir. Ödeme sırasında kullanılan finansal bilgiler Fleeca tarafından işlenir; Sanboard bu bilgileri kendi sisteminde doğrudan saklamaz.'], ['Şüpheli bir işlem fark edersem ne yapmalıyım?', 'Şüpheli bir ilan, kullanıcı davranışı veya hesap hareketi fark ettiğinde Sanboard’un raporlama ve destek kanallarını kullanabilirsin. Bildirimin incelenir ve gerekli görülmesi halinde ilgili içerik veya hesap hakkında işlem uygulanır.']] },
 ] as const;
 
 const terms = [
-  { title: 'Platform ve hesaplar', text: 'Sanboard tarafları buluşturan bağımsız bir ilan platformudur; satışın, ödemenin veya mülkiyet devrinin tarafı değildir. Hesap güvenliği ve hesap üzerinden yapılan işlemler kullanıcı sorumluluğundadır.' },
-  { title: 'İlan yayınlama', text: 'Yalnızca satış yetkinizin bulunduğu araç veya mülk için ilan yayınlayabilirsiniz. Başlık, açıklama, kategori, fiyat ve görseller doğru ve güncel olmalıdır. Bireysel ilanlar 7 gün aktif kalır.' },
-  { title: 'İletişim ve satış', text: 'Fiyat, buluşma, ödeme ve devir koşullarını alıcı ile satıcı belirler. Favoriye eklemek rezervasyon, öncelik veya satın alma hakkı oluşturmaz.' },
-  { title: 'İçerik ve güvenlik', text: 'Yanıltıcı bilgi, yanlış kategori, izinsiz içerik, spam, tehdit, taciz, dolandırıcılık ve başka hesaplara erişme girişimleri yasaktır.' },
-  { title: 'Ücretler ve süreler', text: 'Standart bireysel ilan yayınlama bedeli $2.000’dır ve bu tutar satış komisyonu değildir. Bakım veya teknik sorunlarda hizmet geçici olarak durdurulabilir.' },
-  { title: 'OOC sınırlar', text: 'Sanboard GTA World’den bağımsız bir topluluk projesidir. Gerçek para ticareti (RMT), gerçek banka verileri ve oyun dışı finansal işlemler desteklenmez.' },
+  { title: 'Platformun Amacı', text: 'Sanboard, araç ve mülk ilanlarının yayınlanması, görüntülenmesi ve kullanıcıların birbirleriyle iletişim kurması için hizmet veren bir ilan platformudur. Sanboard, ilan konusu varlıkların doğrudan alıcısı, satıcısı veya sahibi değildir.' },
+  { title: 'Kullanıcı Sorumluluğu', text: 'Kullanıcılar hesapları üzerinden gerçekleştirdikleri işlemlerden, yayınladıkları ilanlardan ve paylaştıkları bilgilerin doğruluğundan sorumludur.' },
+  { title: 'İlan Verme Yetkisi', text: 'Kullanıcı yalnızca satışa sunmaya yetkili olduğu araç veya mülkler için ilan yayınlayabilir. Başkasına ait bir varlığın izinsiz şekilde ilana eklenmesi yasaktır.' },
+  { title: 'Yasaklı İçerikler', text: 'Dolandırıcılık amacı taşıyan, yanıltıcı, hakaret içeren, yasa dışı faaliyetleri teşvik eden veya platformun amacı dışında kullanılan içerik sahipleri Sanboard platformundan yasaklanır.' },
+  { title: 'Teklif Sistemi', text: 'Sanboard üzerinden gönderilen teklifler taraflar arasındaki görüşmeyi kolaylaştırır. Bir teklifin kabul edilmesi, satışın veya mülkiyet devrinin Sanboard tarafından tamamlandığı anlamına gelmez.' },
+  { title: 'Satış ve Devir İşlemleri', text: 'Alıcı ve satıcı arasındaki nihai ödeme, teslim ve devir işlemleri tarafların kendi sorumluluğundadır. Sanboard bu işlemlerin tarafı değildir.' },
+  { title: 'İlan Süresi', text: 'İlanlar belirlenen yayın süresi boyunca aktif kalır. Süresi dolan, satılan, kaldırılan veya kurallara aykırı bulunan ilanlar yayından kaldırılabilir.' },
+  { title: 'Kurumsal Hesaplar', text: 'Kurumsal satıcı olarak işlem yapmak isteyen kullanıcıların gerekli başvuru sürecini tamamlaması gerekir. Sanboard, başvuruları inceleme ve uygun bulunmayan başvuruları reddetme hakkını saklı tutar.' },
+  { title: 'Hesap Güvenliği', text: 'Kullanıcı, hesabının ve karakter erişiminin güvenliğinden sorumludur. Yetkisiz kullanım veya şüpheli hareket fark edildiğinde destek ekibine bildirilmelidir.' },
+  { title: 'Hizmetin Kötüye Kullanılması', text: 'Spam, sahte teklif, sistem açıklarından yararlanma, diğer kullanıcıları yanıltma veya platform işleyişini bozacak davranışlar yasaktır.' },
+] as const;
+
+const privacyItems = [
+  { title: 'İletişim Bilgilerinin Görünürlüğü', text: 'Telefon ve SanMail gibi iletişim bilgileri, yalnızca görünürlük tercihleri ve ilgili işlem akışı doğrultusunda paylaşılır. Kabul edilen bir teklif sonrasında ilan sahibinin görünür iletişim bilgileri ilgili kullanıcıya gösterilebilir.', icon: LockKeyhole },
+  { title: 'Özel Bilgilerin Korunması', text: 'Özel olarak belirlenen iletişim bilgileri diğer kullanıcılara açılmaz. Sanboard yalnızca ilgili işlem için gerekli olan ve paylaşılmasına izin verilen bilgileri görünür hale getirir.', icon: ShieldCheck },
+  { title: 'Ödeme Bilgileri', text: 'Fleeca üzerinden gerçekleştirilen ödemelerde finansal bilgiler ödeme sağlayıcısı tarafından işlenir. Sanboard, ödeme bilgilerinin tamamını kendi sisteminde saklamaz; yalnızca işlem durumu ve sonucu gibi gerekli kayıtları takip eder.', icon: Mail },
+  { title: 'Hesap Güvenliği', text: 'Kullanıcılar hesaplarının güvenliğini korumakla sorumludur. Yetkisiz erişim veya şüpheli bir işlem fark edilmesi halinde Sanboard destek kanalları üzerinden bildirim yapılmalıdır.', icon: ShieldCheck },
+] as const;
+
+const aboutItems = [
+  { title: 'Sanboard’un Amacı', text: 'Sanboard, San Andreas genelindeki araç ve mülk ilanlarını tek bir platformda bir araya getirerek alıcılarla satıcıların daha kolay, düzenli ve hızlı şekilde buluşmasını sağlar. Kullanıcılar sahip oldukları araç veya mülkleri ilana çıkarabilir, ilgilendikleri ilanları keşfedebilir ve ihtiyaçlarına uygun seçenekleri karşılaştırabilir.', icon: Info },
+  { title: 'Nasıl Çalışır?', text: 'Kullanıcılar ilanları kategori, fiyat ve diğer özelliklere göre inceleyebilir; favorilerine ekleyebilir, karşılaştırabilir ve uygun gördükleri ilanlar için teklif gönderebilir. Teklif kabul edildiğinde taraflar iletişime geçerek süreci kendi aralarında tamamlar. Sanboard, ilan ve iletişim sürecini kolaylaştırır; doğrudan satış veya devir işleminin tarafı değildir.', icon: BadgeHelp },
 ] as const;
 
 function isSectionKey(value: string | string[] | undefined): value is SectionKey {
@@ -41,15 +57,15 @@ function FaqContent() {
 }
 
 function TermsContent() {
-  return <div><div className="mb-6 flex items-center gap-2 text-xs text-[var(--text-dim)]"><FileCheck2 className="h-4 w-4 text-[#FF8A1F]" />Son güncelleme: 27 Eylül 2026</div><div className="grid gap-4 md:grid-cols-2">{terms.map((term, index) => <article key={term.title} className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-5"><span className="text-[10px] font-black tracking-[0.18em] text-[#FF8A1F]">0{index + 1}</span><h2 className="mt-2 font-bold text-[var(--text-main)]">{term.title}</h2><p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">{term.text}</p></article>)}</div><p className="mt-6 text-xs leading-6 text-[var(--text-dim)]">Koşullar hizmetlerdeki değişikliklere göre güncellenebilir. Güncel sürüm her zaman bu bilgi merkezinde yayınlanır.</p></div>;
+  return <div className="grid gap-4 md:grid-cols-2">{terms.map((term, index) => <article key={term.title} className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-5"><span className="text-[10px] font-black tracking-[0.18em] text-[#FF8A1F]">{String(index + 1).padStart(2, '0')}</span><h2 className="mt-2 font-bold text-[var(--text-main)]">{term.title}</h2><p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">{term.text}</p></article>)}</div>;
 }
 
 function PrivacyContent() {
-  return <div className="space-y-4"><InfoCard icon={LockKeyhole} title="İletişim bilgileriniz">Telefon ve SanMail bilgileri yalnızca seçtiğiniz görünürlük tercihleri doğrultusunda gösterilir. Gizlenen değerler sunucu seviyesinde maskelenir.</InfoCard><InfoCard icon={ShieldCheck} title="Hesap ve işlem güvenliği">Platformda gerçek banka bilgisi, kredi kartı veya oyun hesabı şifresi tutulmaz. Yetkilendirme ve karakter erişimi sunucu tarafında doğrulanır.</InfoCard><InfoCard icon={Mail} title="Roleplay verileri">Fleeca ödemeleri roleplay çerçevesinde oyun içi bankacılık protokolüyle işlenir. Güvenlik ve işlem doğrulama kayıtları hizmet bütünlüğü için korunabilir.</InfoCard></div>;
+  return <div className="space-y-4">{privacyItems.map((item) => <InfoCard key={item.title} icon={item.icon} title={item.title}>{item.text}</InfoCard>)}</div>;
 }
 
 function AboutContent() {
-  return <div className="space-y-6"><div className="rounded-2xl border border-[#FF8A1F]/20 bg-[#FF8A1F]/[0.06] p-6"><Sparkles className="h-5 w-5 text-[#FF8A1F]" /><h2 className="mt-4 text-xl font-black text-[var(--text-main)]">Los Santos’un ilan platformu</h2><p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">Sanboard, GTA World evreninde araç ve mülk alım satımını kolaylaştıran bağımsız bir roleplay ilan ağıdır. Alıcı ile satıcıyı profesyonel bir ortamda buluşturur; devir işlemini doğrudan gerçekleştirmez.</p></div><div className="grid gap-4 sm:grid-cols-2"><InfoCard icon={CarFront} title="Araç pazarı">Otomobil, SUV, motosiklet ve diğer araç ilanlarını tek akışta keşfedin.</InfoCard><InfoCard icon={Building2} title="Mülk portföyü">Daire, villa, iş yeri ve Los Santos’un özel lokasyonlarını inceleyin.</InfoCard></div><Link href="/ilanlari-kesfet" className="btn-primary inline-flex px-5 py-3 text-sm">İlanları Keşfet</Link></div>;
+  return <div className="grid gap-4 sm:grid-cols-2">{aboutItems.map((item) => <InfoCard key={item.title} icon={item.icon} title={item.title}>{item.text}</InfoCard>)}</div>;
 }
 
 function InfoCard({ icon: Icon, title, children }: { icon: typeof Info; title: string; children: React.ReactNode }) {

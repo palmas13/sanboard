@@ -51,4 +51,25 @@ describe('footer and kesfet UI refinements', () => {
     assert.match(accordion, /aria-hidden=\{!isOpen\}/);
     assert.match(accordion, /ChevronDown/);
   });
+
+  test('kesfet keeps the four content areas separate and uses the requested copy', () => {
+    const page = source('src/app/kesfet/page.tsx');
+    const categoryOrder = ['Genel', 'Platform', 'Gizlilik & Güvenlik'].map((title) => page.indexOf(`title: '${title}'`));
+    assert.ok(categoryOrder.every((index) => index >= 0));
+    assert.deepEqual([...categoryOrder].sort((a, b) => a - b), categoryOrder);
+    assert.match(page, /Sanboard; araç ve mülk sahiplerinin ilanlarını yayınlayabildiği/);
+    assert.match(page, /Sanboard’da teklif sistemi nasıl çalışır\?/);
+    assert.match(page, /title: 'Platformun Amacı'/);
+    assert.match(page, /title: 'Hizmetin Kötüye Kullanılması'/);
+    assert.match(page, /const privacyItems = \[/);
+    assert.match(page, /title: 'İletişim Bilgilerinin Görünürlüğü'/);
+    assert.match(page, /const aboutItems = \[/);
+    assert.match(page, /title: 'Sanboard’un Amacı'/);
+    assert.match(page, /title: 'Nasıl Çalışır\?'/);
+    assert.doesNotMatch(page, /İlanlar ve hesap|İletişim ve güvenlik|Los Santos’un ilan platformu|Araç pazarı|Mülk portföyü/);
+    assert.match(page, /activeKey === 'sss' && <FaqContent \/>/);
+    assert.match(page, /activeKey === 'kullanim-kosullari' && <TermsContent \/>/);
+    assert.match(page, /activeKey === 'gizlilik' && <PrivacyContent \/>/);
+    assert.match(page, /activeKey === 'hakkimizda' && <AboutContent \/>/);
+  });
 });
