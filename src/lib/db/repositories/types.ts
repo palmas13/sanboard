@@ -12,6 +12,7 @@ import {
   TicketStatus,
   TicketCategory,
   User,
+  OfferThread,
 } from '@/types';
 import { ListingFilterParams } from '../listings';
 
@@ -21,6 +22,8 @@ export interface CreateListingInput {
   title: string;
   description: string;
   price: number;
+  offers_enabled?: boolean;
+  minimum_offer_amount?: number | null;
   location?: string | null;
   images: Array<{
     storage_path: string;
@@ -108,10 +111,23 @@ export interface INotificationRepository {
     type: NotificationType;
     title: string;
     message: string;
-    entity_type?: 'listing' | 'ticket' | 'application' | 'system';
+    entity_type?: 'listing' | 'ticket' | 'application' | 'system' | 'offer';
     entity_id?: string;
     metadata?: Record<string, any>;
   }): Promise<Notification>;
+}
+
+export interface IOfferRepository {
+  createOffer(input: { listingId: string; amount: number; actorProfileId: string; actorUserId: string }): Promise<{ success: boolean; thread?: OfferThread; error?: string; code?: string }>;
+  listOffers(input: { actorProfileId: string; box?: 'received' | 'sent'; status?: string; cursor?: string; limit?: number }): Promise<{ threads: OfferThread[]; nextCursor?: string | null }>;
+  getOffer(threadId: string, actorProfileId: string): Promise<{ success: boolean; thread?: OfferThread; error?: string }>;
+  actOnOffer(input: { threadId: string; actorProfileId: string; actorUserId: string; action: 'COUNTER' | 'ACCEPT' | 'REJECT' | 'WITHDRAW'; amount?: number }): Promise<{ success: boolean; thread?: OfferThread; error?: string; code?: string }>;
+  markRead(threadId: string, actorProfileId: string): Promise<{ success: boolean; unreadCount: number; error?: string }>;
+  getUnreadCount(actorProfileId: string): Promise<number>;
+  getActiveCountForListing(listingId: string, actorProfileId: string): Promise<number>;
+  expireStale(): Promise<number>;
+  closeForListing(listingId: string, reason: import('@/types').OfferCloseReason): Promise<number>;
+  recordListingPriceChange(listingId: string, oldPrice: number, newPrice: number): Promise<number>;
 }
 
 export interface IUserRepository {

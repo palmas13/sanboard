@@ -52,6 +52,8 @@ export default function YeniIlanOlusturPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
+  const [offersEnabled, setOffersEnabled] = useState(true);
+  const [minimumOffer, setMinimumOffer] = useState('');
   const [location, setLocation] = useState('');
 
   // Vehicle Details (Brand -> Model dependent selection)
@@ -256,6 +258,10 @@ export default function YeniIlanOlusturPage() {
       errors.push('Lütfen geçerli bir satış fiyatı giriniz.');
       invalid.price = true;
     }
+    if (minimumOffer !== '' && (Number(minimumOffer) <= 0 || Number(minimumOffer) > Number(price))) {
+      errors.push('Minimum teklif 0’dan büyük ve satış fiyatından yüksek olmamalıdır.');
+      invalid.minimumOffer = true;
+    }
 
     if (category === 'property') {
       if (!location.trim()) {
@@ -352,6 +358,8 @@ export default function YeniIlanOlusturPage() {
       title: title.trim(),
       description: description.trim(),
       price: Number(price),
+      offers_enabled: offersEnabled,
+      minimum_offer_amount: offersEnabled && minimumOffer !== '' ? Number(minimumOffer) : null,
       images,
       corporate: isCorporate,
       seller_type: isCorporate ? 'CORPORATE' : 'INDIVIDUAL',
@@ -681,6 +689,16 @@ export default function YeniIlanOlusturPage() {
                 />
               </div>
             )}
+
+            <div className="space-y-3 rounded-xl border border-[var(--border-app)] p-4">
+              <label className="flex items-center justify-between gap-4 text-xs font-semibold text-[var(--text-muted)]">
+                <span><b className="block text-[var(--text-main)]">Tekliflere Açık</b>Alıcılar yalnız fiyat teklifi verebilir; serbest mesaj gönderemez.</span>
+                <input type="checkbox" checked={offersEnabled} onChange={(e) => setOffersEnabled(e.target.checked)} className="h-5 w-5 accent-[#FF8A1F]" />
+              </label>
+              {offersEnabled && <label className="block text-xs font-semibold text-[var(--text-muted)]">Minimum Teklif (opsiyonel)
+                <input type="number" min="1" max={price || undefined} value={minimumOffer} onChange={(e) => setMinimumOffer(e.target.value)} className={`form-input mt-2 ${invalidFields.minimumOffer ? 'border-red-500' : ''}`} placeholder="Örn: 80000" />
+              </label>}
+            </div>
 
             {/* VEHICLE TECHNICAL FIELDS */}
             {category === 'vehicle' && (

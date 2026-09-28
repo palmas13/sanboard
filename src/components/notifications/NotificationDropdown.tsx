@@ -15,6 +15,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { Notification } from '@/types';
+import { openOfferThread } from '@/components/offers/OfferCenter';
 
 export function NotificationDropdown() {
   const router = useRouter();
@@ -147,7 +148,9 @@ export function NotificationDropdown() {
 
     setIsOpen(false);
 
-    if (notif.entity_type === 'listing' && notif.entity_id) {
+    if (notif.entity_type === 'offer' && (notif.metadata?.offerThreadId || notif.entity_id)) {
+      openOfferThread(String(notif.metadata?.offerThreadId || notif.entity_id));
+    } else if (notif.entity_type === 'listing' && notif.entity_id) {
       router.push(`/ilan/${notif.entity_id}`);
     } else if (notif.entity_type === 'ticket' && notif.entity_id) {
       router.push(`/hesabim/destek/${notif.entity_id}`);

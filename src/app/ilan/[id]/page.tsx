@@ -25,6 +25,7 @@ import { PropertyCompareButton } from '@/components/compare/PropertyCompareButto
 import { getOptionalSimilarListings } from '@/lib/db/optional-listing-data';
 import { MemberListingDetail } from '@/types';
 import { sortListingImages } from '@/lib/listings/images';
+import { OfferButton } from '@/components/offers/OfferButton';
 import { getAbsoluteUrl, getListingUrl, parseListingRouteIdentifier } from '@/lib/urls';
 
 interface PageProps {
@@ -242,6 +243,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
             </div>
 
             <div className="flex flex-wrap gap-2 pt-2 sm:pt-2.5 md:justify-end">
+              {!isLocked && !isOwner && !closedLabel && (listing as MemberListingDetail).offers_enabled !== false && <OfferButton listing={listing as MemberListingDetail} />}
               {isVehicle && <CompareButton listing={listing} />}
               {!isVehicle && !closedLabel && <PropertyCompareButton listing={listing} />}
               <CopyListingLinkButton path={canonicalPath} />

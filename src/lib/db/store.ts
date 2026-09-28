@@ -15,10 +15,14 @@ import {
   SupportTicket,
   TicketMessage,
   User,
+  OfferThread,
+  OfferEvent,
 } from '@/types';
 
 // In-memory persistent state during server runtime
 class SanboardDatabase {
+  offerThreads: OfferThread[] = [];
+  offerEvents: OfferEvent[] = [];
   users: User[] = [
     {
       id: '22222222-2222-2222-2222-222222222222',

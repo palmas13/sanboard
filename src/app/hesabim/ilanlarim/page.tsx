@@ -34,6 +34,7 @@ export default function HesabimIlanlarimPage() {
   const [isProcessingClose, setIsProcessingClose] = useState(false);
   const [republishingId, setRepublishingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  const [activeOfferCount, setActiveOfferCount] = useState(0);
   const [savedDraft, setSavedDraft] = useState<{ quality: number; savedAt?: string; href: string } | null>(null);
 
   const fetchListings = async () => {
@@ -232,9 +233,12 @@ export default function HesabimIlanlarimPage() {
 
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         setCloseReason('SOLD');
                         setCloseModalListing(listing);
+                        const response = await fetch(`/api/offers?listingId=${encodeURIComponent(listing.id)}`);
+                        const data = await response.json().catch(() => ({}));
+                        setActiveOfferCount(response.ok ? Number(data.activeCount || 0) : 0);
                       }}
                       className="flex-1 sm:flex-none btn-danger text-xs py-2 px-3 flex items-center justify-center gap-1 cursor-pointer"
                     >
@@ -336,6 +340,7 @@ export default function HesabimIlanlarimPage() {
             <div className="p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] text-xs text-[var(--text-main)] font-semibold truncate">
               {closeModalListing.title}
             </div>
+            {activeOfferCount > 0 && <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-semibold text-amber-300">Bu ilan için {activeOfferCount} aktif teklif bulunuyor. İlanı kaldırırsanız bu tekliflerin tamamı kapatılacak.</p>}
 
             <div className="grid gap-2">
               {([

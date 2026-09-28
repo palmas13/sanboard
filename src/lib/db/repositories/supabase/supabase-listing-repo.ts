@@ -807,6 +807,7 @@ export class SupabaseListingRepository implements IListingRepository {
       p_listing: {
         listing_number: rpcListingNumber, category: input.category, subcategory: input.subcategory,
         title: input.title, description: input.description, price: input.price,
+        offers_enabled: input.offers_enabled !== false, minimum_offer_amount: input.minimum_offer_amount ?? null,
         location: input.category === 'vehicle' ? null : (input.location?.trim() || null),
       },
       p_details: details,
@@ -939,6 +940,8 @@ export class SupabaseListingRepository implements IListingRepository {
     if (input.title) updateData.title = input.title;
     if (input.description) updateData.description = input.description;
     if (input.price !== undefined) updateData.price = input.price;
+    if (input.offers_enabled !== undefined) updateData.offers_enabled = input.offers_enabled;
+    if (input.minimum_offer_amount !== undefined) updateData.minimum_offer_amount = input.minimum_offer_amount;
     if (input.subcategory) updateData.subcategory = input.subcategory;
 
     if (existing.category === 'vehicle') {
@@ -969,6 +972,7 @@ export class SupabaseListingRepository implements IListingRepository {
     if (updateErr) {
       return { success: false, error: `İlan güncellenemedi: ${updateErr.message}` };
     }
+    if (newPrice !== oldPrice) await (await import('../index')).getOfferRepository().recordListingPriceChange(id, oldPrice, newPrice);
 
     // Update category details if provided
     if (existing.category === 'vehicle') {
@@ -1107,7 +1111,8 @@ export class SupabaseListingRepository implements IListingRepository {
       return { success: false, error: 'Geçersiz ilan ID formatı.' };
     }
     const client = this.getAdminClient();
-    const safeProfileId = resolveProfileId(profileId);
+    const isAdminAction = profileId === 'SYSTEM_ADMIN';
+    const safeProfileId = isAdminAction ? null : resolveProfileId(profileId);
 
     const { data: listing, error: fetchErr } = await client
       .from('listings')
@@ -1116,31 +1121,28 @@ export class SupabaseListingRepository implements IListingRepository {
       .single();
 
     if (fetchErr || !listing) return { success: false, error: 'İlan bulunamadı.' };
-    if (listing.seller_profile_id !== safeProfileId) return { success: false, error: 'Bu işlem için yetkiniz yok.' };
-    if (getEffectiveListingStatus(listing) !== 'ACTIVE') return { success: false, error: 'Yalnızca yayındaki ilanlar kapatılabilir.' };
-
-    const { error: updateErr } = await client
-      .from('listings')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', id);
-
-    if (updateErr) return { success: false, error: updateErr.message };
+    const { data: closeResult, error: closeError } = await client.rpc('close_listing_with_offers', {
+      p_listing_id: id,
+      p_actor_profile_id: safeProfileId,
+      p_status: status,
+      p_admin: isAdminAction,
+    });
+    if (closeError || !closeResult?.success) return { success: false, error: closeResult?.error || closeError?.message || 'İlan kapatılamadı.' };
 
     if (status === 'SOLD') {
       await client.from('sold_listing_audit').insert({
         original_listing_id: id,
-        seller_profile_id: safeProfileId,
+        seller_profile_id: listing.seller_profile_id,
         sold_at: new Date().toISOString(),
       });
     }
-
     await this.cleanupListingMedia(
       id,
       listing.category,
       status === 'SOLD' ? 'LISTING_SOLD' : 'LISTING_REMOVED'
     );
 
-    return { success: true, listing: { ...listing, status, images: [], updated_at: new Date().toISOString() } };
+    return { success: true, listing: { ...listing, ...(closeResult.listing || {}), status, images: [] } };
   }
 
   async removeListing(id: string, profileId: string): Promise<{ success: boolean; error?: string }> {

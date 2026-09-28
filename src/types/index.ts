@@ -125,6 +125,8 @@ export interface Listing {
   title: string; // max 60
   description: string; // max 100
   price: number;
+  offers_enabled?: boolean;
+  minimum_offer_amount?: number | null;
   previous_price?: number;
   location: string | null;
   status: ListingStatus;
@@ -252,7 +254,46 @@ export type NotificationType =
   | 'CORPORATE_SUBSCRIPTION_EXPIRING'
   | 'CORPORATE_STORE_SUSPENDED'
   | 'CORPORATE_STORE_REACTIVATED'
-  | 'CORPORATE_STORE_DELETED';
+  | 'CORPORATE_STORE_DELETED'
+  | 'OFFER_ACTIVITY';
+
+export type OfferThreadStatus = 'ACTIVE' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN' | 'EXPIRED' | 'CLOSED';
+export type OfferCloseReason = 'LISTING_EXPIRED' | 'LISTING_REMOVED_BY_SELLER' | 'LISTING_REMOVED_BY_ADMIN' | 'LISTING_SOLD' | 'LISTING_DELETED' | 'LISTING_SUSPENDED';
+export type OfferEventType = 'OFFER_CREATED' | 'COUNTER_OFFER_CREATED' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN' | 'LISTING_PRICE_CHANGED' | 'THREAD_CLOSED';
+
+export interface OfferEvent {
+  id: string;
+  thread_id: string;
+  actor_profile_id?: string | null;
+  event_type: OfferEventType;
+  amount?: number | null;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface OfferThread {
+  id: string;
+  listing_id: string;
+  buyer_profile_id: string;
+  seller_profile_id: string;
+  seller_corporate_profile_id?: string | null;
+  current_amount: number;
+  status: OfferThreadStatus;
+  close_reason?: OfferCloseReason | null;
+  turn_profile_id?: string | null;
+  movement_count: number;
+  expires_at: string;
+  buyer_last_read_at?: string | null;
+  seller_last_read_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  listing?: Pick<Listing, 'id' | 'public_id' | 'title' | 'price' | 'status' | 'images' | 'offers_enabled' | 'minimum_offer_amount'>;
+  buyer?: Pick<CharacterProfile, 'id' | 'full_name'>;
+  seller?: Pick<CharacterProfile, 'id' | 'full_name'>;
+  events?: OfferEvent[];
+  unread_count?: number;
+  actor_side?: 'BUYER' | 'SELLER';
+}
 
 export interface Notification {
   id: string;
@@ -261,7 +302,7 @@ export interface Notification {
   type: NotificationType;
   title: string;
   message: string;
-  entity_type?: 'listing' | 'ticket' | 'application' | 'system';
+  entity_type?: 'listing' | 'ticket' | 'application' | 'system' | 'offer';
   entity_id?: string;
   metadata?: Record<string, any>;
   read_at?: string | null;

@@ -102,7 +102,7 @@ export async function createNotification(params: {
   type: NotificationType;
   title: string;
   message: string;
-  entity_type?: 'listing' | 'ticket' | 'application' | 'system';
+  entity_type?: 'listing' | 'ticket' | 'application' | 'system' | 'offer';
   entity_id?: string;
   metadata?: Record<string, any>;
 }): Promise<Notification> {

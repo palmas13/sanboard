@@ -7,6 +7,7 @@ import {
   IDealerRepository,
   IPaymentRepository,
   IAuditRepository,
+  IOfferRepository,
 } from './types';
 import { MemoryListingRepository } from './memory/memory-listing-repo';
 import { MemoryNotificationRepository } from './memory/memory-notification-repo';
@@ -22,6 +23,8 @@ import { SupabaseTicketRepository } from './supabase/supabase-ticket-repo';
 import { SupabaseDealerRepository } from './supabase/supabase-dealer-repo';
 import { SupabasePaymentRepository } from './supabase/supabase-payment-repo';
 import { SupabaseAuditRepository } from './supabase/supabase-audit-repo';
+import { MemoryOfferRepository } from './memory/memory-offer-repo';
+import { SupabaseOfferRepository } from './supabase/supabase-offer-repo';
 
 export * from './types';
 
@@ -45,6 +48,7 @@ let userRepoInstance: IUserRepository | null = null;
 let ticketRepoInstance: ITicketRepository | null = null;
 let dealerRepoInstance: IDealerRepository | null = null;
 let paymentRepoInstance: IPaymentRepository | null = null;
+let offerRepoInstance: IOfferRepository | null = null;
 
 export function getListingRepository(): IListingRepository {
   if (!listingRepoInstance) {
@@ -98,6 +102,11 @@ export function getPaymentRepository(): IPaymentRepository {
       : new MemoryPaymentRepository();
   }
   return paymentRepoInstance;
+}
+
+export function getOfferRepository(): IOfferRepository {
+  if (!offerRepoInstance) offerRepoInstance = shouldUseSupabase() ? new SupabaseOfferRepository() : new MemoryOfferRepository();
+  return offerRepoInstance;
 }
 
 let auditRepoInstance: IAuditRepository | null = null;

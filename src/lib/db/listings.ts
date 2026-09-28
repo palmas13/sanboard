@@ -611,6 +611,8 @@ export async function createListingWithCredit(
     title: input.title,
     description: input.description,
     price: Number(input.price),
+    offers_enabled: input.offers_enabled !== false,
+    minimum_offer_amount: input.minimum_offer_amount ?? null,
     location: input.category === 'vehicle' ? null : (input.location || null),
     status: 'ACTIVE',
     published_at: now.toISOString(),
@@ -694,6 +696,8 @@ export async function updateListing(
   listing.title = input.title;
   listing.description = input.description;
   listing.price = newPrice;
+  if (input.offers_enabled !== undefined) listing.offers_enabled = Boolean(input.offers_enabled);
+  if (input.minimum_offer_amount !== undefined) listing.minimum_offer_amount = input.minimum_offer_amount == null ? null : Number(input.minimum_offer_amount);
   
   // Only property listings have location!
   if (listing.category === 'property') {
@@ -741,6 +745,7 @@ export async function updateListing(
 
   // Price Change Check & Notification Trigger
   if (newPrice !== oldPrice) {
+    await (await import('./repositories')).getOfferRepository().recordListingPriceChange(id, oldPrice, newPrice);
     // 1. Record in price history
     if (!db.priceHistories) db.priceHistories = [];
     db.priceHistories.push({
@@ -810,6 +815,7 @@ export async function markListingAsSold(
   listing.updated_at = new Date().toISOString();
   listing.images = [];
   db.favorites = db.favorites.filter((favorite) => favorite.listing_id !== id);
+  await (await import('./repositories')).getOfferRepository().closeForListing(id, 'LISTING_SOLD');
 
   // Store audit record
   db.soldAudits.push({
@@ -848,6 +854,7 @@ export async function removeListing(
   listing.updated_at = new Date().toISOString();
   listing.images = [];
   db.favorites = db.favorites.filter((favorite) => favorite.listing_id !== id);
+  await (await import('./repositories')).getOfferRepository().closeForListing(id, requesterProfileId === 'SYSTEM_ADMIN' ? 'LISTING_REMOVED_BY_ADMIN' : 'LISTING_REMOVED_BY_SELLER');
 
   return { success: true };
 }

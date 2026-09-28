@@ -55,6 +55,8 @@ export const baseListingFields = {
     .number({ message: 'Geçerli bir fiyat giriniz' })
     .positive('Fiyat 0\'dan büyük olmalıdır')
     .max(1_000_000_000, 'Fiyat çok yüksek'),
+  offers_enabled: z.boolean().default(true),
+  minimum_offer_amount: z.number().int('Minimum teklif tam sayı olmalıdır').positive('Minimum teklif 0’dan büyük olmalıdır').max(1_000_000_000, 'Minimum teklif çok yüksek').optional().nullable(),
   images: listingImagesSchema(3),
   seller_type: z.enum(['INDIVIDUAL', 'CORPORATE']).optional().nullable(),
   corporate_profile_id: z
@@ -68,6 +70,8 @@ export const baseListingFields = {
 export const baseListingSchema = z.object({
   ...baseListingFields,
   location: z.string().trim().min(2, 'Konum en az 2 karakter olmalıdır').max(80, 'Konum en fazla 80 karakter olabilir').optional().nullable(),
+}).refine((value) => value.minimum_offer_amount == null || value.minimum_offer_amount <= value.price, {
+  message: 'Minimum teklif ilan fiyatından yüksek olamaz.', path: ['minimum_offer_amount'],
 });
 
 export const vehicleListingSchema = z.object({
@@ -97,6 +101,8 @@ export const vehicleListingSchema = z.object({
   suspension: z.string().trim().optional().nullable(),
   fuel_type: z.enum(['BENZIN', 'DIZEL', 'ELEKTRIK']).optional().nullable(),
   factory_price: z.number().min(0).optional().nullable(),
+}).refine((value) => value.minimum_offer_amount == null || value.minimum_offer_amount <= value.price, {
+  message: 'Minimum teklif ilan fiyatından yüksek olamaz.', path: ['minimum_offer_amount'],
 });
 
 export const propertyListingSchema = z.object({
@@ -118,12 +124,11 @@ export const propertyListingSchema = z.object({
   furnished: z.boolean().default(false),
   building_type: z.enum(buildingTypes).default('Normal'),
   balcony: z.boolean().default(false),
+}).refine((value) => value.minimum_offer_amount == null || value.minimum_offer_amount <= value.price, {
+  message: 'Minimum teklif ilan fiyatından yüksek olamaz.', path: ['minimum_offer_amount'],
 });
 
-export const listingUnionSchema = z.discriminatedUnion('category', [
-  vehicleListingSchema,
-  propertyListingSchema,
-]);
+export const listingUnionSchema = z.union([vehicleListingSchema, propertyListingSchema]);
 
 export type VehicleListingFormInput = z.infer<typeof vehicleListingSchema>;
 export type PropertyListingFormInput = z.infer<typeof propertyListingSchema>;

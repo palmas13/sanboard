@@ -1,0 +1,9 @@
+export const OFFER_RESPONSE_HOURS = 24;
+export const OFFER_MAX_PRICE_MOVEMENTS = 6;
+export const OFFER_REOPEN_COOLDOWN_MINUTES = 30;
+export const OFFER_MAX_ACTIVE_THREADS_PER_BUYER = 10;
+export const OFFER_MAX_NEW_THREADS_PER_HOUR = 10;
+export const OFFER_PAGE_SIZE = 20;
+export const OFFER_MAX_AMOUNT = 9_000_000_000_000_000;
+
+export const ACTIVE_OFFER_STATUSES = ['ACTIVE'] as const;

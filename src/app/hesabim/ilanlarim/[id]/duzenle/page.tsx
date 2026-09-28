@@ -44,6 +44,8 @@ export default function IlanDuzenlePage({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
+  const [offersEnabled, setOffersEnabled] = useState(true);
+  const [minimumOffer, setMinimumOffer] = useState('');
   const [location, setLocation] = useState('');
 
   // Vehicle Details
@@ -117,6 +119,8 @@ export default function IlanDuzenlePage({
         setTitle(l.title);
         setDescription(l.description);
         setPrice(String(l.price));
+        setOffersEnabled(l.offers_enabled !== false);
+        setMinimumOffer(l.minimum_offer_amount ? String(l.minimum_offer_amount) : '');
         setLocation(l.location || '');
         setImages(l.images || []);
 
@@ -178,6 +182,10 @@ export default function IlanDuzenlePage({
       setError('Geçerli bir fiyat giriniz.');
       return;
     }
+    if (minimumOffer !== '' && (Number(minimumOffer) <= 0 || Number(minimumOffer) > Number(price))) {
+      setError('Minimum teklif 0’dan büyük ve satış fiyatından yüksek olmamalıdır.');
+      return;
+    }
     if (images.length === 0) {
       setError('En az 1 adet fotoğraf yüklemelisiniz.');
       return;
@@ -218,6 +226,8 @@ export default function IlanDuzenlePage({
         title: title.trim(),
         description: description.trim(),
         price: Number(price),
+        offers_enabled: offersEnabled,
+        minimum_offer_amount: offersEnabled && minimumOffer !== '' ? Number(minimumOffer) : null,
         subcategory,
         images,
       };
@@ -438,6 +448,10 @@ export default function IlanDuzenlePage({
                   }
                 />
               </div>
+            </div>
+            <div className="space-y-3 rounded-xl border border-[var(--border-app)] p-4">
+              <label className="flex items-center justify-between gap-4 text-xs font-semibold text-[var(--text-muted)]"><span><b className="block text-[var(--text-main)]">Tekliflere Açık</b>Fiyat pazarlığını aç veya kapat.</span><input type="checkbox" checked={offersEnabled} onChange={(e)=>setOffersEnabled(e.target.checked)} className="h-5 w-5 accent-[#FF8A1F]" /></label>
+              {offersEnabled&&<label className="block text-xs font-semibold text-[var(--text-muted)]">Minimum Teklif (opsiyonel)<input type="number" min="1" max={price||undefined} value={minimumOffer} onChange={(e)=>setMinimumOffer(e.target.value)} className="form-input mt-2" /></label>}
             </div>
 
             {/* MÜLK İÇİN KONUM (Araç ilanlarında konum bulunmaz!) */}

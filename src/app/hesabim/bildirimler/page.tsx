@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
 import {
@@ -17,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Notification } from '@/types';
 import { formatDateTime } from '@/lib/utils/format';
+import { openOfferThread } from '@/components/offers/OfferCenter';
 
 export default function HesabimBildirimlerPage() {
   const router = useRouter();
@@ -108,7 +108,9 @@ export default function HesabimBildirimlerPage() {
       handleMarkAsRead(notif.id);
     }
 
-    if (notif.entity_type === 'listing' && notif.entity_id) {
+    if (notif.entity_type === 'offer' && (notif.metadata?.offerThreadId || notif.entity_id)) {
+      openOfferThread(String(notif.metadata?.offerThreadId || notif.entity_id));
+    } else if (notif.entity_type === 'listing' && notif.entity_id) {
       router.push(`/ilan/${notif.entity_id}`);
     } else if (notif.entity_type === 'ticket' && notif.entity_id) {
       router.push(`/hesabim/destek/${notif.entity_id}`);
