@@ -126,6 +126,7 @@ export interface IOfferRepository {
   hideOffer(threadId: string, actorProfileId: string): Promise<{ success: boolean; unreadCount: number; error?: string }>;
   getActiveThreadForListing(listingId: string, actorProfileId: string): Promise<OfferThread | null>;
   getUnreadCount(actorProfileId: string): Promise<number>;
+  getUnreadCounts(actorProfileId: string): Promise<{ total: number; received: number; sent: number }>;
   getActiveCountForListing(listingId: string, actorProfileId: string): Promise<number>;
   expireStale(): Promise<number>;
   closeForListing(listingId: string, reason: import('@/types').OfferCloseReason): Promise<number>;

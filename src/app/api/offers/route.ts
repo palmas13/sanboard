@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
   const actor=await resolveOwnedActiveProfile(req); if(!actor.ok)return NextResponse.json({error:actor.error},{status:actor.status});
   const countOnly=req.nextUrl.searchParams.get('countOnly')==='1'; const repo=getOfferRepository();
   await repo.expireStale();
-  if(countOnly)return NextResponse.json({unreadCount:await repo.getUnreadCount(actor.profileId)});
+  if(countOnly){const counts=await repo.getUnreadCounts(actor.profileId);return NextResponse.json({unreadCount:counts.total,unreadCounts:counts});}
   const listingId=req.nextUrl.searchParams.get('listingId');
   if(listingId)return NextResponse.json({activeCount:await repo.getActiveCountForListing(listingId,actor.profileId)});
   const threadListingId=req.nextUrl.searchParams.get('threadForListing');

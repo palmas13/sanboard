@@ -167,15 +167,55 @@ describe('Structured offer system', () => {
     assert.equal(restored.threads[0].unread_count, 1);
   });
 
-  test('accepted thread exposes only public counterparty contact fields', async () => {
+  test('accepted individual thread exposes the same canonical seller contact to both sides', async () => {
     await create();
     const thread = db.offerThreads[0];
     db.profiles[0].phone_visibility = 'PRIVATE';
     db.profiles[0].sanmail_visibility = 'PUBLIC';
     await repo.actOnOffer({ threadId: thread.id, actorProfileId: seller, actorUserId: 'seller-account', action: 'ACCEPT' });
-    const detail = await repo.getOffer(thread.id, buyer);
-    assert.equal(detail.thread?.visible_contact?.phone, '');
-    assert.equal(detail.thread?.visible_contact?.sanmail_email, 'seller@sanmail.com');
+    const buyerDetail = await repo.getOffer(thread.id, buyer);
+    const sellerDetail = await repo.getOffer(thread.id, seller);
+    assert.deepEqual(buyerDetail.thread?.visible_contact, sellerDetail.thread?.visible_contact);
+    assert.equal(buyerDetail.thread?.visible_contact?.phone, '');
+    assert.equal(buyerDetail.thread?.visible_contact?.sanmail_email, 'seller@sanmail.com');
+    assert.notEqual(sellerDetail.thread?.visible_contact?.sanmail_email, 'buyer@sanmail.com');
+    db.profiles[0].sanmail_visibility = 'PRIVATE';
+    const privateDetail = await repo.getOffer(thread.id, buyer);
+    assert.equal(privateDetail.thread?.visible_contact?.phone, '');
+    assert.equal(privateDetail.thread?.visible_contact?.sanmail_email, '');
+  });
+
+  test('accepted corporate thread uses canonical store contact, never buyer contact', async () => {
+    db.listings[0].seller_type = 'CORPORATE';
+    db.listings[0].corporate_profile_id = 'offer-store';
+    db.dealers[0].phone = '5559000';
+    db.dealers[0].sanmail_email = 'store@sanmail.com';
+    await create();
+    const thread = db.offerThreads[0];
+    await repo.actOnOffer({ threadId: thread.id, actorProfileId: seller, actorUserId: 'seller-account', action: 'ACCEPT' });
+    const buyerDetail = await repo.getOffer(thread.id, buyer);
+    const sellerDetail = await repo.getOffer(thread.id, seller);
+    assert.deepEqual(buyerDetail.thread?.visible_contact, { phone: '5559000', sanmail_email: 'store@sanmail.com' });
+    assert.deepEqual(sellerDetail.thread?.visible_contact, buyerDetail.thread?.visible_contact);
+    assert.notEqual(buyerDetail.thread?.visible_contact?.phone, '2');
+  });
+
+  test('unread box counts split received and sent, exclude own events and update after read', async () => {
+    await create();
+    assert.deepEqual(await repo.getUnreadCounts(seller), { total: 1, received: 1, sent: 0 });
+    assert.deepEqual(await repo.getUnreadCounts(buyer), { total: 0, received: 0, sent: 0 });
+    const thread = db.offerThreads[0];
+    await repo.actOnOffer({ threadId: thread.id, actorProfileId: seller, actorUserId: 'seller-account', action: 'COUNTER', amount: 70000 });
+    assert.deepEqual(await repo.getUnreadCounts(buyer), { total: 1, received: 0, sent: 1 });
+    await repo.markRead(thread.id, buyer);
+    assert.deepEqual(await repo.getUnreadCounts(buyer), { total: 0, received: 0, sent: 0 });
+  });
+
+  test('offer API ignores client supplied contact identity fields', () => {
+    const route = readFileSync(join(process.cwd(), 'src/app/api/offers/[id]/route.ts'), 'utf8');
+    const repos = readFileSync(join(process.cwd(), 'src/lib/db/repositories/memory/memory-offer-repo.ts'), 'utf8') + readFileSync(join(process.cwd(), 'src/lib/db/repositories/supabase/supabase-offer-repo.ts'), 'utf8');
+    assert.doesNotMatch(route, /ownerProfileId|sellerProfileId|contactProfileId/);
+    assert.match(repos, /redactPrivateContact\(seller\)|redactPrivateContact\(thread\.seller\)/);
   });
 
   test('corrective migration adds participant visibility without rewriting production offer migration', () => {

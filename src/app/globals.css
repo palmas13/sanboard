@@ -83,17 +83,20 @@ a {
 .offer-launcher { transition: transform 200ms cubic-bezier(.22,1,.36,1), background-color 180ms ease, box-shadow 180ms ease; }
 .offer-launcher:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 18px 45px -14px rgba(255,138,31,.8); }
 .offer-launcher:active { transform: translateY(0) scale(.97); }
-.offer-panel { transform-origin: bottom right; transition: opacity 200ms ease, transform 220ms cubic-bezier(.22,1,.36,1); }
-.offer-view { animation: offer-view-enter 180ms cubic-bezier(.22,1,.36,1) both; }
+.offer-panel { transform-origin: bottom right; transition: opacity 260ms cubic-bezier(.22,1,.36,1), transform 280ms cubic-bezier(.22,1,.36,1); will-change: opacity, transform; }
+.offer-view { min-width: 0; }
+.offer-view-forward { animation: offer-view-forward 220ms cubic-bezier(.22,1,.36,1) both; }
+.offer-view-back { animation: offer-view-back 220ms cubic-bezier(.22,1,.36,1) both; }
 .offer-icon-button { display: inline-flex; height: 2.25rem; width: 2.25rem; align-items: center; justify-content: center; border-radius: .75rem; color: var(--text-muted); transition: background-color 150ms ease, color 150ms ease, transform 150ms ease; }
 .offer-icon-button:hover { background: var(--bg-surface-secondary); color: var(--text-main); }
 .offer-icon-button:active { transform: scale(.94); }
 .offer-icon-button:focus-visible { outline: 2px solid var(--brand-orange); outline-offset: 2px; }
-@keyframes offer-view-enter { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes offer-view-forward { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes offer-view-back { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
 @media (prefers-reduced-motion: reduce) {
   .offer-launcher, .offer-panel, .offer-icon-button { transition: none; }
   .offer-launcher:hover, .offer-launcher:active, .offer-icon-button:active { transform: none; }
-  .offer-view { animation: none; }
+  .offer-view-forward, .offer-view-back { animation: none; }
 }
 
 /* Custom Scrollbar */

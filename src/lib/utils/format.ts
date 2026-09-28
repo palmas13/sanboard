@@ -1,11 +1,14 @@
 /**
  * Format currency to GTA World format: $75.000
  */
-export function formatCurrency(amount: number): string {
-  const formatted = new Intl.NumberFormat('tr-TR', {
+export function formatNumber(amount: number): string {
+  return new Intl.NumberFormat('tr-TR', {
     maximumFractionDigits: 0,
   }).format(amount);
-  return `$${formatted}`;
+}
+
+export function formatCurrency(amount: number): string {
+  return `$${formatNumber(amount)}`;
 }
 
 /**

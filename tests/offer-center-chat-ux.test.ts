@@ -1,51 +1,95 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { formatCurrency, formatNumber } from '@/lib/utils/format';
 import { offerEventCopy } from '@/lib/offers/presentation';
 
 const source = (path: string) => readFileSync(path, 'utf8');
 const center = source('src/components/offers/OfferCenter.tsx');
 const styles = source('src/app/globals.css');
+const offerRoute = source('src/app/api/offers/route.ts');
 
 describe('OfferCenter chat UX', () => {
-  test('floating messenger shell has animated open and closed states with mobile layout', () => {
-    assert.match(center, /offer-launcher/);
-    assert.match(center, /data-state=\{open\?'open':'closed'\}/);
+  test('amount formatter uses Turkish grouping and API receives raw numeric amount', () => {
+    assert.equal(formatNumber(2000), '2.000');
+    assert.equal(formatNumber(20000), '20.000');
+    assert.equal(formatNumber(200000), '200.000');
+    assert.equal(formatNumber(2000000), '2.000.000');
+    assert.equal(formatCurrency(300000), '$300.000');
+    assert.match(center, /inputMode="numeric"/);
+    assert.match(center, /pattern="\[0-9\]\*"/);
+    assert.match(center, /input\.value\.replace\(\/\\D\/g, ''\)/);
+    assert.match(center, /amount: Number\(amount\)/);
+    assert.match(center, /formatNumber\(Number\(rawValue\)\)/);
+  });
+
+  test('all offer surfaces use the shared currency formatter', () => {
+    assert.match(center, /İlan fiyatı: \{formatCurrency\(compose\.price\)\}/);
+    assert.match(center, /Minimum teklif: \{formatCurrency\(compose\.minimum\)\}/);
+    assert.match(center, /formatCurrency\(thread\.current_amount\)/);
+    assert.equal(offerEventCopy({ id: 'e', thread_id: 't', event_type: 'OFFER_CREATED', amount: 300000, created_at: '' }), 'Bu ilan için teklifim $300.000.');
+    assert.match(offerEventCopy({ id: 'e', thread_id: 't', event_type: 'LISTING_PRICE_CHANGED', metadata: { oldPrice: 300000, newPrice: 250000 }, created_at: '' }), /\$300\.000 → \$250\.000/);
+  });
+
+  test('received and sent tabs have independent unread badges and read refreshes counts', () => {
+    assert.match(center, /<TabBadge count=\{unreadCounts\[item\]\}/);
+    assert.match(center, /item === 'received' \? 'Aldıklarım' : 'Gönderdiklerim'/);
+    assert.match(center, /setRows\(\(previous\) => previous\.map\(\(row\) => row\.id === id \? \{ \.\.\.row, unread_count: 0 \}/);
+    assert.match(offerRoute, /getUnreadCounts/);
+    assert.match(offerRoute, /unreadCount:counts\.total,unreadCounts:counts/);
+  });
+
+  test('thread rows expose balanced metadata, unread styling and isolated trash action', () => {
+    assert.match(center, /data-offer-row-meta/);
+    assert.match(center, /w-\[92px\]/);
+    assert.match(center, /offerStatusText\[row\.status\]/);
+    assert.match(center, /aria-label=\{`\$\{person\?\.full_name/);
+    assert.match(center, /event\.stopPropagation\(\)/);
+    assert.match(center, /bg-\[#FF8A1F\]\/8/);
+    assert.match(center, /font-black/);
+    assert.match(center, /h-2 w-2[\s\S]*bg-\[#FF8A1F\]/);
+  });
+
+  test('panel open/close and list/detail transitions are soft and reduced-motion safe', () => {
+    assert.match(center, /data-state=\{open \? 'open' : 'closed'\}/);
     assert.match(center, /opacity-100 translate-y-0 scale-100/);
-    assert.match(center, /opacity-0 translate-y-3 scale-\[\.97\]/);
+    assert.match(center, /opacity-0 translate-y-2 scale-\[\.985\]/);
+    assert.match(center, /setTimeout\(\(\) => setMounted\(false\), 280\)/);
+    assert.match(center, /offer-view-forward/);
+    assert.match(center, /offer-view-back/);
+    assert.match(styles, /transition: opacity 260ms[\s\S]*transform 280ms/);
+    assert.match(styles, /@keyframes offer-view-forward/);
+    assert.match(styles, /@keyframes offer-view-back/);
+    assert.match(styles, /prefers-reduced-motion: reduce[\s\S]*offer-view-forward/);
     assert.match(center, /h-\[min\(92dvh,760px\)\]/);
     assert.match(center, /sm:w-\[420px\]/);
-    assert.match(styles, /prefers-reduced-motion: reduce[\s\S]*offer-panel/);
   });
 
-  test('list and thread render chat metadata, unread state, avatars and directional events', () => {
-    assert.match(center, /data-offer-view="list"/);
-    assert.match(center, /latestOfferSummary\(row\)/);
-    assert.match(center, /row\.unread_count/);
-    assert.match(center, /function Avatar/);
-    assert.match(center, /data-offer-event=\{own \? 'own' : 'counterparty'\}/);
-    assert.match(center, /data-offer-event="system"/);
+  test('three-dot menu is accessible, clipping-safe and uses participant hide', () => {
+    assert.match(center, /aria-haspopup="menu"/);
+    assert.match(center, /aria-expanded=\{menuOpen\}/);
+    assert.match(center, /role="menu"/);
+    assert.match(center, /z-\[70\]/);
+    assert.match(center, /overflow-visible/);
+    assert.match(center, /Listeden kaldır/);
+    assert.match(center, /hideThread\(thread\.id, true\)/);
+    assert.match(center, /method: 'DELETE'/);
+    assert.match(center, /Bu teklif görüşmesi yalnız sizin listenizden kaldırılır/);
   });
 
-  test('structured events use Turkish messenger copy', () => {
-    const event = (event_type: any, amount?: number, metadata?: Record<string, unknown>) => ({ id: 'e', thread_id: 't', event_type, amount, metadata, created_at: '' });
-    assert.equal(offerEventCopy(event('OFFER_CREATED', 90000)), 'Bu ilan için teklifim $90.000.');
-    assert.equal(offerEventCopy(event('COUNTER_OFFER_CREATED', 95000)), 'Teklifine karşılık teklifim $95.000.');
-    assert.equal(offerEventCopy(event('ACCEPTED')), 'Teklifini kabul ediyorum.');
-    assert.equal(offerEventCopy(event('REJECTED')), 'Teklif reddedildi.');
-    assert.match(offerEventCopy(event('LISTING_PRICE_CHANGED', undefined, { oldPrice: 100000, newPrice: 90000 })), /\$100\.000 → \$90\.000/);
-    assert.match(offerEventCopy(event('THREAD_CLOSED')), /artık aktif olmadığı/);
+  test('accepted contact card is listing-owner specific and old copy is gone', () => {
+    assert.match(center, /data-offer-contact="listing-owner"/);
+    assert.match(center, /İlan sahibinin iletişim bilgileri/);
+    assert.match(center, /İlan sahibinin görünür iletişim bilgisi bulunmuyor/);
+    assert.doesNotMatch(center, /Karşı tarafın görünür iletişim bilgisi bulunmuyor/);
   });
 
-  test('listing integration reuses an active thread and no freeform chat exists', () => {
+  test('structured-only flow, listing reuse, dashboard removal and generic identity remain intact', () => {
     assert.match(center, /threadForListing/);
-    assert.match(center, /if\(response\.ok&&data\.thread\)/);
+    assert.match(center, /response\.ok && data\.thread/);
     assert.match(center, /Teklif tutarın/);
     assert.match(center, /Karşı teklifin/);
     assert.doesNotMatch(center, /Mesajını yaz|emoji|attachment|type="file"/i);
-  });
-
-  test('dashboard navigation is removed and participant hide is server verified', () => {
     assert.doesNotMatch(source('src/app/hesabim/layout.tsx'), /href: '\/hesabim\/teklifler'/);
     assert.match(source('src/app/api/offers/[id]/route.ts'), /resolveOwnedActiveProfile/);
     assert.match(source('src/app/api/offers/[id]/route.ts'), /hideOffer\(id,actor\.profileId\)/);
