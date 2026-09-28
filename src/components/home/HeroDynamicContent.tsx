@@ -50,7 +50,7 @@ export function HeroTypewriter() {
     const phrase = phrases[phraseIndex];
     const complete = length === phrase.length;
     const empty = length === 0;
-    const delay = deleting ? (empty ? 240 : 42) : (complete ? 1250 : 72);
+    const delay = deleting ? (empty ? 260 : 65) : (complete ? 1050 : 105);
     const timer = window.setTimeout(() => {
       if (!deleting && complete) setDeleting(true);
       else if (deleting && empty) {
@@ -68,7 +68,7 @@ export function HeroStats({ stats }: { stats: HomepageStats }) {
   const items = [
     { value: stats.activeListings, label: 'Aktif İlan' },
     { value: stats.totalOffers, label: 'Teklif Sayısı' },
-    { value: stats.totalSellers, label: 'Toplam Satıcı' },
+    { value: stats.totalSellers, label: 'Toplam Kullanıcı' },
   ];
   return <div className="hero-stats" aria-label="Sanboard platform istatistikleri">{items.map((item) => <div key={item.label} className="hero-stat"><strong><CountUp value={item.value} /></strong><span>{item.label}</span></div>)}</div>;
 }

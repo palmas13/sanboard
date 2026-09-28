@@ -35,6 +35,9 @@ describe('homepage marketplace redesign', () => {
     assert.match(dynamic, /requestAnimationFrame/);
     assert.match(dynamic, /prefers-reduced-motion/);
     assert.match(dynamic, /ilan oluştur/);
+    assert.match(dynamic, /complete \? 1050 : 105/);
+    assert.match(dynamic, /empty \? 260 : 65/);
+    assert.match(dynamic, /Toplam Kullanıcı/);
     assert.match(hero, /Hayalindeki araca/);
   });
 
@@ -46,6 +49,18 @@ describe('homepage marketplace redesign', () => {
     assert.match(rotator, /getListingUrl\(listing\)/);
     assert.match(rotator, /<FavoriteButton/);
     assert.match(marketplace, /<FavoriteButton/);
+    assert.doesNotMatch(marketplace, /listing\.location \|\| listing\.subcategory/);
+    assert.doesNotMatch(rotator, /listing\.location \|\| listing\.subcategory/);
+    assert.match(marketplace, /quality=\{88\}/);
+    assert.match(rotator, /quality=\{88\}/);
+  });
+
+  test('homepage corporate sellers require active non-expired membership', () => {
+    const page = source('src/app/page.tsx');
+    assert.match(page, /dealer\.subscription_status === 'ACTIVE'/);
+    assert.match(page, /dealer\.subscription_expires_at/);
+    assert.match(page, /getTime\(\) > now/);
+    assert.match(page, /dealer\.moderation_status === 'ACTIVE'/);
   });
 
   test('shared rotator covers autoplay, manual navigation, pause and reduced motion', () => {
@@ -62,7 +77,7 @@ describe('homepage marketplace redesign', () => {
 
   test('responsive four-column and reduced-motion styles remain present', () => {
     const css = source('src/app/globals.css');
-    assert.match(css, /@media \(min-width: 1280px\)[\s\S]*repeat\(4,minmax\(0,1fr\)\)/);
+    assert.match(css, /@media \(min-width: 1280px\)[\s\S]*minmax\(340px,1\.14fr\)[\s\S]*minmax\(340px,1\.14fr\)/);
     assert.match(css, /@media \(max-width: 639px\)/);
     assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   });

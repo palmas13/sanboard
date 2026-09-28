@@ -11,19 +11,75 @@ import { FavoriteButton } from '@/components/listings/FavoriteButton';
 const PROPERTY_FALLBACK = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=900&auto=format&fit=crop&q=80';
 
 function SectionHeader({ icon: Icon, title, subtitle, href }: { icon: typeof Sparkles; title: string; subtitle: string; href: string }) {
-  return <header className="mb-4 min-h-[68px] border-b border-[var(--border-app)] pb-3"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 gap-2.5"><Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#ff8a1f]" /><div><h2 className="text-sm font-extrabold text-[var(--text-main)]">{title}</h2><p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">{subtitle}</p></div></div><Link href={href} className="flex shrink-0 items-center gap-1 text-[10px] font-bold text-[#ff8a1f] hover:text-[#ffb267]">Tümünü Gör <ArrowRight className="h-3 w-3" /></Link></div></header>;
+  return (
+    <header className="homepage-section-header">
+      <div className="flex min-w-0 gap-2.5">
+        <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#ff8a1f]" />
+        <div>
+          <h2 className="text-sm font-extrabold text-[var(--text-main)]">{title}</h2>
+          <p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">{subtitle}</p>
+        </div>
+      </div>
+      <Link href={href} className="homepage-see-all">Tümünü Gör <ArrowRight className="h-3 w-3" /></Link>
+    </header>
+  );
 }
 
 function FeaturedListing({ listing }: { listing: PublicListingSummary }) {
   const image = resolveMediaUrl(listing.cover_image) || PROPERTY_FALLBACK;
-  return <article className="homepage-featured-card group relative"><Link href={getListingUrl(listing)} className="absolute inset-0 z-0" aria-label={`${listing.title} ilanını görüntüle`} /><div className="relative aspect-[1.48/1] overflow-hidden rounded-t-[inherit]"><Image src={image} alt={listing.title} fill sizes="(max-width: 768px) 100vw, 360px" className="object-cover transition-transform duration-500 group-hover:scale-105" /><div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-black/10" /><span className="absolute left-3 top-3 rounded-md border border-white/10 bg-black/65 px-2.5 py-1.5 text-[10px] font-semibold text-white backdrop-blur-sm">{listing.subcategory}</span><span className="pointer-events-auto absolute right-3 top-3 z-10"><FavoriteButton listingId={listing.id} initialCount={listing.favorite_count} initialIsFavorited={listing.is_favorited} size="sm" /></span></div><div className="pointer-events-none relative z-10 p-[1.125rem]"><p className="text-[1.35rem] font-black tracking-tight text-[#ff8a1f]">{formatCurrency(listing.price)}</p><h3 className="mt-1.5 line-clamp-2 min-h-10 text-[15px] font-bold leading-5 text-[var(--text-main)] group-hover:text-[#ff9d45]">{listing.title}</h3><div className="mt-3 flex items-center justify-between gap-3 border-t border-[var(--border-app)] pt-3 text-[11px] text-[var(--text-muted)]"><span className="flex min-w-0 items-center gap-1"><MapPin className="h-3.5 w-3.5 shrink-0 text-[#ff8a1f]" /><span className="truncate">{listing.location || listing.subcategory}</span></span>{listing.published_at && <span className="flex shrink-0 items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{new Intl.DateTimeFormat('tr-TR', { year: 'numeric' }).format(new Date(listing.published_at))}</span>}</div></div></article>;
+  return (
+    <article className="homepage-featured-card group relative">
+      <Link href={getListingUrl(listing)} className="absolute inset-0 z-0" aria-label={`${listing.title} ilanını görüntüle`} />
+      <div className="relative aspect-[1.48/1] overflow-hidden rounded-t-[inherit]">
+        <Image src={image} alt={listing.title} fill sizes="(max-width: 767px) 100vw, (max-width: 1279px) 50vw, 320px" quality={88} className="object-cover object-center transition-transform duration-500 group-hover:scale-105" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-black/10" />
+        <span className="absolute left-3 top-3 rounded-md border border-white/10 bg-black/65 px-2.5 py-1.5 text-[10px] font-semibold text-white backdrop-blur-sm">{listing.subcategory}</span>
+        <span className="pointer-events-auto absolute right-3 top-3 z-10"><FavoriteButton listingId={listing.id} initialCount={listing.favorite_count} initialIsFavorited={listing.is_favorited} size="sm" /></span>
+      </div>
+      <div className="pointer-events-none relative z-10 p-[1.125rem]">
+        <p className="text-[1.35rem] font-black tracking-tight text-[#ff8a1f]">{formatCurrency(listing.price)}</p>
+        <h3 className="mt-1.5 line-clamp-2 min-h-10 text-[15px] font-bold leading-5 text-[var(--text-main)] group-hover:text-[#ff9d45]">{listing.title}</h3>
+        <div className="mt-3 flex min-h-5 items-center justify-between gap-3 border-t border-[var(--border-app)] pt-3 text-[11px] text-[var(--text-muted)]">
+          {listing.location ? <span className="flex min-w-0 items-center gap-1"><MapPin className="h-3.5 w-3.5 shrink-0 text-[#ff8a1f]" /><span className="truncate">{listing.location}</span></span> : <span aria-hidden="true" />}
+          {listing.published_at && <span className="flex shrink-0 items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{new Intl.DateTimeFormat('tr-TR', { year: 'numeric' }).format(new Date(listing.published_at))}</span>}
+        </div>
+      </div>
+    </article>
+  );
 }
 
 function CorporateSellerList({ sellers, counts }: { sellers: CorporateProfile[]; counts: Record<string, number> }) {
   if (!sellers.length) return <div className="homepage-empty-state">Henüz görünür kurumsal satıcı bulunmuyor.</div>;
-  return <div className="space-y-2.5">{sellers.map((seller) => { const logo = resolveMediaUrl(seller.logo_path || seller.logo_url); return <Link key={seller.id} href={getCorporateUrl(seller)} className="homepage-corporate-row group"><span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#ff8a1f]/30 bg-[var(--bg-surface-secondary)]">{logo ? <Image src={logo} alt={`${seller.company_name} logosu`} fill sizes="48px" className="object-cover" /> : <Building2 className="h-5 w-5 text-[#ff8a1f]" />}</span><span className="min-w-0 flex-1"><span className="flex items-center gap-1.5"><strong className="truncate text-[13px] text-[var(--text-main)]">{seller.company_name}</strong>{seller.is_verified && <CheckCircle2 className="h-3.5 w-3.5 shrink-0 fill-[#ff8a1f] text-[#191006]" aria-label="Doğrulanmış satıcı" />}</span><span className="mt-1 block text-[11px] text-[var(--text-muted)]">{counts[seller.id] || 0} aktif ilan</span></span><ArrowRight className="h-4 w-4 shrink-0 text-[#ff8a1f] transition-transform group-hover:translate-x-0.5" /></Link>; })}</div>;
+  return (
+    <div className="space-y-2.5">
+      {sellers.map((seller) => {
+        const logo = resolveMediaUrl(seller.logo_path || seller.logo_url);
+        return (
+          <Link key={seller.id} href={getCorporateUrl(seller)} className="homepage-corporate-row group">
+            <span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#ff8a1f]/30 bg-[var(--bg-surface-secondary)]">
+              {logo ? <Image src={logo} alt={`${seller.company_name} logosu`} fill sizes="48px" quality={88} className="object-cover object-center" /> : <Building2 className="h-5 w-5 text-[#ff8a1f]" />}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1.5"><strong className="truncate text-[13px] text-[var(--text-main)]">{seller.company_name}</strong>{seller.is_verified && <CheckCircle2 className="h-3.5 w-3.5 shrink-0 fill-[#ff8a1f] text-[#191006]" aria-label="Doğrulanmış satıcı" />}</span>
+              <span className="mt-1 block text-[11px] text-[var(--text-muted)]">{counts[seller.id] || 0} aktif ilan</span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-[#ff8a1f] transition-transform group-hover:translate-x-0.5" />
+          </Link>
+        );
+      })}
+    </div>
+  );
 }
 
 export function HomepageMarketplace({ featuredListings, vehicleListings, propertyListings, corporateSellers, corporateListingCounts }: { featuredListings: PublicListingSummary[]; vehicleListings: PublicListingSummary[]; propertyListings: PublicListingSummary[]; corporateSellers: CorporateProfile[]; corporateListingCounts: Record<string, number> }) {
-  return <section className="mx-auto max-w-[1480px] px-4 sm:px-6 lg:px-8" aria-label="Sanboard ilan vitrini"><div className="homepage-marketplace-grid"><div className="homepage-marketplace-column"><SectionHeader icon={Sparkles} title="Öne Çıkan İlanlar" subtitle="Öne çıkarılmış vitrin ilanları" href="/ilanlari-kesfet" />{featuredListings[0] ? <FeaturedListing listing={featuredListings[0]} /> : <div className="homepage-empty-state">Şu anda öne çıkarılmış aktif ilan bulunmuyor.</div>}</div><div className="homepage-marketplace-column"><SectionHeader icon={Car} title="Yeni Araç İlanları" subtitle="En yeni araç ilanlarını keşfet" href="/arac" /><HomepageListingRotator listings={vehicleListings} emptyMessage="Henüz yeni araç ilanı bulunmuyor." label="araç ilanları" /></div><div className="homepage-marketplace-column"><SectionHeader icon={Home} title="Yeni Mülk İlanları" subtitle="En yeni mülk ilanlarını keşfet" href="/mulk" /><HomepageListingRotator listings={propertyListings} emptyMessage="Henüz yeni mülk ilanı bulunmuyor." label="mülk ilanları" /></div><div className="homepage-marketplace-column"><SectionHeader icon={Store} title="Kurumsal Satıcılar" subtitle="Onaylı kurumsal satıcılar" href="/ilanlari-kesfet" /><CorporateSellerList sellers={corporateSellers} counts={corporateListingCounts} /></div></div></section>;
+  return (
+    <section className="mx-auto max-w-[1560px] px-4 sm:px-6 lg:px-8" aria-label="Sanboard ilan vitrini">
+      <div className="homepage-marketplace-grid">
+        <div className="homepage-marketplace-column"><SectionHeader icon={Sparkles} title="Öne Çıkan İlanlar" subtitle="Öne çıkarılmış vitrin ilanları" href="/ilanlari-kesfet" />{featuredListings[0] ? <FeaturedListing listing={featuredListings[0]} /> : <div className="homepage-empty-state">Şu anda öne çıkarılmış aktif ilan bulunmuyor.</div>}</div>
+        <div className="homepage-marketplace-column"><SectionHeader icon={Car} title="Yeni Araç İlanları" subtitle="En yeni araç ilanlarını keşfet" href="/arac" /><HomepageListingRotator listings={vehicleListings} emptyMessage="Henüz yeni araç ilanı bulunmuyor." label="araç ilanları" /></div>
+        <div className="homepage-marketplace-column"><SectionHeader icon={Home} title="Yeni Mülk İlanları" subtitle="En yeni mülk ilanlarını keşfet" href="/mulk" /><HomepageListingRotator listings={propertyListings} emptyMessage="Henüz yeni mülk ilanı bulunmuyor." label="mülk ilanları" /></div>
+        <div className="homepage-marketplace-column"><SectionHeader icon={Store} title="Kurumsal Satıcılar" subtitle="Aktif üyeliğe sahip kurumsal satıcılar" href="/ilanlari-kesfet" /><CorporateSellerList sellers={corporateSellers} counts={corporateListingCounts} /></div>
+      </div>
+    </section>
+  );
 }

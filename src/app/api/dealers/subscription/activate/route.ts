@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
-import { getDealerRepository } from '@/lib/db/repositories';
+import { getAuditRepository, getDealerRepository } from '@/lib/db/repositories';
+import { isCanonicalTestLoginActor } from '@/lib/auth/test-login';
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,6 +28,28 @@ export async function POST(req: NextRequest) {
 
     if (dealer.status !== 'APPROVED') {
       return NextResponse.json({ error: 'Yalnızca onaylanmış kurumsal mağazalar üyelik aktif edebilir.' }, { status: 400 });
+    }
+
+    const testActivationBypass = await isCanonicalTestLoginActor({ userId: actor.userId, profile: actor.profile });
+    if (testActivationBypass) {
+      if (typeof dealerRepo.activateSubscription !== 'function') {
+        return NextResponse.json({ error: 'Üyelik aktivasyonu kullanılamıyor.' }, { status: 503 });
+      }
+      const result = await dealerRepo.activateSubscription(dealer.id);
+      if (!result.success || !result.dealer) {
+        return NextResponse.json({ error: result.error || 'Üyelik aktif edilemedi.' }, { status: 500 });
+      }
+      try {
+        await getAuditRepository().recordEvent({
+          eventType: 'TEST_CORPORATE_SUBSCRIPTION_BYPASS',
+          userId: actor.userId,
+          profileId: actor.profileId,
+          metadata: { dealerId: dealer.id, paymentSource: 'TEST_BYPASS', charged: false },
+        });
+      } catch (auditError) {
+        console.error('Failed to record test corporate subscription bypass audit:', auditError);
+      }
+      return NextResponse.json({ success: true, dealer: result.dealer, testActivationBypass: true });
     }
 
     return NextResponse.json(

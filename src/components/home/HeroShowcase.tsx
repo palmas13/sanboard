@@ -21,7 +21,7 @@ function HeroDecorativeListingCard({ listing, index }: { listing: typeof decorat
         <span className="absolute left-3 top-3 rounded-md border border-white/10 bg-black/70 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">{listing.category}</span>
         <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full border border-white/10 bg-black/70 px-2 py-1 text-[10px] text-white backdrop-blur-sm"><Heart className="h-3 w-3" /> {listing.favorites}</span>
       </div>
-      <div className="space-y-1.5 p-3.5">
+      <div className="hero-listing-card-content space-y-1.5 p-3.5">
         <p className="text-lg font-black tracking-tight text-[#ff921f]">{formatCurrency(listing.price)}</p>
         <h3 className="truncate text-sm font-bold text-white">{listing.title}</h3>
         <div className="flex items-center justify-between gap-2 text-[10px] text-zinc-400">
@@ -34,7 +34,7 @@ function HeroDecorativeListingCard({ listing, index }: { listing: typeof decorat
 }
 
 function HeroAnnotations() {
-  return <div className="hero-annotations" aria-hidden="true"><div className="hero-note hero-note-primary"><span>Hayalindeki araca<br />bir adım daha yakın</span><svg viewBox="0 0 150 74"><path d="M5 8 C 48 4, 72 18, 92 39 C 105 53, 118 57, 140 54" /><path d="M129 46 L141 54 L130 62" /></svg></div><div className="hero-note hero-note-secondary"><span>Los Santos&apos;ta daha fazlası<br />seni bekliyor</span><svg viewBox="0 0 135 68"><path d="M5 58 C 33 54, 43 34, 68 27 C 88 21, 105 25, 125 12" /><path d="M113 10 L126 12 L121 24" /></svg></div></div>;
+  return <div className="hero-annotations" aria-hidden="true"><div className="hero-note hero-note-primary"><span>Hayalindeki araca<br />bir adım daha yakın</span><svg viewBox="0 0 150 82"><path d="M8 8 C 42 10, 67 23, 83 43 C 98 61, 116 68, 140 67" /><path d="M129 58 L141 67 L129 75" /></svg></div><div className="hero-note hero-note-secondary"><span>Los Santos&apos;ta daha fazlası<br />seni bekliyor</span><svg viewBox="0 0 150 82"><path d="M142 8 C 116 10, 101 24, 91 42 C 80 61, 60 68, 34 67" /><path d="M45 58 L33 67 L45 75" /></svg></div></div>;
 }
 
 export function HeroShowcase({ stats }: { stats: HomepageStats }) {

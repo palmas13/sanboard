@@ -18,7 +18,12 @@ export default async function HomePage() {
   const featuredListings = allListings.filter((listing) => listing.is_featured && (!listing.featured_until || new Date(listing.featured_until).getTime() > now));
   const vehicleListings = allListings.filter((listing) => listing.category === 'vehicle');
   const propertyListings = allListings.filter((listing) => listing.category === 'property');
-  const corporateSellers = allDealers.filter((dealer) => dealer.status === 'APPROVED' && dealer.moderation_status !== 'SUSPENDED' && dealer.moderation_status !== 'DELETED' && !dealer.deleted_at).slice(0, 5);
+  const corporateSellers = allDealers.filter((dealer) => dealer.status === 'APPROVED'
+    && dealer.moderation_status === 'ACTIVE'
+    && !dealer.deleted_at
+    && dealer.subscription_status === 'ACTIVE'
+    && Boolean(dealer.subscription_expires_at)
+    && new Date(dealer.subscription_expires_at!).getTime() > now).slice(0, 5);
   const corporateListingCounts = allListings.reduce<Record<string, number>>((counts, listing) => {
     if (listing.corporate_profile_id) counts[listing.corporate_profile_id] = (counts[listing.corporate_profile_id] || 0) + 1;
     return counts;
