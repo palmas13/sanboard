@@ -2,6 +2,7 @@ import { getDealerRepository, getListingRepository } from '@/lib/db/repositories
 import { HeroShowcase } from '@/components/home/HeroShowcase';
 import { HomepageMarketplace } from '@/components/home/HomepageMarketplace';
 import { WhySanboardSection } from '@/components/home/WhySanboardSection';
+import { getHomepageStats } from '@/lib/db/homepage-stats';
 
 export const revalidate = 30;
 
@@ -22,10 +23,11 @@ export default async function HomePage() {
     if (listing.corporate_profile_id) counts[listing.corporate_profile_id] = (counts[listing.corporate_profile_id] || 0) + 1;
     return counts;
   }, {});
+  const homepageStats = await getHomepageStats(allListings.length);
 
   return (
     <div className="homepage-shell pb-8 sm:pb-12">
-      <HeroShowcase />
+      <HeroShowcase stats={homepageStats} />
       <HomepageMarketplace featuredListings={featuredListings} vehicleListings={vehicleListings} propertyListings={propertyListings} corporateSellers={corporateSellers} corporateListingCounts={corporateListingCounts} />
       <WhySanboardSection />
     </div>

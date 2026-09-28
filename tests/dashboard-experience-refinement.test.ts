@@ -57,12 +57,12 @@ describe('dashboard experience refinement regressions', () => {
     const terms = source('src/app/kullanim-kosullari/page.tsx');
     assert.match(navbar, />Keşfet/);
     assert.doesNotMatch(navbar, />X</);
-    assert.match(home, /<HeroShowcase \/>/);
+    assert.match(home, /<HeroShowcase stats=\{homepageStats\} \/>/);
     assert.match(hero, /href="\/ilan-ver"/);
     assert.match(hero, /href="\/ilanlari-kesfet"/);
     assert.doesNotMatch(home, /Los Santos ilan deneyimi/);
     assert.match(hero, /hero-card-stage/);
-    assert.match(hero, /hayat seninle başlar/);
+    assert.match(hero, /<HeroTypewriter \/>/);
     assert.match(explore, /href: '\/arac'/);
     assert.match(explore, /href: '\/mulk'/);
     assert.match(explore, /Araç mı arıyorsun\?/);

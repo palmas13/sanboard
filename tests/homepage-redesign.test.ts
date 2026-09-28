@@ -19,9 +19,23 @@ describe('homepage marketplace redesign', () => {
     const hero = source('src/components/home/HeroShowcase.tsx');
     assert.match(hero, /href="\/ilan-ver"/);
     assert.match(hero, /href="\/ilanlari-kesfet"/);
-    assert.match(hero, /\/home\/hero-los-santos\.webp/);
+    assert.match(hero, /\/home\/sanboard-background1\.png/);
     assert.match(hero, /aria-hidden="true"/);
     assert.doesNotMatch(hero, /<button|cursor-pointer/);
+  });
+
+  test('hero polish uses real counters, stable typewriter and decorative notes', () => {
+    const page = source('src/app/page.tsx');
+    const stats = source('src/lib/db/homepage-stats.ts');
+    const dynamic = source('src/components/home/HeroDynamicContent.tsx');
+    const hero = source('src/components/home/HeroShowcase.tsx');
+    assert.match(page, /getHomepageStats\(allListings\.length\)/);
+    assert.match(stats, /offer_threads/);
+    assert.match(stats, /from\('users'\)/);
+    assert.match(dynamic, /requestAnimationFrame/);
+    assert.match(dynamic, /prefers-reduced-motion/);
+    assert.match(dynamic, /ilan oluştur/);
+    assert.match(hero, /Hayalindeki araca/);
   });
 
   test('real homepage cards use canonical listing and corporate links', () => {
@@ -30,6 +44,8 @@ describe('homepage marketplace redesign', () => {
     assert.match(marketplace, /getListingUrl\(listing\)/);
     assert.match(marketplace, /getCorporateUrl\(seller\)/);
     assert.match(rotator, /getListingUrl\(listing\)/);
+    assert.match(rotator, /<FavoriteButton/);
+    assert.match(marketplace, /<FavoriteButton/);
   });
 
   test('shared rotator covers autoplay, manual navigation, pause and reduced motion', () => {
