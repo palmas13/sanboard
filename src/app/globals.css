@@ -87,16 +87,20 @@ a {
 .offer-view { min-width: 0; }
 .offer-view-forward { animation: offer-view-forward 220ms cubic-bezier(.22,1,.36,1) both; }
 .offer-view-back { animation: offer-view-back 220ms cubic-bezier(.22,1,.36,1) both; }
+.offer-confirm-backdrop { animation: offer-confirm-backdrop 180ms ease-out both; }
+.offer-confirm-dialog { animation: offer-confirm-dialog 220ms cubic-bezier(.22,1,.36,1) both; }
 .offer-icon-button { display: inline-flex; height: 2.25rem; width: 2.25rem; align-items: center; justify-content: center; border-radius: .75rem; color: var(--text-muted); transition: background-color 150ms ease, color 150ms ease, transform 150ms ease; }
 .offer-icon-button:hover { background: var(--bg-surface-secondary); color: var(--text-main); }
 .offer-icon-button:active { transform: scale(.94); }
 .offer-icon-button:focus-visible { outline: 2px solid var(--brand-orange); outline-offset: 2px; }
 @keyframes offer-view-forward { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes offer-view-back { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes offer-confirm-backdrop { from { opacity: 0; } to { opacity: 1; } }
+@keyframes offer-confirm-dialog { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @media (prefers-reduced-motion: reduce) {
   .offer-launcher, .offer-panel, .offer-icon-button { transition: none; }
   .offer-launcher:hover, .offer-launcher:active, .offer-icon-button:active { transform: none; }
-  .offer-view-forward, .offer-view-back { animation: none; }
+  .offer-view-forward, .offer-view-back, .offer-confirm-backdrop, .offer-confirm-dialog { animation: none; }
 }
 
 /* Custom Scrollbar */

@@ -4,7 +4,7 @@ import { OFFER_PAGE_SIZE } from '@/lib/offers/constants';
 import { OfferCloseReason, OfferThread } from '@/types';
 import { redactPrivateContact } from '@/lib/profiles/contact-privacy';
 
-const relations = 'listing:listings(id,public_id,title,price,status,offers_enabled,minimum_offer_amount,seller_type,corporate_profile_id,listing_images(*),corporate:corporate_profiles(phone,email)), buyer:character_profiles!offer_threads_buyer_profile_id_fkey(id,full_name,avatar_url,avatar_path,phone,sanmail_email,phone_visibility,sanmail_visibility), seller:character_profiles!offer_threads_seller_profile_id_fkey(id,full_name,avatar_url,avatar_path,phone,sanmail_email,phone_visibility,sanmail_visibility)';
+const relations = 'listing:listings(id,public_id,title,price,status,offers_enabled,minimum_offer_amount,seller_type,corporate_profile_id,listing_images(*),corporate:corporate_profiles(phone,email)), buyer:character_profiles!offer_threads_buyer_profile_id_fkey(id,public_id,full_name,avatar_url,avatar_path,phone,sanmail_email,phone_visibility,sanmail_visibility), seller:character_profiles!offer_threads_seller_profile_id_fkey(id,public_id,full_name,avatar_url,avatar_path,phone,sanmail_email,phone_visibility,sanmail_visibility)';
 
 export class SupabaseOfferRepository implements IOfferRepository {
   private client(){const c=getSupabaseAdminClient();if(!c)throw new Error('Supabase service role yapılandırılmamış.');return c;}
@@ -15,7 +15,7 @@ export class SupabaseOfferRepository implements IOfferRepository {
     const readAt=side==='BUYER'?thread.buyer_last_read_at:thread.seller_last_read_at;
     const corporate=Array.isArray(thread.listing?.corporate)?thread.listing.corporate[0]:thread.listing?.corporate;
     const contact=withContact&&thread.status==='ACCEPTED'?(thread.listing?.seller_type==='CORPORATE'&&corporate?{phone:corporate.phone||'',sanmail_email:corporate.email||''}:redactPrivateContact(thread.seller)):undefined;
-    const safeProfile=(profile:any)=>profile?{id:profile.id,full_name:profile.full_name,avatar_url:profile.avatar_url||'',avatar_path:profile.avatar_path||''}:undefined;
+    const safeProfile=(profile:any)=>profile?{id:profile.id,public_id:profile.public_id,full_name:profile.full_name,avatar_url:profile.avatar_url||'',avatar_path:profile.avatar_path||''}:undefined;
     return {...thread,buyer:safeProfile(thread.buyer),seller:safeProfile(thread.seller),events,actor_side:side,unread_count:events.filter((event:any)=>event.actor_profile_id!==actorProfileId&&(!readAt||event.created_at>readAt)).length,visible_contact:contact?{phone:contact.phone,sanmail_email:contact.sanmail_email}:undefined};
   }
   async createOffer(input:any){const {data,error}=await this.client().rpc('create_offer_thread',{p_actor_profile_id:input.actorProfileId,p_listing_id:input.listingId,p_amount:input.amount});return this.result(data,error);}

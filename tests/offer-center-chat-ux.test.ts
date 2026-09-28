@@ -48,6 +48,17 @@ describe('OfferCenter chat UX', () => {
     assert.match(center, /bg-\[#FF8A1F\]\/8/);
     assert.match(center, /font-black/);
     assert.match(center, /h-2 w-2[\s\S]*bg-\[#FF8A1F\]/);
+    assert.match(center, /href=\{profileUrl\(person\)\}/);
+    assert.match(center, /event\.stopPropagation\(\)/);
+  });
+
+  test('actions preserve hydrated detail by refetching the canonical thread', () => {
+    assert.match(center, /const fetchThread = useCallback/);
+    assert.match(center, /const hydratedThread = await fetchThread\(threadId\)/);
+    assert.match(center, /await hydrateThread\(thread\.id\)/);
+    const actionBlock = center.slice(center.indexOf('const act ='), center.indexOf('const closeHideDialog'));
+    assert.doesNotMatch(actionBlock, /setThread\(data\.thread\)/);
+    for (const action of ['COUNTER', 'ACCEPT', 'REJECT', 'WITHDRAW']) assert.match(center, new RegExp(`'${action}'`));
   });
 
   test('panel open/close and list/detail transitions are soft and reduced-motion safe', () => {
@@ -65,16 +76,22 @@ describe('OfferCenter chat UX', () => {
     assert.match(center, /sm:w-\[420px\]/);
   });
 
-  test('three-dot menu is accessible, clipping-safe and uses participant hide', () => {
+  test('three-dot menu is accessible, clipping-safe and shares a custom hide confirmation modal', () => {
     assert.match(center, /aria-haspopup="menu"/);
     assert.match(center, /aria-expanded=\{menuOpen\}/);
     assert.match(center, /role="menu"/);
     assert.match(center, /z-\[70\]/);
     assert.match(center, /overflow-visible/);
     assert.match(center, /Listeden kaldır/);
-    assert.match(center, /hideThread\(thread\.id, true\)/);
+    assert.match(center, /requestHide\(thread\.id, true\)/);
     assert.match(center, /method: 'DELETE'/);
+    assert.match(center, /role="dialog"/);
+    assert.match(center, /aria-modal="true"/);
+    assert.match(center, /Teklif görüşmesini kaldır/);
     assert.match(center, /Bu teklif görüşmesi yalnız sizin listenizden kaldırılır/);
+    assert.match(center, /onMouseDown=\{\(event\) => \{ if \(event\.target === event\.currentTarget\) closeHideDialog\(\); \}\}/);
+    assert.match(center, /hideCancelButton\.current\?\.focus\(\)/);
+    assert.doesNotMatch(center, /window\.confirm|\bconfirm\(/);
   });
 
   test('accepted contact card is listing-owner specific and old copy is gone', () => {

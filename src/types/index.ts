@@ -290,8 +290,8 @@ export interface OfferThread {
   created_at: string;
   updated_at: string;
   listing?: Pick<Listing, 'id' | 'public_id' | 'title' | 'price' | 'status' | 'images' | 'offers_enabled' | 'minimum_offer_amount'>;
-  buyer?: Pick<CharacterProfile, 'id' | 'full_name' | 'avatar_url' | 'avatar_path'>;
-  seller?: Pick<CharacterProfile, 'id' | 'full_name' | 'avatar_url' | 'avatar_path'>;
+  buyer?: Pick<CharacterProfile, 'id' | 'public_id' | 'full_name' | 'avatar_url' | 'avatar_path'>;
+  seller?: Pick<CharacterProfile, 'id' | 'public_id' | 'full_name' | 'avatar_url' | 'avatar_path'>;
   events?: OfferEvent[];
   unread_count?: number;
   actor_side?: 'BUYER' | 'SELLER';
