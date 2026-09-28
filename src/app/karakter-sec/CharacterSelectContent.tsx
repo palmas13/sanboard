@@ -10,9 +10,10 @@ import { resolveAvatarUrl } from '@/lib/media/url';
 interface CharacterSelectContentProps {
   redirect: string;
   isTestSource: boolean;
+  defaultCharacterName: string | null;
 }
 
-export function CharacterSelectContent({ redirect, isTestSource }: CharacterSelectContentProps) {
+export function CharacterSelectContent({ redirect, isTestSource, defaultCharacterName }: CharacterSelectContentProps) {
   const router = useRouter();
   const { characters, selectCharacter, refreshCharacters } = useAuth();
   const [switchingId, setSwitchingId] = React.useState<string | null>(null);
@@ -145,6 +146,11 @@ export function CharacterSelectContent({ redirect, isTestSource }: CharacterSele
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>Profil mevcut</span>
                         </span>
+                        {char.displayName === defaultCharacterName ? (
+                          <span className="rounded border border-[var(--color-success)]/30 px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-success)]">
+                            VARSAYILAN
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   </div>

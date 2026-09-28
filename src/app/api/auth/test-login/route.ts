@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { syncExternalGameAccount } from '@/lib/auth/gtaworld-sync';
-import { createCharacterSelectionToken, createSessionToken, clearSessionCookieOnResponse, setCharacterSelectionCookieOnResponse, setSessionCookieOnResponse } from '@/lib/auth/session';
-import { assertTestLoginAccountNamespace, isTestLoginEnabled, reconcileTestLoginRoles, TEST_LOGIN_JOHN_CHARACTER_ID } from '@/lib/auth/test-login';
+import { createCharacterSelectionToken, clearSessionCookieOnResponse, setCharacterSelectionCookieOnResponse } from '@/lib/auth/session';
+import { assertTestLoginAccountNamespace, isTestLoginEnabled, reconcileTestLoginRoles } from '@/lib/auth/test-login';
 import { MockGtaWorldAuthProvider, resolveTestLoginAccountKey } from '@/lib/integrations/gtaworld/mock-provider';
 import { recordAuditEvent } from '@/lib/audit';
 import { normalizeInternalRedirect } from '@/lib/auth/redirect';
@@ -23,19 +23,7 @@ export async function GET(req: NextRequest) {
 
     await recordAuditEvent({ eventType: 'AUTH_LOGIN_SUCCESS', userId: user.id, metadata: { provider: 'temporary-test-login', accountKey, characterCount: profiles.length } });
     const redirect = normalizeInternalRedirect(req.nextUrl.searchParams.get('redirect'));
-    if (accountKey === 'secondary') {
-      const johnProfiles = profiles.filter((profile) => profile.external_character_id === TEST_LOGIN_JOHN_CHARACTER_ID && profile.user_id === user.id);
-      if (johnProfiles.length !== 1) throw new Error('Default secondary test character could not be resolved unambiguously.');
-      const john = johnProfiles[0];
-      const response = NextResponse.redirect(new URL(redirect, req.url));
-      clearSessionCookieOnResponse(response);
-      setSessionCookieOnResponse(response, createSessionToken({ userId: user.id, profileId: john.id, role: john.role || 'USER' }));
-      response.cookies.set('sanboard_profile_id', john.id, { path: '/', maxAge: 86400, sameSite: 'lax' });
-      response.cookies.set('sanboard_user_id', user.id, { path: '/', maxAge: 86400, sameSite: 'lax' });
-      response.cookies.set('sanboard_role', john.role || 'USER', { path: '/', maxAge: 86400, sameSite: 'lax' });
-      return response;
-    }
-    const destination = `/karakter-sec?redirect=${encodeURIComponent(redirect)}&source=test`;
+    const destination = `/karakter-sec?redirect=${encodeURIComponent(redirect)}&source=test&account=${accountKey}`;
     const response = NextResponse.redirect(new URL(destination, req.url));
     clearSessionCookieOnResponse(response);
     setCharacterSelectionCookieOnResponse(response, createCharacterSelectionToken(user.id));

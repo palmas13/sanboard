@@ -57,7 +57,7 @@ describe('SANBOARD temporary test character login harness', () => {
     process.env.ENABLE_TEST_LOGIN = 'true';
     const response = await startTestLogin(new NextRequest('http://localhost/api/auth/test-login?redirect=%2Farac'));
     assert.equal(response.status, 307);
-    assert.match(response.headers.get('location') || '', /\/karakter-sec\?redirect=%2Farac&source=test$/);
+    assert.match(response.headers.get('location') || '', /\/karakter-sec\?redirect=%2Farac&source=test&account=fixtures$/);
     assert.equal(db.users.length, 1);
     assert.equal(db.profiles.length, 3);
     assert.ok(db.users[0].external_user_id?.startsWith(TEST_LOGIN_ACCOUNT_PREFIX));
@@ -70,7 +70,7 @@ describe('SANBOARD temporary test character login harness', () => {
     assert.ok(response.cookies.get(CHARACTER_SELECTION_COOKIE)?.value);
   });
 
-  test('secondary account is canonical, defaults to John, switches to Jane, and cannot inject accounts or profiles', async () => {
+  test('secondary account is canonical, offers John and Jane selection, and cannot inject accounts or profiles', async () => {
     process.env.ENABLE_TEST_LOGIN = 'true';
     const accountAStart = await startTestLogin(new NextRequest('http://localhost/api/auth/test-login'));
     assert.ok(accountAStart.cookies.get(CHARACTER_SELECTION_COOKIE)?.value);
@@ -80,7 +80,7 @@ describe('SANBOARD temporary test character login harness', () => {
 
     const accountBStart = await startTestLogin(new NextRequest('http://localhost/api/auth/test-login?account=secondary&redirect=%2Farac'));
     assert.equal(accountBStart.status, 307);
-    assert.match(accountBStart.headers.get('location') || '', /\/arac$/);
+    assert.match(accountBStart.headers.get('location') || '', /\/karakter-sec\?redirect=%2Farac&source=test&account=secondary$/);
     assert.equal(db.users.length, 2);
     assert.equal(db.profiles.length, 5);
 
@@ -100,15 +100,20 @@ describe('SANBOARD temporary test character login harness', () => {
     assert.equal(jane.role, 'USER');
     assert.ok(db.profiles.filter((profile) => profile.user_id === accountA.id).every((profile) => ![john.id, jane.id].includes(profile.id)));
 
-    const johnToken = accountBStart.cookies.get('sanboard_session')!.value;
+    assert.equal(accountBStart.cookies.get('sanboard_session')?.value, '');
+    const accountBSelectionToken = accountBStart.cookies.get(CHARACTER_SELECTION_COOKIE)!.value;
+    const accountBSelectionCookie = `${CHARACTER_SELECTION_COOKIE}=${accountBSelectionToken}`;
+    const accountBCharacters = await listCharacters(new NextRequest('http://localhost/api/user/characters', { headers: { cookie: accountBSelectionCookie } }));
+    const accountBBody = await accountBCharacters.json();
+    assert.deepEqual(accountBBody.characters.map((character: { displayName: string }) => character.displayName), ['John Doe', 'Jane Doe']);
+
+    const selectedJohn = await selectCharacter(new NextRequest('http://localhost/api/auth/session', { method: 'POST', headers: { cookie: accountBSelectionCookie, 'content-type': 'application/json' }, body: JSON.stringify({ characterId: john.id }) }));
+    assert.equal(selectedJohn.status, 200);
+    const johnToken = selectedJohn.cookies.get('sanboard_session')!.value;
     const johnSession = verifySessionToken(johnToken)!;
     assert.equal(johnSession.userId, accountB.id);
     assert.equal(johnSession.profileId, john.id);
     assert.equal(johnSession.role, 'USER');
-
-    const accountBCharacters = await listCharacters(new NextRequest('http://localhost/api/user/characters', { headers: { cookie: `sanboard_session=${johnToken}` } }));
-    const accountBBody = await accountBCharacters.json();
-    assert.deepEqual(accountBBody.characters.map((character: { displayName: string }) => character.displayName), ['John Doe', 'Jane Doe']);
 
     const mavis = db.profiles.find((profile) => profile.external_character_id === TEST_LOGIN_MAVIS_CHARACTER_ID)!;
     const crossAccountInjection = await selectCharacter(new NextRequest('http://localhost/api/auth/session', { method: 'POST', headers: { cookie: `sanboard_session=${johnToken}`, 'content-type': 'application/json' }, body: JSON.stringify({ characterId: mavis.id, userId: accountA.id }) }));
@@ -122,13 +127,13 @@ describe('SANBOARD temporary test character login harness', () => {
   });
 
   test('character picker resolves test and normal UI from server search params without client URL branching', async () => {
-    const testPage = await CharacterSelectPage({ searchParams: Promise.resolve({ redirect: '/arac', source: 'test' }) });
+    const testPage = await CharacterSelectPage({ searchParams: Promise.resolve({ redirect: '/arac', source: 'test', account: 'secondary' }) });
     assert.equal(testPage.type, CharacterSelectContent);
-    assert.deepEqual(testPage.props, { redirect: '/arac', isTestSource: true });
+    assert.deepEqual(testPage.props, { redirect: '/arac', isTestSource: true, defaultCharacterName: 'John Doe' });
 
     const normalPage = await CharacterSelectPage({ searchParams: Promise.resolve({}) });
     assert.equal(normalPage.type, CharacterSelectContent);
-    assert.deepEqual(normalPage.props, { redirect: '/', isTestSource: false });
+    assert.deepEqual(normalPage.props, { redirect: '/', isTestSource: false, defaultCharacterName: null });
 
     const clientSource = readFileSync(join(process.cwd(), 'src/app/karakter-sec/CharacterSelectContent.tsx'), 'utf8');
     assert.doesNotMatch(clientSource, /useSearchParams/);

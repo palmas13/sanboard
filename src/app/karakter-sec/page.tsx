@@ -5,6 +5,7 @@ interface CharacterSelectPageProps {
   searchParams: Promise<{
     redirect?: string | string[];
     source?: string | string[];
+    account?: string | string[];
   }>;
 }
 
@@ -12,6 +13,7 @@ export default async function CharacterSelectPage({ searchParams }: CharacterSel
   const params = await searchParams;
   const redirect = normalizeInternalRedirect(params.redirect);
   const isTestSource = params.source === 'test';
+  const defaultCharacterName = isTestSource && params.account === 'secondary' ? 'John Doe' : null;
 
-  return <CharacterSelectContent redirect={redirect} isTestSource={isTestSource} />;
+  return <CharacterSelectContent redirect={redirect} isTestSource={isTestSource} defaultCharacterName={defaultCharacterName} />;
 }
