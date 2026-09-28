@@ -214,9 +214,9 @@ export function NotificationDropdown() {
 
       {/* Popover Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 sm:right-auto sm:left-auto md:right-0 mt-2 w-[340px] sm:w-[380px] rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="fixed inset-x-3 top-[76px] z-50 flex max-h-[calc(100dvh-88px)] flex-col overflow-hidden rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] shadow-2xl animate-in fade-in slide-in-from-top-2 duration-150 sm:absolute sm:inset-x-auto sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:block sm:max-h-none sm:w-[380px]">
           {/* Header */}
-          <div className="p-3.5 px-4 border-b border-[var(--border-app)] flex items-center justify-between bg-[var(--bg-surface-secondary)]/50">
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/50 p-3.5 px-4">
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-[var(--text-main)]">Bildirimler</span>
               {hasUnread && (
@@ -231,7 +231,7 @@ export function NotificationDropdown() {
                 type="button"
                 onClick={handleMarkAllRead}
                 disabled={loading}
-                className="text-xs font-semibold text-[#FF8A1F] hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                className="flex shrink-0 cursor-pointer items-center gap-1 text-right text-[11px] font-semibold leading-tight text-[#FF8A1F] hover:underline disabled:opacity-50 sm:text-xs"
               >
                 {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCheck className="w-3 h-3" />}
                 <span>Tümünü Okundu İşaretle</span>
@@ -240,7 +240,7 @@ export function NotificationDropdown() {
           </div>
 
           {/* Notification Items */}
-          <div className="max-h-[360px] overflow-y-auto divide-y divide-[var(--border-app)]">
+          <div className="min-h-0 flex-1 divide-y divide-[var(--border-app)] overflow-y-auto overscroll-contain sm:max-h-[360px]">
             {recentNotifications.length > 0 ? (
               recentNotifications.map((notif) => {
                 const isUnread = !notif.read_at;
@@ -294,7 +294,7 @@ export function NotificationDropdown() {
                       <button
                         type="button"
                         onClick={(e) => handleMarkAsRead(e, notif.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[#FF8A1F] transition-all shrink-0 cursor-pointer"
+                        className="shrink-0 cursor-pointer rounded-lg p-1 text-[var(--text-dim)] transition-all hover:bg-[var(--bg-surface)] hover:text-[#FF8A1F] sm:opacity-0 sm:group-hover:opacity-100"
                         title="Okundu İşaretle"
                       >
                         <Check className="w-3.5 h-3.5" />
