@@ -9,6 +9,8 @@ export async function GET(req: NextRequest) {
   if(countOnly)return NextResponse.json({unreadCount:await repo.getUnreadCount(actor.profileId)});
   const listingId=req.nextUrl.searchParams.get('listingId');
   if(listingId)return NextResponse.json({activeCount:await repo.getActiveCountForListing(listingId,actor.profileId)});
+  const threadListingId=req.nextUrl.searchParams.get('threadForListing');
+  if(threadListingId)return NextResponse.json({thread:await repo.getActiveThreadForListing(threadListingId,actor.profileId)});
   const result=await repo.listOffers({actorProfileId:actor.profileId,box:req.nextUrl.searchParams.get('box')==='sent'?'sent':'received',status:req.nextUrl.searchParams.get('status')||undefined,cursor:req.nextUrl.searchParams.get('cursor')||undefined});
   return NextResponse.json(result);
 }

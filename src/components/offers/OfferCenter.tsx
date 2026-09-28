@@ -1,31 +1,48 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Handshake, Loader2, X } from 'lucide-react';
+import { ArrowLeft, Check, Handshake, Info, Loader2, MoreHorizontal, Phone, Send, Trash2, X } from 'lucide-react';
 import { useAuth } from '@/features/auth/AuthContext';
 import { OfferEvent, OfferThread } from '@/types';
 import { formatCurrency } from '@/lib/utils/format';
+import { resolveMediaUrl } from '@/lib/media/url';
+import { isSystemOfferEvent, latestOfferSummary, offerEventCopy, offerStatusText } from '@/lib/offers/presentation';
 
 type OpenInput = { listingId: string; title: string; price: number; thumbnail?: string; minimum?: number | null };
 type OfferCenterContext = { openForListing: (input: OpenInput) => void; openThread: (threadId: string) => void };
+type ProfileSummary = NonNullable<OfferThread['buyer']>;
 
 export const OFFER_CENTER_OPEN_THREAD_EVENT = 'sanboard:open-offer-thread';
 const Context = createContext<OfferCenterContext>({ openForListing: () => undefined, openThread: () => undefined });
 export const useOfferCenter = () => useContext(Context);
 export function openOfferThread(threadId: string) {
-  window.dispatchEvent(new CustomEvent(OFFER_CENTER_OPEN_THREAD_EVENT, { detail: { threadId } }));
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(OFFER_CENTER_OPEN_THREAD_EVENT, { detail: { threadId } }));
 }
 
-const statusText: Record<OfferThread['status'], string> = {
-  ACTIVE: 'Aktif', ACCEPTED: 'Kabul edildi', REJECTED: 'Reddedildi', WITHDRAWN: 'Geri çekildi', EXPIRED: 'Yanıt süresi doldu', CLOSED: 'İlan kapandığı için kapatıldı',
-};
-const closeReasonText: Record<string, string> = {
-  LISTING_EXPIRED: 'İlanın süresi doldu.', LISTING_REMOVED_BY_SELLER: 'İlan satıcı tarafından kaldırıldı.', LISTING_REMOVED_BY_ADMIN: 'İlan yönetim tarafından kaldırıldı.', LISTING_SOLD: 'İlan satıldı.', LISTING_DELETED: 'İlan silindi.', LISTING_SUSPENDED: 'İlan askıya alındı.',
-};
+function Avatar({ profile, size = 'md' }: { profile?: ProfileSummary; size?: 'sm' | 'md' }) {
+  const [failed, setFailed] = useState(false);
+  const source = resolveMediaUrl(profile?.avatar_path || profile?.avatar_url || '');
+  const classes = size === 'sm' ? 'h-9 w-9 text-xs' : 'h-11 w-11 text-sm';
+  return source && !failed ? <img src={source} alt="" onError={() => setFailed(true)} className={`${classes} shrink-0 rounded-full border border-white/10 object-cover`} /> : <span aria-hidden="true" className={`${classes} flex shrink-0 items-center justify-center rounded-full border border-[#FF8A1F]/30 bg-[#FF8A1F]/12 font-black text-[#FF9E45]`}>{profile?.full_name?.split(' ').map((part) => part[0]).slice(0, 2).join('') || '?'}</span>;
+}
+
+function timeText(value: string) {
+  const date = new Date(value);
+  const today = new Date();
+  return date.toDateString() === today.toDateString() ? date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : date.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' });
+}
+
+function EventBubble({ event, thread, currentProfileId }: { event: OfferEvent; thread: OfferThread; currentProfileId?: string }) {
+  if (isSystemOfferEvent(event)) return <li className="flex justify-center py-1"><div data-offer-event="system" className="max-w-[88%] rounded-full border border-amber-400/15 bg-amber-400/7 px-3 py-1.5 text-center text-[11px] text-[var(--text-muted)]"><Info className="mr-1 inline h-3 w-3 text-amber-400" />{offerEventCopy(event)} <time className="ml-1 text-[10px] text-[var(--text-dim)]">{timeText(event.created_at)}</time></div></li>;
+  const own = event.actor_profile_id === currentProfileId;
+  const profile = event.actor_profile_id === thread.buyer_profile_id ? thread.buyer : thread.seller;
+  return <li data-offer-event={own ? 'own' : 'counterparty'} className={`flex items-end gap-2 ${own ? 'justify-end' : 'justify-start'}`}>{!own && <Avatar profile={profile} size="sm" />}<div className={`max-w-[78%] rounded-2xl px-3.5 py-2.5 text-sm shadow-sm ${own ? 'rounded-br-md bg-[#FF8A1F] text-[#1a0e04]' : 'rounded-bl-md border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] text-[var(--text-main)]'}`}><p className="font-medium leading-relaxed">{offerEventCopy(event)}</p><time className={`mt-1 block text-right text-[10px] ${own ? 'text-black/55' : 'text-[var(--text-dim)]'}`}>{timeText(event.created_at)}</time></div>{own && <Avatar profile={profile} size="sm" />}</li>;
+}
 
 export function OfferCenterProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, currentProfile } = useAuth();
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [box, setBox] = useState<'received' | 'sent'>('received');
   const [rows, setRows] = useState<OfferThread[]>([]);
   const [thread, setThread] = useState<OfferThread | null>(null);
@@ -35,78 +52,39 @@ export function OfferCenterProvider({ children }: { children: React.ReactNode })
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const launcher = useRef<HTMLButtonElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
+  const previousOpen = useRef(false);
 
-  const refreshUnread = useCallback(async () => {
-    if (!isAuthenticated) return setUnread(0);
-    const response = await fetch('/api/offers?countOnly=1');
-    if (response.ok) setUnread((await response.json()).unreadCount || 0);
-  }, [isAuthenticated]);
-  const load = useCallback(async (append = false) => {
-    const cursor = append && nextCursor ? `&cursor=${encodeURIComponent(nextCursor)}` : '';
-    const response = await fetch(`/api/offers?box=${box}${cursor}`);
-    if (!response.ok) return;
-    const data = await response.json();
-    setRows((previous) => append ? [...previous, ...(data.threads || [])] : (data.threads || []));
-    setNextCursor(data.nextCursor || null);
-  }, [box, nextCursor]);
-  const select = useCallback(async (id: string) => {
-    setOpen(true); setCompose(null); setBusy(true); setError('');
-    const response = await fetch(`/api/offers/${id}`);
-    const data = await response.json();
-    if (response.ok) {
-      setThread(data.thread);
-      await fetch(`/api/offers/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'READ' }) });
-      await refreshUnread();
-    } else setError(data.error || 'Teklif açılamadı.');
-    setBusy(false);
-  }, [refreshUnread]);
-  const openForListing = useCallback((input: OpenInput) => {
-    setCompose(input); setThread(null); setAmount(''); setError(''); setOpen(true);
-  }, []);
-  const openThread = useCallback((threadId: string) => { void select(threadId); }, [select]);
+  const refreshUnread = useCallback(async () => { if (!isAuthenticated) return setUnread(0); try { const response=await fetch('/api/offers?countOnly=1');if(response.ok)setUnread((await response.json()).unreadCount||0); } catch {} }, [isAuthenticated]);
+  const load = useCallback(async (append=false) => { setBusy(true);setError('');try{const cursor=append&&nextCursor?`&cursor=${encodeURIComponent(nextCursor)}`:'';const response=await fetch(`/api/offers?box=${box}${cursor}`);const data=await response.json();if(!response.ok)throw new Error(data.error||'Teklifler yüklenemedi.');setRows((previous)=>append?[...previous,...(data.threads||[])]:data.threads||[]);setNextCursor(data.nextCursor||null);}catch(cause){setError(cause instanceof Error?cause.message:'Teklifler yüklenemedi.');}finally{setBusy(false);}}, [box,nextCursor]);
+  const select = useCallback(async(id:string)=>{setMounted(true);setOpen(true);setCompose(null);setBusy(true);setError('');setMenuOpen(false);try{const response=await fetch(`/api/offers/${id}`);const data=await response.json();if(!response.ok)throw new Error(data.error||'Teklif açılamadı.');setThread(data.thread);await fetch(`/api/offers/${id}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'READ'})});await refreshUnread();}catch(cause){setError(cause instanceof Error?cause.message:'Teklif açılamadı.');}finally{setBusy(false);}},[refreshUnread]);
+  const close = useCallback(()=>setOpen(false),[]);
+  const back = useCallback(()=>{setThread(null);setCompose(null);setAmount('');setError('');setMenuOpen(false);},[]);
+  const openForListing = useCallback(async(input:OpenInput)=>{setMounted(true);setOpen(true);setThread(null);setCompose(null);setAmount('');setError('');setBusy(true);try{const response=await fetch(`/api/offers?threadForListing=${encodeURIComponent(input.listingId)}`);const data=await response.json();if(response.ok&&data.thread){setThread(data.thread);await fetch(`/api/offers/${data.thread.id}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'READ'})});await refreshUnread();}else setCompose(input);}catch{setCompose(input);}finally{setBusy(false);}},[refreshUnread]);
+  const openThread = useCallback((id:string)=>{void select(id);},[select]);
 
-  useEffect(() => { void refreshUnread(); }, [refreshUnread, currentProfile?.id]);
-  useEffect(() => { if (open && isAuthenticated && !compose && !thread) void load(); }, [open, box, isAuthenticated, compose, thread, load]);
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false);
-    const onThread = (event: Event) => openThread((event as CustomEvent<{ threadId: string }>).detail.threadId);
-    document.addEventListener('keydown', onKey); window.addEventListener(OFFER_CENTER_OPEN_THREAD_EVENT, onThread);
-    return () => { document.removeEventListener('keydown', onKey); window.removeEventListener(OFFER_CENTER_OPEN_THREAD_EVENT, onThread); };
-  }, [openThread]);
-  useEffect(() => { if (open) closeButton.current?.focus(); }, [open]);
+  useEffect(()=>{void refreshUnread();},[refreshUnread,currentProfile?.id]);
+  useEffect(()=>{if(open&&isAuthenticated&&!compose&&!thread)void load();},[open,box,isAuthenticated,compose,thread,load]);
+  useEffect(()=>{if(open){setMounted(true);requestAnimationFrame(()=>closeButton.current?.focus());}else if(mounted){const timer=window.setTimeout(()=>setMounted(false),220);if(previousOpen.current)launcher.current?.focus();return()=>window.clearTimeout(timer);}previousOpen.current=open;},[open,mounted]);
+  useEffect(()=>{const onKey=(event:KeyboardEvent)=>event.key==='Escape'&&close();const onThread=(event:Event)=>openThread((event as CustomEvent<{threadId:string}>).detail.threadId);document.addEventListener('keydown',onKey);window.addEventListener(OFFER_CENTER_OPEN_THREAD_EVENT,onThread);return()=>{document.removeEventListener('keydown',onKey);window.removeEventListener(OFFER_CENTER_OPEN_THREAD_EVENT,onThread);};},[close,openThread]);
 
-  const create = async () => {
-    if (!compose) return;
-    setBusy(true); setError('');
-    const response = await fetch('/api/offers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ listingId: compose.listingId, amount: Number(amount) }) });
-    const data = await response.json();
-    if (response.ok) { setCompose(null); setThread(data.thread); setBox('sent'); setAmount(''); } else setError(data.error);
-    setBusy(false);
-  };
-  const act = async (action: 'COUNTER' | 'ACCEPT' | 'REJECT' | 'WITHDRAW') => {
-    if (!thread) return;
-    setBusy(true); setError('');
-    const response = await fetch(`/api/offers/${thread.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, amount: action === 'COUNTER' ? Number(amount) : undefined }) });
-    const data = await response.json();
-    if (response.ok) { setThread(data.thread); setAmount(''); await refreshUnread(); } else setError(data.error);
-    setBusy(false);
-  };
-  const eventText = (event: OfferEvent) => ({ OFFER_CREATED: 'Teklif verildi', COUNTER_OFFER_CREATED: 'Karşı teklif verildi', ACCEPTED: 'Teklif kabul edildi', REJECTED: 'Teklif reddedildi', WITHDRAWN: 'Teklif geri çekildi', LISTING_PRICE_CHANGED: 'İlan fiyatı değiştirildi', THREAD_CLOSED: 'Teklif görüşmesi kapandı' }[event.event_type]);
-  const canRespond = thread?.status === 'ACTIVE' && thread.turn_profile_id === currentProfile?.id;
-  const canWithdraw = thread?.status === 'ACTIVE' && thread.actor_side === 'BUYER';
+  const create=async()=>{if(!compose)return;setBusy(true);setError('');try{const response=await fetch('/api/offers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({listingId:compose.listingId,amount:Number(amount)})});const data=await response.json();if(!response.ok)throw new Error(data.error||'Teklif gönderilemedi.');setCompose(null);setBox('sent');setAmount('');await select(data.thread.id);}catch(cause){setError(cause instanceof Error?cause.message:'Teklif gönderilemedi.');}finally{setBusy(false);}};
+  const act=async(action:'COUNTER'|'ACCEPT'|'REJECT'|'WITHDRAW')=>{if(!thread)return;setBusy(true);setError('');try{const response=await fetch(`/api/offers/${thread.id}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,amount:action==='COUNTER'?Number(amount):undefined})});const data=await response.json();if(!response.ok)throw new Error(data.error||'İşlem tamamlanamadı.');setAmount('');await select(thread.id);}catch(cause){setError(cause instanceof Error?cause.message:'İşlem tamamlanamadı.');}finally{setBusy(false);}};
+  const hide=async()=>{if(!thread||!window.confirm('Bu teklif görüşmesi yalnız sizin listenizden kaldırılır. Yeni bir hareket olduğunda tekrar görünür.'))return;setBusy(true);const response=await fetch(`/api/offers/${thread.id}`,{method:'DELETE'});const data=await response.json().catch(()=>({}));if(response.ok){setUnread(data.unreadCount||0);back();await load();}else setError(data.error||'Teklif gizlenemedi.');setBusy(false);};
+  const other=thread?(thread.actor_side==='BUYER'?thread.seller:thread.buyer):undefined;
+  const canRespond=thread?.status==='ACTIVE'&&thread.turn_profile_id===currentProfile?.id;
+  const canWithdraw=thread?.status==='ACTIVE'&&thread.actor_side==='BUYER';
 
-  return <Context.Provider value={{ openForListing, openThread }}>
-    {children}
-    {isAuthenticated && <>
-      <button aria-label="Teklifleri aç" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-5 z-50 h-14 w-14 rounded-full bg-[#FF8A1F] text-black shadow-2xl flex items-center justify-center"><Handshake />{unread > 0 && <span aria-label={`${unread} okunmamış teklif hareketi`} className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">{unread}</span>}</button>
-      {open && <div role="dialog" aria-modal="true" aria-label="Teklifler" className="fixed z-50 bottom-0 right-0 sm:bottom-20 sm:right-5 w-full sm:w-[400px] h-[85vh] sm:h-[620px] max-h-[calc(100vh-6rem)] pb-[env(safe-area-inset-bottom)] bg-[var(--bg-surface)] border border-[var(--border-app)] sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-        <header className="p-4 border-b border-[var(--border-app)] flex items-center justify-between"><div className="flex items-center gap-2">{(thread || compose) && <button aria-label="Listeye dön" onClick={() => { setThread(null); setCompose(null); setError(''); }}><ArrowLeft /></button>}<h2 className="font-bold">Teklifler</h2></div><button ref={closeButton} aria-label="Kapat" onClick={() => setOpen(false)}><X /></button></header>
-        {!thread && !compose && <><div role="tablist" aria-label="Teklif kutusu" className="grid grid-cols-2 p-2 gap-2"><button role="tab" aria-selected={box === 'received'} onClick={() => setBox('received')} className="btn-secondary">Aldıklarım</button><button role="tab" aria-selected={box === 'sent'} onClick={() => setBox('sent')} className="btn-secondary">Gönderdiklerim</button></div><div className="overflow-y-auto flex-1">{rows.map((row) => <button key={row.id} onClick={() => void select(row.id)} className="w-full text-left p-4 border-t border-[var(--border-app)] hover:bg-[var(--bg-surface-secondary)]"><div className="font-bold text-sm truncate">{row.listing?.title}</div><div className="text-xs text-[var(--text-muted)]">{box === 'sent' ? row.seller?.full_name : row.buyer?.full_name} · {statusText[row.status]}</div><div className="text-[#FF8A1F] font-bold">{formatCurrency(row.current_amount)}</div></button>)}{!rows.length && <p className="p-8 text-center text-sm text-[var(--text-muted)]">Teklif bulunmuyor.</p>}{nextCursor && <button className="btn-secondary m-4 w-[calc(100%-2rem)]" onClick={() => void load(true)}>Daha fazla</button>}</div></>}
-        {compose && <div className="p-5 space-y-4"><h3 className="font-bold">{compose.title}</h3><p className="text-sm">İlan fiyatı: {formatCurrency(compose.price)}</p>{compose.minimum && <p className="text-xs text-[var(--text-muted)]">Minimum teklif: {formatCurrency(compose.minimum)}</p>}<input autoFocus className="form-input w-full" inputMode="numeric" aria-label="Teklif tutarı" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ''))} /><button disabled={busy || !amount} onClick={() => void create()} className="btn-primary w-full">{busy ? <Loader2 className="animate-spin" /> : 'Teklifi Gönder'}</button></div>}
-        {thread && <div className="flex-1 overflow-y-auto p-5 space-y-4"><div><h3 className="font-bold">{thread.listing?.title}</h3><p className="text-2xl font-black text-[#FF8A1F]">{formatCurrency(thread.current_amount)}</p><p className="text-sm text-[var(--text-muted)]">{statusText[thread.status]}</p>{thread.close_reason && <p className="text-sm mt-2">{closeReasonText[thread.close_reason]}</p>}</div><div className="space-y-2">{thread.events?.map((event) => <div key={event.id} className="rounded-xl bg-[var(--bg-surface-secondary)] p-3 text-sm"><b>{eventText(event)}</b>{event.amount ? ` · ${formatCurrency(event.amount)}` : ''}</div>)}</div>{thread.status === 'ACCEPTED' && <p className="rounded-xl bg-emerald-500/10 p-3 text-sm">{formatCurrency(thread.current_amount)} teklif üzerinde anlaşıldı. İletişim ve devir işlemleri için karşı tarafla Sanboard profil bilgileri üzerinden iletişime geçebilirsiniz.</p>}{thread.status === 'ACTIVE' && <div className="space-y-2">{canRespond && <><input className="form-input w-full" inputMode="numeric" aria-label="Karşı teklif tutarı" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ''))} /><div className="grid grid-cols-3 gap-2"><button disabled={busy || !amount || thread.movement_count >= 6} onClick={() => void act('COUNTER')} className="btn-secondary">Karşı Teklif</button><button disabled={busy} onClick={() => void act('ACCEPT')} className="btn-primary">Kabul Et</button><button disabled={busy} onClick={() => void act('REJECT')} className="btn-secondary">Reddet</button></div></>}{!canRespond && <p className="text-sm text-[var(--text-muted)]">{thread.actor_side === 'BUYER' ? 'Satıcı yanıtı bekleniyor' : 'Alıcı yanıtı bekleniyor'}</p>}{canWithdraw && <button disabled={busy} onClick={() => void act('WITHDRAW')} className="btn-secondary w-full">Teklifi Geri Çek</button>}</div>}</div>}
-        {busy && !thread && !compose && <Loader2 className="m-auto animate-spin" />}{error && <p role="alert" className="p-3 text-sm text-red-400">{error}</p>}
-      </div>}
-    </>}
-  </Context.Provider>;
+  return <Context.Provider value={{openForListing,openThread}}>{children}{isAuthenticated&&<>
+    <button ref={launcher} aria-label={open?'Teklifleri kapat':'Teklifleri aç'} aria-expanded={open} aria-controls="offer-center-panel" onClick={()=>{setMounted(true);setOpen((value)=>!value);}} className={`offer-launcher fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full border text-[#1a0e04] shadow-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF8A1F] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-app)] ${open?'rotate-3 border-white/20 bg-[#ffad5e]':'border-[#FFB267]/50 bg-[#FF8A1F]'}`}><span className="sr-only">Teklif merkezi</span>{open?<X className="h-5 w-5"/>:<Handshake className="h-5 w-5"/>}{unread>0&&<span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full border-2 border-[var(--bg-app)] bg-red-500 px-1 text-[10px] font-black text-white"><span className="sr-only">Okunmamış teklif hareketi: </span>{unread>99?'99+':unread}</span>}</button>
+    {mounted&&<section id="offer-center-panel" role="dialog" aria-modal="false" aria-labelledby="offer-center-title" data-state={open?'open':'closed'} className={`offer-panel fixed inset-x-0 bottom-0 z-40 flex h-[min(92dvh,760px)] flex-col overflow-hidden border border-[var(--border-app)] bg-[var(--bg-surface)] shadow-[0_24px_80px_rgba(0,0,0,.55)] sm:inset-x-auto sm:bottom-20 sm:right-5 sm:h-[min(650px,calc(100vh-6rem))] sm:w-[420px] sm:rounded-3xl ${open?'pointer-events-auto opacity-100 translate-y-0 scale-100':'pointer-events-none opacity-0 translate-y-3 scale-[.97]'}`}>
+      <header className="flex min-h-16 shrink-0 items-center justify-between border-b border-[var(--border-app)] bg-[var(--bg-surface)]/95 px-4 backdrop-blur-xl">{thread||compose?<div className="flex min-w-0 items-center gap-3"><button type="button" aria-label="Teklif listesine dön" onClick={back} className="offer-icon-button"><ArrowLeft className="h-4 w-4"/></button>{thread&&<Avatar profile={other}/>}<div className="min-w-0"><h2 id="offer-center-title" className="truncate text-sm font-black">{thread?other?.full_name:compose?.title}</h2><p className="truncate text-[11px] text-[var(--text-muted)]">{thread?thread.listing?.title:'Yeni teklif'}</p></div></div>:<div><h2 id="offer-center-title" className="text-base font-black">Teklifler</h2><p className="text-[11px] text-[var(--text-muted)]">İlan görüşmeleriniz</p></div>}<div className="flex items-center gap-1">{thread&&<div className="relative"><button type="button" aria-label="Teklif seçenekleri" aria-expanded={menuOpen} onClick={()=>setMenuOpen((value)=>!value)} className="offer-icon-button"><MoreHorizontal className="h-4 w-4"/></button>{menuOpen&&<div className="absolute right-0 top-10 z-10 w-48 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-1 shadow-2xl"><button type="button" onClick={()=>void hide()} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold hover:bg-[var(--bg-surface-secondary)]"><Trash2 className="h-3.5 w-3.5 text-red-400"/>Listeden kaldır</button></div>}</div>}<button ref={closeButton} type="button" aria-label="Teklif merkezini kapat" onClick={close} className="offer-icon-button"><X className="h-4 w-4"/></button></div></header>
+      {!thread&&!compose&&<div data-offer-view="list" className="offer-view flex min-h-0 flex-1 flex-col"><div role="tablist" aria-label="Teklif kutusu" className="mx-4 mt-3 grid grid-cols-2 rounded-xl bg-[var(--bg-surface-secondary)] p-1"><button role="tab" aria-selected={box==='received'} onClick={()=>{setRows([]);setBox('received');}} className={`rounded-lg px-3 py-2 text-xs font-bold transition-colors ${box==='received'?'bg-[var(--bg-surface)] text-[#FF9E45] shadow-sm':'text-[var(--text-muted)]'}`}>Aldıklarım</button><button role="tab" aria-selected={box==='sent'} onClick={()=>{setRows([]);setBox('sent');}} className={`rounded-lg px-3 py-2 text-xs font-bold transition-colors ${box==='sent'?'bg-[var(--bg-surface)] text-[#FF9E45] shadow-sm':'text-[var(--text-muted)]'}`}>Gönderdiklerim</button></div><div role="tabpanel" className="mt-2 min-h-0 flex-1 overflow-y-auto px-2 pb-3">{rows.map((row)=>{const counterparty=row.actor_side==='BUYER'?row.seller:row.buyer;const unreadRow=(row.unread_count||0)>0;return <button key={row.id} type="button" onClick={()=>void select(row.id)} className={`group relative flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF8A1F] ${unreadRow?'bg-[#FF8A1F]/8 hover:bg-[#FF8A1F]/12':'hover:bg-[var(--bg-surface-secondary)]'}`}>{unreadRow&&<span aria-hidden="true" className="absolute left-0 h-8 w-0.5 rounded-full bg-[#FF8A1F]"/>}<Avatar profile={counterparty}/><span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-2"><strong className={`truncate text-sm ${unreadRow?'font-black':'font-bold'}`}>{counterparty?.full_name||'Sanboard kullanıcısı'}</strong><time className="shrink-0 text-[10px] text-[var(--text-dim)]">{timeText(row.updated_at)}</time></span><span className="mt-0.5 block truncate text-xs font-semibold text-[var(--text-muted)]">{row.listing?.title}</span><span className={`mt-1 block truncate text-[11px] ${unreadRow?'font-bold text-[var(--text-main)]':'text-[var(--text-dim)]'}`}>{latestOfferSummary(row)}</span></span><span className="flex shrink-0 flex-col items-end gap-1"><span className="rounded-full border border-[var(--border-app)] px-2 py-0.5 text-[9px] font-bold text-[var(--text-muted)]">{offerStatusText[row.status]}</span>{unreadRow&&<span aria-label={`${row.unread_count} okunmamış hareket`} className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#FF8A1F] px-1 text-[9px] font-black text-black">{row.unread_count}</span>}</span></button>;})}{busy&&!rows.length&&<div role="status" className="flex h-full items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-[#FF8A1F]"/><span className="sr-only">Teklifler yükleniyor</span></div>}{!busy&&!rows.length&&<div className="flex h-full flex-col items-center justify-center px-8 text-center"><Handshake className="mb-3 h-8 w-8 text-[var(--text-dim)]"/><p className="text-sm font-bold">Henüz teklif görüşmesi yok</p><p className="mt-1 text-xs text-[var(--text-muted)]">Yeni hareketler burada sohbet listesi gibi görünecek.</p></div>}{nextCursor&&<button className="btn-secondary my-2 w-full" onClick={()=>void load(true)}>Daha fazla göster</button>}</div></div>}
+      {compose&&<div data-offer-view="composer" className="offer-view flex flex-1 flex-col justify-between overflow-y-auto p-5"><div><div className="overflow-hidden rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]">{compose.thumbnail&&<img src={resolveMediaUrl(compose.thumbnail)} alt="" className="h-28 w-full object-cover"/>}<div className="p-4"><h3 className="font-black">{compose.title}</h3><p className="mt-1 text-sm text-[#FF9E45]">İlan fiyatı: {formatCurrency(compose.price)}</p>{compose.minimum&&<p className="mt-1 text-xs text-[var(--text-muted)]">Minimum teklif: {formatCurrency(compose.minimum)}</p>}</div></div><div className="mt-6 rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/60 p-4"><label htmlFor="offer-amount" className="mb-2 block text-xs font-bold">Teklif tutarın</label><div className="flex items-center gap-2"><span className="text-xl font-black text-[#FF8A1F]">$</span><input id="offer-amount" autoFocus className="form-input min-w-0 flex-1 text-lg font-black" inputMode="numeric" pattern="[0-9]*" value={amount} onChange={(event)=>setAmount(event.target.value.replace(/\D/g,''))} placeholder="90.000"/></div><p className="mt-2 text-[11px] text-[var(--text-muted)]">Gönderildiğinde görüşmeye otomatik teklif mesajı eklenir.</p></div></div><button disabled={busy||!amount} onClick={()=>void create()} className="btn-primary mt-5 flex w-full justify-center gap-2">{busy?<Loader2 className="h-4 w-4 animate-spin"/>:<Send className="h-4 w-4"/>}Teklifi Gönder</button></div>}
+      {thread&&<div data-offer-view="thread" className="offer-view flex min-h-0 flex-1 flex-col"><div className="border-b border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/40 px-4 py-2.5"><div className="flex items-center justify-between gap-3"><p className="truncate text-xs font-semibold text-[var(--text-muted)]">{thread.listing?.title}</p><strong className="shrink-0 text-sm text-[#FF9E45]">{formatCurrency(thread.current_amount)}</strong></div></div><ol aria-label="Teklif hareketleri" className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-5">{thread.events?.map((event)=><EventBubble key={event.id} event={event} thread={thread} currentProfileId={currentProfile?.id}/>)}{thread.status==='ACCEPTED'&&<li className="rounded-2xl border border-emerald-400/20 bg-emerald-400/8 p-3 text-xs"><div className="flex items-center gap-2 font-black text-emerald-300"><Check className="h-4 w-4"/>İletişim için</div>{thread.visible_contact?.phone&&<p className="mt-2 flex items-center gap-2"><Phone className="h-3.5 w-3.5"/>Telefon: {thread.visible_contact.phone}</p>}{thread.visible_contact?.sanmail_email&&<p className="mt-1">SanMail: {thread.visible_contact.sanmail_email}</p>}{!thread.visible_contact?.phone&&!thread.visible_contact?.sanmail_email&&<p className="mt-2 text-[var(--text-muted)]">Karşı tarafın görünür iletişim bilgisi bulunmuyor.</p>}</li>}</ol><div className="shrink-0 border-t border-[var(--border-app)] bg-[var(--bg-surface)] p-3 pb-[max(.75rem,env(safe-area-inset-bottom))]">{thread.status==='ACTIVE'?<>{canRespond&&<div className="space-y-2"><label htmlFor="counter-amount" className="sr-only">Karşı teklifin</label><div className="flex gap-2"><input id="counter-amount" className="form-input min-w-0 flex-1" inputMode="numeric" pattern="[0-9]*" aria-label="Karşı teklifin" value={amount} onChange={(event)=>setAmount(event.target.value.replace(/\D/g,''))} placeholder="Karşı teklifin"/><button disabled={busy||!amount||thread.movement_count>=6} onClick={()=>void act('COUNTER')} className="btn-primary shrink-0 px-3"><Send className="h-4 w-4"/><span className="sr-only">Karşı teklif gönder</span></button></div><div className="grid grid-cols-2 gap-2"><button disabled={busy} onClick={()=>void act('ACCEPT')} className="rounded-xl bg-emerald-500/15 px-3 py-2 text-xs font-black text-emerald-300 hover:bg-emerald-500/20">Kabul Et</button><button disabled={busy} onClick={()=>void act('REJECT')} className="rounded-xl bg-red-500/10 px-3 py-2 text-xs font-black text-red-300 hover:bg-red-500/15">Reddet</button></div></div>}{!canRespond&&<p className="rounded-xl bg-[var(--bg-surface-secondary)] px-3 py-2.5 text-center text-xs text-[var(--text-muted)]">{thread.actor_side==='BUYER'?'Satıcı yanıtı bekleniyor':'Alıcı yanıtı bekleniyor'}</p>}{canWithdraw&&<button disabled={busy} onClick={()=>void act('WITHDRAW')} className="mt-2 w-full rounded-xl px-3 py-2 text-xs font-bold text-[var(--text-muted)] hover:bg-[var(--bg-surface-secondary)]">Teklifi geri çek</button>}</>:<p className="rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] px-3 py-2.5 text-center text-xs text-[var(--text-muted)]">Bu görüşme salt okunur · {offerStatusText[thread.status]}</p>}</div></div>}
+      {error&&<p role="alert" className="absolute bottom-20 left-4 right-4 rounded-xl border border-red-400/20 bg-red-950/95 p-3 text-xs text-red-200 shadow-xl">{error}</p>}
+    </section>}
+  </>}</Context.Provider>;
 }

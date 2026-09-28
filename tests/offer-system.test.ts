@@ -151,4 +151,35 @@ describe('Structured offer system', () => {
     const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20260928010000_offer_system.sql'), 'utf8');
     for (const pattern of [/offer_threads/, /offer_events/, /ux_offer_threads_active_buyer_listing/, /ENABLE ROW LEVEL SECURITY/, /notifications_entity_type_check/, /close_listing_with_offers/, /expire_stale_offer_threads/, /pg_advisory_xact_lock/]) assert.match(sql, pattern);
   });
+
+  test('participant hide is isolated, preserves history and new activity restores visibility and unread', async () => {
+    await create();
+    const thread = db.offerThreads[0];
+    const eventCount = db.offerEvents.length;
+    assert.equal((await repo.hideOffer(thread.id, buyer)).success, true);
+    assert.equal((await repo.listOffers({ actorProfileId: buyer, box: 'sent' })).threads.length, 0);
+    assert.equal((await repo.listOffers({ actorProfileId: seller, box: 'received' })).threads.length, 1);
+    assert.equal(db.offerEvents.length, eventCount);
+    assert.equal((await repo.hideOffer(thread.id, sibling)).success, false);
+    await repo.actOnOffer({ threadId: thread.id, actorProfileId: seller, actorUserId: 'seller-account', action: 'COUNTER', amount: 70000 });
+    const restored = await repo.listOffers({ actorProfileId: buyer, box: 'sent' });
+    assert.equal(restored.threads.length, 1);
+    assert.equal(restored.threads[0].unread_count, 1);
+  });
+
+  test('accepted thread exposes only public counterparty contact fields', async () => {
+    await create();
+    const thread = db.offerThreads[0];
+    db.profiles[0].phone_visibility = 'PRIVATE';
+    db.profiles[0].sanmail_visibility = 'PUBLIC';
+    await repo.actOnOffer({ threadId: thread.id, actorProfileId: seller, actorUserId: 'seller-account', action: 'ACCEPT' });
+    const detail = await repo.getOffer(thread.id, buyer);
+    assert.equal(detail.thread?.visible_contact?.phone, '');
+    assert.equal(detail.thread?.visible_contact?.sanmail_email, 'seller@sanmail.com');
+  });
+
+  test('corrective migration adds participant visibility without rewriting production offer migration', () => {
+    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20260928020000_offer_participant_visibility.sql'), 'utf8');
+    for (const pattern of [/buyer_hidden_at/, /seller_hidden_at/, /hide_offer_thread/, /restore_offer_thread_visibility_on_event/, /get_offer_unread_count/]) assert.match(sql, pattern);
+  });
 });

@@ -16,7 +16,6 @@ import {
   LifeBuoy,
   Crown,
   Shield,
-  Handshake,
   ArrowRight,
 } from 'lucide-react';
 import { getCorporateSidebarLabel, resolveCorporateHeaderActions } from '@/lib/dealers/status';
@@ -105,7 +104,6 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
     { href: '/hesabim', label: 'Genel Bakış', icon: LayoutDashboard, iconAccent: 'text-orange-400 bg-orange-400/10' },
     { href: '/hesabim/profil', label: 'Profilim', icon: User, iconAccent: 'text-blue-400 bg-blue-400/10' },
     { href: '/hesabim/ilanlarim', label: 'İlanlarım', icon: ListPlus, iconAccent: 'text-amber-400 bg-amber-400/10' },
-    { href: '/hesabim/teklifler', label: 'Teklifler', icon: Handshake, iconAccent: 'text-orange-400 bg-orange-400/10' },
     { href: '/hesabim/favorilerim', label: 'Favorilerim', icon: Heart, iconAccent: 'text-rose-400 bg-rose-400/10' },
     { href: '/hesabim/odemeler', label: 'Ödeme Geçmişim', icon: CreditCard, iconAccent: 'text-emerald-400 bg-emerald-400/10' },
     { href: '/hesabim/destek', label: 'Destek', icon: LifeBuoy, iconAccent: 'text-violet-400 bg-violet-400/10' },

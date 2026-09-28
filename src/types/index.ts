@@ -285,14 +285,17 @@ export interface OfferThread {
   expires_at: string;
   buyer_last_read_at?: string | null;
   seller_last_read_at?: string | null;
+  buyer_hidden_at?: string | null;
+  seller_hidden_at?: string | null;
   created_at: string;
   updated_at: string;
   listing?: Pick<Listing, 'id' | 'public_id' | 'title' | 'price' | 'status' | 'images' | 'offers_enabled' | 'minimum_offer_amount'>;
-  buyer?: Pick<CharacterProfile, 'id' | 'full_name'>;
-  seller?: Pick<CharacterProfile, 'id' | 'full_name'>;
+  buyer?: Pick<CharacterProfile, 'id' | 'full_name' | 'avatar_url' | 'avatar_path'>;
+  seller?: Pick<CharacterProfile, 'id' | 'full_name' | 'avatar_url' | 'avatar_path'>;
   events?: OfferEvent[];
   unread_count?: number;
   actor_side?: 'BUYER' | 'SELLER';
+  visible_contact?: { phone?: string; sanmail_email?: string };
 }
 
 export interface Notification {

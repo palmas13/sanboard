@@ -4,6 +4,7 @@ import { OfferCloseReason, OfferEvent, OfferThread } from '@/types';
 import { getEffectiveListingStatus } from '@/lib/listings/visibility';
 import { OFFER_MAX_ACTIVE_THREADS_PER_BUYER, OFFER_MAX_AMOUNT, OFFER_MAX_NEW_THREADS_PER_HOUR, OFFER_MAX_PRICE_MOVEMENTS, OFFER_PAGE_SIZE, OFFER_REOPEN_COOLDOWN_MINUTES, OFFER_RESPONSE_HOURS } from '@/lib/offers/constants';
 import { createNotification } from '../../notifications';
+import { redactPrivateContact } from '@/lib/profiles/contact-privacy';
 
 const terminal = new Set(['ACCEPTED', 'REJECTED', 'WITHDRAWN', 'EXPIRED', 'CLOSED']);
 const nowIso = () => new Date().toISOString();
@@ -18,7 +19,10 @@ export class MemoryOfferRepository implements IOfferRepository {
       thread.seller_last_read_at ? new Date(thread.seller_last_read_at).getTime() + 1 : 0,
     );
     const row: OfferEvent = { id: `oe-${Date.now()}-${Math.random()}`, thread_id: thread.id, actor_profile_id, event_type, amount, metadata, created_at: new Date(latestTimestamp).toISOString() };
-    db.offerEvents.push(row); return row;
+    db.offerEvents.push(row);
+    if (!actor_profile_id || actor_profile_id !== thread.buyer_profile_id) thread.buyer_hidden_at = null;
+    if (!actor_profile_id || actor_profile_id !== thread.seller_profile_id) thread.seller_hidden_at = null;
+    return row;
   }
   private expire(thread: OfferThread) {
     if (thread.status === 'ACTIVE' && new Date(thread.expires_at).getTime() <= Date.now()) {
@@ -33,7 +37,8 @@ export class MemoryOfferRepository implements IOfferRepository {
     const side = actorProfileId === thread.buyer_profile_id ? 'BUYER' : 'SELLER';
     const readAt = side === 'BUYER' ? thread.buyer_last_read_at : thread.seller_last_read_at;
     const events = db.offerEvents.filter(e => e.thread_id === thread.id);
-    return { ...thread, listing, buyer, seller, events, actor_side: side, unread_count: events.filter(e => e.actor_profile_id !== actorProfileId && (!readAt || e.created_at > readAt)).length };
+    const contact = thread.status === 'ACCEPTED' ? redactPrivateContact(side === 'BUYER' ? seller : buyer) : undefined;
+    return { ...thread, listing, buyer, seller, events, actor_side: side, unread_count: events.filter(e => e.actor_profile_id !== actorProfileId && (!readAt || e.created_at > readAt)).length, visible_contact: contact ? { phone: contact.phone, sanmail_email: contact.sanmail_email } : undefined };
   }
   async createOffer({ listingId, amount, actorProfileId, actorUserId }: { listingId: string; amount: number; actorProfileId: string; actorUserId: string }) {
     const listing = db.listings.find(l => l.id === listingId); const buyer = db.profiles.find(p => p.id === actorProfileId);
@@ -58,12 +63,13 @@ export class MemoryOfferRepository implements IOfferRepository {
     return { success: true, thread: this.hydrate(thread, actorProfileId) };
   }
   async listOffers({ actorProfileId, box = 'received', status, cursor, limit = OFFER_PAGE_SIZE }: any) {
-    let rows = db.offerThreads.filter(t => box === 'sent' ? t.buyer_profile_id === actorProfileId : t.seller_profile_id === actorProfileId);
+    let rows = db.offerThreads.filter(t => box === 'sent' ? t.buyer_profile_id === actorProfileId && !t.buyer_hidden_at : t.seller_profile_id === actorProfileId && !t.seller_hidden_at);
     rows.forEach(t => this.expire(t)); if (status) rows = rows.filter(t => t.status === status); if (cursor) rows = rows.filter(t => t.updated_at < cursor);
     rows.sort((a,b)=>b.updated_at.localeCompare(a.updated_at)); const page = rows.slice(0, Math.min(limit, OFFER_PAGE_SIZE));
     return { threads: page.map(t => this.hydrate(t, actorProfileId)), nextCursor: rows.length > page.length ? page.at(-1)?.updated_at : null };
   }
   async getOffer(threadId: string, actorProfileId: string) { const t = db.offerThreads.find(x=>x.id===threadId); if (!t || (t.buyer_profile_id!==actorProfileId && t.seller_profile_id!==actorProfileId)) return { success:false,error:'Teklif bulunamadı.' }; return { success:true,thread:this.hydrate(t,actorProfileId) }; }
+  async getActiveThreadForListing(listingId:string,actorProfileId:string){const t=db.offerThreads.find(x=>x.listing_id===listingId&&x.status==='ACTIVE'&&(x.buyer_profile_id===actorProfileId||x.seller_profile_id===actorProfileId));return t?this.hydrate(t,actorProfileId):null;}
   async actOnOffer({ threadId, actorProfileId, action, amount }: any) {
     const t=db.offerThreads.find(x=>x.id===threadId); if(!t||(t.buyer_profile_id!==actorProfileId&&t.seller_profile_id!==actorProfileId)) return {success:false,error:'Teklif bulunamadı.'}; this.expire(t);
     const listing=db.listings.find(l=>l.id===t.listing_id); if(!listing||getEffectiveListingStatus(listing)!=='ACTIVE') return {success:false,code:'LISTING_INACTIVE',error:'İlan yayında olmadığı için işlem yapılamaz.'}; if(t.status!=='ACTIVE') return {success:false,error:'Bu teklif artık aktif değil.'};
@@ -73,7 +79,8 @@ export class MemoryOfferRepository implements IOfferRepository {
     t.updated_at=nowIso(); const target=db.profiles.find(p=>p.id===other); if(target) await createNotification({recipient_profile_id:target.id,user_id:target.user_id,type:'OFFER_ACTIVITY' as any,title:'Teklif güncellendi',message:`${listing.title} ilanındaki teklif görüşmesinde yeni hareket var.`,entity_type:'offer' as any,entity_id:t.id,metadata:{offerThreadId:t.id}}); return {success:true,thread:this.hydrate(t,actorProfileId)};
   }
   async markRead(threadId:string,actorProfileId:string){const t=db.offerThreads.find(x=>x.id===threadId);if(!t||(t.buyer_profile_id!==actorProfileId&&t.seller_profile_id!==actorProfileId))return{success:false,unreadCount:0,error:'Teklif bulunamadı.'};const latestEvent=Math.max(Date.now(),...db.offerEvents.filter(e=>e.thread_id===threadId).map(e=>new Date(e.created_at).getTime()+1));const readAt=new Date(latestEvent).toISOString();if(t.buyer_profile_id===actorProfileId)t.buyer_last_read_at=readAt;else t.seller_last_read_at=readAt;return{success:true,unreadCount:await this.getUnreadCount(actorProfileId)};}
-  async getUnreadCount(actorProfileId:string){return db.offerThreads.filter(t=>t.buyer_profile_id===actorProfileId||t.seller_profile_id===actorProfileId).reduce((n,t)=>n+(this.hydrate(t,actorProfileId).unread_count||0),0);}
+  async hideOffer(threadId:string,actorProfileId:string){const t=db.offerThreads.find(x=>x.id===threadId);if(!t||(t.buyer_profile_id!==actorProfileId&&t.seller_profile_id!==actorProfileId))return{success:false,unreadCount:0,error:'Teklif bulunamadı.'};const time=nowIso();if(t.buyer_profile_id===actorProfileId){t.buyer_hidden_at=time;t.buyer_last_read_at=time;}else{t.seller_hidden_at=time;t.seller_last_read_at=time;}return{success:true,unreadCount:await this.getUnreadCount(actorProfileId)};}
+  async getUnreadCount(actorProfileId:string){return db.offerThreads.filter(t=>(t.buyer_profile_id===actorProfileId&&!t.buyer_hidden_at)||(t.seller_profile_id===actorProfileId&&!t.seller_hidden_at)).reduce((n,t)=>n+(this.hydrate(t,actorProfileId).unread_count||0),0);}
   async getActiveCountForListing(listingId:string,actorProfileId:string){const listing=db.listings.find(l=>l.id===listingId);if(!listing)return 0;const sellerId=listing.seller_type==='CORPORATE'?db.dealers.find(d=>d.id===listing.corporate_profile_id)?.owner_profile_id:listing.seller_profile_id;if(sellerId!==actorProfileId)return 0;return db.offerThreads.filter(t=>t.listing_id===listingId&&t.status==='ACTIVE').length;}
   async expireStale(){let count=0;for(const t of db.offerThreads.filter(x=>x.status==='ACTIVE')){const listing=db.listings.find(l=>l.id===t.listing_id);if(listing&&getEffectiveListingStatus(listing)!=='ACTIVE'){await this.closeForListing(t.listing_id,'LISTING_EXPIRED');count++;continue;}if(new Date(t.expires_at).getTime()<=Date.now()){this.expire(t);count++;}}return count;}
   async closeForListing(listingId:string,reason:OfferCloseReason){let n=0;const listing=db.listings.find(l=>l.id===listingId);for(const t of db.offerThreads.filter(x=>x.listing_id===listingId&&x.status==='ACTIVE')){t.status='CLOSED';t.close_reason=reason;t.turn_profile_id=null;t.updated_at=nowIso();this.event(t,'THREAD_CLOSED',null,null,{reason});for(const profileId of [t.buyer_profile_id,t.seller_profile_id]){const target=db.profiles.find(p=>p.id===profileId);if(target)await createNotification({recipient_profile_id:target.id,user_id:target.user_id,type:'OFFER_ACTIVITY',title:'Teklif görüşmesi kapandı',message:reason==='LISTING_REMOVED_BY_ADMIN'?'İlan yönetim tarafından yayından kaldırıldı. Bu teklif görüşmesi artık devam ettirilemez.':`${listing?.title||'İlan'} yayında olmadığı için bu teklif kapandı.`,entity_type:'offer',entity_id:t.id,metadata:{offerThreadId:t.id,eventType:'THREAD_CLOSED',reason}});}n++;}return n;}
