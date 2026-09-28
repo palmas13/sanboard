@@ -48,8 +48,8 @@ describe('OfferCenter chat UX', () => {
     assert.match(center, /bg-\[#FF8A1F\]\/8/);
     assert.match(center, /font-black/);
     assert.match(center, /h-2 w-2[\s\S]*bg-\[#FF8A1F\]/);
-    assert.match(center, /href=\{profileUrl\(person\)\}/);
-    assert.match(center, /event\.stopPropagation\(\)/);
+    assert.doesNotMatch(center, /href=\{profileUrl\(person\)\}/);
+    assert.match(center, /<Avatar profile=\{person\} \/><span className="min-w-0 flex-1">/);
   });
 
   test('actions preserve hydrated detail by refetching the canonical thread', () => {
