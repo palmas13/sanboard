@@ -202,6 +202,26 @@ export default function HesabimKurumsalPage() {
     setSuccess('');
 
     try {
+      const activationRes = await fetch('/api/dealers/subscription/activate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dealerId: dealer.id }),
+      });
+      const activationData = await activationRes.json().catch(() => ({})) as {
+        error?: string;
+        testActivationBypass?: boolean;
+      };
+
+      if (activationRes.ok && activationData.testActivationBypass) {
+        setSuccess('Test hesabı kurumsal üyeliği ödeme alınmadan aktif edildi.');
+        await fetchDealer();
+        return;
+      }
+
+      if (activationRes.status !== 409) {
+        throw new Error(activationData.error || 'Üyelik aktivasyonu başlatılamadı.');
+      }
+
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: {

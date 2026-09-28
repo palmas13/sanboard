@@ -34,7 +34,7 @@ function HeroDecorativeListingCard({ listing, index }: { listing: typeof decorat
 }
 
 function HeroAnnotations() {
-  return <div className="hero-annotations" aria-hidden="true"><div className="hero-note hero-note-primary"><span>Hayalindeki araca<br />bir adım daha yakın</span><svg viewBox="0 0 150 82"><path d="M8 8 C 42 10, 67 23, 83 43 C 98 61, 116 68, 140 67" /><path d="M129 58 L141 67 L129 75" /></svg></div><div className="hero-note hero-note-secondary"><span>Los Santos&apos;ta daha fazlası<br />seni bekliyor</span><svg viewBox="0 0 150 82"><path d="M142 8 C 116 10, 101 24, 91 42 C 80 61, 60 68, 34 67" /><path d="M45 58 L33 67 L45 75" /></svg></div></div>;
+  return <div className="hero-annotations" aria-hidden="true"><div className="hero-note hero-note-primary"><span>Hayalindeki araca<br />bir adım daha yakın</span><svg viewBox="0 0 150 82"><path d="M8 8 C 42 10, 67 23, 83 43 C 98 61, 116 68, 140 67" /><path d="M129 58 L141 67 L129 75" /></svg></div><div className="hero-note hero-note-secondary"><span>Los Santos&apos;ta daha fazlası<br />seni bekliyor</span><svg viewBox="0 0 150 82"><path d="M142 8 C 119 13, 103 25, 91 41 C 79 56, 65 63, 43 66" /><path d="M54 57 L42 66 L55 73" /></svg></div></div>;
 }
 
 export function HeroShowcase({ stats }: { stats: HomepageStats }) {

@@ -51,6 +51,8 @@ describe('homepage marketplace redesign', () => {
     assert.match(marketplace, /<FavoriteButton/);
     assert.doesNotMatch(marketplace, /listing\.location \|\| listing\.subcategory/);
     assert.doesNotMatch(rotator, /listing\.location \|\| listing\.subcategory/);
+    assert.match(rotator, /listing\.category === 'vehicle'/);
+    assert.match(rotator, /<Tag/);
     assert.match(marketplace, /quality=\{88\}/);
     assert.match(rotator, /quality=\{88\}/);
   });
@@ -73,6 +75,13 @@ describe('homepage marketplace redesign', () => {
     assert.match(rotator, /aria-label=\{`Önceki/);
     assert.match(rotator, /aria-label=\{`Sonraki/);
     assert.match(rotator, /listings\.slice\(index \* 2, index \* 2 \+ 2\)/);
+  });
+
+  test('section controls use a shared two-row header rhythm without fixed link padding', () => {
+    const css = source('src/app/globals.css');
+    assert.match(css, /\.homepage-section-header \{[^}]*display: grid/);
+    assert.match(css, /grid-template-columns: minmax\(0,1fr\) auto/);
+    assert.doesNotMatch(css, /\.homepage-see-all \{[^}]*padding-right/);
   });
 
   test('responsive four-column and reduced-motion styles remain present', () => {

@@ -1,5 +1,7 @@
 import { beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db/store';
 import { createSessionToken } from '@/lib/auth/session';
@@ -63,5 +65,13 @@ describe('canonical test-login corporate subscription bypass', () => {
     const response = await activateSubscription(request(testUserId, testProfileId, 'real-dealer'));
     assert.equal(response.status, 403);
     assert.equal(db.dealers[1].subscription_status, 'INACTIVE');
+  });
+
+  test('corporate dashboard probes the server-side activation route before checkout', () => {
+    const dashboard = readFileSync(join(process.cwd(), 'src/app/hesabim/kurumsal/page.tsx'), 'utf8');
+    assert.match(dashboard, /fetch\('\/api\/dealers\/subscription\/activate'/);
+    assert.match(dashboard, /JSON\.stringify\(\{ dealerId: dealer\.id \}\)/);
+    assert.match(dashboard, /activationRes\.status !== 409/);
+    assert.doesNotMatch(dashboard, /skipPayment|isTest: true/);
   });
 });
