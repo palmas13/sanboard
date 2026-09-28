@@ -50,20 +50,19 @@ describe('dashboard experience refinement regressions', () => {
   test('discovery navigation, hero and terms experience stay polished', () => {
     const navbar = source('src/components/layout/Navbar.tsx');
     const home = source('src/app/page.tsx');
-    const hero = source('src/components/home/HeroTypewriter.tsx');
+    const hero = source('src/components/home/HeroShowcase.tsx');
     const explore = source('src/app/ilanlari-kesfet/page.tsx');
     const infoCenter = source('src/app/kesfet/page.tsx');
     const footer = source('src/components/layout/Footer.tsx');
     const terms = source('src/app/kullanim-kosullari/page.tsx');
     assert.match(navbar, />Keşfet/);
     assert.doesNotMatch(navbar, />X</);
-    assert.doesNotMatch(hero, /hero-caret/);
-    assert.match(home, /max-w-4xl flex-col items-center text-center/);
-    assert.match(home, /href="\/ilan-ver"/);
-    assert.match(home, /href="\/ilanlari-kesfet"/);
+    assert.match(home, /<HeroShowcase \/>/);
+    assert.match(hero, /href="\/ilan-ver"/);
+    assert.match(hero, /href="\/ilanlari-kesfet"/);
     assert.doesNotMatch(home, /Los Santos ilan deneyimi/);
-    assert.match(home, /hero-eyebrow-label/);
-    assert.match(hero, /justify-center/);
+    assert.match(hero, /hero-card-stage/);
+    assert.match(hero, /hayat seninle başlar/);
     assert.match(explore, /href: '\/arac'/);
     assert.match(explore, /href: '\/mulk'/);
     assert.match(explore, /Araç mı arıyorsun\?/);
