@@ -63,10 +63,12 @@ export class RealFleecaPaymentProvider implements FleecaPaymentProvider {
 
   async getOrder(paymentId: string): Promise<FleecaOrder | null> {
     const details = await this.getPaymentDetails(paymentId);
+    const status = mapFleecaPaymentStatus(details.data.status);
+    if (!status) throw new Error('Fleeca ödeme durumu tanınmıyor.');
     return {
       orderId: details.data.description, profileId: '', characterName: '', packageCode: details.data.description,
       packageName: details.data.description, amount: details.data.amount, currency: 'USD',
-      status: details.data.status === 'payment_successful' ? 'SUCCESS' : details.data.status === 'awaiting_payment' ? 'PENDING' : 'FAILED',
+      status: status === 'VERIFIED' ? 'SUCCESS' : status === 'PENDING' ? 'PENDING' : 'FAILED',
       createdAt: details.data.created_at, paymentId: details.data.payment_id,
     };
   }
@@ -82,13 +84,22 @@ export class RealFleecaPaymentProvider implements FleecaPaymentProvider {
   async verifyPayment(paymentId: string): Promise<VerifiedExternalPayment> {
     const details = await this.getPaymentDetails(paymentId);
     const successful = details.data.status === 'payment_successful' && Boolean(details.data.paid_at);
+    const status = successful ? 'VERIFIED' : mapFleecaPaymentStatus(details.data.status);
+    if (!status || status === 'VERIFIED') throw new Error('Fleeca ödeme durumu doğrulanamadı.');
     return {
       externalTransactionId: details.data.payment_id,
-      status: successful ? 'VERIFIED' : details.data.status === 'awaiting_payment' ? 'PENDING' : 'FAILED',
+      status,
       orderReference: '', payerReference: '', amount: details.data.amount, currency: 'USD',
       purposeReference: details.data.description, occurredAt: details.data.paid_at || details.data.updated_at,
     };
   }
+}
+
+export function mapFleecaPaymentStatus(status: string): VerifiedExternalPayment['status'] | null {
+  if (status === 'payment_successful') return 'VERIFIED';
+  if (status === 'awaiting_payment') return 'PENDING';
+  if (status === 'payment_failed') return 'FAILED';
+  return null;
 }
 
 export function parseFleecaCreateResponse(raw: unknown, status: number) {

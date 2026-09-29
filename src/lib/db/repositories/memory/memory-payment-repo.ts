@@ -32,6 +32,16 @@ export class MemoryPaymentRepository implements IPaymentRepository {
     return { success: res.success, credit: res.credit, error: res.error };
   }
 
+  async failPayment(orderId: string, externalPaymentId: string) {
+    const payment = db.payments.find((item) => item.order_id === orderId);
+    if (!payment || payment.external_payment_id !== externalPaymentId) return { success: false, error: 'Ödeme kaydı bulunamadı.' };
+    if (payment.status === 'FAILED') return { success: true };
+    if (payment.status !== 'PENDING' || payment.entitlement_applied_at) return { success: false, error: 'Ödeme terminal başarısız duruma geçirilemedi.' };
+    payment.status = 'FAILED';
+    payment.processed_at = new Date().toISOString();
+    return { success: true };
+  }
+
   async completeBoostPayment(orderId: string) {
     const payment = db.payments.find((item) => item.order_id === orderId);
     if (!payment || payment.purpose !== 'LISTING_BOOST' || !payment.target_listing_id) return { success: false, error: 'Boost ödemesi bulunamadı.' };
@@ -72,5 +82,9 @@ export class MemoryPaymentRepository implements IPaymentRepository {
 
   async getPaymentOrder(orderId: string) {
     return db.payments.find((payment) => payment.order_id === orderId) || null;
+  }
+
+  async getPaymentByExternalPaymentId(externalPaymentId: string) {
+    return db.payments.find((payment) => payment.external_payment_id === externalPaymentId) || null;
   }
 }

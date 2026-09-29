@@ -7,9 +7,12 @@ import { verifyAndFulfillPayment } from '@/lib/payments/verification';
 export async function GET(req: NextRequest) {
   const actor = await resolveOwnedActiveProfile(req);
   if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+  const repo = getPaymentRepository();
+  const paymentId = new URL(req.url).searchParams.get('payment_id');
   const orderId = getPaymentCorrelation(req);
-  if (!orderId) return NextResponse.json({ state: 'NOT_FOUND' }, { status: 404 });
-  const payment = await getPaymentRepository().getPaymentOrder(orderId);
+  const payment = paymentId
+    ? await repo.getPaymentByExternalPaymentId(paymentId)
+    : orderId ? await repo.getPaymentOrder(orderId) : null;
   if (!payment || payment.profile_id !== actor.profileId) return NextResponse.json({ state: 'NOT_FOUND' }, { status: 404 });
   try {
     const result = await verifyAndFulfillPayment(payment);

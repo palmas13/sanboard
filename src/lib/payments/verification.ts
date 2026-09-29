@@ -1,16 +1,21 @@
 import { getDealerRepository, getPaymentRepository } from '@/lib/db/repositories';
 import { RealFleecaPaymentProvider } from '@/lib/integrations/fleeca/real-provider';
 
-export type SafePaymentState = 'PENDING' | 'SUCCESS' | 'UNVERIFIED';
+export type SafePaymentState = 'PENDING' | 'SUCCESS' | 'FAILED' | 'UNVERIFIED';
 
 export async function verifyAndFulfillPayment(payment: any): Promise<{ state: SafePaymentState; featuredUntil?: string }> {
   if (payment.status === 'SUCCESS' && payment.entitlement_applied_at) return { state: 'SUCCESS' };
+  if (payment.status === 'FAILED') return { state: 'FAILED' };
   if (!payment.external_payment_id) return { state: 'UNVERIFIED' };
 
   const details = await new RealFleecaPaymentProvider().getPaymentDetails(payment.external_payment_id);
   if (details.data.payment_id !== payment.external_payment_id) return { state: 'UNVERIFIED' };
   if (details.data.amount !== payment.amount) return { state: 'UNVERIFIED' };
   if (details.data.status === 'awaiting_payment') return { state: 'PENDING' };
+  if (details.data.status === 'payment_failed') {
+    const failed = await getPaymentRepository().failPayment(payment.order_id, payment.external_payment_id);
+    return { state: failed.success ? 'FAILED' : 'UNVERIFIED' };
+  }
   if (details.data.status !== 'payment_successful' || !details.data.paid_at) return { state: 'UNVERIFIED' };
 
   const repo = getPaymentRepository();

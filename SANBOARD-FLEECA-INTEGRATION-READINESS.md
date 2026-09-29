@@ -73,7 +73,7 @@ The payment page no longer exposes success/failure simulation controls. Browser 
 
 ## 8. Transport-neutral completion
 
-Fleeca may ultimately use a browser callback, signed webhook, polling, or server lookup. Any supported transport must:
+Fleeca V2 uses a signed POST webhook and may also be polled server-side. The supported transport must:
 
 1. authenticate/verify the provider input using the official contract;
 2. retrieve or derive a trusted external transaction;
@@ -81,7 +81,16 @@ Fleeca may ultimately use a browser callback, signed webhook, polling, or server
 4. run `validateExternalPayment()` against the stored payment row;
 5. call the existing idempotent completion repository/RPC only after validation.
 
-No webhook route exists. It must remain absent/disabled until official signature verification is available. Unsigned input cannot reach completion.
+`POST /api/payments/fleeca/webhook` verifies `X-Fleeca-Signature` as
+`sha256=<HMAC-SHA256(raw body, FLEECA_API_KEY)>` with a timing-safe comparison before parsing JSON.
+Unsigned or invalidly signed input receives HTTP 403 and cannot reach completion. Signed callbacks are
+matched to the existing local row by `external_payment_id`, checked against the stored amount, and then
+reuse the existing idempotent completion/failure path. `status_reason` is stored only as sanitized audit
+metadata; payer routing/name and authorization secrets are not returned to the browser.
+
+The hosted redirect appends `payment_id=<uuid>`. This value is correlation context only: the result page
+passes it to the authenticated status endpoint, which resolves the owned local payment and performs
+server-side verification or reads an already verified webhook state. The query parameter is never payment proof.
 
 ## 9. Refund, reversal, expiry, and currency
 
@@ -101,7 +110,7 @@ Primary implementation points:
 - `src/lib/integrations/fleeca/types.ts` only for evidence-backed optional canonical fields
 - `src/lib/integrations/fleeca/index.ts`
 - `src/app/api/checkout/route.ts`
-- a new callback/webhook/polling route only for the officially documented transport
+- `src/app/api/payments/fleeca/webhook/route.ts`
 - `.env.example` with only officially confirmed secret/configuration names
 - `tests/fleeca-provider-boundary-readiness.test.ts`
 - this readiness document and `SANBOARD-FLEECA-INTEGRATION-CONTRACT-REQUIRED.md`

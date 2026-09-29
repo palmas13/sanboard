@@ -153,6 +153,32 @@ export class SupabasePaymentRepository implements IPaymentRepository {
     return { success: Boolean(result?.success), credit: result?.credit || undefined, error: result?.error || undefined };
   }
 
+  async failPayment(orderId: string, externalPaymentId: string): Promise<{ success: boolean; error?: string }> {
+    const client = this.getAdminClient();
+    const { data: existing, error: existingError } = await client.from('payments')
+      .select('status, external_payment_id, entitlement_applied_at')
+      .eq('order_id', orderId).maybeSingle();
+    if (existingError || !existing) return { success: false, error: existingError?.message || 'Ödeme kaydı bulunamadı.' };
+    if (existing.external_payment_id !== externalPaymentId) return { success: false, error: 'Fleeca ödeme kimliği eşleşmedi.' };
+    if (existing.status === 'FAILED') return { success: true };
+    if (existing.status !== 'PENDING' || existing.entitlement_applied_at) return { success: false, error: 'Ödeme terminal başarısız duruma geçirilemedi.' };
+    const { data, error } = await client.from('payments')
+      .update({ status: 'FAILED', processed_at: new Date().toISOString() })
+      .eq('order_id', orderId).eq('external_payment_id', externalPaymentId).eq('status', 'PENDING')
+      .is('entitlement_applied_at', null).select('id').maybeSingle();
+    if (error) return { success: false, error: error.message };
+    if (data) return { success: true };
+    const { data: terminal, error: terminalError } = await client.from('payments')
+      .select('status, external_payment_id, entitlement_applied_at')
+      .eq('order_id', orderId).maybeSingle();
+    if (terminalError) return { success: false, error: terminalError.message };
+    return terminal?.status === 'FAILED'
+      && terminal.external_payment_id === externalPaymentId
+      && !terminal.entitlement_applied_at
+      ? { success: true }
+      : { success: false, error: 'Ödeme terminal başarısız duruma geçirilemedi.' };
+  }
+
   async completeBoostPayment(orderId: string): Promise<{ success: boolean; error?: string; featured_until?: string }> {
     const client = this.getAdminClient();
     const { data, error } = await client.rpc('complete_sanboard_boost_payment', { p_order_id: orderId });
@@ -205,6 +231,13 @@ export class SupabasePaymentRepository implements IPaymentRepository {
   async getPaymentOrder(orderId: string): Promise<any | null> {
     const client = this.getAdminClient();
     const { data, error } = await client.from('payments').select('*').eq('order_id', orderId).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data || null;
+  }
+
+  async getPaymentByExternalPaymentId(externalPaymentId: string): Promise<any | null> {
+    const client = this.getAdminClient();
+    const { data, error } = await client.from('payments').select('*').eq('external_payment_id', externalPaymentId).maybeSingle();
     if (error) throw new Error(error.message);
     return data || null;
   }

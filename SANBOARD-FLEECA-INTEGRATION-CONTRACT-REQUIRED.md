@@ -17,16 +17,16 @@ No real Fleeca transport may be enabled until the official contract answers ever
 | 9 | Transaction ID uniqueness guarantee | UNKNOWN — official Fleeca contract required |
 | 10 | Payment status values | UNKNOWN — official Fleeca contract required |
 | 11 | Final/settled status | UNKNOWN — official Fleeca contract required |
-| 12 | Failed/cancelled statuses | UNKNOWN — official Fleeca contract required |
-| 13 | Pending status behavior | UNKNOWN — official Fleeca contract required |
+| 12 | Failed/cancelled statuses | `payment_failed` is a terminal failure; no fulfillment |
+| 13 | Pending status behavior | `pending` callback performs no fulfillment |
 | 14 | Amount field format and units | UNKNOWN — official Fleeca contract required |
 | 15 | Currency behavior | UNKNOWN — official Fleeca contract required |
 | 16 | Payer identity field | UNKNOWN — official Fleeca contract required |
 | 17 | Character/account/bank-account relationship | UNKNOWN — official Fleeca contract required |
 | 18 | Order/reference/purpose field | UNKNOWN — official Fleeca contract required |
-| 19 | Browser callback mechanism | UNKNOWN — official Fleeca contract required |
-| 20 | Webhook availability | UNKNOWN — official Fleeca contract required |
-| 21 | Webhook signature verification | UNKNOWN — official Fleeca contract required |
+| 19 | Browser callback mechanism | Redirect URI receives `payment_id=<uuid>` as correlation only |
+| 20 | Webhook availability | POST callback confirmed |
+| 21 | Webhook signature verification | `X-Fleeca-Signature: sha256=<HMAC-SHA256(raw body, FLEECA_API_KEY)>` |
 | 22 | Webhook event ID | UNKNOWN — official Fleeca contract required |
 | 23 | Event replay semantics | UNKNOWN — official Fleeca contract required |
 | 24 | Polling support | UNKNOWN — official Fleeca contract required |
@@ -44,7 +44,7 @@ No real Fleeca transport may be enabled until the official contract answers ever
 
 ## Mandatory security gate
 
-- A webhook route must not be activated until the official signature verification contract is implemented and tested.
+- The webhook route verifies the official raw-body HMAC contract with timing-safe comparison before payload parsing.
 - Unsigned or unverifiable events must never produce `VerifiedExternalPayment`, mark a payment `SUCCESS`, or apply an entitlement.
 - Browser redirects and query/body fields are navigation context only. They are never payment proof.
 - Provider transaction identity must come from trusted server-side verification, not the browser.
