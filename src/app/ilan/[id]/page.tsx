@@ -373,9 +373,9 @@ export default async function ListingDetailPage({ params }: PageProps) {
                               </div>
                             </div>
                           )}
-                          <VehicleSpecItem label="Motor Upgrade" value={`Seviye ${vd.engine_upgrade}`} badge />
+                          <VehicleSpecItem label="Motor Yükseltme" value={`Seviye ${vd.engine_upgrade}`} badge />
                           <VehicleSpecItem label="Şanzıman Upgrade" value={`Seviye ${vd.transmission_upgrade}`} badge />
-                          <VehicleSpecItem label="Fren Upgrade" value={`Seviye ${vd.brake_upgrade}`} badge />
+                          <VehicleSpecItem label="Fren Yükseltme" value={`Seviye ${vd.brake_upgrade}`} badge />
                           {vd.suspension && <VehicleSpecItem label="Süspansiyon" value={vd.suspension} />}
                         </VehicleSpecSection>
 

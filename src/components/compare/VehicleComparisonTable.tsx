@@ -76,7 +76,7 @@ export function getVehicleComparisonSections(listingA: Listing, listingB: Listin
       row('brake-upgrade', 'Fren Güçlendirmesi', vA?.brake_upgrade, vB?.brake_upgrade, formatUpgrade(vA?.brake_upgrade), missingB(formatUpgrade(vB?.brake_upgrade))),
       row('transmission-upgrade', 'Şanzıman Güçlendirmesi', vA?.transmission_upgrade, vB?.transmission_upgrade, formatUpgrade(vA?.transmission_upgrade), missingB(formatUpgrade(vB?.transmission_upgrade))),
       row('turbo', 'Turbo', vA?.turbo, vB?.turbo, formatBoolean(vA?.turbo), missingB(formatBoolean(vB?.turbo)), 'boolean'),
-      row('suspension', 'Süspansiyon', vA?.suspension, vB?.suspension, vA?.suspension || 'Belirtilmemiş', missingB(vB?.suspension || 'Belirtilmemiş')),
+      row('suspension', 'Süspansiyon', vA?.suspension, vB?.suspension, formatUpgrade(vA?.suspension), missingB(formatUpgrade(vB?.suspension))),
     ]},
     { key: 'comfort', title: 'Ses & Konfor', description: 'Kullanım ve satış tercihleri', icon: Headphones, rows: [
       row('subwoofer', 'Subwoofer', vA?.subwoofer, vB?.subwoofer, formatBoolean(vA?.subwoofer), missingB(formatBoolean(vB?.subwoofer)), 'boolean'),

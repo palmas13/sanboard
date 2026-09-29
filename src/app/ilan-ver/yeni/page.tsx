@@ -27,6 +27,7 @@ import { getListingUrl } from '@/lib/urls';
 import { calculateListingQuality } from '@/lib/listings/quality';
 import { ListingQualityIndicator } from '@/components/listings/ListingQualityIndicator';
 import { LISTING_TITLE_MAX_ERROR, LISTING_TITLE_MAX_LENGTH } from '@/lib/validations/listing';
+import { getVehicleLevelOptions, normalizeVehicleLevel, VEHICLE_LEVEL_FIELDS } from '@/lib/listings/vehicle-levels';
 
 const TITLE_MAX = LISTING_TITLE_MAX_LENGTH;
 const DESC_MAX = 100;
@@ -118,17 +119,17 @@ export default function YeniIlanOlusturPage() {
         setModel(draft.model || '');
         setPlate(draft.plate || '');
         setMileage(draft.mileage || '');
-        setEngineUpgrade(draft.engineUpgrade || '0');
-        setTransmissionUpgrade(draft.transmissionUpgrade || '0');
-        setBrakeUpgrade(draft.brakeUpgrade || '0');
-        setTurbo(Boolean(draft.turbo));
+        setEngineUpgrade(normalizeVehicleLevel(draft.engineUpgrade, 'engine_upgrade'));
+        setTransmissionUpgrade(normalizeVehicleLevel(draft.transmissionUpgrade, 'transmission_upgrade'));
+        setBrakeUpgrade(normalizeVehicleLevel(draft.brakeUpgrade, 'brake_upgrade'));
+        setTurbo(normalizeVehicleLevel(draft.turbo ? 1 : 0, 'turbo') === '1');
         setSubwoofer(Boolean(draft.subwoofer));
         setTradeAvailable(Boolean(draft.tradeAvailable));
-        setLockLevel(draft.lockLevel || '');
-        setAlarmLevel(draft.alarmLevel || '');
-        setAntiTheftLevel(draft.antiTheftLevel || '');
+        setLockLevel(normalizeVehicleLevel(draft.lockLevel, 'lock_level'));
+        setAlarmLevel(normalizeVehicleLevel(draft.alarmLevel, 'alarm_level'));
+        setAntiTheftLevel(normalizeVehicleLevel(draft.antiTheftLevel, 'anti_theft_level'));
         setEngineHealth(draft.engineHealth || '');
-        setSuspension(draft.suspension || '');
+        setSuspension(normalizeVehicleLevel(draft.suspension, 'suspension'));
         setFuelType(draft.fuelType || 'BENZIN');
         setFactoryPrice(draft.factoryPrice || '');
         setFloor(draft.floor || '1');
@@ -378,11 +379,11 @@ export default function YeniIlanOlusturPage() {
       payload.turbo = turbo;
       payload.subwoofer = subwoofer;
       payload.trade_available = tradeAvailable;
-      payload.lock_level = lockLevel !== '' ? Number(lockLevel) : null;
-      payload.alarm_level = alarmLevel !== '' ? Number(alarmLevel) : null;
-      payload.anti_theft_level = antiTheftLevel !== '' ? Number(antiTheftLevel) : null;
+      payload.lock_level = Number(lockLevel);
+      payload.alarm_level = Number(alarmLevel);
+      payload.anti_theft_level = Number(antiTheftLevel);
       payload.engine_health = engineHealth !== '' ? Number(engineHealth) : null;
-      payload.suspension = suspension.trim() || null;
+      payload.suspension = Number(suspension);
       payload.fuel_type = fuelType || null;
       payload.factory_price = factoryPrice !== '' ? Number(factoryPrice) : null;
     } else {
@@ -775,47 +776,29 @@ export default function YeniIlanOlusturPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[11px] text-[var(--text-dim)] font-medium">Motor Geliştirmesi</label>
+                      <label className="text-[11px] text-[var(--text-dim)] font-medium">{VEHICLE_LEVEL_FIELDS.engine_upgrade.label}</label>
                       <CustomSelect
                         value={engineUpgrade}
                         onChange={(v) => setEngineUpgrade(v)}
-                        options={[
-                          { value: '0', label: 'Seviye 0' },
-                          { value: '1', label: 'Seviye 1' },
-                          { value: '2', label: 'Seviye 2' },
-                          { value: '3', label: 'Seviye 3' },
-                          { value: '4', label: 'Seviye 4' },
-                        ]}
+                        options={getVehicleLevelOptions('engine_upgrade')}
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[11px] text-[var(--text-dim)] font-medium">Şanzıman Geliştirmesi</label>
+                      <label className="text-[11px] text-[var(--text-dim)] font-medium">{VEHICLE_LEVEL_FIELDS.transmission_upgrade.label}</label>
                       <CustomSelect
                         value={transmissionUpgrade}
                         onChange={(v) => setTransmissionUpgrade(v)}
-                        options={[
-                          { value: '0', label: 'Seviye 0' },
-                          { value: '1', label: 'Seviye 1' },
-                          { value: '2', label: 'Seviye 2' },
-                          { value: '3', label: 'Seviye 3' },
-                          { value: '4', label: 'Seviye 4' },
-                        ]}
+                        options={getVehicleLevelOptions('transmission_upgrade')}
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[11px] text-[var(--text-dim)] font-medium">Fren Geliştirmesi</label>
+                      <label className="text-[11px] text-[var(--text-dim)] font-medium">{VEHICLE_LEVEL_FIELDS.brake_upgrade.label}</label>
                       <CustomSelect
                         value={brakeUpgrade}
                         onChange={(v) => setBrakeUpgrade(v)}
-                        options={[
-                          { value: '0', label: 'Seviye 0' },
-                          { value: '1', label: 'Seviye 1' },
-                          { value: '2', label: 'Seviye 2' },
-                          { value: '3', label: 'Seviye 3' },
-                          { value: '4', label: 'Seviye 4' },
-                        ]}
+                        options={getVehicleLevelOptions('brake_upgrade')}
                       />
                     </div>
                   </div>
@@ -835,13 +818,11 @@ export default function YeniIlanOlusturPage() {
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[11px] text-[var(--text-dim)] font-medium">Süspansiyon</label>
-                      <input
-                        type="text"
-                        placeholder="Örn: Stok, Spor..."
+                      <label className="text-[11px] text-[var(--text-dim)] font-medium">{VEHICLE_LEVEL_FIELDS.suspension.label}</label>
+                      <CustomSelect
                         value={suspension}
-                        onChange={(e) => setSuspension(e.target.value)}
-                        className="form-input text-sm"
+                        onChange={setSuspension}
+                        options={getVehicleLevelOptions('suspension')}
                       />
                     </div>
 
@@ -868,38 +849,29 @@ export default function YeniIlanOlusturPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[11px] text-[var(--text-dim)] font-medium">Kilit Seviyesi</label>
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder="Örn: 2"
+                      <label className="text-[11px] text-[var(--text-dim)] font-medium">{VEHICLE_LEVEL_FIELDS.lock_level.label}</label>
+                      <CustomSelect
                         value={lockLevel}
-                        onChange={(e) => setLockLevel(e.target.value)}
-                        className={`form-input text-sm ${invalidFields.lockLevel ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
+                        onChange={setLockLevel}
+                        options={getVehicleLevelOptions('lock_level')}
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[11px] text-[var(--text-dim)] font-medium">Alarm Seviyesi</label>
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder="Örn: 1"
+                      <label className="text-[11px] text-[var(--text-dim)] font-medium">{VEHICLE_LEVEL_FIELDS.alarm_level.label}</label>
+                      <CustomSelect
                         value={alarmLevel}
-                        onChange={(e) => setAlarmLevel(e.target.value)}
-                        className={`form-input text-sm ${invalidFields.alarmLevel ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
+                        onChange={setAlarmLevel}
+                        options={getVehicleLevelOptions('alarm_level')}
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[11px] text-[var(--text-dim)] font-medium">Hırsızlık Önleme Seviyesi</label>
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder="Örn: 3"
+                      <label className="text-[11px] text-[var(--text-dim)] font-medium">{VEHICLE_LEVEL_FIELDS.anti_theft_level.label}</label>
+                      <CustomSelect
                         value={antiTheftLevel}
-                        onChange={(e) => setAntiTheftLevel(e.target.value)}
-                        className={`form-input text-sm ${invalidFields.antiTheftLevel ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
+                        onChange={setAntiTheftLevel}
+                        options={getVehicleLevelOptions('anti_theft_level')}
                       />
                     </div>
                   </div>
@@ -912,15 +884,10 @@ export default function YeniIlanOlusturPage() {
                   </h3>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <label className="flex items-center gap-2.5 p-3 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/50 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={turbo}
-                        onChange={(e) => setTurbo(e.target.checked)}
-                        className="rounded border-[var(--border-app)] text-[#FF8A1F] focus:ring-[#FF8A1F]"
-                      />
-                      <span className="text-xs font-semibold text-[var(--text-main)]">Turbo Şarj</span>
-                    </label>
+                    <div className="space-y-1">
+                      <label className="text-[11px] text-[var(--text-dim)] font-medium">{VEHICLE_LEVEL_FIELDS.turbo.label}</label>
+                      <CustomSelect value={turbo ? '1' : '0'} onChange={(value) => setTurbo(value === '1')} options={getVehicleLevelOptions('turbo')} />
+                    </div>
 
                     <label className="flex items-center gap-2.5 p-3 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/50 cursor-pointer">
                       <input
@@ -1171,6 +1138,11 @@ export default function YeniIlanOlusturPage() {
                       {Number(mileage).toLocaleString('tr-TR')} km
                     </span>
                   </div>
+                  <div><span className="text-[var(--text-muted)]">{VEHICLE_LEVEL_FIELDS.brake_upgrade.label}: </span><span className="font-bold text-[var(--text-main)]">{brakeUpgrade}</span></div>
+                  <div><span className="text-[var(--text-muted)]">{VEHICLE_LEVEL_FIELDS.engine_upgrade.label}: </span><span className="font-bold text-[var(--text-main)]">{engineUpgrade}</span></div>
+                  <div><span className="text-[var(--text-muted)]">{VEHICLE_LEVEL_FIELDS.transmission_upgrade.label}: </span><span className="font-bold text-[var(--text-main)]">{transmissionUpgrade}</span></div>
+                  <div><span className="text-[var(--text-muted)]">{VEHICLE_LEVEL_FIELDS.suspension.label}: </span><span className="font-bold text-[var(--text-main)]">{suspension}</span></div>
+                  <div><span className="text-[var(--text-muted)]">{VEHICLE_LEVEL_FIELDS.turbo.label}: </span><span className="font-bold text-[var(--text-main)]">{turbo ? '1' : '0'}</span></div>
                 </div>
               </div>
             )}

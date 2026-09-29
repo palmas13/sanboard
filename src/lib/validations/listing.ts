@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { VEHICLE_LEVEL_FIELDS, VehicleLevelField } from '@/lib/listings/vehicle-levels';
 
 export const LISTING_TITLE_MAX_LENGTH = 40;
 export const LISTING_TITLE_MAX_ERROR = 'İlan başlığı en fazla 40 karakter olabilir.';
@@ -26,6 +27,14 @@ export const roomCounts = [
 ] as const;
 
 export const buildingTypes = ['Normal', 'Dubleks'] as const;
+
+const vehicleLevelSchema = (field: VehicleLevelField) => {
+  const definition = VEHICLE_LEVEL_FIELDS[field];
+  return z.number().int(`${definition.label} seviyesi tam sayı olmalıdır`).min(0).max(
+    definition.max,
+    `${definition.label} seviyesi en fazla ${definition.max} olabilir`
+  );
+};
 
 export const imageSchema = z.object({
   id: z.string().optional(),
@@ -91,17 +100,17 @@ export const vehicleListingSchema = z.object({
     .number({ message: 'Kilometre geçerli bir sayı olmalıdır' })
     .int()
     .min(0, 'Kilometre negatif olamaz'),
-  engine_upgrade: z.number().int().min(0).max(4).default(0),
-  transmission_upgrade: z.number().int().min(0).max(4).default(0),
-  brake_upgrade: z.number().int().min(0).max(4).default(0),
+  engine_upgrade: vehicleLevelSchema('engine_upgrade').default(0),
+  transmission_upgrade: vehicleLevelSchema('transmission_upgrade').default(0),
+  brake_upgrade: vehicleLevelSchema('brake_upgrade').default(0),
   turbo: z.boolean().default(false),
   subwoofer: z.boolean().default(false),
   trade_available: z.boolean().default(false),
-  lock_level: z.number().int().min(0).optional().nullable(),
-  alarm_level: z.number().int().min(0).optional().nullable(),
-  anti_theft_level: z.number().int().min(0).optional().nullable(),
+  lock_level: vehicleLevelSchema('lock_level').optional().nullable(),
+  alarm_level: vehicleLevelSchema('alarm_level').optional().nullable(),
+  anti_theft_level: vehicleLevelSchema('anti_theft_level').optional().nullable(),
   engine_health: z.number().int().min(0).max(100).optional().nullable(),
-  suspension: z.string().trim().optional().nullable(),
+  suspension: vehicleLevelSchema('suspension').optional().nullable(),
   fuel_type: z.enum(['BENZIN', 'DIZEL', 'ELEKTRIK']).optional().nullable(),
   factory_price: z.number().min(0).optional().nullable(),
 }).refine((value) => value.minimum_offer_amount == null || value.minimum_offer_amount <= value.price, {

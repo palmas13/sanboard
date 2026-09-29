@@ -52,7 +52,7 @@ export interface CreateListingInput {
   alarm_level?: number | null;
   anti_theft_level?: number | null;
   engine_health?: number | null;
-  suspension?: string | null;
+  suspension?: number | null;
   factory_price?: number | null;
   seller_type?: 'INDIVIDUAL' | 'CORPORATE' | null;
   corporate_profile_id?: string | null;

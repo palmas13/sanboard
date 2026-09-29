@@ -1,3 +1,6 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { CalendarDays, MapPin, Tag } from 'lucide-react';
@@ -22,5 +25,42 @@ function HomepageCompactListing({ listing }: { listing: PublicListingSummary }) 
 
 export function HomepageListingRotator({ listings, emptyMessage }: { listings: PublicListingSummary[]; emptyMessage: string; label: string }) {
   if (!listings.length) return <div className="homepage-empty-state">{emptyMessage}</div>;
-  return <div className="homepage-listing-stack">{listings.slice(0, 3).map((listing) => <HomepageCompactListing key={listing.id} listing={listing} />)}</div>;
+  return <HomepageListingPages listings={listings} />;
+}
+
+function HomepageListingPages({ listings }: { listings: PublicListingSummary[] }) {
+  const pages = useMemo(() => Array.from({ length: Math.ceil(listings.length / 3) }, (_, index) => listings.slice(index * 3, index * 3 + 3)), [listings]);
+  const [page, setPage] = useState(0);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [hidden, setHidden] = useState(false);
+
+  useEffect(() => {
+    const onVisibilityChange = () => setHidden(document.hidden);
+    onVisibilityChange();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, []);
+
+  useEffect(() => {
+    if (pages.length < 2 || hovered || focused || hidden) return;
+    const timer = window.setTimeout(() => setPage((current) => (current + 1) % pages.length), 5000);
+    return () => window.clearTimeout(timer);
+  }, [focused, hidden, hovered, page, pages.length]);
+
+  useEffect(() => setPage((current) => Math.min(current, pages.length - 1)), [pages.length]);
+
+  return (
+    <div
+      className="homepage-rotator-viewport"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocusCapture={() => setFocused(true)}
+      onBlurCapture={(event) => setFocused(event.currentTarget.contains(event.relatedTarget as Node))}
+    >
+      <div key={page} className="homepage-listing-stack homepage-rotator-enter">
+        {pages[page].map((listing) => <HomepageCompactListing key={listing.id} listing={listing} />)}
+      </div>
+    </div>
+  );
 }

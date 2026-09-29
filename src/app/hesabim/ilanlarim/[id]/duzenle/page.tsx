@@ -19,6 +19,7 @@ import { CustomSelect } from '@/components/ui/CustomSelect';
 import { formatTimeRemaining } from '@/lib/utils/format';
 import { getVehicleBrands, getModelsByBrand } from '@/lib/constants/vehicleCatalog';
 import { LISTING_TITLE_MAX_ERROR, LISTING_TITLE_MAX_LENGTH } from '@/lib/validations/listing';
+import { getVehicleLevelOptions, normalizeVehicleLevel, VEHICLE_LEVEL_FIELDS } from '@/lib/listings/vehicle-levels';
 
 const TITLE_MAX = LISTING_TITLE_MAX_LENGTH;
 const DESC_MAX = 100;
@@ -130,17 +131,17 @@ export default function IlanDuzenlePage({
           setModel(vd.model || '');
           setPlate(vd.plate || '');
           setMileage(String(vd.mileage ?? ''));
-          setEngineUpgrade(String(vd.engine_upgrade ?? '0'));
-          setTransmissionUpgrade(String(vd.transmission_upgrade ?? '0'));
-          setBrakeUpgrade(String(vd.brake_upgrade ?? '0'));
+          setEngineUpgrade(normalizeVehicleLevel(vd.engine_upgrade, 'engine_upgrade'));
+          setTransmissionUpgrade(normalizeVehicleLevel(vd.transmission_upgrade, 'transmission_upgrade'));
+          setBrakeUpgrade(normalizeVehicleLevel(vd.brake_upgrade, 'brake_upgrade'));
           setTurbo(Boolean(vd.turbo));
           setSubwoofer(Boolean(vd.subwoofer));
           setTradeAvailable(Boolean(vd.trade_available));
-          setLockLevel(vd.lock_level !== null && vd.lock_level !== undefined ? String(vd.lock_level) : '');
-          setAlarmLevel(vd.alarm_level !== null && vd.alarm_level !== undefined ? String(vd.alarm_level) : '');
-          setAntiTheftLevel(vd.anti_theft_level !== null && vd.anti_theft_level !== undefined ? String(vd.anti_theft_level) : '');
+          setLockLevel(normalizeVehicleLevel(vd.lock_level, 'lock_level'));
+          setAlarmLevel(normalizeVehicleLevel(vd.alarm_level, 'alarm_level'));
+          setAntiTheftLevel(normalizeVehicleLevel(vd.anti_theft_level, 'anti_theft_level'));
           setEngineHealth(vd.engine_health !== null && vd.engine_health !== undefined ? String(vd.engine_health) : '');
-          setSuspension(vd.suspension || '');
+          setSuspension(normalizeVehicleLevel(vd.suspension, 'suspension'));
           setFuelType(vd.fuel_type || 'BENZIN');
           setFactoryPrice(vd.factory_price !== null && vd.factory_price !== undefined ? String(vd.factory_price) : '');
         }
@@ -266,11 +267,11 @@ export default function IlanDuzenlePage({
         payload.turbo = turbo;
         payload.subwoofer = subwoofer;
         payload.trade_available = tradeAvailable;
-        payload.lock_level = lockLevel !== '' ? Number(lockLevel) : null;
-        payload.alarm_level = alarmLevel !== '' ? Number(alarmLevel) : null;
-        payload.anti_theft_level = antiTheftLevel !== '' ? Number(antiTheftLevel) : null;
+        payload.lock_level = Number(lockLevel);
+        payload.alarm_level = Number(alarmLevel);
+        payload.anti_theft_level = Number(antiTheftLevel);
         payload.engine_health = engineHealth !== '' ? Number(engineHealth) : null;
-        payload.suspension = suspension.trim() || null;
+        payload.suspension = Number(suspension);
         payload.fuel_type = fuelType || null;
         payload.factory_price = factoryPrice !== '' ? Number(factoryPrice) : null;
       } else {
@@ -418,7 +419,7 @@ export default function IlanDuzenlePage({
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className={`grid grid-cols-1 gap-4 ${category === 'property' ? 'sm:grid-cols-2' : ''}`}>
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-[var(--text-muted)]">Fiyat ($)</label>
                 <input
@@ -431,28 +432,20 @@ export default function IlanDuzenlePage({
                 />
               </div>
 
-              <div className="space-y-1.5">
+              {category === 'property' && <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-[var(--text-muted)]">
-                  {category === 'vehicle' ? 'Araç Kategorisi' : 'Mülk Türü'}
+                  Mülk Türü
                 </label>
                 <CustomSelect
                   value={subcategory}
                   onChange={handleSubcategoryChange}
-                  options={
-                    category === 'vehicle'
-                      ? [
-                          { value: 'Otomobil', label: 'Otomobil' },
-                          { value: 'SUV / Off-Road / Kamyonet', label: 'SUV / Off-Road / Kamyonet' },
-                          { value: 'Motosiklet', label: 'Motosiklet' },
-                        ]
-                      : [
-                          { value: 'Ev / Daire', label: 'Ev / Daire' },
-                          { value: 'İşyeri', label: 'İşyeri' },
-                          { value: 'Diğer Mülk', label: 'Diğer Mülk' },
-                        ]
-                  }
+                  options={[
+                    { value: 'Ev / Daire', label: 'Ev / Daire' },
+                    { value: 'İşyeri', label: 'İşyeri' },
+                    { value: 'Diğer Mülk', label: 'Diğer Mülk' },
+                  ]}
                 />
-              </div>
+              </div>}
             </div>
             <div className="space-y-3 rounded-xl border border-[var(--border-app)] p-4">
               <label className="flex items-center justify-between gap-4 text-xs font-semibold text-[var(--text-muted)]"><span><b className="block text-[var(--text-main)]">Tekliflere Açık</b>Fiyat pazarlığını aç veya kapat.</span><input type="checkbox" checked={offersEnabled} onChange={(e)=>setOffersEnabled(e.target.checked)} className="h-5 w-5 accent-[#FF8A1F]" /></label>
@@ -538,45 +531,27 @@ export default function IlanDuzenlePage({
               <h4 className="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider">Mekanik & Performans</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <span className="text-[11px] text-[var(--text-dim)] font-medium">Motor Geliştirmesi</span>
+                  <span className="text-[11px] text-[var(--text-dim)] font-medium">{VEHICLE_LEVEL_FIELDS.engine_upgrade.label}</span>
                   <CustomSelect
                     value={engineUpgrade}
                     onChange={(v) => setEngineUpgrade(v)}
-                    options={[
-                      { value: '0', label: 'Seviye 0' },
-                      { value: '1', label: 'Seviye 1' },
-                      { value: '2', label: 'Seviye 2' },
-                      { value: '3', label: 'Seviye 3' },
-                      { value: '4', label: 'Seviye 4' },
-                    ]}
+                    options={getVehicleLevelOptions('engine_upgrade')}
                   />
                 </div>
                 <div className="space-y-1">
-                  <span className="text-[11px] text-[var(--text-dim)] font-medium">Şanzıman Geliştirmesi</span>
+                  <span className="text-[11px] text-[var(--text-dim)] font-medium">{VEHICLE_LEVEL_FIELDS.transmission_upgrade.label}</span>
                   <CustomSelect
                     value={transmissionUpgrade}
                     onChange={(v) => setTransmissionUpgrade(v)}
-                    options={[
-                      { value: '0', label: 'Seviye 0' },
-                      { value: '1', label: 'Seviye 1' },
-                      { value: '2', label: 'Seviye 2' },
-                      { value: '3', label: 'Seviye 3' },
-                      { value: '4', label: 'Seviye 4' },
-                    ]}
+                    options={getVehicleLevelOptions('transmission_upgrade')}
                   />
                 </div>
                 <div className="space-y-1">
-                  <span className="text-[11px] text-[var(--text-dim)] font-medium">Fren Geliştirmesi</span>
+                  <span className="text-[11px] text-[var(--text-dim)] font-medium">{VEHICLE_LEVEL_FIELDS.brake_upgrade.label}</span>
                   <CustomSelect
                     value={brakeUpgrade}
                     onChange={(v) => setBrakeUpgrade(v)}
-                    options={[
-                      { value: '0', label: 'Seviye 0' },
-                      { value: '1', label: 'Seviye 1' },
-                      { value: '2', label: 'Seviye 2' },
-                      { value: '3', label: 'Seviye 3' },
-                      { value: '4', label: 'Seviye 4' },
-                    ]}
+                    options={getVehicleLevelOptions('brake_upgrade')}
                   />
                 </div>
               </div>
@@ -595,13 +570,11 @@ export default function IlanDuzenlePage({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] text-[var(--text-dim)] font-medium">Süspansiyon</label>
-                  <input
-                    type="text"
+                  <label className="text-[11px] text-[var(--text-dim)] font-medium">{VEHICLE_LEVEL_FIELDS.suspension.label}</label>
+                  <CustomSelect
                     value={suspension}
-                    onChange={(e) => setSuspension(e.target.value)}
-                    placeholder="Örn: Stok, Spor, Yarış..."
-                    className="form-input text-sm"
+                    onChange={setSuspension}
+                    options={getVehicleLevelOptions('suspension')}
                   />
                 </div>
                 <div className="space-y-1">
@@ -624,36 +597,27 @@ export default function IlanDuzenlePage({
               <h4 className="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider">Güvenlik Seviyeleri</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[11px] text-[var(--text-dim)] font-medium">Kilit Seviyesi</label>
-                  <input
-                    type="number"
-                    min="0"
+                  <label className="text-[11px] text-[var(--text-dim)] font-medium">{VEHICLE_LEVEL_FIELDS.lock_level.label}</label>
+                  <CustomSelect
                     value={lockLevel}
-                    onChange={(e) => setLockLevel(e.target.value)}
-                    placeholder="Örn: 2"
-                    className="form-input text-sm"
+                    onChange={setLockLevel}
+                    options={getVehicleLevelOptions('lock_level')}
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] text-[var(--text-dim)] font-medium">Alarm Seviyesi</label>
-                  <input
-                    type="number"
-                    min="0"
+                  <label className="text-[11px] text-[var(--text-dim)] font-medium">{VEHICLE_LEVEL_FIELDS.alarm_level.label}</label>
+                  <CustomSelect
                     value={alarmLevel}
-                    onChange={(e) => setAlarmLevel(e.target.value)}
-                    placeholder="Örn: 1"
-                    className="form-input text-sm"
+                    onChange={setAlarmLevel}
+                    options={getVehicleLevelOptions('alarm_level')}
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] text-[var(--text-dim)] font-medium">Hırsızlık Önleme Seviyesi</label>
-                  <input
-                    type="number"
-                    min="0"
+                  <label className="text-[11px] text-[var(--text-dim)] font-medium">{VEHICLE_LEVEL_FIELDS.anti_theft_level.label}</label>
+                  <CustomSelect
                     value={antiTheftLevel}
-                    onChange={(e) => setAntiTheftLevel(e.target.value)}
-                    placeholder="Örn: 3"
-                    className="form-input text-sm"
+                    onChange={setAntiTheftLevel}
+                    options={getVehicleLevelOptions('anti_theft_level')}
                   />
                 </div>
               </div>
@@ -663,15 +627,10 @@ export default function IlanDuzenlePage({
             <div className="pt-2 space-y-3">
               <h4 className="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider">Ek Donanım & Satış</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <label className="flex items-center gap-2.5 p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={turbo}
-                    onChange={(e) => setTurbo(e.target.checked)}
-                    className="rounded border-[var(--border-app)] text-[#FF8A1F] focus:ring-[#FF8A1F]"
-                  />
-                  <span className="text-xs font-semibold text-[var(--text-main)]">Turbo Şarj</span>
-                </label>
+                <div className="space-y-1">
+                  <label className="text-[11px] text-[var(--text-dim)] font-medium">{VEHICLE_LEVEL_FIELDS.turbo.label}</label>
+                  <CustomSelect value={turbo ? '1' : '0'} onChange={(value) => setTurbo(value === '1')} options={getVehicleLevelOptions('turbo')} />
+                </div>
 
                 <label className="flex items-center gap-2.5 p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] cursor-pointer">
                   <input

@@ -49,4 +49,15 @@ describe('listing edit ownership and validation context', () => {
     assert.equal(putResponse.status, 200);
     assert.equal(db.listings[0].title, 'Güncel Kurumsal Araç');
   });
+
+  test('edit API rejects a vehicle level above the canonical maximum', async () => {
+    const response = await PUT(request('PUT', {
+      category: 'vehicle', subcategory: 'Otomobil', title: 'Kurumsal Araç', description: 'Temiz araç', price: 1000,
+      offers_enabled: true, minimum_offer_amount: null, images: db.listings[0].images,
+      brand: 'Annis', model: 'Elegy', plate: 'LS 123', mileage: 100, engine_upgrade: 4, transmission_upgrade: 4,
+      brake_upgrade: 3, turbo: false, subwoofer: false, trade_available: false,
+    }), { params: Promise.resolve({ id: 'corporate-listing' }) });
+    assert.equal(response.status, 400);
+    assert.equal(db.listings[0].vehicle_details?.transmission_upgrade, 0);
+  });
 });

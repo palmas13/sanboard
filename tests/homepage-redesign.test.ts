@@ -74,10 +74,15 @@ describe('homepage marketplace redesign', () => {
     assert.match(page, /dealer\.moderation_status === 'ACTIVE'/);
   });
 
-  test('vehicle and property columns render three listings without slider controls', () => {
+  test('vehicle and property columns autoplay in groups of three without manual controls', () => {
     const rotator = source('src/components/home/HomepageListingRotator.tsx');
-    assert.match(rotator, /listings\.slice\(0, 3\)/);
-    assert.doesNotMatch(rotator, /ChevronLeft|ChevronRight|homepage-arrow|setInterval/);
+    assert.match(rotator, /listings\.slice\(index \* 3, index \* 3 \+ 3\)/);
+    assert.match(rotator, /window\.setTimeout/);
+    assert.match(rotator, /\(current \+ 1\) % pages\.length/);
+    assert.match(rotator, /onMouseEnter/);
+    assert.match(rotator, /onFocusCapture/);
+    assert.match(rotator, /visibilitychange/);
+    assert.doesNotMatch(rotator, /ChevronLeft|ChevronRight|homepage-arrow/);
   });
 
   test('featured showcase uses the dedicated homepage-only label', () => {
@@ -90,6 +95,9 @@ describe('homepage marketplace redesign', () => {
     assert.match(css, /\.homepage-section-header \{[^}]*display: grid/);
     assert.match(css, /grid-template-columns: minmax\(0,1fr\) auto/);
     assert.doesNotMatch(css, /\.homepage-see-all \{[^}]*padding-right/);
+    assert.match(css, /\.homepage-section-header \{[^}]*min-height: 58px[^}]*margin-bottom: \.65rem/);
+    assert.match(css, /\.homepage-rotator-viewport \{[^}]*overflow: hidden/);
+    assert.doesNotMatch(css, /\.homepage-listing-stack \{[^}]*min-height: 22rem/);
   });
 
   test('responsive four-column and reduced-motion styles remain present', () => {

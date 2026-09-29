@@ -98,7 +98,7 @@ export interface VehicleDetails {
   alarm_level?: number | null;
   anti_theft_level?: number | null;
   engine_health?: number | null;
-  suspension?: string | null;
+  suspension?: UpgradeLevel | null;
   fuel_type?: FuelType | null;
   factory_price?: number | null;
 }
