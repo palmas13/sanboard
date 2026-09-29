@@ -31,7 +31,7 @@ describe('listing edit ownership and validation context', () => {
       seller_type: 'CORPORATE', category: 'vehicle', subcategory: 'Otomobil', title: 'Kurumsal Araç', description: 'Temiz araç', price: 1000,
       offers_enabled: true, minimum_offer_amount: null, location: null, status: 'ACTIVE', expires_at: '2026-10-10T12:00:00.000Z',
       images: [{ id: 'image-1', listing_id: 'corporate-listing', storage_path: 'listing/test.webp', sort_order: 0, is_cover: true, size_bytes: 100 }],
-      vehicle_details: { listing_id: 'corporate-listing', vehicle_category: 'Otomobil', brand: 'Annis', model: 'Elegy', plate: 'LS 123', mileage: 100, engine_upgrade: 0, transmission_upgrade: 0, brake_upgrade: 0, turbo: false, subwoofer: false, trade_available: false },
+      vehicle_details: { listing_id: 'corporate-listing', vehicle_category: 'Otomobil', brand: 'Annis', model: 'Elegy Retro', plate: 'LS 123', mileage: 100, engine_upgrade: 0, transmission_upgrade: 0, brake_upgrade: 0, turbo: false, subwoofer: false, trade_available: false },
       created_at: now, updated_at: now,
     }] as any;
     db.favorites = [];
@@ -43,7 +43,7 @@ describe('listing edit ownership and validation context', () => {
     const putResponse = await PUT(request('PUT', {
       category: 'vehicle', subcategory: 'Otomobil', title: 'Güncel Kurumsal Araç', description: 'Temiz araç', price: 1200,
       offers_enabled: true, minimum_offer_amount: null, images: db.listings[0].images,
-      brand: 'Annis', model: 'Elegy', plate: 'LS 123', mileage: 100, engine_upgrade: 0, transmission_upgrade: 0,
+      brand: 'Annis', model: 'Elegy Retro', plate: 'LS 123', mileage: 100, engine_upgrade: 0, transmission_upgrade: 0,
       brake_upgrade: 0, turbo: false, subwoofer: false, trade_available: false,
     }), { params: Promise.resolve({ id: 'corporate-listing' }) });
     assert.equal(putResponse.status, 200);
@@ -54,7 +54,7 @@ describe('listing edit ownership and validation context', () => {
     const response = await PUT(request('PUT', {
       category: 'vehicle', subcategory: 'Otomobil', title: 'Kurumsal Araç', description: 'Temiz araç', price: 1000,
       offers_enabled: true, minimum_offer_amount: null, images: db.listings[0].images,
-      brand: 'Annis', model: 'Elegy', plate: 'LS 123', mileage: 100, engine_upgrade: 4, transmission_upgrade: 4,
+      brand: 'Annis', model: 'Elegy Retro', plate: 'LS 123', mileage: 100, engine_upgrade: 4, transmission_upgrade: 4,
       brake_upgrade: 3, turbo: false, subwoofer: false, trade_available: false,
     }), { params: Promise.resolve({ id: 'corporate-listing' }) });
     assert.equal(response.status, 400);

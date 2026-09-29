@@ -21,7 +21,7 @@ import {
 import { PhotoUploader, UploadedImage } from '@/components/forms/PhotoUploader';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { formatCurrency } from '@/lib/utils/format';
-import { getVehicleBrands, getModelsByBrand } from '@/lib/constants/vehicleCatalog';
+import { getVehicleBrandsByCategory, getVehicleModels, isMotorcycleCategory, isValidVehicleSelection, reconcileVehicleSelection, VEHICLE_CATEGORIES, VehicleCategory } from '@/lib/constants/vehicleCategories';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { getListingUrl } from '@/lib/urls';
 import { calculateListingQuality } from '@/lib/listings/quality';
@@ -63,12 +63,21 @@ export default function YeniIlanOlusturPage() {
   const [model, setModel] = useState('');
   const [plate, setPlate] = useState('');
 
-  const vehicleBrands = React.useMemo(() => getVehicleBrands(), []);
-  const availableModels = React.useMemo(() => getModelsByBrand(brand), [brand]);
+  const vehicleCategory = subcategory as VehicleCategory;
+  const vehicleBrands = React.useMemo(() => getVehicleBrandsByCategory(vehicleCategory), [vehicleCategory]);
+  const availableModels = React.useMemo(() => getVehicleModels(vehicleCategory, brand), [vehicleCategory, brand]);
 
   const handleBrandChange = (newBrand: string) => {
     setBrand(newBrand);
     setModel(''); // Automatically reset model selection when brand changes
+  };
+  const handleVehicleCategoryChange = (newCategory: string) => {
+    const nextCategory = newCategory as VehicleCategory;
+    const next = reconcileVehicleSelection(nextCategory, brand, model);
+    setSubcategory(nextCategory);
+    setBrand(next.brand);
+    setModel(next.model);
+    if (isMotorcycleCategory(nextCategory)) setSuspension('');
   };
   const [mileage, setMileage] = useState('');
   const [engineUpgrade, setEngineUpgrade] = useState('0');
@@ -110,13 +119,15 @@ export default function YeniIlanOlusturPage() {
         const draft = JSON.parse(raw);
         setStep(draft.step || 1);
         setCategory(draft.category || 'vehicle');
-        setSubcategory(draft.subcategory || 'Otomobil');
+        const restoredSubcategory = draft.subcategory || 'Otomobil';
+        setSubcategory(restoredSubcategory);
         setTitle(draft.title || '');
         setDescription(draft.description || '');
         setPrice(draft.price || '');
         setLocation(draft.location || '');
-        setBrand(draft.brand || '');
-        setModel(draft.model || '');
+        const restoredVehicle = reconcileVehicleSelection(restoredSubcategory as VehicleCategory, draft.brand || '', draft.model || '');
+        setBrand(restoredVehicle.brand);
+        setModel(restoredVehicle.model);
         setPlate(draft.plate || '');
         setMileage(draft.mileage || '');
         setEngineUpgrade(normalizeVehicleLevel(draft.engineUpgrade, 'engine_upgrade'));
@@ -129,7 +140,7 @@ export default function YeniIlanOlusturPage() {
         setAlarmLevel(normalizeVehicleLevel(draft.alarmLevel, 'alarm_level'));
         setAntiTheftLevel(normalizeVehicleLevel(draft.antiTheftLevel, 'anti_theft_level'));
         setEngineHealth(draft.engineHealth || '');
-        setSuspension(normalizeVehicleLevel(draft.suspension, 'suspension'));
+        setSuspension(isMotorcycleCategory(restoredSubcategory as VehicleCategory) ? '' : normalizeVehicleLevel(draft.suspension, 'suspension'));
         setFuelType(draft.fuelType || 'BENZIN');
         setFactoryPrice(draft.factoryPrice || '');
         setFloor(draft.floor || '1');
@@ -281,6 +292,11 @@ export default function YeniIlanOlusturPage() {
         errors.push('Lütfen araç modelini seçiniz.');
         invalid.model = true;
       }
+      if (!isValidVehicleSelection(vehicleCategory, brand, model)) {
+        errors.push('Lütfen kategoriyle uyumlu geçerli bir marka ve model seçiniz.');
+        invalid.brand = true;
+        invalid.model = true;
+      }
       if (!plate.trim()) {
         errors.push('Plaka bilgisi zorunludur.');
         invalid.plate = true;
@@ -383,7 +399,7 @@ export default function YeniIlanOlusturPage() {
       payload.alarm_level = Number(alarmLevel);
       payload.anti_theft_level = Number(antiTheftLevel);
       payload.engine_health = engineHealth !== '' ? Number(engineHealth) : null;
-      payload.suspension = Number(suspension);
+      payload.suspension = isMotorcycleCategory(vehicleCategory) ? null : (suspension !== '' ? Number(suspension) : null);
       payload.fuel_type = fuelType || null;
       payload.factory_price = factoryPrice !== '' ? Number(factoryPrice) : null;
     } else {
@@ -532,7 +548,7 @@ export default function YeniIlanOlusturPage() {
               <div>
                 <h3 className="font-bold text-base text-[var(--text-main)]">Araç İlanı</h3>
                 <p className="text-xs text-[var(--text-muted)] mt-1">
-                  Otomobil, SUV / Off-Road / Kamyonet, Motosiklet
+                  Otomobil, Motosiklet, SUV, Pickup, ATV ve Ticari
                 </p>
               </div>
             </button>
@@ -589,14 +605,12 @@ export default function YeniIlanOlusturPage() {
               </label>
               <select
                 value={subcategory}
-                onChange={(e) => setSubcategory(e.target.value)}
+                onChange={(e) => category === 'vehicle' ? handleVehicleCategoryChange(e.target.value) : setSubcategory(e.target.value)}
                 className="form-input text-sm"
               >
                 {category === 'vehicle' ? (
                   <>
-                    <option value="Otomobil">Otomobil</option>
-                    <option value="SUV / Off-Road / Kamyonet">SUV / Off-Road / Kamyonet</option>
-                    <option value="Motosiklet">Motosiklet</option>
+                    {VEHICLE_CATEGORIES.map((vehicleCategoryOption) => <option key={vehicleCategoryOption} value={vehicleCategoryOption}>{vehicleCategoryOption}</option>)}
                   </>
                 ) : (
                   <>
@@ -817,14 +831,14 @@ export default function YeniIlanOlusturPage() {
                       />
                     </div>
 
-                    <div className="space-y-1">
+                    {!isMotorcycleCategory(vehicleCategory) && <div className="space-y-1">
                       <label className="text-[11px] text-[var(--text-dim)] font-medium">{VEHICLE_LEVEL_FIELDS.suspension.label}</label>
                       <CustomSelect
                         value={suspension}
                         onChange={setSuspension}
                         options={getVehicleLevelOptions('suspension')}
                       />
-                    </div>
+                    </div>}
 
                     <div className="space-y-1">
                       <label className="text-[11px] text-[var(--text-dim)] font-medium">Yakıt Türü</label>
@@ -1141,7 +1155,7 @@ export default function YeniIlanOlusturPage() {
                   <div><span className="text-[var(--text-muted)]">{VEHICLE_LEVEL_FIELDS.brake_upgrade.label}: </span><span className="font-bold text-[var(--text-main)]">{brakeUpgrade}</span></div>
                   <div><span className="text-[var(--text-muted)]">{VEHICLE_LEVEL_FIELDS.engine_upgrade.label}: </span><span className="font-bold text-[var(--text-main)]">{engineUpgrade}</span></div>
                   <div><span className="text-[var(--text-muted)]">{VEHICLE_LEVEL_FIELDS.transmission_upgrade.label}: </span><span className="font-bold text-[var(--text-main)]">{transmissionUpgrade}</span></div>
-                  <div><span className="text-[var(--text-muted)]">{VEHICLE_LEVEL_FIELDS.suspension.label}: </span><span className="font-bold text-[var(--text-main)]">{suspension}</span></div>
+                  {!isMotorcycleCategory(vehicleCategory) && <div><span className="text-[var(--text-muted)]">{VEHICLE_LEVEL_FIELDS.suspension.label}: </span><span className="font-bold text-[var(--text-main)]">{suspension}</span></div>}
                   <div><span className="text-[var(--text-muted)]">{VEHICLE_LEVEL_FIELDS.turbo.label}: </span><span className="font-bold text-[var(--text-main)]">{turbo ? '1' : '0'}</span></div>
                 </div>
               </div>

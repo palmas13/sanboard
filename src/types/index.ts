@@ -1,9 +1,7 @@
 export type ListingCategory = 'vehicle' | 'property';
 
-export type VehicleCategory =
-  | 'Otomobil'
-  | 'SUV / Off-Road / Kamyonet'
-  | 'Motosiklet';
+export type { VehicleCategory } from '@/lib/constants/vehicleCategories';
+import type { VehicleCategory } from '@/lib/constants/vehicleCategories';
 
 export type PropertyType =
   | 'Ev / Daire'

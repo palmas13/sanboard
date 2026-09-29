@@ -31,6 +31,12 @@ describe('comparison redesign and listing number presentation', () => {
     assert.equal(mileage.rawA ?? null, mileage.rawB ?? null);
   });
 
+  test('motorcycle comparisons omit suspension while other categories keep it', () => {
+    const motorcycle = vehicle('a', { vehicle_category: 'Motosiklet', brand: 'Dinka', model: 'Akuma', suspension: null });
+    assert.equal(getVehicleComparisonSections(motorcycle, null).flatMap((section) => section.rows).some((row) => row.key === 'suspension'), false);
+    assert.equal(getVehicleComparisonSections(vehicle('a', { suspension: 2 }), null).flatMap((section) => section.rows).some((row) => row.key === 'suspension'), true);
+  });
+
   test('mobile comparison uses stacked value cards without forced horizontal table overflow', () => {
     const source = readFileSync(join(process.cwd(), 'src/components/compare/VehicleComparisonTable.tsx'), 'utf8');
     assert.match(source, /grid-cols-2/);

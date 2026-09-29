@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Car, Home, Search } from 'lucide-react';
+import { VEHICLE_CATEGORIES } from '@/lib/constants/vehicleCategories';
 
 const LOCATIONS = [
   'Vinewood',
@@ -94,9 +95,7 @@ export function HomeSearchBox() {
                 className="form-input text-xs"
               >
                 <option value="all">Tüm Kategoriler</option>
-                <option value="Otomobil">Otomobil</option>
-                <option value="SUV / Off-Road / Kamyonet">SUV / Off-Road / Kamyonet</option>
-                <option value="Motosiklet">Motosiklet</option>
+                {VEHICLE_CATEGORIES.map((value) => <option key={value} value={value}>{value}</option>)}
               </select>
             </div>
 

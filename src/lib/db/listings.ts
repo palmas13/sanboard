@@ -637,7 +637,7 @@ export async function createListingWithCredit(
       alarm_level: input.alarm_level !== undefined && input.alarm_level !== null ? Number(input.alarm_level) : null,
       anti_theft_level: input.anti_theft_level !== undefined && input.anti_theft_level !== null ? Number(input.anti_theft_level) : null,
       engine_health: input.engine_health !== undefined && input.engine_health !== null ? Number(input.engine_health) : null,
-      suspension: input.suspension || null,
+      suspension: input.subcategory === 'Motosiklet' ? null : (input.suspension || null),
       fuel_type: (input.fuel_type as any) || null,
       factory_price: input.factory_price !== undefined && input.factory_price !== null ? Number(input.factory_price) : null,
     } : undefined,
@@ -714,7 +714,7 @@ export async function updateListing(
 
   if (listing.category === 'vehicle' && listing.vehicle_details) {
     if (input.subcategory) listing.subcategory = input.subcategory;
-    if (input.vehicle_category) listing.vehicle_details.vehicle_category = input.vehicle_category;
+    if (input.subcategory) listing.vehicle_details.vehicle_category = input.subcategory;
     if (input.brand) listing.vehicle_details.brand = input.brand;
     listing.vehicle_details.model = input.model || listing.vehicle_details.model;
     listing.vehicle_details.plate = input.plate || listing.vehicle_details.plate;
@@ -729,7 +729,7 @@ export async function updateListing(
     if (input.alarm_level !== undefined) listing.vehicle_details.alarm_level = input.alarm_level !== null ? Number(input.alarm_level) : null;
     if (input.anti_theft_level !== undefined) listing.vehicle_details.anti_theft_level = input.anti_theft_level !== null ? Number(input.anti_theft_level) : null;
     if (input.engine_health !== undefined) listing.vehicle_details.engine_health = input.engine_health !== null ? Number(input.engine_health) : null;
-    if (input.suspension !== undefined) listing.vehicle_details.suspension = input.suspension || null;
+    if (input.suspension !== undefined || input.subcategory === 'Motosiklet') listing.vehicle_details.suspension = input.subcategory === 'Motosiklet' ? null : (input.suspension || null);
     if (input.fuel_type !== undefined) listing.vehicle_details.fuel_type = (input.fuel_type as any) || null;
     if (input.factory_price !== undefined) listing.vehicle_details.factory_price = input.factory_price !== null ? Number(input.factory_price) : null;
   }

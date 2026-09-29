@@ -61,6 +61,17 @@ export function getVehicleComparisonSections(listingA: Listing, listingB: Listin
   const row = (key: string, label: string, rawA: unknown, rawB: unknown, valA: string, valB: string, kind?: 'boolean'): SpecRow => ({ key, label, rawA, rawB, valA, valB, kind });
   const missingB = (value: string) => listingB ? value : '—';
 
+  const performanceRows = [
+    row('engine-health', 'Motor Sağlığı', vA?.engine_health, vB?.engine_health, formatEngineHealth(vA?.engine_health), missingB(formatEngineHealth(vB?.engine_health))),
+    row('engine-upgrade', 'Motor Güçlendirmesi', vA?.engine_upgrade, vB?.engine_upgrade, formatUpgrade(vA?.engine_upgrade), missingB(formatUpgrade(vB?.engine_upgrade))),
+    row('brake-upgrade', 'Fren Güçlendirmesi', vA?.brake_upgrade, vB?.brake_upgrade, formatUpgrade(vA?.brake_upgrade), missingB(formatUpgrade(vB?.brake_upgrade))),
+    row('transmission-upgrade', 'Şanzıman Güçlendirmesi', vA?.transmission_upgrade, vB?.transmission_upgrade, formatUpgrade(vA?.transmission_upgrade), missingB(formatUpgrade(vB?.transmission_upgrade))),
+    row('turbo', 'Turbo', vA?.turbo, vB?.turbo, formatBoolean(vA?.turbo), missingB(formatBoolean(vB?.turbo)), 'boolean'),
+  ];
+  if (vA?.vehicle_category !== 'Motosiklet' && (!vB || vB.vehicle_category !== 'Motosiklet')) {
+    performanceRows.push(row('suspension', 'Süspansiyon', vA?.suspension, vB?.suspension, formatUpgrade(vA?.suspension), missingB(formatUpgrade(vB?.suspension))));
+  }
+
   return [
     { key: 'general', title: 'Genel', description: 'Temel araç ve fiyat bilgileri', icon: Info, rows: [
       row('price', 'Fiyat', listingA.price, listingB?.price, formatCurrency(listingA.price), listingB ? formatCurrency(listingB.price) : '—'),
@@ -70,14 +81,7 @@ export function getVehicleComparisonSections(listingA: Listing, listingB: Listin
       row('mileage', 'Kilometre', vA?.mileage, vB?.mileage, vA?.mileage === undefined ? 'Belirtilmemiş' : `${vA.mileage.toLocaleString('tr-TR')} km`, missingB(vB?.mileage === undefined ? 'Belirtilmemiş' : `${vB.mileage.toLocaleString('tr-TR')} km`)),
       row('fuel', 'Yakıt Tipi', vA?.fuel_type, vB?.fuel_type, formatFuel(vA?.fuel_type), missingB(formatFuel(vB?.fuel_type))),
     ]},
-    { key: 'performance', title: 'Performans', description: 'Motor, aktarma ve sürüş donanımları', icon: Gauge, rows: [
-      row('engine-health', 'Motor Sağlığı', vA?.engine_health, vB?.engine_health, formatEngineHealth(vA?.engine_health), missingB(formatEngineHealth(vB?.engine_health))),
-      row('engine-upgrade', 'Motor Güçlendirmesi', vA?.engine_upgrade, vB?.engine_upgrade, formatUpgrade(vA?.engine_upgrade), missingB(formatUpgrade(vB?.engine_upgrade))),
-      row('brake-upgrade', 'Fren Güçlendirmesi', vA?.brake_upgrade, vB?.brake_upgrade, formatUpgrade(vA?.brake_upgrade), missingB(formatUpgrade(vB?.brake_upgrade))),
-      row('transmission-upgrade', 'Şanzıman Güçlendirmesi', vA?.transmission_upgrade, vB?.transmission_upgrade, formatUpgrade(vA?.transmission_upgrade), missingB(formatUpgrade(vB?.transmission_upgrade))),
-      row('turbo', 'Turbo', vA?.turbo, vB?.turbo, formatBoolean(vA?.turbo), missingB(formatBoolean(vB?.turbo)), 'boolean'),
-      row('suspension', 'Süspansiyon', vA?.suspension, vB?.suspension, formatUpgrade(vA?.suspension), missingB(formatUpgrade(vB?.suspension))),
-    ]},
+    { key: 'performance', title: 'Performans', description: 'Motor, aktarma ve sürüş donanımları', icon: Gauge, rows: performanceRows },
     { key: 'comfort', title: 'Ses & Konfor', description: 'Kullanım ve satış tercihleri', icon: Headphones, rows: [
       row('subwoofer', 'Subwoofer', vA?.subwoofer, vB?.subwoofer, formatBoolean(vA?.subwoofer), missingB(formatBoolean(vB?.subwoofer)), 'boolean'),
       row('trade', 'Takas İmkanı', vA?.trade_available, vB?.trade_available, formatBoolean(vA?.trade_available), missingB(formatBoolean(vB?.trade_available)), 'boolean'),

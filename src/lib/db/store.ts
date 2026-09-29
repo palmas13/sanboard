@@ -360,7 +360,7 @@ class SanboardDatabase {
       listing_number: '#SB-100029',
       seller_profile_id: 'char-zade-02',
       category: 'vehicle',
-      subcategory: 'SUV / Off-Road / Kamyonet',
+      subcategory: 'SUV',
       title: 'ZIRHLI SEVİYE • DECLASSE GRANGER 3600LX',
       description: 'VIP koruma ve konvoy kullanımına uygun, hatasız orijinal zırhlı arazi aracı.',
       price: 135000,
@@ -383,7 +383,7 @@ class SanboardDatabase {
       ],
       vehicle_details: {
         listing_id: 'lst-veh-02',
-        vehicle_category: 'SUV / Off-Road / Kamyonet',
+        vehicle_category: 'SUV',
         brand: 'Declasse',
         model: 'Granger 3600LX',
         plate: 'VIP770',

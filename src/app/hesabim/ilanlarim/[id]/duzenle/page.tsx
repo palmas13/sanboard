@@ -17,7 +17,7 @@ import {
 import { PhotoUploader, UploadedImage } from '@/components/forms/PhotoUploader';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { formatTimeRemaining } from '@/lib/utils/format';
-import { getVehicleBrands, getModelsByBrand } from '@/lib/constants/vehicleCatalog';
+import { getVehicleBrandsByCategory, getVehicleModels, isMotorcycleCategory, isValidVehicleSelection, reconcileVehicleSelection, VEHICLE_CATEGORIES, VehicleCategory } from '@/lib/constants/vehicleCategories';
 import { LISTING_TITLE_MAX_ERROR, LISTING_TITLE_MAX_LENGTH } from '@/lib/validations/listing';
 import { getVehicleLevelOptions, normalizeVehicleLevel, VEHICLE_LEVEL_FIELDS } from '@/lib/listings/vehicle-levels';
 
@@ -78,8 +78,9 @@ export default function IlanDuzenlePage({
   // Photos
   const [images, setImages] = useState<UploadedImage[]>([]);
 
-  const vehicleBrands = React.useMemo(() => getVehicleBrands(), []);
-  const availableModels = React.useMemo(() => getModelsByBrand(brand), [brand]);
+  const vehicleCategory = subcategory as VehicleCategory;
+  const vehicleBrands = React.useMemo(() => getVehicleBrandsByCategory(vehicleCategory), [vehicleCategory]);
+  const availableModels = React.useMemo(() => getVehicleModels(vehicleCategory, brand), [vehicleCategory, brand]);
 
   const handleBrandChange = (newBrand: string) => {
     setBrand(newBrand);
@@ -90,9 +91,10 @@ export default function IlanDuzenlePage({
     if (newSub !== subcategory) {
       setSubcategory(newSub);
       if (category === 'vehicle') {
-        // Reset brand and model when category changes (e.g. Otomobil -> Motosiklet)
-        setBrand('');
-        setModel('');
+        const next = reconcileVehicleSelection(newSub as VehicleCategory, brand, model);
+        setBrand(next.brand);
+        setModel(next.model);
+        if (isMotorcycleCategory(newSub as VehicleCategory)) setSuspension('');
       }
     }
   };
@@ -141,7 +143,7 @@ export default function IlanDuzenlePage({
           setAlarmLevel(normalizeVehicleLevel(vd.alarm_level, 'alarm_level'));
           setAntiTheftLevel(normalizeVehicleLevel(vd.anti_theft_level, 'anti_theft_level'));
           setEngineHealth(vd.engine_health !== null && vd.engine_health !== undefined ? String(vd.engine_health) : '');
-          setSuspension(normalizeVehicleLevel(vd.suspension, 'suspension'));
+          setSuspension(isMotorcycleCategory(l.subcategory as VehicleCategory) ? '' : normalizeVehicleLevel(vd.suspension, 'suspension'));
           setFuelType(vd.fuel_type || 'BENZIN');
           setFactoryPrice(vd.factory_price !== null && vd.factory_price !== undefined ? String(vd.factory_price) : '');
         }
@@ -199,6 +201,10 @@ export default function IlanDuzenlePage({
       }
       if (!model) {
         setError('Lütfen araç modelini seçiniz.');
+        return;
+      }
+      if (!isValidVehicleSelection(vehicleCategory, brand, model)) {
+        setError('Lütfen kategoriyle uyumlu geçerli bir marka ve model seçiniz.');
         return;
       }
       if (!plate.trim()) {
@@ -271,7 +277,7 @@ export default function IlanDuzenlePage({
         payload.alarm_level = Number(alarmLevel);
         payload.anti_theft_level = Number(antiTheftLevel);
         payload.engine_health = engineHealth !== '' ? Number(engineHealth) : null;
-        payload.suspension = Number(suspension);
+        payload.suspension = isMotorcycleCategory(vehicleCategory) ? null : (suspension !== '' ? Number(suspension) : null);
         payload.fuel_type = fuelType || null;
         payload.factory_price = factoryPrice !== '' ? Number(factoryPrice) : null;
       } else {
@@ -476,6 +482,11 @@ export default function IlanDuzenlePage({
               2. Araç Detayları
             </h3>
 
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Araç Kategorisi</label>
+              <CustomSelect value={subcategory} onChange={handleSubcategoryChange} options={VEHICLE_CATEGORIES.map((value) => ({ value, label: value }))} />
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Marka */}
               <div className="space-y-1.5">
@@ -569,14 +580,14 @@ export default function IlanDuzenlePage({
                     className="form-input text-sm"
                   />
                 </div>
-                <div className="space-y-1">
+                {!isMotorcycleCategory(vehicleCategory) && <div className="space-y-1">
                   <label className="text-[11px] text-[var(--text-dim)] font-medium">{VEHICLE_LEVEL_FIELDS.suspension.label}</label>
                   <CustomSelect
                     value={suspension}
                     onChange={setSuspension}
                     options={getVehicleLevelOptions('suspension')}
                   />
-                </div>
+                </div>}
                 <div className="space-y-1">
                   <label className="text-[11px] text-[var(--text-dim)] font-medium">Yakıt Türü</label>
                   <CustomSelect

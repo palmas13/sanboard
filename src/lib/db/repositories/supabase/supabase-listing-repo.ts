@@ -752,7 +752,7 @@ export class SupabaseListingRepository implements IListingRepository {
       brake_upgrade: input.brake_upgrade || 0, turbo: Boolean(input.turbo), subwoofer: Boolean(input.subwoofer),
       trade_available: Boolean(input.trade_available), lock_level: input.lock_level ?? null, alarm_level: input.alarm_level ?? null,
       anti_theft_level: input.anti_theft_level ?? null, engine_health: input.engine_health ?? null,
-      suspension: input.suspension || null, fuel_type: input.fuel_type || null, factory_price: input.factory_price ?? null,
+      suspension: input.subcategory === 'Motosiklet' ? null : (input.suspension || null), fuel_type: input.fuel_type || null, factory_price: input.factory_price ?? null,
     } : {
       property_type: input.subcategory, floor: input.floor || 1, room_count: input.room_count || '1+1',
       furnished: Boolean(input.furnished), building_type: input.building_type || 'Normal', balcony: Boolean(input.balcony),
@@ -996,7 +996,7 @@ export class SupabaseListingRepository implements IListingRepository {
       if (input.alarm_level !== undefined) vehUpdate.alarm_level = input.alarm_level !== null ? Number(input.alarm_level) : null;
       if (input.anti_theft_level !== undefined) vehUpdate.anti_theft_level = input.anti_theft_level !== null ? Number(input.anti_theft_level) : null;
       if (input.engine_health !== undefined) vehUpdate.engine_health = input.engine_health !== null ? Number(input.engine_health) : null;
-      if (input.suspension !== undefined) vehUpdate.suspension = input.suspension ? String(input.suspension).trim() : null;
+      if (input.suspension !== undefined || vehicleCategory === 'Motosiklet') vehUpdate.suspension = vehicleCategory === 'Motosiklet' ? null : (input.suspension ? String(input.suspension).trim() : null);
       if (input.fuel_type !== undefined) vehUpdate.fuel_type = input.fuel_type ? String(input.fuel_type).trim() : null;
       if (input.factory_price !== undefined) vehUpdate.factory_price = input.factory_price !== null ? Number(input.factory_price) : null;
 

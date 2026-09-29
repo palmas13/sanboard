@@ -376,7 +376,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
                           <VehicleSpecItem label="Motor Yükseltme" value={`Seviye ${vd.engine_upgrade}`} badge />
                           <VehicleSpecItem label="Şanzıman Upgrade" value={`Seviye ${vd.transmission_upgrade}`} badge />
                           <VehicleSpecItem label="Fren Yükseltme" value={`Seviye ${vd.brake_upgrade}`} badge />
-                          {vd.suspension && <VehicleSpecItem label="Süspansiyon" value={vd.suspension} />}
+                          {vd.vehicle_category !== 'Motosiklet' && vd.suspension !== undefined && vd.suspension !== null && <VehicleSpecItem label="Süspansiyon" value={`Seviye ${vd.suspension}`} />}
                         </VehicleSpecSection>
 
                         {/* 3. GÜVENLİK */}

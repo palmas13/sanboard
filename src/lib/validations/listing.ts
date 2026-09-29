@@ -1,14 +1,11 @@
 import { z } from 'zod';
 import { VEHICLE_LEVEL_FIELDS, VehicleLevelField } from '@/lib/listings/vehicle-levels';
+import { isMotorcycleCategory, isValidVehicleSelection, VEHICLE_CATEGORIES } from '@/lib/constants/vehicleCategories';
 
 export const LISTING_TITLE_MAX_LENGTH = 40;
 export const LISTING_TITLE_MAX_ERROR = 'İlan başlığı en fazla 40 karakter olabilir.';
 
-export const vehicleCategories = [
-  'Otomobil',
-  'SUV / Off-Road / Kamyonet',
-  'Motosiklet',
-] as const;
+export const vehicleCategories = VEHICLE_CATEGORIES;
 
 export const propertyTypes = [
   'Ev / Daire',
@@ -113,8 +110,16 @@ export const vehicleListingSchema = z.object({
   suspension: vehicleLevelSchema('suspension').optional().nullable(),
   fuel_type: z.enum(['BENZIN', 'DIZEL', 'ELEKTRIK']).optional().nullable(),
   factory_price: z.number().min(0).optional().nullable(),
-}).refine((value) => value.minimum_offer_amount == null || value.minimum_offer_amount <= value.price, {
-  message: 'Minimum teklif ilan fiyatından yüksek olamaz.', path: ['minimum_offer_amount'],
+}).superRefine((value, ctx) => {
+  if (value.minimum_offer_amount != null && value.minimum_offer_amount > value.price) {
+    ctx.addIssue({ code: 'custom', message: 'Minimum teklif ilan fiyatından yüksek olamaz.', path: ['minimum_offer_amount'] });
+  }
+  if (!isValidVehicleSelection(value.subcategory, value.brand, value.model)) {
+    ctx.addIssue({ code: 'custom', message: 'Araç kategorisi, marka ve model eşleşmesi geçersiz.', path: ['model'] });
+  }
+  if (isMotorcycleCategory(value.subcategory) && value.suspension != null) {
+    ctx.addIssue({ code: 'custom', message: 'Motosiklet ilanlarında süspansiyon seviyesi kullanılamaz.', path: ['suspension'] });
+  }
 });
 
 export const propertyListingSchema = z.object({

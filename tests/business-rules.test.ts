@@ -238,11 +238,11 @@ describe('Sanboard Business Rules & Validation Tests', () => {
     const vehicleInput = {
       category: 'vehicle' as const,
       subcategory: 'Otomobil' as const,
-      title: '2024 Vapid Dominator GT',
+      title: '2024 Vapid Dominator GTT',
       description: 'Temiz araç',
       price: 85000,
       brand: 'Vapid',
-      model: 'Dominator GT',
+      model: 'Dominator GTT',
       plate: '62LS901',
       mileage: 1500,
       engine_upgrade: 3,

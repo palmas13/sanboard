@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Filter, RotateCcw, Search } from 'lucide-react';
 import { ListingCategory } from '@/types';
-import { getVehicleBrands, getModelsByBrand } from '@/lib/constants/vehicleCatalog';
+import { getVehicleBrandsByCategory, getVehicleModels, VEHICLE_CATEGORIES, VehicleCategory } from '@/lib/constants/vehicleCategories';
 
 interface FilterSidebarProps {
   category: ListingCategory;
@@ -50,15 +50,21 @@ export function FilterSidebar({
   const [subwoofer, setSubwoofer] = useState(searchParams.get('subwoofer') || 'all');
   const [trade, setTrade] = useState(searchParams.get('trade') || 'all');
 
-  const vehicleBrands = React.useMemo(() => getVehicleBrands(), []);
+  const selectedVehicleCategory = subcategory !== 'all' ? subcategory as VehicleCategory : null;
+  const vehicleBrands = React.useMemo(() => selectedVehicleCategory ? getVehicleBrandsByCategory(selectedVehicleCategory) : [], [selectedVehicleCategory]);
   const availableModels = React.useMemo(
-    () => (brand && brand !== 'all' ? getModelsByBrand(brand) : []),
-    [brand]
+    () => (selectedVehicleCategory && brand && brand !== 'all' ? getVehicleModels(selectedVehicleCategory, brand) : []),
+    [selectedVehicleCategory, brand]
   );
 
   const handleBrandFilterChange = (newBrand: string) => {
     setBrand(newBrand);
     setModel('all'); // Clear model filter when brand changes
+  };
+  const handleSubcategoryFilterChange = (newCategory: string) => {
+    setSubcategory(newCategory);
+    setBrand('all');
+    setModel('all');
   };
 
   // Property specific
@@ -199,15 +205,13 @@ export function FilterSidebar({
         </label>
         <select
           value={subcategory}
-          onChange={(e) => setSubcategory(e.target.value)}
+          onChange={(e) => category === 'vehicle' ? handleSubcategoryFilterChange(e.target.value) : setSubcategory(e.target.value)}
           className="form-input text-xs"
         >
           <option value="all">Tümü</option>
           {category === 'vehicle' ? (
             <>
-              <option value="Otomobil">Otomobil</option>
-              <option value="SUV / Off-Road / Kamyonet">SUV / Off-Road / Kamyonet</option>
-              <option value="Motosiklet">Motosiklet</option>
+              {VEHICLE_CATEGORIES.map((value) => <option key={value} value={value}>{value}</option>)}
             </>
           ) : (
             <>
@@ -284,6 +288,7 @@ export function FilterSidebar({
             <select
               value={brand}
               onChange={(e) => handleBrandFilterChange(e.target.value)}
+              disabled={!selectedVehicleCategory}
               className="form-input text-xs cursor-pointer"
             >
               <option value="all">Tüm Markalar</option>
@@ -301,7 +306,7 @@ export function FilterSidebar({
             <select
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              disabled={brand === 'all'}
+              disabled={!selectedVehicleCategory || brand === 'all'}
               className={`form-input text-xs cursor-pointer ${
                 brand === 'all'
                   ? 'opacity-50 cursor-not-allowed bg-[var(--bg-surface-secondary)] text-[var(--text-dim)]'
