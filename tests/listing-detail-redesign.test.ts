@@ -21,8 +21,13 @@ describe('premium listing detail redesign', () => {
     assert.match(page, /xl:grid-cols-\[minmax\(0,1\.6fr\)_minmax\(340px,\.9fr\)_minmax\(290px,\.75fr\)\]/);
     assert.match(page, /data-testid="property-listing-layout"/);
     assert.match(page, /lg:grid-cols-\[minmax\(0,1\.5fr\)_minmax\(380px,1fr\)\]/);
-    assert.match(page, /order-2[^>]*><SellerArea/);
-    assert.match(page, /order-4[^>]*><ListingDescription/);
+    assert.match(page, /data-testid="vehicle-left-column"[^>]*listing-detail-left-column[^>]*>[\s\S]*?<ListingGallery[\s\S]*?<ListingDescription/);
+    assert.match(page, /data-testid="vehicle-middle-column"[^>]*listing-detail-middle-column[^>]*>[\s\S]*?<VehicleDetailsPanel/);
+    assert.match(page, /data-testid="vehicle-right-column"[^>]*listing-detail-right-column[^>]*xl:sticky[^>]*>[\s\S]*?<SellerArea/);
+    assert.match(page, /data-testid="property-left-column"[^>]*listing-detail-left-column[^>]*>[\s\S]*?<ListingGallery[\s\S]*?<ListingDescription/);
+    assert.match(page, /data-testid="property-right-column"[^>]*listing-detail-right-column[^>]*lg:sticky[^>]*>[\s\S]*?<PropertyDetailsPanel[\s\S]*?<SellerArea/);
+    assert.doesNotMatch(page, /xl:row-start-2/);
+    assert.doesNotMatch(page, /min-h-\[calc\(100vh-5rem\)\]/);
   });
 
   test('seller variations and owner/offer actions retain canonical behavior', () => {
@@ -48,9 +53,10 @@ describe('premium listing detail redesign', () => {
 
   test('motorcycle suspension is hidden, ATV remains eligible, and levels are labelled', () => {
     assert.match(vehicle, /details\.vehicle_category !== 'Motosiklet'/);
-    assert.match(vehicle, /details\.suspension !== null/);
-    assert.match(vehicle, /`Seviye \$\{value\}`/);
+    assert.match(vehicle, /numericValue >= 0 && numericValue <= 4/);
+    assert.match(vehicle, /`Seviye \$\{numericValue\}`/);
     assert.doesNotMatch(vehicle, /vehicle_category === 'ATV'/);
+    assert.doesNotMatch(vehicle, /Seviye Spor/);
   });
 
   test('gallery renders thumbnails, counter, arrows, fullscreen and keyboard controls', () => {

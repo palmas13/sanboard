@@ -69,11 +69,11 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
   };
 
   return (
-    <div data-testid={isCorporate ? 'corporate-seller-card' : 'individual-seller-card'} className={`surface-card rounded-2xl border p-5 shadow-[0_18px_55px_rgba(0,0,0,.16)] ${
+    <div data-testid={isCorporate ? 'corporate-seller-card' : 'individual-seller-card'} className={`surface-card rounded-2xl border p-4 shadow-[0_18px_55px_rgba(0,0,0,.16)] sm:p-5 ${
       isCorporate ? 'border-[#FF8A1F]/25 bg-gradient-to-b from-[var(--bg-surface)] to-[var(--bg-surface-secondary)]' : 'border-[var(--border-app)]'
     }`}>
       {/* Header Profile / Store Info */}
-      <div className="flex items-center gap-3.5 pb-4 border-b border-[var(--border-app)]">
+      <div className="flex items-center gap-3.5 border-b border-[var(--border-app)] pb-3">
         <Link href={publicUrl} className="shrink-0 group">
           {displayAvatar && !imgError ? (
             <img
@@ -119,7 +119,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
       </div>
 
       {/* Contact Details & Action CTAs */}
-      <div className="mt-5 space-y-2.5">
+      <div className="mt-4 space-y-2">
         {/* Phone */}
         {displayPhone ? (
           <div className="p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] flex items-center justify-between">
@@ -209,7 +209,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
             <span>Mağaza Profilini Görüntüle</span>
           </Link>
         )}
-        {actions ? <div className="grid gap-2 border-t border-[var(--border-app)] pt-4">{actions}</div> : null}
+        {actions ? <div className="grid gap-2 border-t border-[var(--border-app)] pt-3">{actions}</div> : null}
       </div>
     </div>
   );

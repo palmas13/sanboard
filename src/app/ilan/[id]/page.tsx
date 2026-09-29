@@ -44,7 +44,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 function SellerArea({ listing, isLocked, isOwner, closedLabel }: { listing: MemberListingDetail; isLocked: boolean; isOwner: boolean; closedLabel: string | null }) {
   if (isLocked) return <><div className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-6 text-center shadow-[0_18px_55px_rgba(0,0,0,.16)]"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-surface-secondary)] text-[var(--text-dim)]"><Lock className="h-5 w-5" /></div><h2 className="mt-4 text-sm font-black">Satıcı Bilgileri Kilitli</h2><p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">Satıcıyla iletişime geçmek ve görünür iletişim bilgilerini görmek için giriş yapınız.</p><Link href={`/giris?redirect=${getListingUrl(listing)}`} className="btn-primary mt-4 w-full text-xs">Giriş Yap</Link></div><SafeShoppingCard /></>;
 
-  const actions = isOwner ? <Link href="/hesabim/ilanlarim" className="btn-primary w-full text-xs"><Settings2 className="h-4 w-4" />İlanı Yönet</Link> : !closedLabel ? <>{listing.offers_enabled !== false ? <OfferButton listing={listing} className="w-full text-xs" /> : null}<p className="text-center text-[10px] leading-4 text-[var(--text-dim)]">Görünür telefon veya SanMail bilgisini kullanarak satıcıyla iletişime geçebilirsiniz.</p></> : null;
+  const actions = isOwner ? <Link href="/hesabim/ilanlarim" className="btn-primary w-full text-xs"><Settings2 className="h-4 w-4" />İlanı Yönet</Link> : !closedLabel && listing.offers_enabled !== false ? <OfferButton listing={listing} className="w-full text-xs" /> : null;
   return <><SellerCard seller={listing.seller} dealer={listing.dealer} actions={actions} /><SafeShoppingCard /></>;
 }
 
@@ -76,20 +76,31 @@ export default async function ListingDetailPage({ params }: PageProps) {
     {isVehicle ? <CompareButton listing={listing} /> : !closedLabel ? <PropertyCompareButton listing={listing} /> : null}
   </div>;
 
-  return <main className="mx-auto min-h-[calc(100vh-5rem)] w-full max-w-[1500px] space-y-5 px-3 py-4 sm:px-5 lg:px-7 lg:py-6">
+  return <main className="mx-auto w-full max-w-[1500px] space-y-5 px-3 py-4 sm:px-5 lg:px-7 lg:py-6">
     {closedLabel ? <div role="status" className="flex items-center gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/8 p-4 text-sm font-semibold text-amber-200"><CircleOff className="h-5 w-5 shrink-0" /><div><p>{closedLabel}</p><p className="mt-0.5 text-xs font-normal text-[var(--text-muted)]">İlan bilgileri arşiv amacıyla görüntüleniyor; yeni iletişim ve favori işlemleri kapalıdır.</p></div></div> : null}
 
     <ListingDetailHeader listing={listing} categoryHref={categoryLink} categoryName={categoryName} actions={headerActions} />
 
     {isVehicle ? <section data-testid="vehicle-listing-layout" className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 xl:grid-cols-[minmax(0,1.6fr)_minmax(340px,.9fr)_minmax(290px,.75fr)]">
-      <div className="order-1 md:col-span-2 xl:col-span-1"><ListingGallery images={galleryImages} title={listing.title} isLocked={result.isLocked} variant="vehicle" /></div>
-      <aside className="order-2 space-y-4 md:col-start-2 md:row-start-2 xl:col-start-3 xl:row-start-1 xl:sticky xl:top-24"><SellerArea listing={memberListing} isLocked={result.isLocked} isOwner={result.isOwner} closedLabel={closedLabel} /></aside>
-      <div className="order-3 md:col-start-1 md:row-start-2 xl:col-start-2 xl:row-start-1">{detailReady ? <VehicleDetailsPanel listing={memberListing} /> : <div className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-6 text-sm text-[var(--text-muted)]">Teknik detayları görmek için giriş yapınız.</div>}</div>
-      {detailReady ? <div className="order-4 md:col-span-2 xl:col-span-1 xl:col-start-1 xl:row-start-2"><ListingDescription listing={memberListing} /></div> : null}
+      <div data-testid="vehicle-left-column" className="listing-detail-left-column flex min-w-0 flex-col gap-5 md:col-span-2 xl:col-span-1">
+        <ListingGallery images={galleryImages} title={listing.title} isLocked={result.isLocked} variant="vehicle" />
+        {detailReady ? <ListingDescription listing={memberListing} /> : null}
+      </div>
+      <div data-testid="vehicle-middle-column" className="listing-detail-middle-column min-w-0 md:col-start-1 xl:col-start-auto">
+        {detailReady ? <VehicleDetailsPanel listing={memberListing} /> : <div className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-6 text-sm text-[var(--text-muted)]">Teknik detayları görmek için giriş yapınız.</div>}
+      </div>
+      <aside data-testid="vehicle-right-column" className="listing-detail-right-column min-w-0 space-y-4 md:col-start-2 xl:col-start-auto xl:sticky xl:top-24">
+        <SellerArea listing={memberListing} isLocked={result.isLocked} isOwner={result.isOwner} closedLabel={closedLabel} />
+      </aside>
     </section> : <section data-testid="property-listing-layout" className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(380px,1fr)]">
-      <div className="order-1"><ListingGallery images={galleryImages} title={listing.title} isLocked={result.isLocked} variant="property" /></div>
-      <aside className="order-2 space-y-4 lg:col-start-2 lg:row-span-2 lg:row-start-1">{detailReady ? <PropertyDetailsPanel listing={memberListing} /> : null}<div className="lg:sticky lg:top-24"><SellerArea listing={memberListing} isLocked={result.isLocked} isOwner={result.isOwner} closedLabel={closedLabel} /></div></aside>
-      {detailReady ? <div className="order-3 lg:col-start-1"><ListingDescription listing={memberListing} /></div> : null}
+      <div data-testid="property-left-column" className="listing-detail-left-column flex min-w-0 flex-col gap-5">
+        <ListingGallery images={galleryImages} title={listing.title} isLocked={result.isLocked} variant="property" />
+        {detailReady ? <ListingDescription listing={memberListing} /> : null}
+      </div>
+      <aside data-testid="property-right-column" className="listing-detail-right-column min-w-0 space-y-4 lg:sticky lg:top-24">
+        {detailReady ? <PropertyDetailsPanel listing={memberListing} /> : null}
+        <SellerArea listing={memberListing} isLocked={result.isLocked} isOwner={result.isOwner} closedLabel={closedLabel} />
+      </aside>
     </section>}
 
     {isVehicle && similarListings.length > 0 ? <SimilarListings listings={similarListings} /> : null}
