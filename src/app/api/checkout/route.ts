@@ -3,9 +3,11 @@ import { getPaymentRepository, getDealerRepository } from '@/lib/db/repositories
 import {
   FleecaProviderNotConfiguredError,
   getFleecaPaymentProvider,
-  validateExternalPayment,
 } from '@/lib/integrations/fleeca';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
+import { setPaymentCorrelationCookie } from '@/lib/payments/correlation';
+import { getPaymentPrice, type PaymentPurpose } from '@/lib/payments/pricing';
+import { verifyAndFulfillPayment } from '@/lib/payments/verification';
 
 export async function GET(req: NextRequest) {
   try {
@@ -47,6 +49,7 @@ export async function POST(req: NextRequest) {
 
     let chargeProfileId = activeProfileId;
     let corporateProfileId: string | null = null;
+    let purpose: PaymentPurpose = 'LISTING_PUBLICATION';
 
     // Corporate package validation & eligibility resolution (Section 1 & 4)
     if (requestedPackage === 'CORPORATE_14_DAY') {
@@ -64,6 +67,7 @@ export async function POST(req: NextRequest) {
       chargeProfileId = eligibility.dealer.owner_profile_id || activeProfileId;
       corporateProfileId = eligibility.dealer.id;
     } else if (requestedPackage === 'CORPORATE_SUBSCRIPTION_30_DAY') {
+      purpose = 'CORPORATE_SUBSCRIPTION';
       const dealerRepo = getDealerRepository();
       const dealer = await dealerRepo.getDealerByProfileId(activeProfileId, true);
       if (!dealer || (dealer.owner_profile_id || dealer.profile_id) !== activeProfileId) {
@@ -80,25 +84,32 @@ export async function POST(req: NextRequest) {
     const order = await repo.createPaymentOrder(chargeProfileId, requestedPackage, {
       idempotencyKey,
       corporateProfileId,
+      purpose,
     });
 
     // Also notify Fleeca provider
     const fleeca = getFleecaPaymentProvider();
-    await fleeca.createOrder({
+    const providerOrder = await fleeca.createOrder({
       orderId: order.orderId,
       profileId: chargeProfileId,
       characterName: 'Kullanıcı',
       packageCode: requestedPackage,
       amount: order.amount,
-      currency: 'GTA_DOLLAR',
+      currency: 'USD',
+      description: `${purpose === 'CORPORATE_SUBSCRIPTION' ? 'Sanboard Corporate Subscription - SBC' : 'Sanboard Listing Publication - SBP'}-${order.orderId.slice(-8)}`,
     });
+    if (!providerOrder.paymentId || !providerOrder.paymentLink) throw new Error('Fleeca hosted payment bilgileri eksik.');
+    await repo.attachProviderPayment(order.orderId, providerOrder.paymentId);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       orderId: order.orderId,
-      amount: order.amount,
+      amount: getPaymentPrice(purpose),
+      paymentLink: providerOrder.paymentLink,
       packageName: order.packageName || (requestedPackage === 'CORPORATE_14_DAY' ? '14 Günlük Kurumsal İlan' : '7 Günlük Standart İlan'),
       entitlementType: order.entitlementType,
     });
+    setPaymentCorrelationCookie(response, order.orderId);
+    return response;
   } catch (error: any) {
     if (error instanceof FleecaProviderNotConfiguredError) {
       return NextResponse.json(
@@ -134,39 +145,8 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Bu ödeme siparişini tamamlama yetkiniz yok.' }, { status: 403 });
     }
 
-    const fleeca = getFleecaPaymentProvider();
-    const transaction = await fleeca.verifyPayment(orderId);
-    const verification = validateExternalPayment(transaction, {
-      orderReference: payment.order_id,
-      payerReference: payment.profile_id,
-      amount: payment.amount,
-      currency: 'GTA_DOLLAR',
-      purposeReference: requestedPackageCode(payment),
-    });
-
-    if (!verification.verified) {
-      return NextResponse.json(
-        { success: false, error: 'Ödeme sağlayıcı tarafından doğrulanamadı.', reason: verification.reason },
-        { status: 400 }
-      );
-    }
-
-    // Mark as completed in database and issue listing credit via repository
-    const completion = await repo.completePayment(orderId, verification.transaction.externalTransactionId);
-
-    if (!completion.success) {
-      return NextResponse.json(
-        { success: false, error: completion.error },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      transactionId: verification.transaction.externalTransactionId,
-      credit: completion.credit,
-      entitlementType: payment.entitlement_type || 'LISTING_CREDIT',
-    });
+    const result = await verifyAndFulfillPayment(payment);
+    return NextResponse.json({ success: result.state === 'SUCCESS', state: result.state, entitlementType: payment.entitlement_type || 'LISTING_CREDIT' }, { status: result.state === 'SUCCESS' ? 200 : 202 });
   } catch (error: any) {
     if (error instanceof FleecaProviderNotConfiguredError) {
       return NextResponse.json(
@@ -179,9 +159,4 @@ export async function PUT(req: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-function requestedPackageCode(payment: any): string {
-  if (payment.entitlement_type === 'CORPORATE_SUBSCRIPTION') return 'CORPORATE_SUBSCRIPTION_30_DAY';
-  return payment.corporate_profile_id ? 'CORPORATE_14_DAY' : 'STANDARD_7_DAY';
 }

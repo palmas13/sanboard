@@ -1,6 +1,7 @@
 import { db } from './store';
 import { ListingCredit, Payment } from '@/types';
 import { getPaymentRepository } from './repositories';
+import { getPaymentPrice, type PaymentPurpose } from '@/lib/payments/pricing';
 
 /**
  * Creates checkout order securely on server.
@@ -9,7 +10,7 @@ import { getPaymentRepository } from './repositories';
 export async function createCheckoutOrder(
   profileId: string,
   packageCode = 'STANDARD_7_DAY',
-  options: { idempotencyKey?: string; corporateProfileId?: string | null } = {}
+  options: { idempotencyKey?: string; corporateProfileId?: string | null; purpose?: PaymentPurpose; targetListingId?: string | null } = {}
 ): Promise<{ orderId: string; amount: number; packageName: string; error?: string }> {
   if (process.env.DATA_STORE === 'supabase') {
     const repo = getPaymentRepository();
@@ -30,9 +31,6 @@ export async function createCheckoutOrder(
   const pkg = db.packages.find((p) => p.code === packageCode && p.active);
   if (!pkg) {
     return { orderId: '', amount: 0, packageName: '', error: 'Geçersiz veya pasif ilan paketi.' };
-  }
-  if (!Number.isFinite(pkg.price) || pkg.price <= 0) {
-    return { orderId: '', amount: 0, packageName: '', error: 'Ödeme paketinin fiyatı pozitif olmalıdır.' };
   }
   if (
     pkg.code === 'CORPORATE_SUBSCRIPTION_30_DAY'
@@ -58,9 +56,8 @@ export async function createCheckoutOrder(
   }
 
   const orderId = `ORD-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-  const entitlementType = packageCode === 'CORPORATE_SUBSCRIPTION_30_DAY'
-    ? 'CORPORATE_SUBSCRIPTION'
-    : 'LISTING_CREDIT';
+  const purpose = options.purpose || (packageCode === 'CORPORATE_SUBSCRIPTION_30_DAY' ? 'CORPORATE_SUBSCRIPTION' : 'LISTING_PUBLICATION');
+  const entitlementType = purpose === 'CORPORATE_SUBSCRIPTION' ? 'CORPORATE_SUBSCRIPTION' : purpose === 'LISTING_BOOST' ? 'LISTING_BOOST' : 'LISTING_CREDIT';
 
   // Create payment record in DB
   const payment: Payment = {
@@ -69,18 +66,20 @@ export async function createCheckoutOrder(
     profile_id: profileId,
     package_id: pkg.id,
     provider: 'FLEECA',
-    amount: pkg.price, // STRICT SERVER-AUTHORITATIVE PRICE
+    amount: getPaymentPrice(purpose),
     status: 'PENDING',
     idempotency_key: options.idempotencyKey,
     corporate_profile_id: options.corporateProfileId || null,
     entitlement_type: entitlementType,
+    purpose,
+    target_listing_id: options.targetListingId || null,
     created_at: new Date().toISOString(),
   };
   db.payments.push(payment);
 
   return {
     orderId,
-    amount: pkg.price,
+    amount: payment.amount,
     packageName: pkg.name,
   };
 }

@@ -116,7 +116,7 @@ export default function HesabimKurumsalPage() {
       });
       const checkoutData = await checkoutRes.json();
       if (!checkoutRes.ok) throw new Error(checkoutData.error || 'Kurumsal sipariş oluşturulamadı.');
-      router.push(`/odeme/${checkoutData.orderId}`);
+      window.location.assign(checkoutData.paymentLink);
     } catch (err: any) {
       setError(err.message || 'Kurumsal ilan verme işlemi başlatılamadı.');
     } finally {
@@ -231,8 +231,8 @@ export default function HesabimKurumsalPage() {
         },
         body: JSON.stringify({ packageCode: 'CORPORATE_SUBSCRIPTION_30_DAY' }),
       });
-      const data = await readJsonResponse<{ orderId: string }>(res, 'Kurumsal üyelik ödeme siparişi oluşturulamadı.');
-      router.push(`/odeme/${data.orderId}`);
+      const data = await readJsonResponse<{ paymentLink: string }>(res, 'Kurumsal üyelik ödeme siparişi oluşturulamadı.');
+      window.location.assign(data.paymentLink);
     } catch (err: any) {
       setError(err.message || 'Üyelik aktif edilemedi.');
     } finally {
@@ -257,6 +257,10 @@ export default function HesabimKurumsalPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.code ? `${data.error || 'İlan öne çıkarılamadı.'} (${data.code})` : (data.error || 'İlan öne çıkarılamadı.'));
 
+      if (data.paymentRequired && data.paymentLink) {
+        window.location.assign(data.paymentLink);
+        return;
+      }
       setSuccess('İlan başarıyla 24 saatliğine en üst sıraya öne çıkarıldı.');
       await fetchDealer();
     } catch (err: any) {

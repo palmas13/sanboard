@@ -595,7 +595,7 @@ describe('Sanboard Post-Audit Correction Pass: Sections 36-47', () => {
     const pendingPayment = db.payments.at(-1)!;
     assert.strictEqual(pendingPayment.profile_id, mavisProfileId, 'Corporate checkout owner must come from the signed active character');
     assert.strictEqual(pendingPayment.corporate_profile_id, 'dealer-apex-01');
-    assert.strictEqual(pendingPayment.amount, 1750, 'Corporate credit checkout price must be $1,750');
+    assert.strictEqual(pendingPayment.amount, 1, 'Corporate credit checkout price must use centralized $1 pricing');
     assert.strictEqual(pendingPayment.status, 'PENDING');
     assert.strictEqual(pendingPayment.external_payment_id, undefined);
   });

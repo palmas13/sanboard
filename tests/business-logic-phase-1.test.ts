@@ -138,7 +138,7 @@ describe('SANBOARD Business Logic Phase 1 regressions', () => {
     assert.equal(db.dealers[0].subscription_expires_at, firstExpiry);
   });
 
-  test('zero-priced or misconfigured subscription package cannot open a free subscription', async () => {
+  test('legacy zero package price cannot open a free subscription and structural misconfiguration is rejected', async () => {
     db.dealers[0].subscription_status = 'INACTIVE';
     db.dealers[0].subscription_expires_at = null;
     const subscriptionPackage = db.packages.find((pkg) => pkg.code === 'CORPORATE_SUBSCRIPTION_30_DAY')!;
@@ -147,10 +147,13 @@ describe('SANBOARD Business Logic Phase 1 regressions', () => {
     const zeroPrice = await createCheckoutOrder(ownerId, subscriptionPackage.code, {
       idempotencyKey: 'zero-price-subscription', corporateProfileId: storeId,
     });
-    assert.match(zeroPrice.error || '', /fiyatı pozitif/);
-    assert.equal(db.payments.length, 0);
+    assert.equal(zeroPrice.amount, 1);
+    assert.equal(db.payments.length, 1);
+    assert.equal(db.payments[0].status, 'PENDING');
+    assert.equal(db.payments[0].amount, 1);
     assert.equal(db.dealers[0].subscription_status, 'INACTIVE');
 
+    db.payments = [];
     subscriptionPackage.price = 5000;
     subscriptionPackage.seller_type = 'INDIVIDUAL';
     const wrongType = await createCheckoutOrder(ownerId, subscriptionPackage.code, {

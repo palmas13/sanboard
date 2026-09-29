@@ -8,6 +8,7 @@ export * from './mock-provider';
 export * from './real-provider';
 
 export function getFleecaPaymentProvider(): FleecaPaymentProvider {
+  if (process.env.USE_MOCK_FLEECA === 'true' && process.env.NODE_ENV !== 'production') return new MockFleecaPaymentProvider();
   return new RealFleecaPaymentProvider();
 }
 

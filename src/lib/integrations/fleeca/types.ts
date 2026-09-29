@@ -5,6 +5,7 @@ export interface CreateCheckoutParams {
   packageCode: string;
   amount: number;
   currency: string;
+  description?: string;
 }
 
 export interface FleecaOrder {
@@ -17,6 +18,25 @@ export interface FleecaOrder {
   currency: string;
   status: 'PENDING' | 'SUCCESS' | 'FAILED';
   createdAt: string;
+  paymentId?: string;
+  paymentLink?: string;
+}
+
+export interface FleecaPaymentDetailsResponse {
+  success: true;
+  data: {
+    payment_id: string;
+    merchant_id: number;
+    amount: number;
+    description: string;
+    status: string;
+    mode: 'sandbox' | 'live';
+    payer_routing: unknown | null;
+    payer_name: string | null;
+    paid_at: string | null;
+    created_at: string;
+    updated_at: string;
+  };
 }
 
 export type ExternalPaymentStatus = 'VERIFIED' | 'PENDING' | 'FAILED';

@@ -197,8 +197,11 @@ export interface Payment {
   external_payment_id?: string;
   idempotency_key?: string;
   corporate_profile_id?: string | null;
-  entitlement_type?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION';
+  entitlement_type?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' | 'LISTING_BOOST';
+  purpose?: 'LISTING_PUBLICATION' | 'LISTING_BOOST' | 'CORPORATE_SUBSCRIPTION';
+  target_listing_id?: string | null;
   entitlement_applied_at?: string | null;
+  processed_at?: string | null;
   amount: number; // 2000
   status: PaymentStatus;
   created_at: string;

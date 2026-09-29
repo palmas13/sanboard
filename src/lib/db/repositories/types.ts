@@ -188,8 +188,10 @@ export interface IDealerRepository {
 
 export interface IPaymentRepository {
   getUserCredits(profileId: string): Promise<{ available: number; total: number; credits: any[] }>;
-  createPaymentOrder(profileId: string, packageIdOrCode: string, options?: { idempotencyKey?: string; corporateProfileId?: string | null }): Promise<{ orderId: string; amount: number; packageName?: string; entitlementType?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' }>;
+  createPaymentOrder(profileId: string, packageIdOrCode: string, options?: { idempotencyKey?: string; corporateProfileId?: string | null; purpose?: import('@/lib/payments/pricing').PaymentPurpose; targetListingId?: string | null }): Promise<{ orderId: string; amount: number; packageName?: string; entitlementType?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' | 'LISTING_BOOST' }>;
+  attachProviderPayment(orderId: string, providerPaymentId: string): Promise<void>;
   completePayment(orderId: string, externalPaymentId?: string): Promise<{ success: boolean; credit?: any; error?: string }>;
+  completeBoostPayment(orderId: string): Promise<{ success: boolean; error?: string; featured_until?: string }>;
   getPaymentOrder(orderId: string): Promise<any | null>;
   getUserPayments(profileId: string): Promise<any[]>;
   clearUserPaymentHistory(profileId: string): Promise<{ success: boolean; clearedAt?: string; error?: string }>;

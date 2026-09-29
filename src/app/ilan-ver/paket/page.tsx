@@ -12,7 +12,7 @@ export default function IlanPaketSecPage() {
   const [loadingPkg, setLoadingPkg] = useState<'individual' | null>(null);
   const [error, setError] = useState('');
 
-  const individualPrice = 2000;
+  const individualPrice = 1;
 
   const handleSelectIndividual = async () => {
     if (!isAuthenticated || !currentProfile) {
@@ -38,7 +38,7 @@ export default function IlanPaketSecPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Sipariş oluşturulamadı.');
 
-      router.push(`/odeme/${data.orderId}`);
+      window.location.assign(data.paymentLink);
     } catch (err: any) {
       setError(err.message || 'Ödeme sayfası başlatılamadı.');
       setLoadingPkg(null);

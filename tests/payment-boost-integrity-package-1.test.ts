@@ -118,15 +118,13 @@ describe('SANBOARD payment / boost integrity package 1', () => {
     assert.equal(db.dealers[0].boost_credits, boosts);
   });
 
-  test('subscription package creation validates canonical price, seller type, duration and positive price', async () => {
+  test('subscription package creation uses centralized price and validates seller type and duration', async () => {
     const canonical = await createCheckoutOrder(alex, 'CORPORATE_SUBSCRIPTION_30_DAY', { corporateProfileId: store });
-    assert.equal(canonical.amount, 5000);
+    assert.equal(canonical.amount, 1);
 
     for (const mutation of [
       { seller_type: 'INDIVIDUAL' },
       { duration_days: 29 },
-      { price: 0 },
-      { price: -1 },
     ]) {
       db.payments = [];
       Object.assign(db.packages[0], mutation);
@@ -136,18 +134,18 @@ describe('SANBOARD payment / boost integrity package 1', () => {
     }
   });
 
-  test('existing order keeps its 5000 snapshot after package price changes while new orders use 6000', async () => {
+  test('all orders keep the centralized one-dollar snapshot after legacy package price changes', async () => {
     const oldOrder = await createCheckoutOrder(alex, 'CORPORATE_SUBSCRIPTION_30_DAY', { corporateProfileId: store });
-    assert.equal(oldOrder.amount, 5000);
-    assert.equal(db.payments[0].amount, 5000);
+    assert.equal(oldOrder.amount, 1);
+    assert.equal(db.payments[0].amount, 1);
 
     db.packages[0].price = 6000;
-    const oldCompletion = await completePaymentOrder(oldOrder.orderId, 'snapshot-5000', clock);
+    const oldCompletion = await completePaymentOrder(oldOrder.orderId, 'snapshot-1', clock);
     assert.equal(oldCompletion.success, true);
 
     const newOrder = await createCheckoutOrder(alex, 'CORPORATE_SUBSCRIPTION_30_DAY', { corporateProfileId: store });
-    assert.equal(newOrder.amount, 6000);
-    assert.equal(db.payments.find((payment) => payment.order_id === newOrder.orderId)?.amount, 6000);
+    assert.equal(newOrder.amount, 1);
+    assert.equal(db.payments.find((payment) => payment.order_id === newOrder.orderId)?.amount, 1);
   });
 
   test('external verification uses each stored order amount rather than the live package price', async () => {

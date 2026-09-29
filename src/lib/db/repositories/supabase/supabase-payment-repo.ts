@@ -2,6 +2,7 @@ import { IPaymentRepository } from '../types';
 import { getSupabaseClient, getSupabaseAdminClient } from '../../supabase-client';
 
 import { resolveProfileId, isUuid } from '../../id-mapper';
+import { getPaymentPrice, type PaymentPurpose } from '@/lib/payments/pricing';
 
 export class SupabasePaymentRepository implements IPaymentRepository {
   private getClient() {
@@ -45,8 +46,8 @@ export class SupabasePaymentRepository implements IPaymentRepository {
   async createPaymentOrder(
     profileId: string,
     packageIdOrCode: string,
-    options: { idempotencyKey?: string; corporateProfileId?: string | null } = {}
-  ): Promise<{ orderId: string; amount: number; packageName?: string; entitlementType?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' }> {
+    options: { idempotencyKey?: string; corporateProfileId?: string | null; purpose?: PaymentPurpose; targetListingId?: string | null } = {}
+  ): Promise<{ orderId: string; amount: number; packageName?: string; entitlementType?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' | 'LISTING_BOOST' }> {
     const client = this.getAdminClient();
 
     // Query package by code or by id
@@ -65,10 +66,6 @@ export class SupabasePaymentRepository implements IPaymentRepository {
     }
 
     if (!packageRecord.active) throw new Error('İstenen ödeme paketi aktif değildir.');
-    if (!Number.isFinite(packageRecord.price) || packageRecord.price <= 0) {
-      throw new Error('Ödeme paketinin fiyatı pozitif olmalıdır.');
-    }
-
     if (packageRecord.code === 'CORPORATE_SUBSCRIPTION_30_DAY') {
       if (packageRecord.seller_type !== 'CORPORATE' || packageRecord.duration_days !== 30) {
         throw new Error('Kurumsal üyelik paketi yapılandırması geçersizdir.');
@@ -86,20 +83,20 @@ export class SupabasePaymentRepository implements IPaymentRepository {
       throw new Error('Kurumsal ilan paketi yapılandırması geçersizdir.');
     }
 
-    const entitlementType = packageRecord.code === 'CORPORATE_SUBSCRIPTION_30_DAY'
-      ? 'CORPORATE_SUBSCRIPTION'
-      : 'LISTING_CREDIT';
+    const purpose = options.purpose || (packageRecord.code === 'CORPORATE_SUBSCRIPTION_30_DAY' ? 'CORPORATE_SUBSCRIPTION' : 'LISTING_PUBLICATION');
+    const entitlementType = purpose === 'CORPORATE_SUBSCRIPTION' ? 'CORPORATE_SUBSCRIPTION' : purpose === 'LISTING_BOOST' ? 'LISTING_BOOST' : 'LISTING_CREDIT';
 
     if (options.idempotencyKey) {
       const { data: existing, error: existingError } = await client
         .from('payments')
-        .select('order_id, amount, package_id, corporate_profile_id, entitlement_type')
+        .select('order_id, amount, package_id, corporate_profile_id, entitlement_type, purpose, target_listing_id')
         .eq('profile_id', profileId)
         .eq('idempotency_key', options.idempotencyKey)
         .maybeSingle();
       if (existingError) throw new Error(existingError.message);
       if (existing) {
-        if (existing.package_id !== packageRecord.id || (existing.corporate_profile_id || null) !== (options.corporateProfileId || null)) {
+        if (existing.package_id !== packageRecord.id || (existing.corporate_profile_id || null) !== (options.corporateProfileId || null)
+          || existing.purpose !== purpose || (existing.target_listing_id || null) !== (options.targetListingId || null)) {
           throw new Error('Bu işlem anahtarı farklı bir ödeme için zaten kullanılmış.');
         }
         return {
@@ -112,7 +109,7 @@ export class SupabasePaymentRepository implements IPaymentRepository {
     }
 
     const orderId = `ORD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-    const amount = packageRecord.price;
+    const amount = getPaymentPrice(purpose);
 
     const { error } = await client.from('payments').insert({
       order_id: orderId,
@@ -123,6 +120,8 @@ export class SupabasePaymentRepository implements IPaymentRepository {
       idempotency_key: options.idempotencyKey || null,
       corporate_profile_id: options.corporateProfileId || null,
       entitlement_type: entitlementType,
+      purpose,
+      target_listing_id: options.targetListingId || null,
     });
 
     if (error) {
@@ -130,6 +129,16 @@ export class SupabasePaymentRepository implements IPaymentRepository {
     }
 
     return { orderId, amount, packageName: packageRecord.name, entitlementType };
+  }
+
+  async attachProviderPayment(orderId: string, providerPaymentId: string): Promise<void> {
+    const client = this.getAdminClient();
+    const { data, error } = await client.from('payments')
+      .update({ external_payment_id: providerPaymentId })
+      .eq('order_id', orderId).eq('status', 'PENDING')
+      .or(`external_payment_id.is.null,external_payment_id.eq.${providerPaymentId}`)
+      .select('id').maybeSingle();
+    if (error || !data) throw new Error(error?.message || 'Fleeca ödeme kimliği local siparişe bağlanamadı.');
   }
 
   async completePayment(orderId: string, externalPaymentId?: string): Promise<{ success: boolean; credit?: any; error?: string }> {
@@ -142,6 +151,14 @@ export class SupabasePaymentRepository implements IPaymentRepository {
     if (error) return { success: false, error: error.message };
     const result = Array.isArray(data) ? data[0] : data;
     return { success: Boolean(result?.success), credit: result?.credit || undefined, error: result?.error || undefined };
+  }
+
+  async completeBoostPayment(orderId: string): Promise<{ success: boolean; error?: string; featured_until?: string }> {
+    const client = this.getAdminClient();
+    const { data, error } = await client.rpc('complete_sanboard_boost_payment', { p_order_id: orderId });
+    if (error) return { success: false, error: error.message };
+    const result = Array.isArray(data) ? data[0] : data;
+    return { success: Boolean(result?.success), error: result?.error || undefined, featured_until: result?.featured_until || undefined };
   }
 
   async getUserPayments(profileId: string): Promise<any[]> {

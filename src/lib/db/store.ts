@@ -156,6 +156,15 @@ class SanboardDatabase {
       active: true,
       seller_type: 'CORPORATE',
     },
+    {
+      id: 'pkg-listing-boost',
+      code: 'LISTING_BOOST_24_HOUR',
+      name: '24 Saat İlan Öne Çıkarma',
+      price: 1,
+      duration_days: 1,
+      active: true,
+      seller_type: 'CORPORATE',
+    },
   ];
 
   payments: Payment[] = [
