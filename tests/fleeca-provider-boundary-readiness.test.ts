@@ -65,8 +65,11 @@ describe('SANBOARD Fleeca provider boundary readiness', () => {
 
   const callbackPayload = (paymentId: string, status: 'payment_successful' | 'payment_failed' | 'pending', extra: Record<string, unknown> = {}) => ({
     payment_id: paymentId,
+    payment_url: `https://fleeca.example/payments/${paymentId}`,
     mode: 'live',
     amount: 1,
+    payer_routing: null,
+    payer_name: null,
     status,
     description: 'Sanboard payment',
     created_at: '2026-09-29T20:00:00.000Z',
@@ -226,6 +229,46 @@ describe('SANBOARD Fleeca provider boundary readiness', () => {
     assert.equal(db.auditLogs[0].metadata?.payer_routing, undefined);
   });
 
+  test('payment_failed webhook accepts numeric payer_routing, null paid_at and null or omitted status_reason', async () => {
+    const paymentId = '10000000-0000-4000-8000-000000000006';
+    await createCheckoutOrder(alex, 'STANDARD_7_DAY', { idempotencyKey: 'webhook-real-failed-variant' });
+    db.payments[0].external_payment_id = paymentId;
+
+    const numericRouting = await webhook(callbackPayload(paymentId, 'payment_failed', {
+      payer_routing: 10078525,
+      paid_at: null,
+      status_reason: null,
+    }));
+    assert.equal(numericRouting.status, 200);
+    assert.equal((await numericRouting.json()).state, 'FAILED');
+    assert.equal(db.auditLogs[0].metadata?.statusReason, null);
+
+    const withoutStatusReason = callbackPayload(paymentId, 'payment_failed', { payer_routing: '020001001', paid_at: null });
+    delete (withoutStatusReason as { status_reason?: unknown }).status_reason;
+    assert.equal((await webhook(withoutStatusReason)).status, 200);
+  });
+
+  test('schema validation logs only safe field and type diagnostics', async () => {
+    const warnings: unknown[][] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => { warnings.push(args); };
+    try {
+      const response = await webhook(callbackPayload('10000000-0000-4000-8000-000000000007', 'payment_failed', {
+        payer_routing: { sensitive: 'routing-value-must-not-appear' },
+        payer_name: 'payer-name-must-not-appear',
+        paid_at: null,
+      }));
+      assert.equal(response.status, 400);
+      const diagnostic = warnings.flat().join(' ');
+      assert.match(diagnostic, /field=payer_routing/);
+      assert.match(diagnostic, /expected=string\|number\|null/);
+      assert.match(diagnostic, /receivedType=object/);
+      assert.doesNotMatch(diagnostic, /routing-value-must-not-appear|payer-name-must-not-appear|fleeca-webhook-test-key|sha256=/);
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+
   test('payment_successful webhook reuses verified idempotent fulfillment and duplicate callback creates one entitlement', async () => {
     const paymentId = '10000000-0000-4000-8000-000000000003';
     await createCheckoutOrder(alex, 'STANDARD_7_DAY', { idempotencyKey: 'webhook-success' });
@@ -311,8 +354,10 @@ describe('SANBOARD Fleeca provider boundary readiness', () => {
 
   test('webhook source never logs or returns sensitive payer and authorization data', () => {
     const source = readFileSync(join(process.cwd(), 'src/app/api/payments/fleeca/webhook/route.ts'), 'utf8');
-    assert.doesNotMatch(source, /console\.(log|warn|error)/);
+    assert.match(source, /console\.warn\(`Fleeca webhook validation failed: field=\$\{field\} expected=\$\{expected\} receivedType=\$\{receivedType\}`\)/);
+    assert.doesNotMatch(source, /console\.(log|error)/);
     assert.doesNotMatch(source, /Authorization|FLEECA_API_KEY/);
+    assert.doesNotMatch(source, /console\.warn\([^\n]*(rawBody|signature|apiKey|payer_routing|payer_name)/);
     assert.doesNotMatch(source, /payer_routing.*NextResponse|payer_name.*NextResponse/);
   });
 });

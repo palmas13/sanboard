@@ -8,17 +8,52 @@ import { verifyAndFulfillPayment } from '@/lib/payments/verification';
 
 const callbackSchema = z.object({
   payment_id: z.uuid(),
-  payment_url: z.url().optional(),
-  mode: z.enum(['live', 'sandbox']).optional(),
-  amount: z.number().positive(),
-  payer_routing: z.string().nullable().optional(),
-  payer_name: z.string().nullable().optional(),
+  payment_url: z.url(),
+  mode: z.enum(['live', 'sandbox']),
+  amount: z.number().int().positive(),
+  payer_routing: z.union([z.string(), z.number()]).nullable(),
+  payer_name: z.string().nullable(),
   status: z.enum(['payment_successful', 'payment_failed', 'pending']),
-  description: z.string().optional(),
-  created_at: z.string().optional(),
-  paid_at: z.string().nullable().optional(),
-  status_reason: z.string().trim().max(500).optional(),
+  description: z.string().nullable().optional(),
+  created_at: z.string(),
+  paid_at: z.string().nullable(),
+  status_reason: z.string().trim().max(500).nullable().optional(),
 }).strip();
+
+const expectedCallbackTypes: Record<string, string> = {
+  payment_id: 'UUID string',
+  payment_url: 'valid URL string',
+  mode: 'sandbox|live',
+  amount: 'positive integer',
+  payer_routing: 'string|number|null',
+  payer_name: 'string|null',
+  status: 'payment_successful|payment_failed|pending',
+  description: 'string|null|undefined',
+  created_at: 'string',
+  paid_at: 'string|null',
+  status_reason: 'string|null|undefined',
+};
+
+function receivedTypeAtPath(value: unknown, path: PropertyKey[]): string {
+  let current = value;
+  for (const segment of path) {
+    if (typeof current !== 'object' || current === null) return current === null ? 'null' : typeof current;
+    current = (current as Record<PropertyKey, unknown>)[segment];
+  }
+  if (current === null) return 'null';
+  if (Array.isArray(current)) return 'array';
+  return typeof current;
+}
+
+function logSafeValidationFailures(value: unknown, issues: z.core.$ZodIssue[]): void {
+  for (const issue of issues) {
+    const field = issue.path.length > 0 ? issue.path.join('.') : 'payload';
+    const rootField = String(issue.path[0] ?? 'payload');
+    const expected = expectedCallbackTypes[rootField] || 'valid callback payload';
+    const receivedType = receivedTypeAtPath(value, issue.path);
+    console.warn(`Fleeca webhook validation failed: field=${field} expected=${expected} receivedType=${receivedType}`);
+  }
+}
 
 export function isValidFleecaSignature(rawBody: string, signature: string | null, apiKey: string): boolean {
   if (!signature || !/^sha256=[a-f0-9]{64}$/i.test(signature)) return false;
@@ -49,6 +84,7 @@ export async function POST(req: NextRequest) {
   })();
   const parsed = callbackSchema.safeParse(parsedJson);
   if (!parsed.success) {
+    logSafeValidationFailures(parsedJson, parsed.error.issues);
     return NextResponse.json({ received: false, error: 'Geçersiz webhook payloadı.' }, { status: 400 });
   }
 
