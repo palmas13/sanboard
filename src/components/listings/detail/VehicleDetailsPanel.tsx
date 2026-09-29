@@ -30,7 +30,7 @@ export function VehicleDetailsPanel({ listing }: { listing: MemberListingDetail 
   const security: ListingInfoItem[] = [
     { label: 'Kilit Seviyesi', value: level(details.lock_level), badge: true },
     { label: 'Alarm Seviyesi', value: level(details.alarm_level), badge: true },
-    { label: 'Hırsızlık Önleme', value: level(details.anti_theft_level), badge: true },
+    { label: 'Hırsızlık Önleyici', value: level(details.anti_theft_level), badge: true },
   ];
   const additional: ListingInfoItem[] = [
     { label: 'Turbo', value: details.turbo ? 'Var' : 'Yok' },
@@ -44,13 +44,13 @@ export function VehicleDetailsPanel({ listing }: { listing: MemberListingDetail 
       <ListingInfoSection title="Temel Bilgiler" items={basic} />
       <ListingInfoSection title="Mekanik Durum">
         {details.engine_health !== null && details.engine_health !== undefined ? (
-          <div className="mb-3 rounded-xl bg-[var(--bg-surface-secondary)]/55 p-3.5">
+          <div className="mb-3 rounded-xl border border-white/[0.035] bg-[var(--bg-surface-secondary)]/45 p-3.5">
             <div className="mb-2 flex items-center justify-between text-xs"><span className="font-bold text-[var(--text-muted)]">Motor Sağlığı</span><strong className="text-[#FF9E45]">%{details.engine_health}</strong></div>
             <div className="h-2 overflow-hidden rounded-full bg-black/25"><div className="h-full rounded-full bg-gradient-to-r from-[#E87500] to-[#FF9E45]" style={{ width: `${Math.min(100, Math.max(0, details.engine_health))}%` }} /></div>
           </div>
         ) : null}
         <dl className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-          {upgrades.map((item) => <div key={item.label} className="flex min-h-16 items-center justify-between gap-3 rounded-xl bg-[var(--bg-surface-secondary)]/55 px-3.5 py-3"><dt className="text-xs font-bold text-[var(--text-muted)]">{item.label}</dt><dd className="shrink-0 rounded-full border border-[#FF8A1F]/25 bg-[#FF8A1F]/10 px-2.5 py-1 text-xs font-black text-[#FF9E45]">{item.value}</dd></div>)}
+          {upgrades.map((item) => <div key={item.label} className="flex min-h-14 items-center justify-between gap-3 rounded-xl border border-white/[0.035] bg-[var(--bg-surface-secondary)]/45 px-3.5 py-2.5"><dt className="text-xs font-bold text-[var(--text-muted)]">{item.label}</dt><dd className="shrink-0 rounded-full border border-[#FF8A1F]/25 bg-[#FF8A1F]/10 px-2.5 py-1 text-xs font-black text-[#FF9E45]">{item.value}</dd></div>)}
         </dl>
       </ListingInfoSection>
       <ListingInfoSection title="Güvenlik Donanımı" items={security} />

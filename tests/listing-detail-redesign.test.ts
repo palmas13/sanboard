@@ -11,13 +11,18 @@ describe('premium listing detail redesign', () => {
   const property = source('src/components/listings/detail/PropertyDetailsPanel.tsx');
   const gallery = source('src/components/listings/ListingGallery.tsx');
   const seller = source('src/components/listings/SellerCard.tsx');
+  const header = source('src/components/listings/detail/ListingDetailHeader.tsx');
+  const safety = source('src/components/listings/detail/SafeShoppingCard.tsx');
   const offer = source('src/components/offers/OfferCenter.tsx');
 
   test('vehicle and property details use distinct responsive marketplace layouts', () => {
     assert.match(page, /data-testid="vehicle-listing-layout"/);
-    assert.match(page, /xl:grid-cols-\[minmax\(0,1\.55fr\)_minmax\(330px,\.95fr\)_minmax\(280px,\.65fr\)\]/);
+    assert.match(page, /max-w-\[1500px\]/);
+    assert.match(page, /xl:grid-cols-\[minmax\(0,1\.6fr\)_minmax\(340px,\.9fr\)_minmax\(290px,\.75fr\)\]/);
     assert.match(page, /data-testid="property-listing-layout"/);
-    assert.match(page, /lg:grid-cols-\[minmax\(0,1\.55fr\)_minmax\(340px,1fr\)\]/);
+    assert.match(page, /lg:grid-cols-\[minmax\(0,1\.5fr\)_minmax\(380px,1fr\)\]/);
+    assert.match(page, /order-2[^>]*><SellerArea/);
+    assert.match(page, /order-4[^>]*><ListingDescription/);
   });
 
   test('seller variations and owner/offer actions retain canonical behavior', () => {
@@ -26,10 +31,14 @@ describe('premium listing detail redesign', () => {
     assert.match(seller, /seller\?\.phone/);
     assert.match(page, /isOwner \? <Link href="\/hesabim\/ilanlarim"/);
     assert.match(page, /listing\.offers_enabled !== false \? <OfferButton/);
+    assert.match(seller, /Satıcıyla İletişime Geç/);
+    assert.match(seller, /dealer\?\.address/);
+    assert.match(seller, /dealer\?\.is_premium/);
+    assert.match(safety, /Sanboard üzerinden iletişim kurun/);
   });
 
   test('optional fields are conditional and property fields use real listing data', () => {
-    assert.match(page, /listing\.location \?/);
+    assert.match(header, /listing\.location \?/);
     assert.match(property, /value: listing\.location/);
     assert.match(property, /details\.property_type/);
     assert.match(property, /details\.room_count/);
@@ -51,7 +60,8 @@ describe('premium listing detail redesign', () => {
     assert.match(gallery, /ArrowLeft/);
     assert.match(gallery, /ArrowRight/);
     assert.match(gallery, /Escape/);
-    assert.match(gallery, /quality=\{90\}/);
+    assert.match(gallery, /quality=\{92\}/);
+    assert.match(gallery, /useCallback/);
   });
 
   test('favorite, share and report actions remain available in the header', () => {
@@ -59,6 +69,7 @@ describe('premium listing detail redesign', () => {
     assert.match(page, /FavoriteButton/);
     assert.match(page, /CopyListingLinkButton/);
     assert.match(page, /ReportModal/);
+    assert.match(page, /ListingDetailHeader/);
   });
 
   test('minimum offer copy is conditional and below-minimum input is blocked client-side', () => {

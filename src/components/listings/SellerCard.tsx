@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { CharacterProfile, DealerProfile } from '@/types';
-import { Phone, Mail, Copy, Check, ExternalLink, ShieldCheck, Crown, Building2 } from 'lucide-react';
+import { Phone, Mail, Copy, Check, ShieldCheck, Crown, Building2, MapPin, MessageCircle } from 'lucide-react';
 import { resolveAvatarUrl, resolveMediaUrl } from '@/lib/media/url';
 import { getCorporateUrl } from '@/lib/urls';
 
@@ -52,6 +52,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
     : `/user/${seller?.public_id || seller?.id}`;
 
   const publicStoreUrl = isCorporate ? publicUrl : null;
+  const displayLocation = isCorporate ? dealer?.address || '' : '';
 
   const handleCopyPhone = () => {
     if (!displayPhone) return;
@@ -68,7 +69,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
   };
 
   return (
-    <div data-testid={isCorporate ? 'corporate-seller-card' : 'individual-seller-card'} className={`surface-card p-5 rounded-2xl border space-y-5 shadow-[0_18px_55px_rgba(0,0,0,.16)] ${
+    <div data-testid={isCorporate ? 'corporate-seller-card' : 'individual-seller-card'} className={`surface-card rounded-2xl border p-5 shadow-[0_18px_55px_rgba(0,0,0,.16)] ${
       isCorporate ? 'border-[#FF8A1F]/25 bg-gradient-to-b from-[var(--bg-surface)] to-[var(--bg-surface-secondary)]' : 'border-[var(--border-app)]'
     }`}>
       {/* Header Profile / Store Info */}
@@ -98,7 +99,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
             <span className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider">
               {isCorporate ? 'Kurumsal Satıcı' : 'İlan Sahibi'}
             </span>
-            {isCorporate && (
+            {isCorporate && dealer?.is_premium && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border border-[#FF8A1F]/30 text-[10px] font-black">
                 <Crown className="w-3 h-3 fill-current" />
                 <span>Premium Satıcı</span>
@@ -112,13 +113,13 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
           </Link>
           <div className="flex items-center gap-1 text-[11px] text-[var(--color-success)] font-medium">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-            <span>{isCorporate ? 'Onaylı Kurumsal Galeri' : 'Onaylı Karakter'}</span>
+            <span>{isCorporate ? 'Onaylı Kurumsal Profil' : 'Onaylı Karakter'}</span>
           </div>
         </div>
       </div>
 
       {/* Contact Details & Action CTAs */}
-      <div className="space-y-2.5">
+      <div className="mt-5 space-y-2.5">
         {/* Phone */}
         {displayPhone ? (
           <div className="p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] flex items-center justify-between">
@@ -165,25 +166,36 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
           </div>
         ) : null}
 
-        {/* SanMail CTA Button */}
+        {displayLocation ? (
+          <div className="flex items-start gap-2.5 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] p-3">
+            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#FF8A1F]" />
+            <div className="min-w-0"><p className="text-[10px] text-[var(--text-dim)]">Konum</p><p className="mt-0.5 text-xs font-bold leading-5 text-[var(--text-main)]">{displayLocation}</p></div>
+          </div>
+        ) : null}
+
+        {/* Primary contact CTA */}
         {sanmailBaseUrl ? (
           <a
             href={sanmailBaseUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full btn-secondary text-xs py-2.5 flex items-center justify-center gap-1.5"
+            className="btn-primary flex w-full items-center justify-center gap-1.5 py-3 text-xs"
           >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span>SanMail'i Aç</span>
+            <MessageCircle className="h-3.5 w-3.5" />
+            <span>Satıcıyla İletişime Geç</span>
           </a>
         ) : displayMail ? (
           <button
             type="button"
             onClick={handleCopyMail}
-            className="w-full btn-secondary text-xs py-2.5 flex items-center justify-center gap-1.5 cursor-pointer"
+            className="btn-primary flex w-full cursor-pointer items-center justify-center gap-1.5 py-3 text-xs"
           >
             <Mail className="w-3.5 h-3.5 text-[#FF8A1F]" />
-            <span>{copiedMail ? 'SanMail Kopyalandı!' : 'SanMail ile İletişime Geç'}</span>
+            <span>{copiedMail ? 'SanMail Kopyalandı!' : 'Satıcıyla İletişime Geç'}</span>
+          </button>
+        ) : displayPhone ? (
+          <button type="button" onClick={handleCopyPhone} className="btn-primary flex w-full cursor-pointer items-center justify-center gap-1.5 py-3 text-xs">
+            <Phone className="h-3.5 w-3.5" /><span>{copiedPhone ? 'Telefon Kopyalandı!' : 'Satıcıyla İletişime Geç'}</span>
           </button>
         ) : null}
 
@@ -191,7 +203,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
         {isCorporate && publicStoreUrl && (
           <Link
             href={publicStoreUrl}
-            className="w-full btn-primary text-xs py-2.5 flex items-center justify-center gap-1.5 shadow-sm mt-1"
+            className="btn-secondary mt-1 flex w-full items-center justify-center gap-1.5 py-2.5 text-xs"
           >
             <Building2 className="w-3.5 h-3.5" />
             <span>Mağaza Profilini Görüntüle</span>

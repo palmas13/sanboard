@@ -1,4 +1,4 @@
-import { CalendarDays, Clock3, RefreshCw } from 'lucide-react';
+import { CalendarDays, Clock3, FileText, RefreshCw } from 'lucide-react';
 import type { MemberListingDetail } from '@/types';
 import { formatDate, formatTimeRemaining } from '@/lib/utils/format';
 
@@ -6,7 +6,7 @@ export function ListingDescription({ listing }: { listing: MemberListingDetail }
   const remaining = formatTimeRemaining(listing.expires_at);
   return (
     <section data-testid="listing-description" className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-5 shadow-[0_16px_45px_rgba(0,0,0,.12)] sm:p-6">
-      <h2 className="text-xs font-black uppercase tracking-[0.14em] text-[var(--text-muted)]">İlan Açıklaması</h2>
+      <h2 className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-[var(--text-muted)]"><FileText className="h-3.5 w-3.5 text-[#FF8A1F]" />İlan Açıklaması</h2>
       <div className="my-4 h-px bg-[var(--border-app)]" />
       <p className="whitespace-pre-line text-sm leading-7 text-[var(--text-main)]">{listing.description || 'Açıklama belirtilmemiş.'}</p>
       <dl className="mt-6 grid gap-3 border-t border-[var(--border-app)] pt-4 text-xs text-[var(--text-muted)] sm:grid-cols-3">

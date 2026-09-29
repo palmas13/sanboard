@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Expand, ImageIcon, X } from 'lucide-react';
 import type { ListingImage } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
@@ -13,7 +13,7 @@ export function ListingGallery({ images, title, isLocked = false, variant = 'veh
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const currentImage = visibleImages[selectedIdx] || visibleImages[0];
-  const move = (direction: number) => setSelectedIdx((current) => (current + direction + visibleImages.length) % visibleImages.length);
+  const move = useCallback((direction: number) => setSelectedIdx((current) => (current + direction + visibleImages.length) % visibleImages.length), [visibleImages.length]);
 
   useEffect(() => {
     if (!lightboxOpen) return;
@@ -24,16 +24,16 @@ export function ListingGallery({ images, title, isLocked = false, variant = 'veh
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [lightboxOpen, visibleImages.length]);
+  }, [lightboxOpen, move, visibleImages.length]);
 
   if (!currentImage) return <div className={`flex w-full items-center justify-center rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] text-sm font-semibold text-[var(--text-muted)] ${variant === 'property' ? 'aspect-[4/3]' : 'aspect-[16/10]'}`}><ImageIcon className="mr-2 h-5 w-5" />Fotoğraf bulunamadı</div>;
   const imageUrl = resolveMediaUrl(currentImage.storage_path);
-  const aspect = variant === 'property' ? 'aspect-[4/3] lg:aspect-[16/11]' : 'aspect-[16/10]';
+  const aspect = variant === 'property' ? 'aspect-[4/3] lg:aspect-[16/10]' : 'aspect-[16/10] xl:aspect-[16/9]';
 
   return <div data-testid="listing-gallery" className="space-y-3">
     <div className={`group relative w-full overflow-hidden rounded-2xl border border-white/8 bg-black/30 shadow-[0_22px_70px_rgba(0,0,0,.25)] ${aspect}`}>
       <button type="button" aria-label="Fotoğrafı tam ekran aç" disabled={isLocked} onClick={() => setLightboxOpen(true)} className="absolute inset-0 z-10 disabled:cursor-default" />
-      <Image src={imageUrl} alt={title} fill priority quality={90} sizes={variant === 'property' ? '(min-width: 1024px) 58vw, 100vw' : '(min-width: 1280px) 48vw, (min-width: 768px) 65vw, 100vw'} className="object-cover" />
+      <Image src={imageUrl} alt={title} fill priority quality={92} sizes={variant === 'property' ? '(min-width: 1280px) 58vw, (min-width: 1024px) 56vw, 100vw' : '(min-width: 1440px) 47vw, (min-width: 1280px) 45vw, (min-width: 768px) 100vw, 100vw'} className="object-cover" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-24 bg-gradient-to-t from-black/55 to-transparent" />
       <span className="absolute bottom-3 left-3 z-30 rounded-full bg-black/65 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-md">{selectedIdx + 1} / {visibleImages.length}</span>
       {!isLocked ? <span className="absolute right-3 top-3 z-30 rounded-full border border-white/10 bg-black/60 p-2 text-white backdrop-blur-md"><Expand className="h-4 w-4" /></span> : <span className="absolute left-3 top-3 z-30 rounded-full bg-black/65 px-3 py-1.5 text-xs font-bold text-white">Vitrin Fotoğrafı</span>}
