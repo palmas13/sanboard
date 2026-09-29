@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPaymentRepository } from '@/lib/db/repositories';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
-import { isCanonicalTestLoginActor } from '@/lib/auth/test-login';
+import { canBypassTestPayment } from '@/lib/auth/test-login';
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     const repo = getPaymentRepository();
     const [result, testPublishBypass] = await Promise.all([
       repo.getUserCredits(actor.profileId),
-      isCanonicalTestLoginActor({ userId: actor.userId, profile: actor.profile }),
+      canBypassTestPayment({ userId: actor.userId, profile: actor.profile }),
     ]);
     const availableList = (result.credits || []).filter((c: any) => c.status === 'AVAILABLE');
     const individualCredits = availableList.filter((c: any) => c.credit_type === 'INDIVIDUAL').length;

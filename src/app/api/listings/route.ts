@@ -3,7 +3,7 @@ import { getListingRepository, getDealerRepository } from '@/lib/db/repositories
 import { listingUnionSchema } from '@/lib/validations/listing';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { revalidatePath } from 'next/cache';
-import { isCanonicalTestLoginActor } from '@/lib/auth/test-login';
+import { canBypassTestPayment } from '@/lib/auth/test-login';
 import { recordAuditEvent } from '@/lib/audit';
 
 // Public listings search endpoint
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: firstError }, { status: 400 });
     }
 
-    const testPublishBypass = await isCanonicalTestLoginActor({ userId: actor.userId, profile: actor.profile });
+    const testPublishBypass = await canBypassTestPayment({ userId: actor.userId, profile: actor.profile });
     const repo = getListingRepository();
     const result = await repo.createListing(parsed.data, trustedProfileId, {
       paymentMode: testPublishBypass ? 'TEST_BYPASS' : 'REQUIRE_CREDIT',

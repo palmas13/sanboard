@@ -27,6 +27,12 @@ Yalnız exact `ENABLE_TEST_LOGIN=true` değeri harness'ı açar. Eksik, `false` 
 
 `GTA World ile Giriş Yap` her zaman `RealGtaWorldAuthProvider` yoluna gider ve test login'e fallback yapmaz.
 
+`ENABLE_TEST_PAYMENT_BYPASS` bu login flag'inden ayrıdır. Yalnız exact
+`ENABLE_TEST_PAYMENT_BYPASS=true` ve server-side canonical `test-login:*` account/character
+doğrulaması birlikte sağlandığında listing publication, corporate subscription ve listing
+boost ödeme doğrulaması atlanır. `false` iken test hesapları giriş yapmaya devam eder fakat
+normal Fleeca ödeme akışını kullanır. Client bypass alanları authorization girdisi değildir.
+
 ## Test character source ve identity namespace
 
 Mavis Pierce, Zade Vexnera ve Ravi Blumon yalnız `MockGtaWorldAuthProvider` fixture'larıdır ve hepsi canonical sync tarafından `USER` rolüyle oluşturulur. İsim veya fixture ID üzerinden authorization yoktur.
@@ -63,6 +69,7 @@ Canonical sync, character picker, `/api/auth/session`, logout ve business logic 
 ## REAL GTA WORLD GO-LIVE CHECKLIST
 
 - `ENABLE_TEST_LOGIN=false`
+- `ENABLE_TEST_PAYMENT_BYPASS=false`
 - Test login disabled ve UI/route erişimi doğrulandı
 - Mock credentials/provider access disabled
 - Real OAuth endpoint/schema/state/auth contract doğrulandı

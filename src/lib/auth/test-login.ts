@@ -14,6 +14,10 @@ export function isTestLoginEnabled(): boolean {
   return process.env.ENABLE_TEST_LOGIN === 'true';
 }
 
+export function isTestPaymentBypassEnabled(): boolean {
+  return process.env.ENABLE_TEST_PAYMENT_BYPASS === 'true';
+}
+
 export function isTestExternalAccountId(value: string | null | undefined): boolean {
   return typeof value === 'string' && value.startsWith(TEST_LOGIN_ACCOUNT_PREFIX);
 }
@@ -39,6 +43,13 @@ export async function isCanonicalTestLoginActor(params: {
 
   const user = await getUserRepository().getUserById(params.userId);
   return Boolean(user && user.id === params.userId && user.status === 'ACTIVE' && isTestLoginAccount(user));
+}
+
+export async function canBypassTestPayment(params: {
+  userId: string;
+  profile: CharacterProfile;
+}): Promise<boolean> {
+  return isTestPaymentBypassEnabled() && isCanonicalTestLoginActor(params);
 }
 
 export function assertTestLoginAccountNamespace(account: ExternalGameAccount): void {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { getAuditRepository, getDealerRepository } from '@/lib/db/repositories';
-import { isCanonicalTestLoginActor } from '@/lib/auth/test-login';
+import { canBypassTestPayment } from '@/lib/auth/test-login';
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Yalnızca onaylanmış kurumsal mağazalar üyelik aktif edebilir.' }, { status: 400 });
     }
 
-    const testActivationBypass = await isCanonicalTestLoginActor({ userId: actor.userId, profile: actor.profile });
+    const testActivationBypass = await canBypassTestPayment({ userId: actor.userId, profile: actor.profile });
     if (testActivationBypass) {
       if (typeof dealerRepo.activateSubscription !== 'function') {
         return NextResponse.json({ error: 'Üyelik aktivasyonu kullanılamıyor.' }, { status: 503 });

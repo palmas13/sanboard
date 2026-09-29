@@ -21,6 +21,7 @@ describe('canonical test-login listing publish bypass', () => {
   beforeEach(() => {
     process.env.DATA_STORE = 'memory';
     process.env.ENABLE_TEST_LOGIN = 'true';
+    process.env.ENABLE_TEST_PAYMENT_BYPASS = 'true';
     process.env.SANBOARD_SESSION_SECRET = 'test-login-listing-bypass-secret-32-chars';
     db.users = [
       { id: testUserId, provider: 'GTAWORLD', external_user_id: TEST_LOGIN_FIXTURE_ACCOUNT_ID, role: 'USER', status: 'ACTIVE', created_at: now, updated_at: now },
@@ -92,6 +93,19 @@ describe('canonical test-login listing publish bypass', () => {
     assert.equal(db.listings.length, 0);
   });
 
+  test('canonical test account requires normal listing payment when payment bypass is disabled', async () => {
+    process.env.ENABLE_TEST_PAYMENT_BYPASS = 'false';
+    const token = createSessionToken({ userId: testUserId, profileId: testProfileId, role: 'ADMIN' });
+    const credits = await getCredits(new NextRequest('http://localhost/api/credits', { headers: { cookie: `sanboard_session=${token}` } }));
+    assert.equal((await credits.json()).testPublishBypass, false);
+
+    const response = await publishListing(request(testProfileId, testUserId, payload({ testPublishBypass: true, paymentMode: 'TEST_BYPASS' })));
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error, /ilan hakkınız|krediniz/);
+    assert.equal(db.listings.length, 0);
+    assert.equal(db.auditLogs.length, 0);
+  });
+
   test('corporate test publish preserves store authorization and existing 14-day corporate lifecycle', async () => {
     const unauthorized = await publishListing(request(testProfileId, testUserId, payload({ corporate: true, seller_type: 'CORPORATE' })));
     assert.equal(unauthorized.status, 403);
@@ -123,6 +137,19 @@ describe('canonical test-login listing publish bypass', () => {
     assert.ok(new Date(db.listings[0].featured_until!).getTime() >= before + 24 * 3600000);
     assert.equal(db.auditLogs.at(-1)?.event_type, 'TEST_FEATURED_PAYMENT_BYPASS');
     assert.equal(db.auditLogs.at(-1)?.metadata?.charged, false);
+  });
+
+  test('canonical test actor receives no free boost when payment bypass is disabled', async () => {
+    process.env.ENABLE_TEST_PAYMENT_BYPASS = 'false';
+    db.listings.push({ id: 'paid-boost-listing', listing_number: '#TEST3', seller_profile_id: testProfileId, seller_type: 'INDIVIDUAL', corporate_profile_id: null, category: 'vehicle', subcategory: 'Otomobil', title: 'Paid boost', description: 'Test', price: 1000, status: 'ACTIVE', expires_at: '2026-10-12T12:00:00.000Z', created_at: now, updated_at: now } as any);
+    const token = createSessionToken({ userId: testUserId, profileId: testProfileId, role: 'USER' });
+    const response = await boostListing(new NextRequest('http://localhost/api/dealers/boost', {
+      method: 'POST', headers: { cookie: `sanboard_session=${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ listingId: 'paid-boost-listing', skipPayment: true, paymentMode: 'TEST_BYPASS' }),
+    }));
+    assert.notEqual(response.status, 200);
+    assert.equal(db.listings[0].is_featured, undefined);
+    assert.equal(db.auditLogs.some((event) => event.event_type === 'TEST_FEATURED_PAYMENT_BYPASS'), false);
   });
 
   test('canonical corporate actor boosts an authorized listing without consuming credit', async () => {

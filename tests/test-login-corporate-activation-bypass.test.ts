@@ -18,6 +18,7 @@ describe('canonical test-login corporate subscription bypass', () => {
   beforeEach(() => {
     process.env.DATA_STORE = 'memory';
     process.env.ENABLE_TEST_LOGIN = 'true';
+    process.env.ENABLE_TEST_PAYMENT_BYPASS = 'true';
     process.env.SANBOARD_SESSION_SECRET = 'test-login-corporate-bypass-secret';
     db.users = [
       { id: testUserId, provider: 'GTAWORLD', external_user_id: TEST_LOGIN_FIXTURE_ACCOUNT_ID, role: 'USER', status: 'ACTIVE', created_at: now, updated_at: now },
@@ -58,6 +59,14 @@ describe('canonical test-login corporate subscription bypass', () => {
     const response = await activateSubscription(request(normalUserId, normalProfileId, 'real-dealer', { isTest: true, skipPayment: true, testActivationBypass: true }));
     assert.equal(response.status, 409);
     assert.equal(db.dealers[1].subscription_status, 'INACTIVE');
+    assert.equal(db.auditLogs.length, 0);
+  });
+
+  test('canonical test owner remains login-enabled but requires Fleeca checkout when payment bypass is disabled', async () => {
+    process.env.ENABLE_TEST_PAYMENT_BYPASS = 'false';
+    const response = await activateSubscription(request(testUserId, testProfileId, 'test-dealer', { skipPayment: true, testActivationBypass: true }));
+    assert.equal(response.status, 409);
+    assert.equal(db.dealers[0].subscription_status, 'INACTIVE');
     assert.equal(db.auditLogs.length, 0);
   });
 

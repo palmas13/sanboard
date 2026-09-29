@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { getDealerRepository, getPaymentRepository } from '@/lib/db/repositories';
 import { revalidatePath } from 'next/cache';
-import { isCanonicalTestLoginActor } from '@/lib/auth/test-login';
+import { canBypassTestPayment } from '@/lib/auth/test-login';
 import { recordAuditEvent } from '@/lib/audit';
 import { assertBoostAuthorization } from '@/lib/payments/verification';
 import { getFleecaPaymentProvider } from '@/lib/integrations/fleeca';
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Öne çıkarma servisi kullanılamıyor.' }, { status: 500 });
     }
 
-    const testPaymentBypass = await isCanonicalTestLoginActor({ userId: actor.userId, profile: actor.profile });
+    const testPaymentBypass = await canBypassTestPayment({ userId: actor.userId, profile: actor.profile });
     if (!testPaymentBypass) {
       await assertBoostAuthorization(actor.profileId, actor.userId, listingId);
       const paymentRepo = getPaymentRepository();
