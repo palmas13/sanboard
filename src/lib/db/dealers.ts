@@ -303,6 +303,9 @@ export async function boostListing(
   if (listing.status !== 'ACTIVE') {
     return { success: false, code: 'LISTING_NOT_ELIGIBLE', error: 'Yalnızca aktif yayındaki ilanlar öne çıkarılabilir.' };
   }
+  if (!listing.expires_at || new Date(listing.expires_at) <= now) {
+    return { success: false, code: 'LISTING_NOT_ELIGIBLE', error: 'Yayın süresi dolmuş ilanlar öne çıkarılamaz.' };
+  }
   if (listing.is_featured && listing.featured_until && new Date(listing.featured_until) > now) {
     return { success: false, code: 'ALREADY_BOOSTED', error: 'Bu ilan zaten aktif olarak öne çıkarılmış durumdadır.' };
   }

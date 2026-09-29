@@ -66,8 +66,8 @@ export function HeroTypewriter() {
 
 export function HeroStats({ stats }: { stats: HomepageStats }) {
   const items = [
-    { value: stats.activeListings, label: 'Aktif İlan' },
     { value: stats.totalOffers, label: 'Teklif Sayısı' },
+    { value: stats.activeListings, label: 'Aktif İlan' },
     { value: stats.totalSellers, label: 'Toplam Kullanıcı' },
   ];
   return <div className="hero-stats" aria-label="Sanboard platform istatistikleri">{items.map((item) => <div key={item.label} className="hero-stat"><strong><CountUp value={item.value} /></strong><span>{item.label}</span></div>)}</div>;

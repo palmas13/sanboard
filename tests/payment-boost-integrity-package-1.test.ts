@@ -30,7 +30,7 @@ describe('SANBOARD payment / boost integrity package 1', () => {
       { id: jordan, user_id: jordanAccount, full_name: 'Jordan Reed', avatar_url: '', sanmail_email: 'jordan@test', phone: '200', created_at: clock.toISOString(), updated_at: clock.toISOString() },
     ] as any;
     db.dealers = [{ id: store, owner_profile_id: alex, profile_id: alex, company_name: 'Alex Motors', description: '', logo_url: '', banner_url: '', status: 'APPROVED', moderation_status: 'ACTIVE', subscription_status: 'ACTIVE', subscription_expires_at: '2026-11-25T12:00:00.000Z', current_period_start: '2026-09-20T12:00:00.000Z', current_period_end: '2026-10-20T12:00:00.000Z', boost_credits: 3, created_at: clock.toISOString(), updated_at: clock.toISOString() }] as any;
-    db.listings = ['one', 'two'].map((id) => ({ id: `listing-${id}`, listing_number: `#${id}`, seller_profile_id: alex, corporate_profile_id: store, seller_type: 'CORPORATE', category: 'vehicle', subcategory: 'Car', title: id, description: id, price: 1, status: 'ACTIVE', created_at: clock.toISOString(), updated_at: clock.toISOString() })) as any;
+    db.listings = ['one', 'two'].map((id) => ({ id: `listing-${id}`, listing_number: `#${id}`, seller_profile_id: alex, corporate_profile_id: store, seller_type: 'CORPORATE', category: 'vehicle', subcategory: 'Car', title: id, description: id, price: 1, status: 'ACTIVE', expires_at: '2026-10-10T12:00:00.000Z', created_at: clock.toISOString(), updated_at: clock.toISOString() })) as any;
     db.packages = [
       { id: 'subscription', code: 'CORPORATE_SUBSCRIPTION_30_DAY', name: '30 Day', price: 5000, duration_days: 30, active: true, seller_type: 'CORPORATE' },
       { id: 'listing', code: 'STANDARD_7_DAY', name: '7 Day', price: 2000, duration_days: 7, active: true, seller_type: 'INDIVIDUAL' },
@@ -46,6 +46,15 @@ describe('SANBOARD payment / boost integrity package 1', () => {
     assert.equal(db.dealers[0].boost_credits, 2);
     assert.equal(replay.code, 'ALREADY_BOOSTED');
     assert.equal(db.dealers[0].boost_credits, 2);
+  });
+
+  test('expired listing cannot consume a boost credit', async () => {
+    db.listings[0].expires_at = clock.toISOString();
+    const result = await boostListing(alex, 'listing-one', clock);
+    assert.equal(result.success, false);
+    assert.equal(result.code, 'LISTING_NOT_ELIGIBLE');
+    assert.equal(db.dealers[0].boost_credits, 3);
+    assert.notEqual(db.listings[0].is_featured, true);
   });
 
   test('one credit permits only one of two concurrent requests, including separate listings', async () => {
@@ -277,6 +286,7 @@ describe('SANBOARD payment / boost integrity package 1', () => {
     const migration = readFileSync(join(process.cwd(), 'supabase/migrations/20260926060000_payment_boost_integrity_package_1.sql'), 'utf8');
     const preflight = readFileSync(join(process.cwd(), 'supabase/scripts/payment_boost_integrity_package_1_preflight.sql'), 'utf8');
     const postflight = readFileSync(join(process.cwd(), 'supabase/scripts/payment_boost_integrity_package_1_postflight.sql'), 'utf8');
+    const activeWindowMigration = readFileSync(join(process.cwd(), 'supabase/migrations/20260929120000_enforce_active_boost_window.sql'), 'utf8');
     assert.match(migration, /consume_corporate_boost[\s\S]*FOR UPDATE[\s\S]*boost_credits = boost_credits - 1/);
     assert.match(migration, /subscription_status <> 'ACTIVE'[\s\S]*subscription_expires_at IS NULL OR v_store\.subscription_expires_at <= v_now/);
     assert.match(migration, /CASE WHEN v_new_period THEN 3 ELSE boost_credits END/);
@@ -286,6 +296,8 @@ describe('SANBOARD payment / boost integrity package 1', () => {
     assert.match(migration, /REVOKE ALL ON FUNCTION public\.consume_corporate_boost[\s\S]*GRANT EXECUTE[\s\S]*service_role/);
     assert.match(migration, /CHECK \(boost_credits >= 0\)/);
     assert.match(migration, /current_period_start >= v_store\.current_period_end/);
+    assert.match(activeWindowMigration, /v_listing\.expires_at IS NULL OR v_listing\.expires_at <= v_now/);
+    assert.match(activeWindowMigration, /v_now \+ INTERVAL '24 hours'/);
     assert.match(migration, /NOT v_package\.active OR v_payment\.amount <= 0/);
     assert.doesNotMatch(migration, /v_payment\.amount <> v_package\.price/);
     assert.match(packageMigration, /INSERT INTO public\.packages/);

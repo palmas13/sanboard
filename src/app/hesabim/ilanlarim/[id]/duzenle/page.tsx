@@ -13,11 +13,10 @@ import {
   CheckCircle2,
   Loader2,
   Clock,
-  Sparkles,
 } from 'lucide-react';
 import { PhotoUploader, UploadedImage } from '@/components/forms/PhotoUploader';
 import { CustomSelect } from '@/components/ui/CustomSelect';
-import { formatCurrency, formatTimeRemaining } from '@/lib/utils/format';
+import { formatTimeRemaining } from '@/lib/utils/format';
 import { getVehicleBrands, getModelsByBrand } from '@/lib/constants/vehicleCatalog';
 import { LISTING_TITLE_MAX_ERROR, LISTING_TITLE_MAX_LENGTH } from '@/lib/validations/listing';
 
@@ -224,6 +223,7 @@ export default function IlanDuzenlePage({
       const payload: any = {
         profileId: currentProfile.id,
         userId: user?.id,
+        category,
         title: title.trim(),
         description: description.trim(),
         price: Number(price),
@@ -296,7 +296,7 @@ export default function IlanDuzenlePage({
 
       setSuccess(true);
       setTimeout(() => {
-        router.push('/hesabim/ilanlarim');
+        router.push(listingData?.seller_type === 'CORPORATE' ? '/hesabim/kurumsal' : '/hesabim/ilanlarim');
       }, 1500);
     } catch (err: any) {
       setError(err.message || 'Bir hata oluştu.');
@@ -314,6 +314,9 @@ export default function IlanDuzenlePage({
     );
   }
 
+  const returnHref = listingData?.seller_type === 'CORPORATE' ? '/hesabim/kurumsal' : '/hesabim/ilanlarim';
+  const returnLabel = listingData?.seller_type === 'CORPORATE' ? 'Kurumsal İlanlara Dön' : 'İlanlarıma Dön';
+
   if (error && !listingData) {
     return (
       <div className="surface-card p-8 rounded-2xl border border-[var(--color-danger)]/30 text-center space-y-4">
@@ -322,9 +325,9 @@ export default function IlanDuzenlePage({
         </div>
         <h2 className="text-lg font-bold text-[var(--text-main)]">İlan Düzenlenemiyor</h2>
         <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto">{error}</p>
-        <Link href="/hesabim/ilanlarim" className="btn-secondary text-xs py-2 px-4 inline-flex items-center gap-1.5">
+        <Link href={returnHref} className="btn-secondary text-xs py-2 px-4 inline-flex items-center gap-1.5">
           <ArrowLeft className="w-4 h-4" />
-          <span>İlanlarıma Dön</span>
+          <span>{returnLabel}</span>
         </Link>
       </div>
     );
@@ -339,11 +342,11 @@ export default function IlanDuzenlePage({
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Link
-              href="/hesabim/ilanlarim"
+              href={returnHref}
               className="text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] flex items-center gap-1"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>İlanlarıma Dön</span>
+              <span>{returnLabel}</span>
             </Link>
           </div>
           <h2 className="text-xl font-bold text-[var(--text-main)] flex items-center gap-2">
@@ -359,7 +362,7 @@ export default function IlanDuzenlePage({
           <Clock className="w-4 h-4 text-[#FF8A1F]" />
           <div>
             <span className="text-[var(--text-dim)]">Kalan Süre: </span>
-            <span className="font-bold text-[var(--color-success)]">{remaining.text}</span>
+            <span className={`font-bold ${remaining.isExpired ? 'text-[var(--color-danger)]' : 'text-[var(--color-success)]'}`}>{remaining.text}</span>
           </div>
         </div>
       </div>
@@ -367,7 +370,7 @@ export default function IlanDuzenlePage({
       {success && (
         <div className="p-4 rounded-xl bg-[var(--color-success-subtle)] text-[var(--color-success)] text-xs font-semibold flex items-center gap-2 border border-emerald-500/20">
           <CheckCircle2 className="w-5 h-5 shrink-0" />
-          <span>İlan başarıyla güncellendi! İlanlarım sayfasına yönlendiriliyorsunuz...</span>
+          <span>İlan başarıyla güncellendi! İlan yönetimine yönlendiriliyorsunuz...</span>
         </div>
       )}
 

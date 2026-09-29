@@ -34,7 +34,8 @@ import {
 } from 'lucide-react';
 import { DealerProfile } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
-import { formatDate } from '@/lib/utils/format';
+import { formatDate, formatTimeRemaining } from '@/lib/utils/format';
+import { isListingActivelyFeatured } from '@/lib/listings/featured';
 import { normalizeSocialMedia } from '@/lib/dealers/social';
 import { readJsonResponse } from '@/lib/http/json-response';
 
@@ -856,7 +857,8 @@ export default function HesabimKurumsalPage() {
               ) : (
                 <div className="divide-y divide-[var(--border-app)]">
                   {storeListings.map((l: any) => {
-                    const isBoosted = l.is_featured;
+                    const isBoosted = isListingActivelyFeatured(l);
+                    const remaining = formatTimeRemaining(l.expires_at);
                     return (
                       <div
                         key={l.id}
@@ -893,7 +895,7 @@ export default function HesabimKurumsalPage() {
                               <span>•</span>
                               <span>{l.category === 'vehicle' ? 'Araç' : 'Mülk'}</span>
                               <span>•</span>
-                              <span>Bitiş: {formatDate(l.expires_at)}</span>
+                              <span className={`inline-flex items-center gap-1 font-semibold ${remaining.isExpired ? 'text-[var(--color-danger)]' : 'text-[var(--color-success)]'}`}><Clock className="w-3 h-3" />{remaining.text}</span>
                             </div>
                           </div>
                         </div>
@@ -908,11 +910,13 @@ export default function HesabimKurumsalPage() {
                             <button
                               type="button"
                               onClick={() => handleBoostListing(l.id)}
-                              disabled={actionLoading || isSubscriptionExpired}
+                              disabled={actionLoading || isSubscriptionExpired || remaining.isExpired || (dealer.boost_credits ?? 0) <= 0}
                               className="btn-secondary text-[11px] py-1.5 px-3 flex items-center gap-1.5 text-amber-400 hover:border-amber-400/40 cursor-pointer disabled:opacity-50"
                               title={
                                 isSubscriptionExpired
                                   ? 'Abonelik süreniz dolduğu için boost kullanılamaz'
+                                  : remaining.isExpired
+                                  ? 'Yayın süresi dolan ilan öne çıkarılamaz'
                                   : (dealer.boost_credits ?? 0) <= 0
                                   ? 'Kalan öne çıkarma hakkınız bulunmuyor'
                                   : '24 saatliğine öne çıkar'

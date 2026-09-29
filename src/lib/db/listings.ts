@@ -682,7 +682,11 @@ export async function updateListing(
     return { success: false, error: 'İlan bulunamadı.' };
   }
 
-  if (listing.seller_profile_id !== sellerProfileId) {
+  const store = listing.seller_type === 'CORPORATE' && listing.corporate_profile_id
+    ? db.dealers.find((dealer) => dealer.id === listing.corporate_profile_id)
+    : undefined;
+  const storeOwnerId = store?.owner_profile_id || store?.profile_id;
+  if (!isListingOwnedByActiveProfile(listing, sellerProfileId, storeOwnerId)) {
     return { success: false, error: 'Bu ilanı düzenleme yetkiniz yok.' };
   }
 

@@ -10,8 +10,7 @@ describe('homepage marketplace redesign', () => {
     const page = source('src/app/page.tsx');
     assert.match(page, /getPublicListings\(\{ sort: 'newest' \}\)/);
     assert.match(page, /getAllDealers/);
-    assert.match(page, /listing\.is_featured/);
-    assert.match(page, /listing\.featured_until/);
+    assert.match(page, /isListingActivelyFeatured/);
     assert.doesNotMatch(page, /mock|migration|schema/i);
   });
 
@@ -38,6 +37,7 @@ describe('homepage marketplace redesign', () => {
     assert.match(dynamic, /complete \? 1050 : 105/);
     assert.match(dynamic, /empty \? 260 : 65/);
     assert.match(dynamic, /Toplam Kullanıcı/);
+    assert.ok(dynamic.indexOf("label: 'Teklif Sayısı'") < dynamic.indexOf("label: 'Aktif İlan'"));
     assert.match(hero, /Hayalindeki araca/);
   });
 
@@ -74,16 +74,15 @@ describe('homepage marketplace redesign', () => {
     assert.match(page, /dealer\.moderation_status === 'ACTIVE'/);
   });
 
-  test('shared rotator covers autoplay, manual navigation, pause and reduced motion', () => {
+  test('vehicle and property columns render three listings without slider controls', () => {
     const rotator = source('src/components/home/HomepageListingRotator.tsx');
-    assert.match(rotator, /setInterval[\s\S]*5000/);
-    assert.match(rotator, /onMouseEnter/);
-    assert.match(rotator, /onFocusCapture/);
-    assert.match(rotator, /visibilitychange/);
-    assert.match(rotator, /prefers-reduced-motion/);
-    assert.match(rotator, /aria-label=\{`Önceki/);
-    assert.match(rotator, /aria-label=\{`Sonraki/);
-    assert.match(rotator, /listings\.slice\(index \* 2, index \* 2 \+ 2\)/);
+    assert.match(rotator, /listings\.slice\(0, 3\)/);
+    assert.doesNotMatch(rotator, /ChevronLeft|ChevronRight|homepage-arrow|setInterval/);
+  });
+
+  test('featured showcase uses the dedicated homepage-only label', () => {
+    const marketplace = source('src/components/home/HomepageMarketplace.tsx');
+    assert.match(marketplace, />Öne Çıkarılan<\/span>/);
   });
 
   test('section controls use a shared two-row header rhythm without fixed link padding', () => {
@@ -98,5 +97,6 @@ describe('homepage marketplace redesign', () => {
     assert.match(css, /@media \(min-width: 1280px\)[\s\S]*minmax\(340px,1\.14fr\)[\s\S]*minmax\(340px,1\.14fr\)/);
     assert.match(css, /@media \(max-width: 639px\)/);
     assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+    assert.doesNotMatch(css, /\.homepage-rotator-controls|\.homepage-arrow/);
   });
 });

@@ -111,7 +111,7 @@ describe('canonical test-login listing publish bypass', () => {
   });
 
   test('canonical test actor boosts an owned individual listing without payment', async () => {
-    db.listings.push({ id: 'test-individual-listing', listing_number: '#TEST1', seller_profile_id: testProfileId, seller_type: 'INDIVIDUAL', corporate_profile_id: null, category: 'vehicle', subcategory: 'Otomobil', title: 'Test aracı', description: 'Test', price: 1000, status: 'ACTIVE', created_at: now, updated_at: now } as any);
+    db.listings.push({ id: 'test-individual-listing', listing_number: '#TEST1', seller_profile_id: testProfileId, seller_type: 'INDIVIDUAL', corporate_profile_id: null, category: 'vehicle', subcategory: 'Otomobil', title: 'Test aracı', description: 'Test', price: 1000, status: 'ACTIVE', expires_at: '2026-10-12T12:00:00.000Z', created_at: now, updated_at: now } as any);
     const token = createSessionToken({ userId: testUserId, profileId: testProfileId, role: 'USER' });
     const before = Date.now();
     const response = await boostListing(new NextRequest('http://localhost/api/dealers/boost', {
@@ -127,7 +127,7 @@ describe('canonical test-login listing publish bypass', () => {
 
   test('canonical corporate actor boosts an authorized listing without consuming credit', async () => {
     db.dealers.push({ id: 'test-store', profile_id: testProfileId, owner_profile_id: testProfileId, company_name: 'Test Store', status: 'APPROVED', moderation_status: 'ACTIVE', subscription_status: 'ACTIVE', subscription_expires_at: '2026-12-31T00:00:00.000Z', boost_credits: 0, created_at: now, updated_at: now } as any);
-    db.listings.push({ id: 'test-corporate-listing', listing_number: '#TEST2', seller_profile_id: testProfileId, seller_type: 'CORPORATE', corporate_profile_id: 'test-store', category: 'property', subcategory: 'Ev / Daire', title: 'Test mülkü', description: 'Test', price: 1000, status: 'ACTIVE', created_at: now, updated_at: now } as any);
+    db.listings.push({ id: 'test-corporate-listing', listing_number: '#TEST2', seller_profile_id: testProfileId, seller_type: 'CORPORATE', corporate_profile_id: 'test-store', category: 'property', subcategory: 'Ev / Daire', title: 'Test mülkü', description: 'Test', price: 1000, status: 'ACTIVE', expires_at: '2026-10-12T12:00:00.000Z', created_at: now, updated_at: now } as any);
     const token = createSessionToken({ userId: testUserId, profileId: testProfileId, role: 'USER' });
     const response = await boostListing(new NextRequest('http://localhost/api/dealers/boost', {
       method: 'POST', headers: { cookie: `sanboard_session=${token}`, 'content-type': 'application/json' },
@@ -139,7 +139,7 @@ describe('canonical test-login listing publish bypass', () => {
   });
 
   test('test actor cannot boost another listing and production actor cannot inject bypass flags', async () => {
-    db.listings.push({ id: 'foreign-listing', listing_number: '#FOREIGN', seller_profile_id: normalProfileId, seller_type: 'INDIVIDUAL', corporate_profile_id: null, category: 'vehicle', subcategory: 'Otomobil', title: 'Foreign', description: 'Test', price: 1000, status: 'ACTIVE', created_at: now, updated_at: now } as any);
+    db.listings.push({ id: 'foreign-listing', listing_number: '#FOREIGN', seller_profile_id: normalProfileId, seller_type: 'INDIVIDUAL', corporate_profile_id: null, category: 'vehicle', subcategory: 'Otomobil', title: 'Foreign', description: 'Test', price: 1000, status: 'ACTIVE', expires_at: '2026-10-12T12:00:00.000Z', created_at: now, updated_at: now } as any);
     for (const [userId, profileId] of [[testUserId, testProfileId], [normalUserId, normalProfileId]]) {
       const token = createSessionToken({ userId, profileId, role: 'USER' });
       const response = await boostListing(new NextRequest('http://localhost/api/dealers/boost', {

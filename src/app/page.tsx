@@ -3,6 +3,7 @@ import { HeroShowcase } from '@/components/home/HeroShowcase';
 import { HomepageMarketplace } from '@/components/home/HomepageMarketplace';
 import { WhySanboardSection } from '@/components/home/WhySanboardSection';
 import { getHomepageStats } from '@/lib/db/homepage-stats';
+import { isListingActivelyFeatured } from '@/lib/listings/featured';
 
 export const revalidate = 30;
 
@@ -15,7 +16,7 @@ export default async function HomePage() {
   ]);
 
   const now = Date.now();
-  const featuredListings = allListings.filter((listing) => listing.is_featured && (!listing.featured_until || new Date(listing.featured_until).getTime() > now));
+  const featuredListings = allListings.filter((listing) => isListingActivelyFeatured(listing, now));
   const vehicleListings = allListings.filter((listing) => listing.category === 'vehicle');
   const propertyListings = allListings.filter((listing) => listing.category === 'property');
   const corporateSellers = allDealers.filter((dealer) => dealer.status === 'APPROVED'

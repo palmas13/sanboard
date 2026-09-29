@@ -20,7 +20,7 @@ export async function GET(
       return NextResponse.json({ error: 'İlan bulunamadı.' }, { status: 404 });
     }
 
-    if (!isOwner || (listing as any).seller_profile_id !== actor.profileId) {
+    if (!isOwner) {
       return NextResponse.json(
         { error: 'Bu ilanı görüntüleme veya düzenleme yetkiniz yok.' },
         { status: 403 }
@@ -60,7 +60,7 @@ export async function PUT(
     if (!existing.listing) {
       return NextResponse.json({ error: 'İlan bulunamadı.' }, { status: 404 });
     }
-    if (!existing.isOwner || (existing.listing as any).seller_profile_id !== actor.profileId) {
+    if (!existing.isOwner) {
       return NextResponse.json({ error: 'Bu ilanı düzenleme yetkiniz yok.' }, { status: 403 });
     }
 

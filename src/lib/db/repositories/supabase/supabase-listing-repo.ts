@@ -854,7 +854,7 @@ export class SupabaseListingRepository implements IListingRepository {
 
     const { data: existing, error: fetchErr } = await client
       .from('listings')
-      .select('*, seller:character_profiles(user_id)')
+      .select('*, seller:character_profiles(user_id), corporate:corporate_profiles(owner_profile_id)')
       .eq('id', id)
       .single();
 
@@ -864,8 +864,11 @@ export class SupabaseListingRepository implements IListingRepository {
 
     // Ownership check: Admin or Profile Owner or Account Owner
     const isAdmin = role === 'ADMIN';
-    const isProfileOwner = existing.seller_profile_id === safeProfileId;
-    const isAccountOwner = Boolean(safeUserId && existing.seller?.user_id === safeUserId);
+    const isCorporate = existing.seller_type === 'CORPORATE' || Boolean(existing.corporate_profile_id);
+    const isProfileOwner = isCorporate
+      ? existing.corporate?.owner_profile_id === safeProfileId
+      : existing.seller_profile_id === safeProfileId;
+    const isAccountOwner = !isCorporate && Boolean(safeUserId && existing.seller?.user_id === safeUserId);
 
     if (!isAdmin && !isProfileOwner && !isAccountOwner) {
       return { success: false, error: 'Bu ilanı düzenleme yetkiniz yok.' };
@@ -881,7 +884,7 @@ export class SupabaseListingRepository implements IListingRepository {
 
     let rpcExecuted = false;
     // Attempt atomic update via PostgreSQL RPC if available
-    if (newPrice !== oldPrice || input.title || input.description) {
+    if (!isCorporate && (newPrice !== oldPrice || input.title || input.description)) {
       try {
         const { data: rpcData, error: rpcErr } = await client.rpc('update_listing_price', {
           p_listing_id: id,

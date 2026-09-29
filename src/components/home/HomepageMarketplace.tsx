@@ -33,7 +33,7 @@ function FeaturedListing({ listing }: { listing: PublicListingSummary }) {
       <div className="relative aspect-[1.48/1] overflow-hidden rounded-t-[inherit]">
         <Image src={image} alt={listing.title} fill sizes="(max-width: 639px) calc(100vw - 2rem), (max-width: 1279px) calc(50vw - 2rem), 380px" quality={90} className="object-cover object-center transition-transform duration-500 group-hover:scale-105" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-black/10" />
-        <span className="absolute left-3 top-3 rounded-md border border-white/10 bg-black/65 px-2.5 py-1.5 text-[10px] font-semibold text-white backdrop-blur-sm">{listing.subcategory}</span>
+        <span className="absolute left-3 top-3 rounded-md border border-white/10 bg-black/65 px-2.5 py-1.5 text-[10px] font-semibold text-white backdrop-blur-sm">Öne Çıkarılan</span>
         <span className="pointer-events-auto absolute right-3 top-3 z-10"><FavoriteButton listingId={listing.id} initialCount={listing.favorite_count} initialIsFavorited={listing.is_favorited} size="sm" /></span>
       </div>
       <div className="pointer-events-none relative z-10 p-[1.125rem]">
