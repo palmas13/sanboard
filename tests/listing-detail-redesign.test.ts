@@ -18,16 +18,29 @@ describe('premium listing detail redesign', () => {
   test('vehicle and property details use distinct responsive marketplace layouts', () => {
     assert.match(page, /data-testid="vehicle-listing-layout"/);
     assert.match(page, /max-w-\[1500px\]/);
-    assert.match(page, /xl:grid-cols-\[minmax\(0,1\.6fr\)_minmax\(340px,\.9fr\)_minmax\(290px,\.75fr\)\]/);
+    assert.match(page, /xl:grid-cols-\[minmax\(0,1\.55fr\)_minmax\(330px,\.85fr\)_minmax\(285px,\.72fr\)\]/);
     assert.match(page, /data-testid="property-listing-layout"/);
     assert.match(page, /lg:grid-cols-\[minmax\(0,1\.5fr\)_minmax\(380px,1fr\)\]/);
-    assert.match(page, /data-testid="vehicle-left-column"[^>]*listing-detail-left-column[^>]*>[\s\S]*?<ListingGallery[\s\S]*?<ListingDescription/);
-    assert.match(page, /data-testid="vehicle-middle-column"[^>]*listing-detail-middle-column[^>]*>[\s\S]*?<VehicleDetailsPanel/);
-    assert.match(page, /data-testid="vehicle-right-column"[^>]*listing-detail-right-column[^>]*xl:sticky[^>]*>[\s\S]*?<SellerArea/);
-    assert.match(page, /data-testid="property-left-column"[^>]*listing-detail-left-column[^>]*>[\s\S]*?<ListingGallery[\s\S]*?<ListingDescription/);
-    assert.match(page, /data-testid="property-right-column"[^>]*listing-detail-right-column[^>]*lg:sticky[^>]*>[\s\S]*?<PropertyDetailsPanel[\s\S]*?<SellerArea/);
-    assert.doesNotMatch(page, /xl:row-start-2/);
+    assert.match(page, /data-testid="vehicle-gallery-block"[^>]*>[\s\S]*?<ListingGallery/);
+    assert.match(page, /data-testid="vehicle-technical-column"[^>]*xl:col-start-2[^>]*>[\s\S]*?<VehicleDetailsPanel/);
+    assert.match(page, /data-testid="vehicle-seller-rail"[^>]*xl:col-start-3[^>]*xl:sticky[^>]*>[\s\S]*?<SellerArea/);
+    assert.match(page, /data-testid="vehicle-description-row"[^>]*xl:col-span-2[^>]*>[\s\S]*?<ListingDescription/);
+    assert.match(page, /data-testid="vehicle-gallery-block"[^>]*>[\s\S]*?<ListingGallery[^>]*\/>\s*<\/div>\s*<aside data-testid="vehicle-seller-rail"/);
+    assert.ok(page.indexOf('data-testid="vehicle-description-row"') > page.indexOf('data-testid="vehicle-technical-column"'));
+    assert.match(page, /data-testid="property-gallery-block"[^>]*>[\s\S]*?<ListingGallery/);
+    assert.match(page, /data-testid="property-right-column"[^>]*lg:sticky[^>]*>[\s\S]*?<PropertyDetailsPanel[\s\S]*?<SellerArea/);
+    assert.match(page, /data-testid="property-description-row"[^>]*>[\s\S]*?<ListingDescription/);
     assert.doesNotMatch(page, /min-h-\[calc\(100vh-5rem\)\]/);
+  });
+
+  test('vehicle technical information is grouped inside one outer panel', () => {
+    assert.match(vehicle, /data-testid="vehicle-details-panel"/);
+    assert.match(vehicle, />Teknik Özellikler</);
+    assert.match(vehicle, /<TechnicalSection title="Temel Bilgiler"/);
+    assert.match(vehicle, /<TechnicalSection title="Mekanik Durum"/);
+    assert.match(vehicle, /<TechnicalSection title="Güvenlik Donanımı"/);
+    assert.match(vehicle, /<TechnicalSection title="Ek Donanım & Satış"/);
+    assert.doesNotMatch(vehicle, /<ListingInfoSection/);
   });
 
   test('seller variations and owner/offer actions retain canonical behavior', () => {

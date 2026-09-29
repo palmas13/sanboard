@@ -81,26 +81,26 @@ export default async function ListingDetailPage({ params }: PageProps) {
 
     <ListingDetailHeader listing={listing} categoryHref={categoryLink} categoryName={categoryName} actions={headerActions} />
 
-    {isVehicle ? <section data-testid="vehicle-listing-layout" className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 xl:grid-cols-[minmax(0,1.6fr)_minmax(340px,.9fr)_minmax(290px,.75fr)]">
-      <div data-testid="vehicle-left-column" className="listing-detail-left-column flex min-w-0 flex-col gap-5 md:col-span-2 xl:col-span-1">
+    {isVehicle ? <section data-testid="vehicle-listing-layout" className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 xl:grid-cols-[minmax(0,1.55fr)_minmax(330px,.85fr)_minmax(285px,.72fr)]">
+      <div data-testid="vehicle-gallery-block" className="min-w-0 md:col-span-2 xl:col-span-1 xl:col-start-1 xl:row-start-1">
         <ListingGallery images={galleryImages} title={listing.title} isLocked={result.isLocked} variant="vehicle" />
-        {detailReady ? <ListingDescription listing={memberListing} /> : null}
       </div>
-      <div data-testid="vehicle-middle-column" className="listing-detail-middle-column min-w-0 md:col-start-1 xl:col-start-auto">
-        {detailReady ? <VehicleDetailsPanel listing={memberListing} /> : <div className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-6 text-sm text-[var(--text-muted)]">Teknik detayları görmek için giriş yapınız.</div>}
-      </div>
-      <aside data-testid="vehicle-right-column" className="listing-detail-right-column min-w-0 space-y-4 md:col-start-2 xl:col-start-auto xl:sticky xl:top-24">
+      <aside data-testid="vehicle-seller-rail" className="order-2 min-w-0 space-y-3 md:col-start-2 md:row-start-2 xl:order-none xl:col-start-3 xl:row-span-2 xl:row-start-1 xl:sticky xl:top-24">
         <SellerArea listing={memberListing} isLocked={result.isLocked} isOwner={result.isOwner} closedLabel={closedLabel} />
       </aside>
-    </section> : <section data-testid="property-listing-layout" className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(380px,1fr)]">
-      <div data-testid="property-left-column" className="listing-detail-left-column flex min-w-0 flex-col gap-5">
-        <ListingGallery images={galleryImages} title={listing.title} isLocked={result.isLocked} variant="property" />
-        {detailReady ? <ListingDescription listing={memberListing} /> : null}
+      <div data-testid="vehicle-technical-column" className="order-3 min-w-0 md:col-start-1 md:row-start-2 xl:order-none xl:col-start-2 xl:row-start-1">
+        {detailReady ? <VehicleDetailsPanel listing={memberListing} /> : <div className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-6 text-sm text-[var(--text-muted)]">Teknik detayları görmek için giriş yapınız.</div>}
       </div>
-      <aside data-testid="property-right-column" className="listing-detail-right-column min-w-0 space-y-4 lg:sticky lg:top-24">
+      {detailReady ? <div data-testid="vehicle-description-row" className="order-4 min-w-0 md:col-span-2 xl:order-none xl:col-span-2 xl:col-start-1 xl:row-start-2"><ListingDescription listing={memberListing} /></div> : null}
+    </section> : <section data-testid="property-listing-layout" className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(380px,1fr)]">
+      <div data-testid="property-gallery-block" className="min-w-0 lg:col-start-1 lg:row-start-1">
+        <ListingGallery images={galleryImages} title={listing.title} isLocked={result.isLocked} variant="property" />
+      </div>
+      <aside data-testid="property-right-column" className="min-w-0 space-y-3 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:sticky lg:top-24">
         {detailReady ? <PropertyDetailsPanel listing={memberListing} /> : null}
         <SellerArea listing={memberListing} isLocked={result.isLocked} isOwner={result.isOwner} closedLabel={closedLabel} />
       </aside>
+      {detailReady ? <div data-testid="property-description-row" className="min-w-0 lg:col-start-1 lg:row-start-2"><ListingDescription listing={memberListing} /></div> : null}
     </section>}
 
     {isVehicle && similarListings.length > 0 ? <SimilarListings listings={similarListings} /> : null}

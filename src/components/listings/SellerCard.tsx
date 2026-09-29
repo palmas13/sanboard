@@ -122,7 +122,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
       <div className="mt-4 space-y-2">
         {/* Phone */}
         {displayPhone ? (
-          <div className="p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] flex items-center justify-between">
+          <div className="flex items-center justify-between rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] px-3 py-2.5">
             <div className="flex items-center gap-2.5">
               <Phone className="w-4 h-4 text-[#FF8A1F] shrink-0" />
               <div>
@@ -145,7 +145,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
 
         {/* SanMail */}
         {displayMail ? (
-          <div className="p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] flex items-center justify-between">
+          <div className="flex items-center justify-between rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] px-3 py-2.5">
             <div className="flex items-center gap-2.5 truncate mr-2">
               <Mail className="w-4 h-4 text-[#FF8A1F] shrink-0" />
               <div className="truncate">
@@ -167,7 +167,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
         ) : null}
 
         {displayLocation ? (
-          <div className="flex items-start gap-2.5 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] p-3">
+          <div className="flex items-start gap-2.5 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] px-3 py-2.5">
             <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#FF8A1F]" />
             <div className="min-w-0"><p className="text-[10px] text-[var(--text-dim)]">Konum</p><p className="mt-0.5 text-xs font-bold leading-5 text-[var(--text-main)]">{displayLocation}</p></div>
           </div>
@@ -179,7 +179,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
             href={sanmailBaseUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-primary flex w-full items-center justify-center gap-1.5 py-3 text-xs"
+            className="btn-primary flex w-full items-center justify-center gap-1.5 py-2.5 text-xs"
           >
             <MessageCircle className="h-3.5 w-3.5" />
             <span>Satıcıyla İletişime Geç</span>
@@ -188,13 +188,13 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
           <button
             type="button"
             onClick={handleCopyMail}
-            className="btn-primary flex w-full cursor-pointer items-center justify-center gap-1.5 py-3 text-xs"
+            className="btn-primary flex w-full cursor-pointer items-center justify-center gap-1.5 py-2.5 text-xs"
           >
             <Mail className="w-3.5 h-3.5 text-[#FF8A1F]" />
             <span>{copiedMail ? 'SanMail Kopyalandı!' : 'Satıcıyla İletişime Geç'}</span>
           </button>
         ) : displayPhone ? (
-          <button type="button" onClick={handleCopyPhone} className="btn-primary flex w-full cursor-pointer items-center justify-center gap-1.5 py-3 text-xs">
+          <button type="button" onClick={handleCopyPhone} className="btn-primary flex w-full cursor-pointer items-center justify-center gap-1.5 py-2.5 text-xs">
             <Phone className="h-3.5 w-3.5" /><span>{copiedPhone ? 'Telefon Kopyalandı!' : 'Satıcıyla İletişime Geç'}</span>
           </button>
         ) : null}
