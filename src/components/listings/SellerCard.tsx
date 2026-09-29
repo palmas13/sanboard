@@ -10,9 +10,10 @@ import { getCorporateUrl } from '@/lib/urls';
 interface SellerCardProps {
   seller?: CharacterProfile;
   dealer?: DealerProfile;
+  actions?: React.ReactNode;
 }
 
-export function SellerCard({ seller, dealer }: SellerCardProps) {
+export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [copiedMail, setCopiedMail] = useState(false);
   const [imgError, setImgError] = useState(false);
@@ -67,8 +68,8 @@ export function SellerCard({ seller, dealer }: SellerCardProps) {
   };
 
   return (
-    <div className={`surface-card p-6 rounded-2xl border space-y-5 shadow-sm ${
-      isCorporate ? 'border-[#FF8A1F]/30 bg-gradient-to-b from-[var(--bg-surface)] to-[var(--bg-surface-secondary)]' : 'border-[var(--border-app)]'
+    <div data-testid={isCorporate ? 'corporate-seller-card' : 'individual-seller-card'} className={`surface-card p-5 rounded-2xl border space-y-5 shadow-[0_18px_55px_rgba(0,0,0,.16)] ${
+      isCorporate ? 'border-[#FF8A1F]/25 bg-gradient-to-b from-[var(--bg-surface)] to-[var(--bg-surface-secondary)]' : 'border-[var(--border-app)]'
     }`}>
       {/* Header Profile / Store Info */}
       <div className="flex items-center gap-3.5 pb-4 border-b border-[var(--border-app)]">
@@ -196,6 +197,7 @@ export function SellerCard({ seller, dealer }: SellerCardProps) {
             <span>Mağaza Profilini Görüntüle</span>
           </Link>
         )}
+        {actions ? <div className="grid gap-2 border-t border-[var(--border-app)] pt-4">{actions}</div> : null}
       </div>
     </div>
   );

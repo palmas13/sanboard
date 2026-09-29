@@ -1,138 +1,45 @@
 'use client';
 
-import React, { useState } from 'react';
-import { ListingImage } from '@/types';
+import Image from 'next/image';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Expand, ImageIcon, X } from 'lucide-react';
+import type { ListingImage } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
-import { Eye, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { sortListingImages } from '@/lib/listings/images';
 
-interface ListingGalleryProps {
-  images: ListingImage[];
-  title: string;
-  isLocked?: boolean;
-}
-
-export function ListingGallery({ images, title, isLocked = false }: ListingGalleryProps) {
+export function ListingGallery({ images, title, isLocked = false, variant = 'vehicle' }: { images: ListingImage[]; title: string; isLocked?: boolean; variant?: 'vehicle' | 'property' }) {
+  const validImages = useMemo(() => sortListingImages(images), [images]);
+  const visibleImages = isLocked ? validImages.slice(0, 1) : validImages;
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
-
-  const validImages = sortListingImages(images);
-
-  if (validImages.length === 0) {
-    return (
-      <div className="relative aspect-[16/10] w-full rounded-2xl overflow-hidden border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] flex items-center justify-center">
-        <span className="text-sm font-semibold text-[var(--text-muted)]">Fotoğraf bulunamadı</span>
-      </div>
-    );
-  }
-
-  // If locked, only allow viewing the cover photo
-  const visibleImages = isLocked ? [validImages[0]] : validImages;
   const currentImage = visibleImages[selectedIdx] || visibleImages[0];
+  const move = (direction: number) => setSelectedIdx((current) => (current + direction + visibleImages.length) % visibleImages.length);
 
-  const handleNext = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedIdx((prev) => (prev + 1) % visibleImages.length);
-  };
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setLightboxOpen(false);
+      if (event.key === 'ArrowLeft' && visibleImages.length > 1) move(-1);
+      if (event.key === 'ArrowRight' && visibleImages.length > 1) move(1);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [lightboxOpen, visibleImages.length]);
 
-  const handlePrev = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedIdx((prev) => (prev - 1 + visibleImages.length) % visibleImages.length);
-  };
+  if (!currentImage) return <div className={`flex w-full items-center justify-center rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] text-sm font-semibold text-[var(--text-muted)] ${variant === 'property' ? 'aspect-[4/3]' : 'aspect-[16/10]'}`}><ImageIcon className="mr-2 h-5 w-5" />Fotoğraf bulunamadı</div>;
+  const imageUrl = resolveMediaUrl(currentImage.storage_path);
+  const aspect = variant === 'property' ? 'aspect-[4/3] lg:aspect-[16/11]' : 'aspect-[16/10]';
 
-  return (
-    <div className="space-y-3">
-      {/* Main Cover Display */}
-      <div
-        onClick={() => !isLocked && setLightboxOpen(true)}
-        className={`relative aspect-[16/10] w-full rounded-2xl overflow-hidden border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] group ${!isLocked ? 'cursor-pointer' : ''
-          }`}
-      >
-        <img
-          src={resolveMediaUrl(currentImage.storage_path)}
-          alt={title}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-102"
-        />
-
-        {!isLocked && (
-          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <span className="p-2.5 rounded-full bg-black/60 text-white backdrop-blur-sm">
-              <Eye className="w-5 h-5" />
-            </span>
-          </div>
-        )}
-
-        {isLocked && (
-          <div className="absolute top-3 left-3 badge-tag bg-black/60 backdrop-blur-md text-white border-white/10 text-xs">
-            Vitrin Fotoğrafı
-          </div>
-        )}
-      </div>
-
-      {/* Thumbnails (Only if not locked and multiple images exist) */}
-      {!isLocked && visibleImages.length > 1 && (
-        <div className="grid grid-cols-3 gap-2.5">
-          {visibleImages.map((img, idx) => (
-            <button
-              key={img.id}
-              type="button"
-              onClick={() => setSelectedIdx(idx)}
-              className={`aspect-[16/10] rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${selectedIdx === idx
-                  ? 'border-[#FF8A1F] ring-2 ring-[#FF8A1F]/30'
-                  : 'border-[var(--border-app)] hover:border-[var(--border-app-hover)] opacity-70 hover:opacity-100'
-                }`}
-            >
-              <img
-                src={resolveMediaUrl(img.storage_path)}
-                alt={`${title} - ${idx + 1}`}
-                className="w-full h-full object-cover"
-              />
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Lightbox Modal */}
-      {lightboxOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
-          onClick={() => setLightboxOpen(false)}
-        >
-          <button
-            type="button"
-            onClick={() => setLightboxOpen(false)}
-            className="absolute top-5 right-5 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-
-          {visibleImages.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={handlePrev}
-                className="absolute left-4 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
-              <button
-                type="button"
-                onClick={handleNext}
-                className="absolute right-4 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-              >
-                <ChevronRight className="w-6 h-6" />
-              </button>
-            </>
-          )}
-
-          <img
-            src={resolveMediaUrl(currentImage.storage_path)}
-            alt={title}
-            className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
+  return <div data-testid="listing-gallery" className="space-y-3">
+    <div className={`group relative w-full overflow-hidden rounded-2xl border border-white/8 bg-black/30 shadow-[0_22px_70px_rgba(0,0,0,.25)] ${aspect}`}>
+      <button type="button" aria-label="Fotoğrafı tam ekran aç" disabled={isLocked} onClick={() => setLightboxOpen(true)} className="absolute inset-0 z-10 disabled:cursor-default" />
+      <Image src={imageUrl} alt={title} fill priority quality={90} sizes={variant === 'property' ? '(min-width: 1024px) 58vw, 100vw' : '(min-width: 1280px) 48vw, (min-width: 768px) 65vw, 100vw'} className="object-cover" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-24 bg-gradient-to-t from-black/55 to-transparent" />
+      <span className="absolute bottom-3 left-3 z-30 rounded-full bg-black/65 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-md">{selectedIdx + 1} / {visibleImages.length}</span>
+      {!isLocked ? <span className="absolute right-3 top-3 z-30 rounded-full border border-white/10 bg-black/60 p-2 text-white backdrop-blur-md"><Expand className="h-4 w-4" /></span> : <span className="absolute left-3 top-3 z-30 rounded-full bg-black/65 px-3 py-1.5 text-xs font-bold text-white">Vitrin Fotoğrafı</span>}
+      {visibleImages.length > 1 ? <><button type="button" aria-label="Önceki fotoğraf" onClick={(event) => { event.stopPropagation(); move(-1); }} className="absolute left-3 top-1/2 z-30 -translate-y-1/2 rounded-full border border-white/10 bg-black/60 p-2.5 text-white backdrop-blur-md transition hover:border-[#FF8A1F]/50 hover:text-[#FF9E45]"><ChevronLeft className="h-5 w-5" /></button><button type="button" aria-label="Sonraki fotoğraf" onClick={(event) => { event.stopPropagation(); move(1); }} className="absolute right-3 top-1/2 z-30 -translate-y-1/2 rounded-full border border-white/10 bg-black/60 p-2.5 text-white backdrop-blur-md transition hover:border-[#FF8A1F]/50 hover:text-[#FF9E45]"><ChevronRight className="h-5 w-5" /></button></> : null}
     </div>
-  );
+    {!isLocked && visibleImages.length > 1 ? <div className="flex gap-2.5 overflow-x-auto pb-1" aria-label="İlan fotoğrafları">{visibleImages.map((image, index) => <button key={image.id} type="button" onClick={() => setSelectedIdx(index)} aria-label={`${index + 1}. fotoğrafı göster`} aria-current={selectedIdx === index} className={`relative aspect-[16/10] w-24 shrink-0 overflow-hidden rounded-xl border-2 transition sm:w-28 ${selectedIdx === index ? 'border-[#FF8A1F] opacity-100' : 'border-transparent opacity-60 hover:opacity-90'}`}><Image src={resolveMediaUrl(image.storage_path)} alt={`${title} - ${index + 1}`} fill quality={72} sizes="112px" className="object-cover" /></button>)}</div> : null}
+    {lightboxOpen ? <div role="dialog" aria-modal="true" aria-label="Fotoğraf görüntüleyici" onClick={() => setLightboxOpen(false)} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4 backdrop-blur-md"><button type="button" aria-label="Görüntüleyiciyi kapat" onClick={() => setLightboxOpen(false)} className="absolute right-5 top-5 z-20 rounded-full bg-white/10 p-2.5 text-white hover:bg-white/20"><X className="h-6 w-6" /></button><span className="absolute left-5 top-5 z-20 rounded-full bg-white/10 px-3 py-1.5 text-sm font-bold text-white">{selectedIdx + 1} / {visibleImages.length}</span>{visibleImages.length > 1 ? <><button type="button" aria-label="Önceki fotoğraf" onClick={(event) => { event.stopPropagation(); move(-1); }} className="absolute left-3 z-20 rounded-full bg-white/10 p-3 text-white hover:bg-[#FF8A1F]/80 sm:left-6"><ChevronLeft className="h-7 w-7" /></button><button type="button" aria-label="Sonraki fotoğraf" onClick={(event) => { event.stopPropagation(); move(1); }} className="absolute right-3 z-20 rounded-full bg-white/10 p-3 text-white hover:bg-[#FF8A1F]/80 sm:right-6"><ChevronRight className="h-7 w-7" /></button></> : null}<div className="relative h-[85vh] w-[90vw]" onClick={(event) => event.stopPropagation()}><Image src={imageUrl} alt={title} fill quality={95} sizes="90vw" className="object-contain" /></div></div> : null}
+  </div>;
 }

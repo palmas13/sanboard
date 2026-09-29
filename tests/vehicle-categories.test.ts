@@ -92,7 +92,7 @@ describe('authoritative vehicle categories', () => {
       assert.match(form, /isMotorcycleCategory/);
     }
     assert.match(create, /isCorporate/);
-    assert.match(source('src/app/ilan/[id]/page.tsx'), /vehicle_category !== 'Motosiklet'/);
+    assert.match(source('src/components/listings/detail/VehicleDetailsPanel.tsx'), /vehicle_category !== 'Motosiklet'/);
     assert.match(source('src/components/compare/VehicleComparisonTable.tsx'), /vehicle_category !== 'Motosiklet'/);
   });
 
