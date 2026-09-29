@@ -26,7 +26,9 @@ import { getOptionalSimilarListings } from '@/lib/db/optional-listing-data';
 import { MemberListingDetail } from '@/types';
 import { sortListingImages } from '@/lib/listings/images';
 import { OfferButton } from '@/components/offers/OfferButton';
-import { getAbsoluteUrl, getListingUrl, parseListingRouteIdentifier } from '@/lib/urls';
+import { getListingUrl, parseListingRouteIdentifier } from '@/lib/urls';
+import { GENERIC_SHARE_DATA, resolveListingShareData } from '@/lib/seo/listing-share';
+import { SITE_NAME } from '@/lib/seo/site-metadata';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -44,33 +46,25 @@ async function resolveListing(identifier: string, profileId?: string, userId?: s
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
-  const { listing } = await resolveListing(id);
-  if (!listing) return {};
-  const canonical = getAbsoluteUrl(getListingUrl(listing));
-  const rawImage = 'cover_image' in listing
-    ? listing.cover_image
-    : 'images' in listing
-      ? listing.images?.[0]?.storage_path
-      : undefined;
-  const image = rawImage ? getAbsoluteUrl(rawImage) : undefined;
-  const description = 'description' in listing ? listing.description : `${listing.title} ilanını Sanboard üzerinde inceleyin.`;
+  const listing = await resolveListingShareData(id);
+  const share = listing || GENERIC_SHARE_DATA;
   return {
-    title: listing.title,
-    description,
-    alternates: { canonical },
+    title: share.title,
+    description: share.description,
+    alternates: { canonical: share.canonical },
     openGraph: {
-      title: listing.title,
-      description,
-      url: canonical,
-      siteName: 'Sanboard',
+      title: share.title,
+      description: share.description,
+      url: share.canonical,
+      siteName: SITE_NAME,
       type: 'website',
-      images: image ? [{ url: image, alt: listing.title }] : undefined,
+      images: [{ url: share.ogImage, width: 1200, height: 630, alt: share.title }],
     },
     twitter: {
-      card: image ? 'summary_large_image' : 'summary',
-      title: listing.title,
-      description,
-      images: image ? [image] : undefined,
+      card: 'summary_large_image',
+      title: share.title,
+      description: share.description,
+      images: [share.ogImage],
     },
   };
 }

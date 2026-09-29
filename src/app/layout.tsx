@@ -5,6 +5,8 @@ import { AuthProvider } from '@/features/auth/AuthContext';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { getFaviconSetting } from '@/lib/site-settings';
+import { getAbsoluteUrl } from '@/lib/urls';
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from '@/lib/seo/site-metadata';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -25,10 +27,27 @@ import { OfferCenterProvider } from '@/components/offers/OfferCenter';
 export async function generateMetadata(): Promise<Metadata> {
   const favicon = await getFaviconSetting();
   const iconUrl = favicon ? `${favicon.url}${favicon.url.includes('?') ? '&' : '?'}v=${encodeURIComponent(favicon.version)}` : '/favicon.ico';
+  const canonical = getAbsoluteUrl('/');
+  const shareImage = getAbsoluteUrl('/opengraph-image');
   return {
-    title: 'Sanboard – Los Santos\'un İlan Platformu',
-    description: 'GTA World Los Santos araç ve mülk ilan platformu.',
-    keywords: ['GTA World', 'Sanboard', 'Los Santos', 'Araç İlanları', 'Mülk İlanları'],
+    metadataBase: new URL(canonical),
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    keywords: ['Sanboard', 'Los Santos', 'Araç İlanları', 'Mülk İlanları'],
+    openGraph: {
+      title: SITE_TITLE,
+      description: SITE_DESCRIPTION,
+      url: canonical,
+      siteName: SITE_NAME,
+      type: 'website',
+      images: [{ url: shareImage, width: 1200, height: 630, alt: SITE_TITLE }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: SITE_TITLE,
+      description: SITE_DESCRIPTION,
+      images: [shareImage],
+    },
     icons: { icon: [{ url: iconUrl, type: favicon?.mimeType || 'image/x-icon' }], shortcut: iconUrl },
   };
 }
