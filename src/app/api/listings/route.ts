@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getListingRepository, getDealerRepository, getAuditRepository } from '@/lib/db/repositories';
+import { getListingRepository, getDealerRepository } from '@/lib/db/repositories';
 import { listingUnionSchema } from '@/lib/validations/listing';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { revalidatePath } from 'next/cache';
 import { isCanonicalTestLoginActor } from '@/lib/auth/test-login';
+import { recordAuditEvent } from '@/lib/audit';
 
 // Public listings search endpoint
 export async function GET(req: NextRequest) {
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
 
     if (testPublishBypass && result.listing) {
       try {
-        await getAuditRepository().recordEvent({
+        await recordAuditEvent({
           eventType: 'TEST_LISTING_PAYMENT_BYPASS',
           userId: actor.userId,
           profileId: actor.profileId,

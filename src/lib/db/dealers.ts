@@ -286,16 +286,37 @@ export async function activateSubscription(dealerId: string): Promise<{ success:
 export async function boostListing(
   actorProfileId: string,
   listingId: string,
-  now = new Date()
+  now = new Date(),
+  options: { paymentMode?: 'REQUIRE_CREDIT' | 'TEST_BYPASS' } = {}
 ): Promise<{ success: boolean; error?: string; code?: string; remainingBoosts?: number; featured_until?: string }> {
   if (process.env.DATA_STORE === 'supabase') {
     const repo = getDealerRepository();
     if (typeof repo.boostListing === 'function') {
-      return repo.boostListing(actorProfileId, listingId, now);
+      return repo.boostListing(actorProfileId, listingId, now, options);
     }
   }
 
   ensureDealers();
+  const testBypass = options.paymentMode === 'TEST_BYPASS';
+  const listing = db.listings.find((l) => l.id === listingId);
+  if (!listing) return { success: false, code: 'LISTING_NOT_ELIGIBLE', error: 'İlan bulunamadı.' };
+  if (listing.status !== 'ACTIVE') {
+    return { success: false, code: 'LISTING_NOT_ELIGIBLE', error: 'Yalnızca aktif yayındaki ilanlar öne çıkarılabilir.' };
+  }
+  if (listing.is_featured && listing.featured_until && new Date(listing.featured_until) > now) {
+    return { success: false, code: 'ALREADY_BOOSTED', error: 'Bu ilan zaten aktif olarak öne çıkarılmış durumdadır.' };
+  }
+
+  if (testBypass && listing.seller_type === 'INDIVIDUAL') {
+    if (listing.seller_profile_id !== actorProfileId) {
+      return { success: false, code: 'LISTING_NOT_OWNED', error: 'İlan aktif karaktere ait değil.' };
+    }
+    const boostEnd = new Date(now.getTime() + 24 * 3600 * 1000).toISOString();
+    listing.is_featured = true;
+    listing.featured_until = boostEnd;
+    return { success: true, remainingBoosts: 0, featured_until: boostEnd };
+  }
+
   const dealer = db.dealers.find((d) => (d.owner_profile_id || d.profile_id) === actorProfileId);
   if (!dealer) return { success: false, code: 'LISTING_NOT_OWNED', error: 'Aktif karaktere ait kurumsal mağaza bulunamadı.' };
   if (dealer.moderation_status && dealer.moderation_status !== 'ACTIVE') {
@@ -322,14 +343,8 @@ export async function boostListing(
     dealer.current_period_end = nextPeriodEnd.toISOString();
     dealer.boost_credits = 3;
   }
-  if (dealer.boost_credits == null || dealer.boost_credits <= 0) {
+  if (!testBypass && (dealer.boost_credits == null || dealer.boost_credits <= 0)) {
     return { success: false, code: 'NO_BOOST_CREDITS', error: 'Bu abonelik dönemi için öne çıkarma hakkınız tükenmiştir.' };
-  }
-
-  const listing = db.listings.find((l) => l.id === listingId);
-  if (!listing) return { success: false, error: 'İlan bulunamadı.' };
-  if (listing.status !== 'ACTIVE') {
-    return { success: false, code: 'LISTING_NOT_ELIGIBLE', error: 'Yalnızca aktif yayındaki ilanlar öne çıkarılabilir.' };
   }
 
   // STRICT: Corporate boost can ONLY boost corporate listings belonging to this store (Requirement 10 & 11)
@@ -337,18 +352,14 @@ export async function boostListing(
     return { success: false, code: 'LISTING_NOT_OWNED', error: 'İlan aktif karakterin kurumsal mağazasına ait değil.' };
   }
 
-  if (listing.is_featured && listing.featured_until && new Date(listing.featured_until) > now) {
-    return { success: false, code: 'ALREADY_BOOSTED', error: 'Bu ilan zaten aktif olarak öne çıkarılmış durumdadır.' };
-  }
-
-  dealer.boost_credits -= 1;
+  if (!testBypass) dealer.boost_credits = (dealer.boost_credits || 0) - 1;
   listing.is_featured = true;
   const boostEnd = new Date(now.getTime() + 24 * 3600 * 1000).toISOString();
   listing.featured_until = boostEnd;
 
   return {
     success: true,
-    remainingBoosts: dealer.boost_credits,
+    remainingBoosts: dealer.boost_credits || 0,
     featured_until: boostEnd,
   };
 }

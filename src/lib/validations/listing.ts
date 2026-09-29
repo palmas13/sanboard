@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+export const LISTING_TITLE_MAX_LENGTH = 40;
+export const LISTING_TITLE_MAX_ERROR = 'İlan başlığı en fazla 40 karakter olabilir.';
+
 export const vehicleCategories = [
   'Otomobil',
   'SUV / Off-Road / Kamyonet',
@@ -46,7 +49,7 @@ export const baseListingFields = {
     .string()
     .trim()
     .min(3, 'Başlık en az 3 karakter olmalıdır')
-    .max(60, 'İlan başlığı en fazla 60 karakter olabilir'),
+    .max(LISTING_TITLE_MAX_LENGTH, LISTING_TITLE_MAX_ERROR),
   description: z
     .string()
     .trim()

@@ -1,4 +1,4 @@
-import { IDealerRepository } from '../types';
+import { IDealerRepository, ListingBoostOptions } from '../types';
 import {
   getDealerById,
   getDealerBySlug,
@@ -75,9 +75,10 @@ export class MemoryDealerRepository implements IDealerRepository {
   async boostListing(
     actorProfileId: string,
     listingId: string,
-    now?: Date
+    now?: Date,
+    options?: ListingBoostOptions
   ): Promise<{ success: boolean; error?: string; code?: string; remainingBoosts?: number; featured_until?: string }> {
-    return boostListing(actorProfileId, listingId, now);
+    return boostListing(actorProfileId, listingId, now, options);
   }
 
   async toggleFollow(

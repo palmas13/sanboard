@@ -19,8 +19,9 @@ import { PhotoUploader, UploadedImage } from '@/components/forms/PhotoUploader';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { formatCurrency, formatTimeRemaining } from '@/lib/utils/format';
 import { getVehicleBrands, getModelsByBrand } from '@/lib/constants/vehicleCatalog';
+import { LISTING_TITLE_MAX_ERROR, LISTING_TITLE_MAX_LENGTH } from '@/lib/validations/listing';
 
-const TITLE_MAX = 60;
+const TITLE_MAX = LISTING_TITLE_MAX_LENGTH;
 const DESC_MAX = 100;
 
 export default function IlanDuzenlePage({
@@ -171,7 +172,7 @@ export default function IlanDuzenlePage({
 
     // Validation
     if (!title.trim() || title.length > TITLE_MAX) {
-      setError(`İlan başlığı 1-${TITLE_MAX} karakter arasında olmalıdır.`);
+      setError(title.trim() ? LISTING_TITLE_MAX_ERROR : 'İlan başlığı zorunludur.');
       return;
     }
     if (description.length > DESC_MAX) {
@@ -389,12 +390,13 @@ export default function IlanDuzenlePage({
             <div className="space-y-1.5">
               <div className="flex justify-between">
                 <label className="text-xs font-semibold text-[var(--text-muted)]">İlan Başlığı</label>
-                <span className="text-[11px] text-[var(--text-dim)]">{title.length}/{TITLE_MAX}</span>
+                <span className={`text-[11px] ${title.length >= TITLE_MAX - 5 ? 'text-amber-400' : 'text-[var(--text-dim)]'}`}>{title.length} / {TITLE_MAX}</span>
               </div>
               <input
                 type="text"
                 value={title}
-                onChange={(e) => setTitle(e.target.value.slice(0, TITLE_MAX))}
+                onChange={(e) => setTitle(e.target.value)}
+                maxLength={Math.max(TITLE_MAX, title.length)}
                 required
                 className="form-input text-sm"
               />

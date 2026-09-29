@@ -5,6 +5,7 @@ import { db } from '@/lib/db/store';
 import { createSessionToken } from '@/lib/auth/session';
 import { GET as getCredits } from '@/app/api/credits/route';
 import { POST as publishListing } from '@/app/api/listings/route';
+import { POST as boostListing } from '@/app/api/dealers/boost/route';
 import { TEST_LOGIN_FIXTURE_ACCOUNT_ID, TEST_LOGIN_CHARACTER_PREFIX } from '@/lib/auth/test-login';
 
 describe('canonical test-login listing publish bypass', () => {
@@ -107,5 +108,46 @@ describe('canonical test-login listing publish bypass', () => {
     assert.equal(listing.seller_type, 'CORPORATE');
     assert.equal(listing.corporate_profile_id, db.dealers[0].id);
     assert.equal(new Date(listing.expires_at).getTime() - new Date(listing.published_at).getTime(), 14 * 86400000);
+  });
+
+  test('canonical test actor boosts an owned individual listing without payment', async () => {
+    db.listings.push({ id: 'test-individual-listing', listing_number: '#TEST1', seller_profile_id: testProfileId, seller_type: 'INDIVIDUAL', corporate_profile_id: null, category: 'vehicle', subcategory: 'Otomobil', title: 'Test aracı', description: 'Test', price: 1000, status: 'ACTIVE', created_at: now, updated_at: now } as any);
+    const token = createSessionToken({ userId: testUserId, profileId: testProfileId, role: 'USER' });
+    const before = Date.now();
+    const response = await boostListing(new NextRequest('http://localhost/api/dealers/boost', {
+      method: 'POST', headers: { cookie: `sanboard_session=${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ listingId: 'test-individual-listing', skipPayment: true }),
+    }));
+    assert.equal(response.status, 200);
+    assert.equal(db.listings[0].is_featured, true);
+    assert.ok(new Date(db.listings[0].featured_until!).getTime() >= before + 24 * 3600000);
+    assert.equal(db.auditLogs.at(-1)?.event_type, 'TEST_FEATURED_PAYMENT_BYPASS');
+    assert.equal(db.auditLogs.at(-1)?.metadata?.charged, false);
+  });
+
+  test('canonical corporate actor boosts an authorized listing without consuming credit', async () => {
+    db.dealers.push({ id: 'test-store', profile_id: testProfileId, owner_profile_id: testProfileId, company_name: 'Test Store', status: 'APPROVED', moderation_status: 'ACTIVE', subscription_status: 'ACTIVE', subscription_expires_at: '2026-12-31T00:00:00.000Z', boost_credits: 0, created_at: now, updated_at: now } as any);
+    db.listings.push({ id: 'test-corporate-listing', listing_number: '#TEST2', seller_profile_id: testProfileId, seller_type: 'CORPORATE', corporate_profile_id: 'test-store', category: 'property', subcategory: 'Ev / Daire', title: 'Test mülkü', description: 'Test', price: 1000, status: 'ACTIVE', created_at: now, updated_at: now } as any);
+    const token = createSessionToken({ userId: testUserId, profileId: testProfileId, role: 'USER' });
+    const response = await boostListing(new NextRequest('http://localhost/api/dealers/boost', {
+      method: 'POST', headers: { cookie: `sanboard_session=${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ listingId: 'test-corporate-listing' }),
+    }));
+    assert.equal(response.status, 200);
+    assert.equal(db.dealers[0].boost_credits, 0);
+    assert.equal(db.listings[0].is_featured, true);
+  });
+
+  test('test actor cannot boost another listing and production actor cannot inject bypass flags', async () => {
+    db.listings.push({ id: 'foreign-listing', listing_number: '#FOREIGN', seller_profile_id: normalProfileId, seller_type: 'INDIVIDUAL', corporate_profile_id: null, category: 'vehicle', subcategory: 'Otomobil', title: 'Foreign', description: 'Test', price: 1000, status: 'ACTIVE', created_at: now, updated_at: now } as any);
+    for (const [userId, profileId] of [[testUserId, testProfileId], [normalUserId, normalProfileId]]) {
+      const token = createSessionToken({ userId, profileId, role: 'USER' });
+      const response = await boostListing(new NextRequest('http://localhost/api/dealers/boost', {
+        method: 'POST', headers: { cookie: `sanboard_session=${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ listingId: 'foreign-listing', skipPayment: true, paymentMode: 'TEST_BYPASS' }),
+      }));
+      assert.equal(response.status, 403);
+    }
+    assert.equal(db.listings[0].is_featured, undefined);
   });
 });

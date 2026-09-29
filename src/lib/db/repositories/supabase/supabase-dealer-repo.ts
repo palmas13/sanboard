@@ -517,12 +517,15 @@ export class SupabaseDealerRepository implements IDealerRepository {
 
   async boostListing(
     actorProfileId: string,
-    listingId: string
+    listingId: string,
+    _now?: Date,
+    options?: { paymentMode?: 'REQUIRE_CREDIT' | 'TEST_BYPASS' }
   ): Promise<{ success: boolean; error?: string; code?: string; remainingBoosts?: number; featured_until?: string }> {
     const client = this.getAdminClient();
     const { data, error } = await client.rpc('consume_corporate_boost', {
       p_actor_profile_id: actorProfileId,
       p_listing_id: listingId,
+      p_payment_mode: options?.paymentMode || 'REQUIRE_CREDIT',
     });
     if (error) return { success: false, error: 'Öne çıkarma işlemi tamamlanamadı.' };
     const result = Array.isArray(data) ? data[0] : data;

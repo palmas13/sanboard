@@ -4,6 +4,7 @@ import {
   baseListingSchema,
   vehicleListingSchema,
   propertyListingSchema,
+  LISTING_TITLE_MAX_ERROR,
 } from '@/lib/validations/listing';
 import { formatCurrency, formatTimeRemaining, generateListingNumber } from '@/lib/utils/format';
 import {
@@ -18,11 +19,18 @@ import { createCheckoutOrder, completePaymentOrder } from '@/lib/db/payments';
 import { db } from '@/lib/db/store';
 
 describe('Sanboard Business Rules & Validation Tests', () => {
-  test('Title length constraint: max 60 characters', () => {
-    const valid = 'FULL GELİŞTİRME • DÜŞÜK KM • TEMİZ SCHAFTER V12';
-    assert.ok(valid.length <= 60);
+  test('Title length constraint accepts 40 and rejects 41 characters', () => {
+    const valid = 'A'.repeat(40);
+    const validResult = baseListingSchema.safeParse({
+      title: valid,
+      description: 'Test açıklama',
+      price: 50000,
+      location: 'Vinewood',
+      images: [{ storage_path: '/valid.jpg', is_cover: true, size_bytes: 500000, sort_order: 0 }],
+    });
+    assert.strictEqual(validResult.success, true);
 
-    const invalid = 'A'.repeat(61);
+    const invalid = 'A'.repeat(41);
     const result = baseListingSchema.safeParse({
       title: invalid,
       description: 'Test açıklama',
@@ -38,6 +46,7 @@ describe('Sanboard Business Rules & Validation Tests', () => {
       ],
     });
     assert.strictEqual(result.success, false);
+    assert.equal(result.error?.issues[0]?.message, LISTING_TITLE_MAX_ERROR);
   });
 
   test('Description length constraint: max 100 characters', () => {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getListingRepository } from '@/lib/db/repositories';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { revalidatePath } from 'next/cache';
+import { listingUnionSchema } from '@/lib/validations/listing';
 
 export async function GET(
   req: NextRequest,
@@ -55,7 +56,23 @@ export async function PUT(
     const { profileId: _, sellerProfileId: ____, characterId: __, userId: ___, ...input } = body;
 
     const repo = getListingRepository();
-    const result = await repo.updateListing(id, input, actor.profileId, actor.userId, actor.role);
+    const existing = await repo.getListingById(id, actor.profileId, actor.userId);
+    if (!existing.listing) {
+      return NextResponse.json({ error: 'İlan bulunamadı.' }, { status: 404 });
+    }
+    if (!existing.isOwner || (existing.listing as any).seller_profile_id !== actor.profileId) {
+      return NextResponse.json({ error: 'Bu ilanı düzenleme yetkiniz yok.' }, { status: 403 });
+    }
+
+    const parsed = listingUnionSchema.safeParse(input);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || 'Geçersiz ilan verileri.' },
+        { status: 400 }
+      );
+    }
+
+    const result = await repo.updateListing(id, parsed.data, actor.profileId, actor.userId, actor.role);
 
     if (!result.success) {
       const isForbidden = result.error?.includes('yetkiniz yok');

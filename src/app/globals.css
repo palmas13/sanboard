@@ -276,8 +276,8 @@ a {
 .hero-note svg { display: block; overflow: visible; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .hero-note-primary { left: 2%; top: 8%; transform: rotate(-4deg); }
 .hero-note-primary svg { width: 9.25rem; margin: .15rem 0 0 2rem; }
-.hero-note-secondary { right: -1%; top: 10%; text-align: right; transform: rotate(3deg); }
-.hero-note-secondary svg { width: 9rem; margin: -.05rem 1rem 0 auto; }
+.hero-note-secondary { right: 0; top: 7%; width: 12rem; text-align: right; transform: rotate(2deg); }
+.hero-note-secondary svg { width: 9rem; margin: .1rem .25rem 0 auto; }
 .homepage-section-header { display: grid; min-height: 76px; grid-template-columns: minmax(0,1fr) auto; grid-template-rows: auto 1fr; column-gap: .75rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-app); padding-bottom: .75rem; }
 .homepage-section-header > div { grid-row: 1 / span 2; }
 .homepage-see-all { display: inline-flex; min-height: 1.5rem; flex-shrink: 0; align-items: flex-start; justify-self: end; gap: .25rem; color: #ff8a1f; font-size: .625rem; font-weight: 700; line-height: 1.25rem; }

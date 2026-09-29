@@ -26,8 +26,9 @@ import { resolveMediaUrl } from '@/lib/media/url';
 import { getListingUrl } from '@/lib/urls';
 import { calculateListingQuality } from '@/lib/listings/quality';
 import { ListingQualityIndicator } from '@/components/listings/ListingQualityIndicator';
+import { LISTING_TITLE_MAX_ERROR, LISTING_TITLE_MAX_LENGTH } from '@/lib/validations/listing';
 
-const TITLE_MAX = 60;
+const TITLE_MAX = LISTING_TITLE_MAX_LENGTH;
 const DESC_MAX = 100;
 const DRAFT_VERSION = 1;
 
@@ -247,7 +248,7 @@ export default function YeniIlanOlusturPage() {
     const invalid: Record<string, boolean> = {};
 
     if (!title.trim() || title.length > TITLE_MAX) {
-      errors.push(`İlan başlığı 1-${TITLE_MAX} karakter arasında olmalıdır.`);
+      errors.push(title.trim() ? LISTING_TITLE_MAX_ERROR : 'İlan başlığı zorunludur.');
       invalid.title = true;
     }
     if (description.length > DESC_MAX) {
@@ -606,13 +607,13 @@ export default function YeniIlanOlusturPage() {
               </select>
             </div>
 
-            {/* Title with live counter (max 60) */}
+            {/* Title with live counter */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-[var(--text-muted)]">
                   İlan Başlığı
                 </label>
-                <span className={`text-[11px] font-mono font-semibold ${title.length > TITLE_MAX ? 'text-[var(--color-danger)]' : 'text-[var(--text-dim)]'}`}>
+                <span className={`text-[11px] font-mono font-semibold ${title.length >= TITLE_MAX - 5 ? 'text-amber-400' : 'text-[var(--text-dim)]'}`}>
                   {title.length} / {TITLE_MAX}
                 </span>
               </div>

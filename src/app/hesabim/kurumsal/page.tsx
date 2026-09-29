@@ -911,7 +911,7 @@ export default function HesabimKurumsalPage() {
                             <button
                               type="button"
                               onClick={() => handleBoostListing(l.id)}
-                              disabled={actionLoading || isSubscriptionExpired || (dealer.boost_credits ?? 0) <= 0}
+                              disabled={actionLoading || isSubscriptionExpired}
                               className="btn-secondary text-[11px] py-1.5 px-3 flex items-center gap-1.5 text-amber-400 hover:border-amber-400/40 cursor-pointer disabled:opacity-50"
                               title={
                                 isSubscriptionExpired

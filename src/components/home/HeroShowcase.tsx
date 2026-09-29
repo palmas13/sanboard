@@ -1,22 +1,22 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, ArrowUpRight, CalendarDays, Heart, MapPin } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, CalendarDays, Heart, MapPin, Tag } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/format';
 import type { HomepageStats } from '@/lib/db/homepage-stats';
 import { HeroStats, HeroTypewriter } from './HeroDynamicContent';
 
 const HERO_BACKGROUND = '/home/sanboard-background1.png';
 const decorativeListings = [
-  { category: 'Ev / Daire', title: 'Modern Villa', price: 1_250_000, location: 'Vinewood Hills', favorites: 12, image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=900&auto=format&fit=crop&q=84' },
-  { category: 'Otomobil', title: 'Pfister Comet S', price: 320_000, location: 'Rockford Hills', favorites: 24, meta: '2020', image: 'https://images.unsplash.com/photo-1617788138017-80ad40651399?w=900&auto=format&fit=crop&q=84' },
-  { category: 'Motosiklet', title: 'Principe Nemesis', price: 50_000, location: 'Vespucci', favorites: 8, image: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=900&auto=format&fit=crop&q=84' },
+  { kind: 'property', category: 'Ev / Daire', title: 'Vinewood Crest Estate', price: 1_250_000, location: 'Vinewood Hills', date: '14 Şub 2026', favorites: 12, image: '/home/Vinewood Crest Estate.webp', objectPosition: '50% 48%' },
+  { kind: 'vehicle', category: 'Otomobil', title: 'Grotti Turismo R', price: 320_000, date: '27 May 2026', favorites: 24, image: '/home/Grotti Turismo R.webp', objectPosition: '50% 50%' },
+  { kind: 'vehicle', category: 'Motosiklet', title: 'Nagasaki Shinobi', price: 150_000, date: '9 Ağu 2026', favorites: 8, image: '/home/Nagasaki Shinobi.png', objectPosition: '50% 54%' },
 ] as const;
 
 function HeroDecorativeListingCard({ listing, index }: { listing: typeof decorativeListings[number]; index: number }) {
   return (
     <article className={`hero-listing-card hero-listing-card-${index + 1}`} aria-hidden="true">
       <div className="relative aspect-[1.42/1] overflow-hidden rounded-t-[inherit]">
-        <Image src={listing.image} alt="" fill sizes="(max-width: 768px) 48vw, 340px" quality={92} className="object-cover" />
+        <Image src={listing.image} alt="" fill sizes="(max-width: 768px) 48vw, 340px" quality={92} className="object-cover" style={{ objectPosition: listing.objectPosition }} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10" />
         <span className="absolute left-3 top-3 rounded-md border border-white/10 bg-black/70 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">{listing.category}</span>
         <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full border border-white/10 bg-black/70 px-2 py-1 text-[10px] text-white backdrop-blur-sm"><Heart className="h-3 w-3" /> {listing.favorites}</span>
@@ -25,8 +25,10 @@ function HeroDecorativeListingCard({ listing, index }: { listing: typeof decorat
         <p className="text-lg font-black tracking-tight text-[#ff921f]">{formatCurrency(listing.price)}</p>
         <h3 className="truncate text-sm font-bold text-white">{listing.title}</h3>
         <div className="flex items-center justify-between gap-2 text-[10px] text-zinc-400">
-          <span className="flex min-w-0 items-center gap-1"><MapPin className="h-3 w-3 shrink-0 text-[#ff8a1f]" /><span className="truncate">{listing.location}</span></span>
-          {'meta' in listing && <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{listing.meta}</span>}
+          {listing.kind === 'property'
+            ? <span className="flex min-w-0 items-center gap-1"><MapPin className="h-3 w-3 shrink-0 text-[#ff8a1f]" /><span className="truncate">{listing.location}</span></span>
+            : <span className="flex min-w-0 items-center gap-1"><Tag className="h-3 w-3 shrink-0 text-[#ff8a1f]" /><span className="truncate">{listing.category}</span></span>}
+          <span className="flex shrink-0 items-center gap-1"><CalendarDays className="h-3 w-3" />{listing.date}</span>
         </div>
       </div>
     </article>
@@ -34,7 +36,7 @@ function HeroDecorativeListingCard({ listing, index }: { listing: typeof decorat
 }
 
 function HeroAnnotations() {
-  return <div className="hero-annotations" aria-hidden="true"><div className="hero-note hero-note-primary"><span>Hayalindeki araca<br />bir adım daha yakın</span><svg viewBox="0 0 150 82"><path d="M8 8 C 42 10, 67 23, 83 43 C 98 61, 116 68, 140 67" /><path d="M129 58 L141 67 L129 75" /></svg></div><div className="hero-note hero-note-secondary"><span>Los Santos&apos;ta daha fazlası<br />seni bekliyor</span><svg viewBox="0 0 150 82"><path d="M142 8 C 119 13, 103 25, 91 41 C 79 56, 65 63, 43 66" /><path d="M54 57 L42 66 L55 73" /></svg></div></div>;
+  return <div className="hero-annotations" aria-hidden="true"><div className="hero-note hero-note-primary"><span>Hayalindeki araca<br />bir adım daha yakın</span><svg viewBox="0 0 150 82"><path d="M8 8 C 42 10, 67 23, 83 43 C 98 61, 116 68, 140 67" /><path d="M129 58 L141 67 L129 75" /></svg></div><div className="hero-note hero-note-secondary"><span>Los Santos&apos;ta daha fazlası<br />seni bekliyor</span><svg viewBox="0 0 150 82"><path d="M142 8 C 130 20, 124 34, 126 49 C 128 59, 121 65, 111 67" /><path d="M121 57 L110 67 L122 73" /></svg></div></div>;
 }
 
 export function HeroShowcase({ stats }: { stats: HomepageStats }) {
