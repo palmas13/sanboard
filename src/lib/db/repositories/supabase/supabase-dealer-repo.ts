@@ -522,12 +522,21 @@ export class SupabaseDealerRepository implements IDealerRepository {
     options?: { paymentMode?: 'REQUIRE_CREDIT' | 'TEST_BYPASS' }
   ): Promise<{ success: boolean; error?: string; code?: string; remainingBoosts?: number; featured_until?: string }> {
     const client = this.getAdminClient();
-    const { data, error } = await client.rpc('consume_corporate_boost', {
+    let { data, error } = await client.rpc('consume_corporate_boost', {
       p_actor_profile_id: actorProfileId,
       p_listing_id: listingId,
       p_payment_mode: options?.paymentMode || 'REQUIRE_CREDIT',
     });
-    if (error) return { success: false, error: 'Öne çıkarma işlemi tamamlanamadı.' };
+    if (error && options?.paymentMode !== 'TEST_BYPASS' && (error.code === 'PGRST202' || error.message?.includes('p_payment_mode'))) {
+      ({ data, error } = await client.rpc('consume_corporate_boost', {
+        p_actor_profile_id: actorProfileId,
+        p_listing_id: listingId,
+      }));
+    }
+    if (error) {
+      console.error('Corporate boost RPC failed', { code: error.code, details: error.details, hint: error.hint });
+      return { success: false, code: 'BOOST_SERVICE_ERROR', error: 'Öne çıkarma servisine ulaşılamadı.' };
+    }
     const result = Array.isArray(data) ? data[0] : data;
     return {
       success: Boolean(result?.success),

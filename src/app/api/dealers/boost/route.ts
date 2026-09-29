@@ -46,7 +46,8 @@ export async function POST(req: NextRequest) {
       featured_until: result.featured_until,
       message: 'İlanınız başarıyla 24 saat boyunca öne çıkarıldı.',
     });
-  } catch {
-    return NextResponse.json({ error: 'Öne çıkarma işlemi gerçekleştirilemedi.' }, { status: 500 });
+  } catch (error) {
+    console.error('Boost route failed', error);
+    return NextResponse.json({ error: 'Öne çıkarma işlemi gerçekleştirilemedi.', code: 'BOOST_INTERNAL_ERROR' }, { status: 500 });
   }
 }

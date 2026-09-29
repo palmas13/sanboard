@@ -27,6 +27,9 @@ describe('OfferCenter chat UX', () => {
     assert.match(center, /İlan fiyatı: \{formatCurrency\(compose\.price\)\}/);
     assert.match(center, /Minimum teklif: \{formatCurrency\(compose\.minimum\)\}/);
     assert.match(center, /formatCurrency\(thread\.current_amount\)/);
+    assert.match(center, /belowMinimum/);
+    assert.match(center, /Bu ilan için minimum teklif tutarı \{formatCurrency\(compose\.minimum!\)\}/);
+    assert.match(center, /disabled=\{busy \|\| !amount \|\| belowMinimum\}/);
     assert.equal(offerEventCopy({ id: 'e', thread_id: 't', event_type: 'OFFER_CREATED', amount: 300000, created_at: '' }), 'Bu ilan için teklifim $300.000.');
     assert.match(offerEventCopy({ id: 'e', thread_id: 't', event_type: 'LISTING_PRICE_CHANGED', metadata: { oldPrice: 300000, newPrice: 250000 }, created_at: '' }), /\$300\.000 → \$250\.000/);
   });

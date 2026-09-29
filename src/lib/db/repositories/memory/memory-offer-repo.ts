@@ -52,7 +52,7 @@ export class MemoryOfferRepository implements IOfferRepository {
     if (getEffectiveListingStatus(listing) !== 'ACTIVE') return { success: false, code: 'LISTING_INACTIVE', error: 'İlan yayında olmadığı için teklif verilemez.' };
     if (listing.offers_enabled === false) return { success: false, code: 'OFFERS_DISABLED', error: 'Bu ilan tekliflere kapalı.' };
     if (!Number.isSafeInteger(amount) || amount <= 0 || amount > OFFER_MAX_AMOUNT) return { success: false, code: 'INVALID_AMOUNT', error: 'Geçerli bir teklif tutarı girin.' };
-    if (listing.minimum_offer_amount && amount < listing.minimum_offer_amount) return { success: false, code: 'BELOW_MINIMUM', error: `Satıcı bu ilan için ${formatCurrency(listing.minimum_offer_amount)} altında teklif kabul etmiyor.` };
+    if (listing.minimum_offer_amount && amount < listing.minimum_offer_amount) return { success: false, code: 'MINIMUM_OFFER_NOT_MET', error: `Bu ilan için minimum teklif tutarı ${formatCurrency(listing.minimum_offer_amount)}.` };
     const sellerProfileId = listing.seller_type === 'CORPORATE' ? db.dealers.find(d => d.id === listing.corporate_profile_id)?.owner_profile_id : listing.seller_profile_id;
     const seller = db.profiles.find(p => p.id === sellerProfileId);
     if (!seller) return { success: false, error: 'Satıcı bulunamadı.' };

@@ -45,8 +45,23 @@ describe('Structured offer system', () => {
     assert.equal((await create()).code, 'LISTING_INACTIVE');
     db.listings[0].status = 'ACTIVE';
     assert.equal((await create(0)).code, 'INVALID_AMOUNT');
-    assert.equal((await create(49999)).code, 'BELOW_MINIMUM');
+    assert.equal((await create(49999)).code, 'MINIMUM_OFFER_NOT_MET');
     assert.equal((await repo.createOffer({ listingId, amount: 60000, actorProfileId: sibling, actorUserId: 'seller-account' })).code, 'SELF_OFFER');
+  });
+
+  test('minimum offer is enforced for individual, corporate, test-like and direct repository requests', async () => {
+    db.listings[0].minimum_offer_amount = 100000;
+    assert.equal((await create(50000)).code, 'MINIMUM_OFFER_NOT_MET');
+    assert.match((await create(50000)).error || '', /\$100\.000/);
+    assert.equal((await create(100000)).success, true);
+    db.offerThreads = []; db.offerEvents = [];
+    assert.equal((await create(150000)).success, true);
+    db.offerThreads = []; db.offerEvents = [];
+    db.listings[0].seller_type = 'CORPORATE';
+    db.listings[0].corporate_profile_id = 'offer-store';
+    assert.equal((await create(50000)).code, 'MINIMUM_OFFER_NOT_MET');
+    db.listings[0].minimum_offer_amount = null;
+    assert.equal((await create(50000)).success, true);
   });
 
   test('corporate self-offer and structured turn state machine', async () => {

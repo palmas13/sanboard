@@ -53,8 +53,17 @@ describe('homepage marketplace redesign', () => {
     assert.doesNotMatch(rotator, /listing\.location \|\| listing\.subcategory/);
     assert.match(rotator, /listing\.category === 'vehicle'/);
     assert.match(rotator, /<Tag/);
-    assert.match(marketplace, /quality=\{88\}/);
+    assert.match(marketplace, /quality=\{90\}/);
     assert.match(rotator, /quality=\{88\}/);
+  });
+
+  test('hero decorative cards serve original public assets without optimizer recompression', () => {
+    const hero = source('src/components/home/HeroShowcase.tsx');
+    assert.match(hero, /\/home\/Vinewood Crest Estate\.webp/);
+    assert.match(hero, /\/home\/Grotti Turismo R\.webp/);
+    assert.match(hero, /\/home\/Nagasaki Shinobi\.png/);
+    assert.match(hero, /fill unoptimized[\s\S]*quality=\{95\}/);
+    assert.doesNotMatch(hero, /optimizeListingImage|thumbnail|resolveMediaUrl/);
   });
 
   test('homepage corporate sellers require active non-expired membership', () => {

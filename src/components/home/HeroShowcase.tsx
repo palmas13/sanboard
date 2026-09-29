@@ -16,7 +16,7 @@ function HeroDecorativeListingCard({ listing, index }: { listing: typeof decorat
   return (
     <article className={`hero-listing-card hero-listing-card-${index + 1}`} aria-hidden="true">
       <div className="relative aspect-[1.42/1] overflow-hidden rounded-t-[inherit]">
-        <Image src={listing.image} alt="" fill sizes="(max-width: 768px) 48vw, 340px" quality={92} className="object-cover" style={{ objectPosition: listing.objectPosition }} />
+        <Image src={listing.image} alt="" fill unoptimized sizes="(max-width: 768px) 48vw, 340px" quality={95} className="object-cover" style={{ objectPosition: listing.objectPosition }} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10" />
         <span className="absolute left-3 top-3 rounded-md border border-white/10 bg-black/70 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">{listing.category}</span>
         <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full border border-white/10 bg-black/70 px-2 py-1 text-[10px] text-white backdrop-blur-sm"><Heart className="h-3 w-3" /> {listing.favorites}</span>

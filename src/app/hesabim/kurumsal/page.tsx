@@ -240,10 +240,7 @@ export default function HesabimKurumsalPage() {
   };
 
   const handleBoostListing = async (listingId: string) => {
-    if (!dealer || (dealer.boost_credits ?? 0) <= 0) {
-      setError('Yetersiz öne çıkarma hakkı.');
-      return;
-    }
+    if (!dealer) return;
 
     setActionLoading(true);
     setError('');
@@ -253,11 +250,11 @@ export default function HesabimKurumsalPage() {
       const res = await fetch('/api/dealers/boost', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dealerId: dealer.id, listingId }),
+        body: JSON.stringify({ listingId }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'İlan öne çıkarılamadı.');
+      if (!res.ok) throw new Error(data.code ? `${data.error || 'İlan öne çıkarılamadı.'} (${data.code})` : (data.error || 'İlan öne çıkarılamadı.'));
 
       setSuccess('İlan başarıyla 24 saatliğine en üst sıraya öne çıkarıldı.');
       await fetchDealer();
