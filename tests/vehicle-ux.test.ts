@@ -16,6 +16,7 @@ import {
   getSimilarPriceRange,
   isPublicCorporateListingVisible,
 } from '../src/lib/db/repositories/supabase/supabase-listing-repo';
+import { rankSimilarListings } from '../src/lib/listings/similarity';
 
 describe('Sanboard – Vehicle UX Overhaul, Similar Listings & Comparison Tests', () => {
   const TEST_VEHICLE_A: Listing = {
@@ -350,6 +351,115 @@ describe('Sanboard – Vehicle UX Overhaul, Similar Listings & Comparison Tests'
     );
   });
 
+  it('11aa. inactive corporate subscription is excluded from similar listings', async () => {
+    const dealer = db.dealers.find((d) => d.id === 'dealer-store-01');
+    if (dealer) dealer.subscription_status = 'EXPIRED';
+
+    const similar = await getSimilarListings('test-veh-01', 5);
+    assert.equal(similar.some((listing) => listing.id === 'test-veh-02'), false);
+  });
+
+  it('11a. SOLD and different-category listings are excluded while active same-category listings remain eligible', async () => {
+    const sold = {
+      ...TEST_VEHICLE_A,
+      id: 'test-sold-moto',
+      title: 'Sold motorcycle',
+      status: 'SOLD' as const,
+      vehicle_details: { ...TEST_VEHICLE_A.vehicle_details!, listing_id: 'test-sold-moto' },
+    };
+    const differentCategory = {
+      ...TEST_VEHICLE_A,
+      id: 'test-suv-active',
+      title: 'Active SUV',
+      subcategory: 'SUV' as any,
+      vehicle_details: { ...TEST_VEHICLE_A.vehicle_details!, listing_id: 'test-suv-active', vehicle_category: 'SUV' as any },
+    };
+    const expiredStatus = {
+      ...TEST_VEHICLE_A,
+      id: 'test-expired-status',
+      title: 'Expired status motorcycle',
+      status: 'EXPIRED' as const,
+      vehicle_details: { ...TEST_VEHICLE_A.vehicle_details!, listing_id: 'test-expired-status' },
+    };
+    const draft = {
+      ...TEST_VEHICLE_A,
+      id: 'test-draft-moto',
+      title: 'Draft motorcycle',
+      status: 'DRAFT' as const,
+      vehicle_details: { ...TEST_VEHICLE_A.vehicle_details!, listing_id: 'test-draft-moto' },
+    };
+    db.listings.push(sold, differentCategory, expiredStatus, draft);
+
+    const similar = await getSimilarListings(TEST_VEHICLE_A.id, 10);
+    assert.ok(similar.some((listing) => listing.id === TEST_VEHICLE_B.id));
+    assert.equal(similar.some((listing) => listing.id === sold.id), false);
+    assert.equal(similar.some((listing) => listing.id === differentCategory.id), false);
+    assert.equal(similar.some((listing) => listing.id === expiredStatus.id), false);
+    assert.equal(similar.some((listing) => listing.id === draft.id), false);
+  });
+
+  it('11b. model outranks brand-only, brand outranks price-only, and price breaks equally strong matches', () => {
+    const ranked = rankSimilarListings(
+      { id: 'current', category: 'vehicle', subcategory: 'Otomobil', price: '100000', brand: 'Vapid', model: 'Dominator' },
+      [
+        { id: 'price-only', category: 'vehicle' as const, subcategory: 'Otomobil', price: '100001', brand: 'Annis', model: 'Elegy', created_at: '2026-01-04T00:00:00Z' },
+        { id: 'brand-far', category: 'vehicle' as const, subcategory: 'Otomobil', price: '140000', brand: 'Vapid', model: 'Stanier', created_at: '2026-01-03T00:00:00Z' },
+        { id: 'model-far', category: 'vehicle' as const, subcategory: 'Otomobil', price: '150000', brand: 'Declasse', model: 'Dominator', created_at: '2026-01-02T00:00:00Z' },
+        { id: 'model-close', category: 'vehicle' as const, subcategory: 'Otomobil', price: '101000', brand: 'Vapid', model: 'Dominator', created_at: '2026-01-01T00:00:00Z' },
+      ],
+      10
+    );
+
+    assert.deepStrictEqual(ranked.map((listing) => listing.id), ['model-close', 'model-far', 'brand-far', 'price-only']);
+  });
+
+  it('11c. deterministic ties use newest date and then stable id ordering', () => {
+    const current = { id: 'current', category: 'property' as const, subcategory: 'Ev / Daire', price: 500000 };
+    const ranked = rankSimilarListings(current, [
+      { id: 'b-id', category: 'property' as const, subcategory: 'Ev / Daire', price: 500000, created_at: '2026-01-01T00:00:00Z' },
+      { id: 'a-id', category: 'property' as const, subcategory: 'Ev / Daire', price: 500000, created_at: '2026-01-01T00:00:00Z' },
+      { id: 'newest', category: 'property' as const, subcategory: 'Ev / Daire', price: 500000, created_at: '2026-01-02T00:00:00Z' },
+    ]);
+    assert.deepStrictEqual(ranked.map((listing) => listing.id), ['newest', 'a-id', 'b-id']);
+  });
+
+  it('11d. property recommendations use canonical property type and price without vehicle data', async () => {
+    const closeProperty: Listing = {
+      ...TEST_PROPERTY,
+      id: 'test-prop-close',
+      title: 'Close property',
+      price: TEST_PROPERTY.price + 1000,
+      property_details: { ...TEST_PROPERTY.property_details!, listing_id: 'test-prop-close' },
+    };
+    const otherPropertyType: Listing = {
+      ...TEST_PROPERTY,
+      id: 'test-prop-other-type',
+      title: 'Different property type',
+      subcategory: 'İşyeri',
+      property_details: { ...TEST_PROPERTY.property_details!, listing_id: 'test-prop-other-type', property_type: 'İşyeri' },
+    };
+    db.listings.push(closeProperty, otherPropertyType);
+
+    const similar = await getSimilarListings(TEST_PROPERTY.id, 10);
+    assert.deepStrictEqual(similar.map((listing) => listing.id), ['test-prop-close']);
+    assert.equal(similar[0]?.brand, undefined);
+    assert.equal(similar[0]?.model, undefined);
+  });
+
+  it('11e. similar listings are capped at ten results', async () => {
+    for (let index = 0; index < 14; index += 1) {
+      db.listings.push({
+        ...TEST_VEHICLE_A,
+        id: `test-limit-${index}`,
+        title: `Limit candidate ${index}`,
+        price: TEST_VEHICLE_A.price + index,
+        vehicle_details: { ...TEST_VEHICLE_A.vehicle_details!, listing_id: `test-limit-${index}` },
+      });
+    }
+    const similar = await getSimilarListings(TEST_VEHICLE_A.id, 100);
+    assert.equal(similar.length, 10);
+  });
+
   // Scenario 12: compare first listing persists
   it('12. compare first listing persists', () => {
     const compareIds = ['test-veh-01'];
@@ -543,11 +653,12 @@ describe('Sanboard – Vehicle UX Overhaul, Similar Listings & Comparison Tests'
     assert.strictEqual(source.includes('listing.year'), false);
   });
 
-  it('28. Supabase similar listings use targeted candidate queries instead of an arbitrary first 50', () => {
+  it('28. Supabase similar listings use bounded same-category and same-subcategory candidate queries', () => {
     const source = fs.readFileSync(
       path.join(process.cwd(), 'src/lib/db/repositories/supabase/supabase-listing-repo.ts'),
       'utf8'
     );
+    assert.ok(source.includes(".eq('category', current.category)"));
     assert.ok(source.includes(".eq('subcategory', currentSubcategory)"));
     assert.ok(source.includes(".from('vehicle_details').select('listing_id')"));
     assert.ok(source.includes('const { minPrice, maxPrice } = getSimilarPriceRange(currentPrice);'));
@@ -557,16 +668,18 @@ describe('Sanboard – Vehicle UX Overhaul, Similar Listings & Comparison Tests'
     assert.ok(source.includes(".neq('id', currentListingId)"));
   });
 
-  it('29. Supabase similar listings validate visibility and aggregate real favorite counts', () => {
+  it('29. Supabase similar listings validate public visibility and fetch only compact-card fields', () => {
     const source = fs.readFileSync(
       path.join(process.cwd(), 'src/lib/db/repositories/supabase/supabase-listing-repo.ts'),
       'utf8'
     );
     assert.ok(source.includes("current.status !== 'ACTIVE'"));
     assert.ok(source.includes('!this.isPublicCorporateListingVisible(current)'));
-    assert.ok(source.includes(".from('favorites')"));
-    assert.ok(source.includes(".select('listing_id')"));
-    assert.strictEqual(source.includes('favorite_count: 0'), false);
+    assert.ok(source.includes('this.isPublicCorporateListingVisible(item)'));
+    assert.ok(source.includes('rankSimilarListings('));
+    const similarMethod = source.slice(source.indexOf('async getSimilarListings'), source.indexOf('async getListingById'));
+    assert.strictEqual(similarMethod.includes(".from('favorites')"), false);
+    assert.strictEqual(similarMethod.includes('vehicle_details (*)'), false);
   });
 
   it('30. compare facade delegates to Supabase repository while API keeps maximum two listings', () => {
@@ -584,6 +697,10 @@ describe('Sanboard – Vehicle UX Overhaul, Similar Listings & Comparison Tests'
     assert.deepStrictEqual(range, { minPrice: 29999, maxPrice: 69999 });
     assert.strictEqual(Number.isInteger(range.minPrice), true);
     assert.strictEqual(Number.isInteger(range.maxPrice), true);
+    assert.deepStrictEqual(getSimilarPriceRange('90071992547409930'), {
+      minPrice: '54043195528445958',
+      maxPrice: '126100789566373902',
+    });
   });
 
   it('32. optional similar listing failure does not break listing detail data', async () => {

@@ -178,6 +178,20 @@ export interface PublicListingSummary {
   status?: ListingStatus;
 }
 
+export interface SimilarListingSummary {
+  id: string;
+  public_id?: string;
+  category: ListingCategory;
+  subcategory: string;
+  title: string;
+  price: number;
+  location: string | null;
+  published_at?: string;
+  cover_image?: string;
+  brand?: string;
+  model?: string;
+}
+
 // Member-accessible full listing representation
 export interface MemberListingDetail extends Listing {
   is_locked: false;

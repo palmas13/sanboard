@@ -2,6 +2,7 @@ import {
   Listing,
   MemberListingDetail,
   PublicListingSummary,
+  SimilarListingSummary,
   Notification,
   NotificationType,
   CharacterProfile,
@@ -77,7 +78,7 @@ export interface ListingBoostOptions {
 
 export interface IListingRepository {
   getPublicListings(params?: ListingFilterParams): Promise<PublicListingSummary[]>;
-  getSimilarListings?(currentListingId: string, limit?: number): Promise<PublicListingSummary[]>;
+  getSimilarListings?(currentListingId: string, limit?: number): Promise<SimilarListingSummary[]>;
   getCompareListings?(ids: string[]): Promise<(Listing | null)[]>;
   getPropertyCompareListings?(ids: string[]): Promise<(Listing | null)[]>;
   getListingById(id: string, viewerProfileId?: string, viewerUserId?: string): Promise<{ listing: MemberListingDetail | PublicListingSummary | null; isLocked: boolean; isOwner: boolean }>;

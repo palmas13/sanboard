@@ -142,8 +142,35 @@ describe('premium listing detail redesign', () => {
   test('similar listings use the compact horizontal visual and exact title', () => {
     assert.match(similar, />\s*Benzer İlanlar\s*</);
     assert.doesNotMatch(similar, /Benzer İlanları İnceleyin/);
-    assert.match(similarCard, /className="flex min-h-32"/);
+    assert.match(similarCard, /className="flex min-h-32[^\"]*"/);
     assert.match(similarCard, /w-\[42%\]/);
+    assert.match(similarCard, /\{listing\.title\}/);
+    assert.match(similarCard, /\[listing\.brand, listing\.model\]\.filter\(Boolean\)\.join\(' '\)/);
+    assert.match(similarCard, /secondaryText \?/);
+    assert.match(similarCard, /formatCurrency\(listing\.price\)/);
+    assert.match(similarCard, /href=\{getListingUrl\(listing\)\}/);
+    assert.doesNotMatch(similarCard, /undefined undefined/);
+  });
+
+  test('similar listings are integrated for vehicle and property details and hidden for empty results', () => {
+    assert.match(page, /getOptionalSimilarListings\(repo, listing\.id, 10\)/);
+    assert.match(page, /similarListings\.length > 0 \? <SimilarListings/);
+    assert.doesNotMatch(page, /isVehicle && similarListings\.length/);
+    assert.match(similar, /if \(!listings\.length\) return null/);
+  });
+
+  test('carousel preserves manual scrolling, pauses for interaction, and disables autoplay for reduced motion', () => {
+    assert.match(similar, /overflow-x-auto/);
+    assert.match(similar, /snap-x snap-mandatory/);
+    assert.match(similar, /onPointerDown=\{pauseAfterInteraction\}/);
+    assert.match(similar, /onTouchStart=\{pauseAfterInteraction\}/);
+    assert.match(similar, /onWheel=\{pauseAfterInteraction\}/);
+    assert.match(similar, /ArrowRight/);
+    assert.match(similar, /ArrowLeft/);
+    assert.match(similar, /prefers-reduced-motion: reduce/);
+    assert.match(similar, /if \(reducedMotion \|\| isHovering \|\| isFocusWithin \|\| isInteracting/);
+    assert.match(similar, /window\.setInterval/);
+    assert.doesNotMatch(similar, /listings\.concat|\.map\([^)]*=> listings|clone/i);
   });
 
   test('minimum offer copy is conditional and below-minimum input is blocked client-side', () => {

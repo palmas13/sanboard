@@ -1,6 +1,6 @@
 import { IListingRepository, CreateListingInput, ListingPublishOptions } from '../types';
 import { getSupabaseClient, getSupabaseAdminClient } from '../../supabase-client';
-import { Listing, MemberListingDetail, PublicListingSummary } from '@/types';
+import { Listing, MemberListingDetail, PublicListingSummary, SimilarListingSummary } from '@/types';
 import { ListingFilterParams } from '../../listings';
 import { deleteMediaSafely } from '@/lib/storage/lifecycle';
 import { resolveUserId, resolveProfileId, isUuid } from '../../id-mapper';
@@ -9,6 +9,7 @@ import { getListingCoverPath, sortListingImages } from '@/lib/listings/images';
 import { isListingPublicId } from '@/lib/urls';
 import { redactPrivateContact } from '@/lib/profiles/contact-privacy';
 import { sortPublicListings } from '@/lib/listings/public-sort';
+import { clampSimilarListingsLimit, rankSimilarListings } from '@/lib/listings/similarity';
 
 export function isPublicCorporateListingVisible(item: any): boolean {
   if (item.seller_type !== 'CORPORATE') return true;
@@ -26,10 +27,26 @@ export function isPublicCorporateListingVisible(item: any): boolean {
   );
 }
 
-export function getSimilarPriceRange(price: number): { minPrice: number; maxPrice: number } {
+export function getSimilarPriceRange(
+  price: number | string | bigint
+): { minPrice: number | string; maxPrice: number | string } {
+  let integerPrice: bigint;
+  try {
+    integerPrice = typeof price === 'number'
+      ? BigInt(Math.max(0, Math.trunc(price)))
+      : BigInt(price);
+  } catch {
+    integerPrice = BigInt(0);
+  }
+  if (integerPrice < BigInt(0)) integerPrice = BigInt(0);
+
+  const minPrice = (integerPrice * BigInt(3)) / BigInt(5);
+  const maxPrice = (integerPrice * BigInt(7) + BigInt(4)) / BigInt(5);
+  const safeBoundary = (value: bigint) => value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : value.toString();
+
   return {
-    minPrice: Math.max(0, Math.floor(price * 0.6)),
-    maxPrice: Math.ceil(price * 1.4),
+    minPrice: safeBoundary(minPrice),
+    maxPrice: safeBoundary(maxPrice),
   };
 }
 
@@ -360,11 +377,13 @@ export class SupabaseListingRepository implements IListingRepository {
     return ids.map((id) => listingMap.get(id) || null);
   }
 
-  async getSimilarListings(currentListingId: string, limit: number = 4): Promise<PublicListingSummary[]> {
+  async getSimilarListings(currentListingId: string, limit: number = 10): Promise<SimilarListingSummary[]> {
     if (!isUuid(currentListingId)) return [];
 
     const client = this.getClient();
     const nowIso = new Date().toISOString();
+    const boundedLimit = clampSimilarListingsLimit(limit);
+    if (boundedLimit === 0) return [];
 
     const { data: current, error: curErr } = await client
       .from('listings')
@@ -378,7 +397,7 @@ export class SupabaseListingRepository implements IListingRepository {
         seller_type,
         corporate_profile_id,
         corporate:corporate_profiles (moderation_status, deleted_at, subscription_status, subscription_expires_at),
-        vehicle_details (*)
+        vehicle_details (brand, model)
       `)
       .eq('id', currentListingId)
       .maybeSingle();
@@ -386,7 +405,6 @@ export class SupabaseListingRepository implements IListingRepository {
     if (curErr) throw new Error(`Supabase error fetching current similar listing: ${curErr.message}`);
     if (
       !current ||
-      current.category !== 'vehicle' ||
       current.status !== 'ACTIVE' ||
       !current.expires_at ||
       new Date(current.expires_at).getTime() <= Date.now() ||
@@ -404,12 +422,10 @@ export class SupabaseListingRepository implements IListingRepository {
         location,
         published_at,
         created_at,
-        is_featured,
-        featured_until,
         seller_type,
         corporate_profile_id,
         corporate:corporate_profiles (moderation_status, deleted_at, subscription_status, subscription_expires_at),
-        vehicle_details (*),
+        vehicle_details (brand, model),
         listing_images (storage_path, is_cover, sort_order)
       `;
 
@@ -425,24 +441,28 @@ export class SupabaseListingRepository implements IListingRepository {
       .select(candidateSelect)
       .eq('status', 'ACTIVE')
       .gt('expires_at', nowIso)
-      .eq('category', 'vehicle')
+      .eq('category', current.category)
+      .eq('subcategory', currentSubcategory)
       .neq('id', currentListingId);
 
     const candidateQueries: PromiseLike<any>[] = [
       createCandidateQuery()
-        .eq('subcategory', currentSubcategory)
-        .order('published_at', { ascending: false })
-        .limit(80),
-      createCandidateQuery()
         .gte('price', minPrice)
         .lte('price', maxPrice)
         .order('published_at', { ascending: false })
-        .limit(80),
+        .limit(40),
+      createCandidateQuery()
+        .order('published_at', { ascending: false })
+        .limit(20),
     ];
 
     const detailQueries: PromiseLike<any>[] = [];
-    if (currentBrand) detailQueries.push(client.from('vehicle_details').select('listing_id').ilike('brand', currentBrand).limit(80));
-    if (currentModel) detailQueries.push(client.from('vehicle_details').select('listing_id').ilike('model', currentModel).limit(80));
+    if (current.category === 'vehicle' && currentBrand) {
+      detailQueries.push(client.from('vehicle_details').select('listing_id').ilike('brand', currentBrand).limit(30));
+    }
+    if (current.category === 'vehicle' && currentModel) {
+      detailQueries.push(client.from('vehicle_details').select('listing_id').ilike('model', currentModel).limit(30));
+    }
 
     const detailResults = await Promise.all(detailQueries);
     for (const result of detailResults) {
@@ -455,6 +475,7 @@ export class SupabaseListingRepository implements IListingRepository {
           createCandidateQuery()
             .in('id', listingIds)
             .order('published_at', { ascending: false })
+            .limit(30)
         );
       }
     }
@@ -466,87 +487,43 @@ export class SupabaseListingRepository implements IListingRepository {
       for (const candidate of result.data || []) candidateMap.set(candidate.id, candidate);
     }
 
-    const validCandidates = Array.from(candidateMap.values()).filter((item) =>
+    const validCandidates = Array.from(candidateMap.values()).filter((item) => (
+      item.category === current.category &&
+      item.subcategory === currentSubcategory &&
       this.isPublicCorporateListingVisible(item)
+    ));
+
+    const selected = rankSimilarListings(
+      {
+        id: current.id,
+        category: current.category,
+        subcategory: currentSubcategory,
+        price: current.price,
+        brand: currentVeh?.brand,
+        model: currentVeh?.model,
+      },
+      validCandidates.map((cand: any) => {
+        const candVeh = Array.isArray(cand.vehicle_details) ? cand.vehicle_details[0] : cand.vehicle_details;
+        return { ...cand, brand: candVeh?.brand, model: candVeh?.model };
+      }),
+      boundedLimit
     );
 
-    const scored = validCandidates.map((cand: any) => {
-      let score = 0;
-      const candVeh = Array.isArray(cand.vehicle_details) ? cand.vehicle_details[0] : cand.vehicle_details;
-
-      if (cand.subcategory === currentSubcategory) score += 50;
-
-      const candBrand = candVeh?.brand?.toLowerCase().trim();
-      if (currentBrand && candBrand && candBrand === currentBrand) score += 30;
-
-      const candModel = candVeh?.model?.toLowerCase().trim();
-      if (currentModel && candModel && candModel === currentModel) score += 40;
-
-      const candPrice = cand.price || 1;
-      const priceDiffPct = Math.abs(candPrice - currentPrice) / Math.max(currentPrice, 1);
-      if (priceDiffPct <= 0.10) score += 40;
-      else if (priceDiffPct <= 0.25) score += 25;
-      else if (priceDiffPct <= 0.40) score += 15;
-      else score += 5;
-
-      if (currentVeh && candVeh) {
-        if (currentVeh.fuel_type && currentVeh.fuel_type === candVeh.fuel_type) score += 5;
-        if (currentVeh.turbo === candVeh.turbo) score += 3;
-      }
-
-      return { cand, score };
-    });
-
-    scored.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return (
-        new Date(b.cand.published_at || b.cand.created_at).getTime() -
-        new Date(a.cand.published_at || a.cand.created_at).getTime()
-      );
-    });
-
-    const selected = scored.slice(0, Math.max(0, limit));
-    const selectedIds = selected.map(({ cand }) => cand.id);
-    const favoriteCountMap = new Map<string, number>();
-    if (selectedIds.length > 0) {
-      const { data: favorites, error: favoriteError } = await this.getAdminClient()
-        .from('favorites')
-        .select('listing_id')
-        .in('listing_id', selectedIds);
-      if (favoriteError) throw new Error(`Supabase error fetching similar listing favorite counts: ${favoriteError.message}`);
-      for (const favorite of favorites || []) {
-        favoriteCountMap.set(favorite.listing_id, (favoriteCountMap.get(favorite.listing_id) || 0) + 1);
-      }
-    }
-
-    const nowTime = Date.now();
-    return selected.map(({ cand }) => {
+    return selected.map((cand) => {
       const cover = getListingCoverPath(cand.listing_images);
-      const candVeh = Array.isArray(cand.vehicle_details) ? cand.vehicle_details[0] : cand.vehicle_details;
-      const isFeatured = Boolean(
-        cand.is_featured &&
-        (!cand.featured_until || new Date(cand.featured_until).getTime() > nowTime)
-      );
 
       return {
         id: cand.id,
         public_id: cand.public_id,
-        listing_number: cand.listing_number,
         category: cand.category,
         subcategory: cand.subcategory,
         title: cand.title,
-        price: cand.price,
-        location: null,
+        price: Number(cand.price),
+        location: cand.location,
         published_at: cand.published_at,
         cover_image: cover,
-        favorite_count: favoriteCountMap.get(cand.id) || 0,
-        is_locked: true as const,
-        is_featured: isFeatured,
-        featured_until: cand.featured_until,
-        seller_type: cand.seller_type,
-        corporate_profile_id: cand.corporate_profile_id,
-        brand: candVeh?.brand,
-        model: candVeh?.model,
+        brand: cand.brand,
+        model: cand.model,
       };
     });
   }

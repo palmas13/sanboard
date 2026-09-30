@@ -4,6 +4,7 @@ import {
   ListingCategory,
   MemberListingDetail,
   PublicListingSummary,
+  SimilarListingSummary,
   VehicleCategory,
   PropertyType,
   ReportReason,
@@ -23,6 +24,7 @@ import { isListingPublicId } from '../urls';
 import { redactPrivateContact } from '../profiles/contact-privacy';
 import { getSupabaseAdminClient } from './supabase-client';
 import { sortPublicListings } from '@/lib/listings/public-sort';
+import { rankSimilarListings } from '@/lib/listings/similarity';
 
 export interface ListingFilterParams {
   category?: ListingCategory;
@@ -242,12 +244,14 @@ export async function getPublicListings(filters: ListingFilterParams = {}): Prom
  * - Excludes current listing (ASLA kendi benzer ilanları içinde görünmemeli)
  * - Excludes REMOVED, SOLD, EXPIRED, DRAFT
  * - Excludes listings from SUSPENDED or DELETED corporate stores
- * - Evaluates proximity based on subcategory, brand, model, price proximity, and technical attributes
+ * - Requires the same canonical category and subcategory
+ * - Ranks vehicle brand/model matches strongly, then numeric price proximity
+ * - Supports property listings without depending on vehicle details
  */
 export async function getSimilarListings(
   currentListingId: string,
-  limit: number = 4
-): Promise<PublicListingSummary[]> {
+  limit: number = 10
+): Promise<SimilarListingSummary[]> {
   if (isSupabaseConfiguredMode()) {
     return getSupabaseRepo().getSimilarListings(currentListingId, limit);
   }
@@ -256,88 +260,46 @@ export async function getSimilarListings(
   if (!current) return [];
 
   const now = new Date();
+  const currentStore = current.seller_type === 'CORPORATE'
+    ? (db.dealers || []).find((dealer) => dealer.id === current.corporate_profile_id)
+    : null;
+  if (!isPublicListingVisible(current, currentStore, now)) return [];
 
-  // Candidate pool: only ACTIVE vehicle listings, not expired, not the same listing
+  // Eligibility is identical to public discovery and enforced before ranking.
   const candidates = db.listings.filter((l) => {
     if (l.id === currentListingId) return false;
-    if (l.status !== 'ACTIVE') return false;
-    if (!l.expires_at || new Date(l.expires_at) <= now) return false;
-    if (l.category !== 'vehicle') return false;
-
-    // Filter out corporate listings from suspended or deleted stores
-    if (l.seller_type === 'CORPORATE' && l.corporate_profile_id) {
-      const store = (db.dealers || []).find((d) => d.id === l.corporate_profile_id);
-      if (!store || !isPublicListingVisible(l, store, now)) {
-        return false;
-      }
-    }
-    return true;
+    if (l.category !== current.category || l.subcategory !== current.subcategory) return false;
+    const store = l.seller_type === 'CORPORATE'
+      ? (db.dealers || []).find((dealer) => dealer.id === l.corporate_profile_id)
+      : null;
+    return isPublicListingVisible(l, store, now);
   });
 
-  const currentPrice = current.price || 1;
-  const currentBrand = current.vehicle_details?.brand?.toLowerCase().trim();
-  const currentModel = current.vehicle_details?.model?.toLowerCase().trim();
-  const currentSubcategory = current.subcategory;
-
-  // Score each candidate according to algorithm requirements
-  const scored = candidates.map((cand) => {
-    let score = 0;
-
-    // 1. Exact subcategory match (+50 points)
-    if (cand.subcategory === currentSubcategory) {
-      score += 50;
-    }
-
-    // 2. Brand match (+30 points)
-    const candBrand = cand.vehicle_details?.brand?.toLowerCase().trim();
-    if (currentBrand && candBrand && candBrand === currentBrand) {
-      score += 30;
-    }
-
-    // 3. Model match (+40 points)
-    const candModel = cand.vehicle_details?.model?.toLowerCase().trim();
-    if (currentModel && candModel && candModel === currentModel) {
-      score += 40;
-    }
-
-    // 4. Price proximity (0-10% -> 40, 10-25% -> 25, 25-40% -> 15, >40% -> 5)
-    const candPrice = cand.price || 1;
-    const priceDiffPct = Math.abs(candPrice - currentPrice) / Math.max(currentPrice, 1);
-    if (priceDiffPct <= 0.10) {
-      score += 40;
-    } else if (priceDiffPct <= 0.25) {
-      score += 25;
-    } else if (priceDiffPct <= 0.40) {
-      score += 15;
-    } else {
-      score += 5;
-    }
-
-    // 5. Technical attributes proximity
-    if (current.vehicle_details && cand.vehicle_details) {
-      if (current.vehicle_details.fuel_type && current.vehicle_details.fuel_type === cand.vehicle_details.fuel_type) {
-        score += 5;
-      }
-      if (current.vehicle_details.turbo === cand.vehicle_details.turbo) {
-        score += 3;
-      }
-    }
-
-    return { cand, score };
-  });
-
-  // Sort by score descending; if tied, newer listings first
-  scored.sort((a, b) => {
-    if (b.score !== a.score) {
-      return b.score - a.score;
-    }
-    return (
-      new Date(b.cand.published_at || b.cand.created_at).getTime() -
-      new Date(a.cand.published_at || a.cand.created_at).getTime()
-    );
-  });
-
-  return scored.slice(0, limit).map((s) => sanitizeListingForPublic(s.cand));
+  return rankSimilarListings(
+    {
+      ...current,
+      brand: current.vehicle_details?.brand,
+      model: current.vehicle_details?.model,
+    },
+    candidates.map((candidate) => ({
+      ...candidate,
+      brand: candidate.vehicle_details?.brand,
+      model: candidate.vehicle_details?.model,
+    })),
+    limit
+  ).map((candidate) => ({
+    id: candidate.id,
+    public_id: candidate.public_id,
+    category: candidate.category,
+    subcategory: candidate.subcategory,
+    title: candidate.title,
+    price: candidate.price,
+    location: candidate.location,
+    published_at: candidate.published_at,
+    cover_image: getListingCoverPath(candidate.images),
+    brand: candidate.brand,
+    model: candidate.model,
+  }));
 }
 
 /**

@@ -68,7 +68,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
   const categoryLink = isVehicle ? '/arac' : '/mulk';
   const categoryName = isVehicle ? 'Araç' : 'Mülk';
   const memberListing = listing as MemberListingDetail;
-  const similarListings = isVehicle ? await getOptionalSimilarListings(repo, id, 6) : [];
+  const similarListings = await getOptionalSimilarListings(repo, listing.id, 10);
   const detailReady = !result.isLocked;
 
   const favoriteProof = !closedLabel ? <FavoriteButton listingId={listing.id} initialCount={listing.favorite_count} initialIsFavorited={memberListing.is_favorited} proofText /> : <span className="inline-block min-w-[16rem]">{listing.favorite_count || 0} kişi favoriledi</span>;
@@ -93,6 +93,6 @@ export default async function ListingDetailPage({ params }: PageProps) {
         : <div className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-6 text-sm text-[var(--text-muted)]">İlan detaylarını görmek için giriş yapınız.</div>}
     />
 
-    {isVehicle && similarListings.length > 0 ? <SimilarListings listings={similarListings} /> : null}
+    {similarListings.length > 0 ? <SimilarListings listings={similarListings} /> : null}
   </main>;
 }

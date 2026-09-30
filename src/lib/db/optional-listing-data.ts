@@ -1,11 +1,11 @@
 import { IListingRepository } from './repositories';
-import { PublicListingSummary } from '@/types';
+import { SimilarListingSummary } from '@/types';
 
 export async function getOptionalSimilarListings(
   repo: IListingRepository,
   listingId: string,
   limit: number
-): Promise<PublicListingSummary[]> {
+): Promise<SimilarListingSummary[]> {
   try {
     if (repo.getSimilarListings) {
       return await repo.getSimilarListings(listingId, limit);
