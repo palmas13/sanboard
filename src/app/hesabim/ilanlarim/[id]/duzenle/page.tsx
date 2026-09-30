@@ -22,6 +22,7 @@ import { getVehicleBrandsByCategory, getVehicleModels, isMotorcycleCategory, isV
 import { LISTING_TITLE_MAX_ERROR, LISTING_TITLE_MAX_LENGTH } from '@/lib/validations/listing';
 import { getVehicleLevelOptions, normalizeVehicleLevel, VEHICLE_LEVEL_FIELDS } from '@/lib/listings/vehicle-levels';
 import { formatTurkishInteger, isIntegerInRange, normalizeIntegerInput, normalizeTurkishIntegerInput } from '@/lib/forms/integer-input';
+import { toListingImageReferences } from '@/lib/listings/image-references';
 
 const TITLE_MAX = LISTING_TITLE_MAX_LENGTH;
 const DESC_MAX = 100;
@@ -261,7 +262,7 @@ export default function IlanDuzenlePage({
         offers_enabled: offersEnabled,
         minimum_offer_amount: offersEnabled && minimumOffer !== '' ? Number(minimumOffer) : null,
         subcategory,
-        images,
+        images: toListingImageReferences(images),
       };
 
       if (category === 'vehicle') {

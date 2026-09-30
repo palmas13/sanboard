@@ -97,7 +97,7 @@ describe('OfferCenter chat UX', () => {
     assert.match(center, /role="dialog"/);
     assert.match(center, /aria-modal="true"/);
     assert.match(center, /Teklif görüşmesini kaldır/);
-    assert.match(center, /Bu teklif görüşmesi yalnız sizin listenizden kaldırılır/);
+    assert.match(center, /Bu teklif görüşmesi yalnız sizin listenizden kalıcı olarak kaldırılır/);
     assert.match(center, /onMouseDown=\{\(event\) => \{ if \(event\.target === event\.currentTarget\) closeHideDialog\(\); \}\}/);
     assert.match(center, /hideCancelButton\.current\?\.focus\(\)/);
     assert.doesNotMatch(center, /window\.confirm|\bconfirm\(/);

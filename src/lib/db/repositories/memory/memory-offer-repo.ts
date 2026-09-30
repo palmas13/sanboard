@@ -21,8 +21,6 @@ export class MemoryOfferRepository implements IOfferRepository {
     );
     const row: OfferEvent = { id: `oe-${Date.now()}-${Math.random()}`, thread_id: thread.id, actor_profile_id, event_type, amount, metadata, created_at: new Date(latestTimestamp).toISOString() };
     db.offerEvents.push(row);
-    if (!actor_profile_id || actor_profile_id !== thread.buyer_profile_id) thread.buyer_hidden_at = null;
-    if (!actor_profile_id || actor_profile_id !== thread.seller_profile_id) thread.seller_hidden_at = null;
     return row;
   }
   private expire(thread: OfferThread) {
@@ -74,8 +72,8 @@ export class MemoryOfferRepository implements IOfferRepository {
     rows.sort((a,b)=>b.updated_at.localeCompare(a.updated_at)); const page = rows.slice(0, Math.min(limit, OFFER_PAGE_SIZE));
     return { threads: page.map(t => this.hydrate(t, actorProfileId)), nextCursor: rows.length > page.length ? page.at(-1)?.updated_at : null };
   }
-  async getOffer(threadId: string, actorProfileId: string) { const t = db.offerThreads.find(x=>x.id===threadId); if (!t || (t.buyer_profile_id!==actorProfileId && t.seller_profile_id!==actorProfileId)) return { success:false,error:'Teklif bulunamadı.' }; return { success:true,thread:this.hydrate(t,actorProfileId) }; }
-  async getActiveThreadForListing(listingId:string,actorProfileId:string){const t=db.offerThreads.find(x=>x.listing_id===listingId&&x.status==='ACTIVE'&&(x.buyer_profile_id===actorProfileId||x.seller_profile_id===actorProfileId));return t?this.hydrate(t,actorProfileId):null;}
+  async getOffer(threadId:string,actorProfileId:string){const t=db.offerThreads.find(x=>x.id===threadId);const hidden=t&&(t.buyer_profile_id===actorProfileId?t.buyer_hidden_at:t.seller_hidden_at);if(!t||hidden||(t.buyer_profile_id!==actorProfileId&&t.seller_profile_id!==actorProfileId))return{success:false,error:'Teklif bulunamadı.'};return{success:true,thread:this.hydrate(t,actorProfileId)};}
+  async getActiveThreadForListing(listingId:string,actorProfileId:string){const t=db.offerThreads.find(x=>x.listing_id===listingId&&x.status==='ACTIVE'&&(x.buyer_profile_id===actorProfileId||x.seller_profile_id===actorProfileId)&&!(x.buyer_profile_id===actorProfileId?x.buyer_hidden_at:x.seller_hidden_at));return t?this.hydrate(t,actorProfileId):null;}
   async actOnOffer({ threadId, actorProfileId, action, amount }: any) {
     const t=db.offerThreads.find(x=>x.id===threadId); if(!t||(t.buyer_profile_id!==actorProfileId&&t.seller_profile_id!==actorProfileId)) return {success:false,error:'Teklif bulunamadı.'}; this.expire(t);
     const listing=db.listings.find(l=>l.id===t.listing_id); if(!listing||getEffectiveListingStatus(listing)!=='ACTIVE') return {success:false,code:'LISTING_INACTIVE',error:'İlan yayında olmadığı için işlem yapılamaz.'}; if(t.status!=='ACTIVE') return {success:false,error:'Bu teklif artık aktif değil.'};

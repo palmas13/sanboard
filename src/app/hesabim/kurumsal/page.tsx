@@ -821,7 +821,7 @@ export default function HesabimKurumsalPage() {
                   <span className="text-xs font-semibold">Kalan Öne Çıkarma</span>
                   <Sparkles className="w-4 h-4 text-amber-400" />
                 </div>
-                <p className="text-2xl font-black text-[var(--text-main)]">{dealer.boost_credits ?? 0}/3</p>
+                <p className="text-2xl font-black tabular-nums text-[var(--text-main)]">{dealer.boost_credits ?? 0}</p>
               </div>
 
               <div className="surface-card p-4 rounded-xl border border-[var(--border-app)] space-y-1">

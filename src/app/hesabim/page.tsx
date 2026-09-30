@@ -6,7 +6,6 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { getCreditPresentation } from '@/lib/dashboard/credit-presentation';
 import {
   ListPlus,
-  Clock,
   Heart,
   ArrowRight,
 } from 'lucide-react';
@@ -15,7 +14,6 @@ export default function HesabimOverviewPage() {
   const { currentProfile } = useAuth();
   const [stats, setStats] = useState({
     activeListings: 0,
-    expiredListings: 0,
     favoritesCount: 0,
     individualCredits: 0,
     corporateCredits: 0,
@@ -34,7 +32,6 @@ export default function HesabimOverviewPage() {
           if (data?.success) {
             setStats({
               activeListings: data.stats?.activeListings || 0,
-              expiredListings: data.stats?.expiredListings || 0,
               favoritesCount: data.stats?.favoritesCount || 0,
               individualCredits: data.credits?.individualCredits || 0,
               corporateCredits: data.credits?.corporateCredits || 0,
@@ -94,7 +91,7 @@ export default function HesabimOverviewPage() {
 
 
       {/* Stat Cards Grid: Strictly Personal Account Context */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {/* Aktif Bireysel İlan */}
         <div className="surface-card p-5 rounded-2xl border border-[var(--border-app)] space-y-2">
           <div className="w-9 h-9 rounded-xl bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center">
@@ -112,25 +109,8 @@ export default function HesabimOverviewPage() {
           </div>
         </div>
 
-        {/* Süresi Dolan İlanlarım */}
-        <div className="surface-card p-5 rounded-2xl border border-[var(--border-app)] space-y-2">
-          <div className="w-9 h-9 rounded-xl bg-[var(--color-danger-subtle)] text-[var(--color-danger)] flex items-center justify-center">
-            <Clock className="w-4 h-4" />
-          </div>
-          <div>
-            <p className="text-xs text-[var(--text-muted)] font-medium">Süresi Dolan İlanlarım</p>
-            {loading ? (
-              <div className="h-8 w-12 rounded-lg bg-[var(--bg-surface-secondary)] animate-pulse mt-1" />
-            ) : (
-              <p className="text-2xl font-black text-[var(--text-main)]">
-                {stats.expiredListings}
-              </p>
-            )}
-          </div>
-        </div>
-
         {/* Favorilerim */}
-        <div className="surface-card p-5 rounded-2xl border border-[var(--border-app)] space-y-2">
+        <div className="surface-card p-5 rounded-2xl border border-[var(--border-app)] space-y-3">
           <div className="w-9 h-9 rounded-xl bg-[var(--brand-orange-subtle)] text-[#FF8A1F] flex items-center justify-center">
             <Heart className="w-4 h-4" />
           </div>
@@ -151,9 +131,23 @@ export default function HesabimOverviewPage() {
           <div className="w-9 h-9 rounded-xl bg-[var(--brand-orange-subtle)] text-[#FF8A1F] flex items-center justify-center">
             <ListPlus className="w-4 h-4" />
           </div>
-          <div>
-            <p className="text-xs text-[var(--text-muted)] font-medium">İlan Hakkı={loading ? '…' : creditPresentation.total}</p>
-            {!loading && <p className="text-[11px] text-[var(--text-dim)]">Bireysel {stats.individualCredits} · Kurumsal {stats.corporateCredits}</p>}
+          <div className="min-w-0">
+            <p className="text-xs text-[var(--text-muted)] font-medium">İlan Haklarım</p>
+            {loading ? (
+              <div className="h-8 w-12 rounded-lg bg-[var(--bg-surface-secondary)] animate-pulse mt-1" />
+            ) : (
+              <>
+                <p className="text-2xl font-black tabular-nums text-[var(--text-main)]">{creditPresentation.total}</p>
+                <div className="mt-2 grid grid-cols-2 gap-2" aria-label="İlan hakkı dağılımı">
+                  <span className="inline-flex min-w-0 items-center justify-between gap-2 rounded-lg border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/55 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-muted)]">
+                    <span>Bireysel</span><strong className="tabular-nums text-[var(--text-main)]">{stats.individualCredits}</strong>
+                  </span>
+                  <span className="inline-flex min-w-0 items-center justify-between gap-2 rounded-lg border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/55 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-muted)]">
+                    <span>Kurumsal</span><strong className="tabular-nums text-[var(--text-main)]">{stats.corporateCredits}</strong>
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

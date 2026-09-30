@@ -33,10 +33,13 @@ export function ListingDetailHeader({
           <h1 className="max-w-4xl text-2xl font-black leading-[1.12] tracking-[-0.03em] text-[var(--text-main)] sm:text-3xl xl:text-[32px]">
             {listing.title}
           </h1>
-          <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[var(--text-muted)]">
-            {listing.category === 'vehicle' && listing.location ? <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-[#FF9E45]" />{listing.location}</span> : null}
-            {listing.published_at ? <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" />{formatDate(listing.published_at)}</span> : null}
-            {favoriteProof}
+          <div data-testid="listing-metadata-row" className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-[var(--text-muted)]">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+              {listing.category === 'vehicle' && listing.location ? <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-[#FF9E45]" />{listing.location}</span> : null}
+              {listing.published_at ? <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" />{formatDate(listing.published_at)}</span> : null}
+              {listing.published_at && favoriteProof ? <span aria-hidden="true" className="text-[var(--text-dim)]">—</span> : null}
+            </div>
+            <div className="min-w-0 flex-1">{favoriteProof}</div>
           </div>
         </div>
 

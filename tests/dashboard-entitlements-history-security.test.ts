@@ -66,6 +66,7 @@ describe('dashboard entitlements and listing-history security', () => {
     assert.deepEqual(getCreditPresentation(2, 0), { total: 2, message: '2 bireysel ilan hakkınız var.', href: '/ilan-ver' });
     assert.deepEqual(getCreditPresentation(0, 3), { total: 3, message: '3 kurumsal ilan hakkınız var.', href: '/hesabim/kurumsal' });
     assert.deepEqual(getCreditPresentation(2, 3), { total: 5, message: '2 bireysel ve 3 kurumsal ilan hakkınız var.', href: '/ilan-ver' });
+    assert.deepEqual(getCreditPresentation(0, 0), { total: 0, message: '0 bireysel ilan hakkınız var.', href: '/ilan-ver' });
   });
 
   test('history clear rejects active status and only hides the actor selected history', async () => {
@@ -81,7 +82,11 @@ describe('dashboard entitlements and listing-history security', () => {
     const overview = source('src/app/hesabim/page.tsx');
     const layout = source('src/app/hesabim/layout.tsx');
     assert.match(overview, /Bireysel ilanlarını görüntüle, düzenle ve durumunu kontrol et\./);
-    assert.match(overview, /İlan Hakkı=/);
+    assert.match(overview, /İlan Haklarım/);
+    assert.match(overview, /\{creditPresentation\.total\}/);
+    assert.match(overview, />Bireysel</);
+    assert.match(overview, />Kurumsal</);
+    assert.doesNotMatch(overview, /Süresi Dolan İlanlarım|İlan Hakkı=/);
     assert.doesNotMatch(layout, /Mağazamı Aç|Yeni İlan Ver/);
   });
 });

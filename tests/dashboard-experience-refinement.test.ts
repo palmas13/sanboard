@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { redactPrivateContact } from '@/lib/profiles/contact-privacy';
 import { MemoryPaymentRepository } from '@/lib/db/repositories/memory/memory-payment-repo';
 import { db } from '@/lib/db/store';
+import { syncExternalGameAccount } from '@/lib/auth/gtaworld-sync';
 
 const source = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
 
@@ -17,13 +18,18 @@ describe('dashboard experience refinement regressions', () => {
   });
 
   test('payment clear uses a profile cutoff and preserves payment rows', async () => {
-    db.profiles = [{ id: 'profile', user_id: 'user', full_name: 'Buyer', avatar_url: '', phone: '', sanmail_email: '', created_at: '', updated_at: '' } as any];
+    process.env.DATA_STORE = 'memory';
+    db.users = [{ id: 'user', provider: 'GTAWORLD', external_user_id: 'payment-account', role: 'USER', status: 'ACTIVE', created_at: '', updated_at: '' } as any];
+    db.profiles = [{ id: 'profile', user_id: 'user', external_character_id: 'payment-character', full_name: 'Buyer', avatar_url: '', phone: '', sanmail_email: '', created_at: '', updated_at: '' } as any];
     db.payments = [{ id: 'payment', profile_id: 'profile', order_id: 'order', amount: 2000, status: 'SUCCESS', created_at: '2026-09-26T12:00:00.000Z' } as any];
     const repo = new MemoryPaymentRepository();
     const result = await repo.clearUserPaymentHistory('profile');
     assert.equal(result.success, true);
     assert.equal(db.payments.length, 1);
     assert.deepEqual(await repo.getUserPayments('profile'), []);
+    assert.deepEqual(await new MemoryPaymentRepository().getUserPayments('profile'), []);
+    await syncExternalGameAccount({ externalAccountId: 'payment-account', characters: [{ externalCharacterId: 'payment-character', displayName: 'Buyer Updated' }] });
+    assert.deepEqual(await new MemoryPaymentRepository().getUserPayments('profile'), []);
   });
 
   test('public application route requires contact and location without accepting profile identity', () => {

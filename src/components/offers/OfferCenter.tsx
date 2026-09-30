@@ -18,7 +18,7 @@ type HideTarget = { threadId: string; fromDetail: boolean };
 
 export const OFFER_CENTER_OPEN_THREAD_EVENT = 'sanboard:open-offer-thread';
 const Context = createContext<OfferCenterContext>({ openForListing: () => undefined, openThread: () => undefined });
-const HIDE_CONFIRMATION = 'Bu teklif görüşmesi yalnız sizin listenizden kaldırılır. Yeni bir hareket olduğunda tekrar görünür.';
+const HIDE_CONFIRMATION = 'Bu teklif görüşmesi yalnız sizin listenizden kalıcı olarak kaldırılır. İşlem ve denetim kayıtları korunur.';
 
 export const useOfferCenter = () => useContext(Context);
 export function openOfferThread(threadId: string) { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(OFFER_CENTER_OPEN_THREAD_EVENT, { detail: { threadId } })); }

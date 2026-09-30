@@ -35,7 +35,10 @@ const vehicleLevelSchema = (field: VehicleLevelField) => {
 
 export const imageSchema = z.object({
   id: z.string().optional(),
-  storage_path: z.string().min(1, 'Fotoğraf yolu zorunludur'),
+  storage_path: z.string().min(1, 'Fotoğraf yolu zorunludur').refine(
+    (value) => !value.trim().toLowerCase().startsWith('data:') && !value.trim().toLowerCase().startsWith('blob:'),
+    'Fotoğraflar ilan isteğine gömülemez; önce yüklenmelidir'
+  ),
   sort_order: z.number().int().default(0),
   is_cover: z.boolean().default(false),
   size_bytes: z.number().max(2 * 1024 * 1024, 'Her fotoğraf maksimum 2 MB olabilir'),

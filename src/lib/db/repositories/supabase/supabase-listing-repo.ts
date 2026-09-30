@@ -2,7 +2,6 @@ import { IListingRepository, CreateListingInput, ListingPublishOptions } from '.
 import { getSupabaseClient, getSupabaseAdminClient } from '../../supabase-client';
 import { Listing, MemberListingDetail, PublicListingSummary } from '@/types';
 import { ListingFilterParams } from '../../listings';
-import { uploadListingImage } from '@/lib/storage';
 import { deleteMediaSafely } from '@/lib/storage/lifecycle';
 import { resolveUserId, resolveProfileId, isUuid } from '../../id-mapper';
 import { getEffectiveListingStatus } from '@/lib/listings/visibility';
@@ -723,18 +722,7 @@ export class SupabaseListingRepository implements IListingRepository {
     const processedImages: Array<{ storage_path: string; is_cover: boolean; sort_order: number; size_bytes: number }> = [];
     for (let i = 0; i < (input.images || []).length; i++) {
       const img = input.images[i];
-      let finalPath = img.storage_path;
-      let sizeBytes = img.size_bytes || 500000;
-      if (finalPath.startsWith('data:image/')) {
-        const matches = finalPath.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
-        if (matches) {
-          const uploadRes = await uploadListingImage(Buffer.from(matches[2], 'base64'), `pending-${Date.now()}`, matches[1]);
-          if (!uploadRes.success) return { success: false, error: `R2 görsel yükleme hatası: ${uploadRes.error}` };
-          finalPath = uploadRes.url;
-          sizeBytes = uploadRes.sizeBytes;
-        }
-      }
-      processedImages.push({ storage_path: finalPath, sort_order: img.sort_order ?? i, is_cover: Boolean(img.is_cover ?? i === 0), size_bytes: sizeBytes });
+      processedImages.push({ storage_path: img.storage_path, sort_order: img.sort_order ?? i, is_cover: Boolean(img.is_cover ?? i === 0), size_bytes: img.size_bytes || 500000 });
     }
 
     const rpcListingNumber = `#SB-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -1037,18 +1025,7 @@ export class SupabaseListingRepository implements IListingRepository {
 
       await client.from('listing_images').delete().eq('listing_id', id);
       for (let i = 0; i < input.images.length; i++) {
-        let finalPath = input.images[i].storage_path;
-        if (finalPath.startsWith('data:image/')) {
-          const matches = finalPath.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
-          if (matches) {
-            const buffer = Buffer.from(matches[2], 'base64');
-            const uploadRes = await uploadListingImage(buffer, id, matches[1]);
-            if (uploadRes.success) {
-              finalPath = uploadRes.url;
-              input.images[i].size_bytes = uploadRes.sizeBytes;
-            }
-          }
-        }
+        const finalPath = input.images[i].storage_path;
 
         retainedPaths.add(finalPath);
 

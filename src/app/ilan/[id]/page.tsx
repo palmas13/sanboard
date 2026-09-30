@@ -24,6 +24,7 @@ import { PropertyDetailsPanel } from '@/components/listings/detail/PropertyDetai
 import { ListingDescription } from '@/components/listings/detail/ListingDescription';
 import { ListingDetailHeader } from '@/components/listings/detail/ListingDetailHeader';
 import { SafeShoppingCard } from '@/components/listings/detail/SafeShoppingCard';
+import { ListingDetailLayout } from '@/components/listings/detail/ListingDetailLayout';
 
 interface PageProps { params: Promise<{ id: string }> }
 export const revalidate = 30;
@@ -82,27 +83,15 @@ export default async function ListingDetailPage({ params }: PageProps) {
 
     <ListingDetailHeader listing={listing} categoryHref={categoryLink} categoryName={categoryName} actions={headerActions} favoriteProof={favoriteProof} />
 
-    {isVehicle ? <section data-testid="vehicle-listing-layout" className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,.85fr)] xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,.9fr)_minmax(245px,.58fr)]">
-      <div data-testid="vehicle-gallery-block" className="min-w-0 lg:col-start-1 lg:row-start-1 xl:col-start-1">
-        <ListingGallery images={galleryImages} title={listing.title} isLocked={result.isLocked} variant="vehicle" />
-      </div>
-      <aside data-testid="vehicle-seller-rail" className="min-w-0 space-y-2.5 lg:col-start-2 lg:row-start-1 xl:col-start-3 xl:row-start-1 xl:sticky xl:top-20">
-        <SellerArea listing={memberListing} isLocked={result.isLocked} isOwner={result.isOwner} closedLabel={closedLabel} />
-      </aside>
-      {detailReady ? <div data-testid="vehicle-description-row" className="min-w-0 self-stretch lg:col-start-1 lg:row-start-2 xl:col-start-1"><ListingDescription listing={memberListing} reportAction={descriptionReport} /></div> : null}
-      <div data-testid="vehicle-technical-column" className="min-w-0 lg:col-start-2 lg:row-start-2 xl:col-start-2 xl:row-start-1 xl:row-span-2">
-        {detailReady ? <VehicleDetailsPanel listing={memberListing} /> : <div className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-6 text-sm text-[var(--text-muted)]">Teknik detayları görmek için giriş yapınız.</div>}
-      </div>
-    </section> : <section data-testid="property-listing-layout" className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(380px,1fr)]">
-      <div data-testid="property-gallery-block" className="min-w-0 lg:col-start-1 lg:row-start-1">
-        <ListingGallery images={galleryImages} title={listing.title} isLocked={result.isLocked} variant="property" />
-      </div>
-      <aside data-testid="property-right-column" className="min-w-0 space-y-3 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:sticky lg:top-24">
-        {detailReady ? <PropertyDetailsPanel listing={memberListing} /> : null}
-        <SellerArea listing={memberListing} isLocked={result.isLocked} isOwner={result.isOwner} closedLabel={closedLabel} />
-      </aside>
-      {detailReady ? <div data-testid="property-description-row" className="min-w-0 self-stretch lg:col-start-1 lg:row-start-2"><ListingDescription listing={memberListing} reportAction={descriptionReport} /></div> : null}
-    </section>}
+    <ListingDetailLayout
+      category={isVehicle ? 'vehicle' : 'property'}
+      gallery={<ListingGallery images={galleryImages} title={listing.title} isLocked={result.isLocked} variant="vehicle" />}
+      seller={<SellerArea listing={memberListing} isLocked={result.isLocked} isOwner={result.isOwner} closedLabel={closedLabel} />}
+      description={detailReady ? <ListingDescription listing={memberListing} reportAction={descriptionReport} /> : undefined}
+      details={detailReady
+        ? (isVehicle ? <VehicleDetailsPanel listing={memberListing} /> : <PropertyDetailsPanel listing={memberListing} />)
+        : <div className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-6 text-sm text-[var(--text-muted)]">İlan detaylarını görmek için giriş yapınız.</div>}
+    />
 
     {isVehicle && similarListings.length > 0 ? <SimilarListings listings={similarListings} /> : null}
   </main>;

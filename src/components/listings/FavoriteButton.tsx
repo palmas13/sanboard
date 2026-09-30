@@ -274,7 +274,8 @@ export function FavoriteButton({
       onClick={handleToggle}
       disabled={isLoading}
       aria-label={isFavorited ? 'Favorilerden çıkar' : 'Favorilere ekle'}
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${
+      title={isFavorited ? 'Favorilerden çıkar' : 'Favorilere ekle'}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF8A1F]/60 ${
         isFavorited
           ? 'bg-[var(--color-danger-subtle)] text-[var(--color-danger)] border border-[rgba(229,72,77,0.3)]'
           : 'bg-[var(--bg-surface-secondary)]/80 backdrop-blur-sm text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-surface-hover)] border border-[var(--border-app)]'
@@ -297,15 +298,15 @@ export function FavoriteButton({
 
   if (proofText) {
     return (
-      <div className="flex flex-col items-end gap-1 w-full">
-        <div className="flex items-center justify-between gap-3 w-full">
-          <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+      <div data-testid="favorite-metadata" className="flex min-w-0 flex-1 flex-col items-stretch gap-1">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex min-w-0 items-center gap-2 text-xs text-[var(--text-muted)]">
             <Heart className="w-4 h-4 text-[#FF8A1F] fill-[#FF8A1F]/20 shrink-0" />
             <span>
               <strong className="text-[var(--text-main)]">{count} kişi</strong> bu ilanı favori listesine ekledi.
             </span>
           </div>
-          {buttonElement}
+          <span className="ml-auto shrink-0">{buttonElement}</span>
         </div>
         {errorElement}
       </div>

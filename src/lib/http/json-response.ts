@@ -8,12 +8,15 @@ export async function readJsonResponse<T>(
   fallbackError: string
 ): Promise<T> {
   const contentType = response.headers.get('content-type') || '';
+  const statusError = response.status === 413
+    ? `${fallbackError} Fotoğraflar yükleme sınırını aştı. Lütfen görselleri yeniden seçip tekrar deneyin.`
+    : `${fallbackError} (HTTP ${response.status})`;
 
   if (!contentType.toLowerCase().includes('application/json')) {
     throw new Error(
       response.ok
         ? fallbackError
-        : `${fallbackError} (HTTP ${response.status})`
+        : statusError
     );
   }
 
@@ -26,7 +29,7 @@ export async function readJsonResponse<T>(
 
   if (!response.ok) {
     const errorPayload = payload as JsonApiErrorPayload;
-    throw new Error(errorPayload.error || errorPayload.message || `${fallbackError} (HTTP ${response.status})`);
+    throw new Error(errorPayload.error || errorPayload.message || statusError);
   }
 
   return payload;

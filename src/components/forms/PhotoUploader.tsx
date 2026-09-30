@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Upload, X, Star, AlertCircle, Image as ImageIcon } from 'lucide-react';
+import { Upload, X, Star, AlertCircle, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { resolveMediaUrl } from '@/lib/media/url';
+import { readJsonResponse } from '@/lib/http/json-response';
 
 export interface UploadedImage {
   id: string;
@@ -9,6 +11,8 @@ export interface UploadedImage {
   size_bytes: number;
   is_cover: boolean;
   sort_order: number;
+  preview_url?: string;
+  is_pending?: boolean;
 }
 
 interface PhotoUploaderProps {
@@ -20,10 +24,12 @@ interface PhotoUploaderProps {
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2 MB
 export function PhotoUploader({ images, onChange, maxImages = 3 }: PhotoUploaderProps) {
   const [error, setError] = useState<string>('');
+  const [uploading, setUploading] = useState(false);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setError('');
-    const files = e.target.files;
+    const input = e.currentTarget;
+    const files = input.files;
     if (!files || files.length === 0) return;
 
     if (images.length + files.length > maxImages) {
@@ -31,38 +37,31 @@ export function PhotoUploader({ images, onChange, maxImages = 3 }: PhotoUploader
       return;
     }
 
-    const newImages: UploadedImage[] = [...images];
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-
-      // File size validation (2 MB max)
-      if (file.size > MAX_IMAGE_SIZE) {
-        setError('Bu fotoğraf 2 MB sınırını aşıyor.');
-        continue;
-      }
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64 = event.target?.result as string;
-        const isFirst = newImages.length === 0;
-
-        newImages.push({
-          id: `img-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          storage_path: base64,
-          size_bytes: file.size,
-          is_cover: isFirst,
-          sort_order: newImages.length,
+    setUploading(true);
+    const nextImages = [...images];
+    try {
+      for (const file of Array.from(files)) {
+        if (file.size > MAX_IMAGE_SIZE) throw new Error('Bu fotoğraf 2 MB sınırını aşıyor.');
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await fetch('/api/listing-images', { method: 'POST', body: formData });
+        const data = await readJsonResponse<{ image: { storage_path: string; size_bytes: number } }>(response, 'Fotoğraf yüklenemedi.');
+        nextImages.push({
+          id: `img-${crypto.randomUUID()}`,
+          storage_path: data.image.storage_path,
+          preview_url: URL.createObjectURL(file),
+          size_bytes: data.image.size_bytes,
+          is_cover: nextImages.length === 0,
+          sort_order: nextImages.length,
+          is_pending: true,
         });
-
-        // Ensure exactly one cover
-        if (!newImages.some((img) => img.is_cover) && newImages.length > 0) {
-          newImages[0].is_cover = true;
-        }
-
-        onChange([...newImages]);
-      };
-      reader.readAsDataURL(file);
+        onChange([...nextImages]);
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Fotoğraf yüklenemedi.');
+    } finally {
+      setUploading(false);
+      input.value = '';
     }
   };
 
@@ -75,11 +74,20 @@ export function PhotoUploader({ images, onChange, maxImages = 3 }: PhotoUploader
   };
 
   const handleRemove = (id: string) => {
+    const removed = images.find((img) => img.id === id);
     const remaining = images.filter((img) => img.id !== id);
     if (remaining.length > 0 && !remaining.some((img) => img.is_cover)) {
       remaining[0].is_cover = true;
     }
     onChange(remaining);
+    if (removed?.preview_url) URL.revokeObjectURL(removed.preview_url);
+    if (removed?.is_pending) {
+      void fetch('/api/listing-images', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storage_path: removed.storage_path }),
+      });
+    }
   };
 
   return (
@@ -88,15 +96,15 @@ export function PhotoUploader({ images, onChange, maxImages = 3 }: PhotoUploader
       <div className="flex flex-col sm:flex-row items-center gap-4">
         <label
           className={`flex-1 w-full border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors ${
-            images.length >= maxImages
+            images.length >= maxImages || uploading
               ? 'border-[var(--border-app)] opacity-50 cursor-not-allowed bg-[var(--bg-surface-secondary)]/50'
               : 'border-[var(--border-app)] hover:border-[#FF8A1F] bg-[var(--bg-surface-secondary)]/30 hover:bg-[var(--bg-surface-secondary)]/60'
           }`}
         >
-          <Upload className="w-8 h-8 text-[#FF8A1F]" />
+          {uploading ? <Loader2 className="h-8 w-8 animate-spin text-[#FF8A1F]" /> : <Upload className="w-8 h-8 text-[#FF8A1F]" />}
           <div className="text-center">
             <p className="text-sm font-bold text-[var(--text-main)]">
-              Fotoğraflarını buraya yükle
+              {uploading ? 'Fotoğraflar yükleniyor...' : 'Fotoğraflarını buraya yükle'}
             </p>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">
               JPG, PNG, WEBP • Maksimum {maxImages} fotoğraf • Fotoğraf başına 2 MB
@@ -106,7 +114,7 @@ export function PhotoUploader({ images, onChange, maxImages = 3 }: PhotoUploader
             type="file"
             accept="image/png, image/jpeg, image/webp"
             multiple
-            disabled={images.length >= maxImages}
+            disabled={images.length >= maxImages || uploading}
             onChange={handleFileUpload}
             className="hidden"
           />
@@ -131,7 +139,7 @@ export function PhotoUploader({ images, onChange, maxImages = 3 }: PhotoUploader
             }`}
           >
             <img
-              src={img.storage_path}
+              src={img.preview_url || resolveMediaUrl(img.storage_path)}
               alt="İlan görseli"
               className="w-full h-full object-cover"
             />
@@ -150,7 +158,7 @@ export function PhotoUploader({ images, onChange, maxImages = 3 }: PhotoUploader
                 <button
                   type="button"
                   onClick={() => handleSetCover(img.id)}
-                  className="px-2.5 py-1 rounded bg-[var(--brand-orange)] text-white text-xs font-semibold flex items-center gap-1 shadow hover:bg-[var(--brand-orange-hover)] cursor-pointer"
+                  className="px-2.5 py-1 rounded bg-[var(--brand-orange)] text-white text-xs font-semibold flex items-center gap-1 shadow hover:bg-[var(--brand-orange-hover)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
                 >
                   <Star className="w-3.5 h-3.5" />
                   <span>Vitrin Yap</span>
@@ -159,7 +167,8 @@ export function PhotoUploader({ images, onChange, maxImages = 3 }: PhotoUploader
               <button
                 type="button"
                 onClick={() => handleRemove(img.id)}
-                className="p-1.5 rounded bg-[var(--color-danger)] text-white text-xs font-semibold shadow hover:opacity-90 cursor-pointer"
+                aria-label="Fotoğrafı kaldır"
+                className="p-1.5 rounded bg-[var(--color-danger)] text-white text-xs font-semibold shadow hover:opacity-90 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
                 title="Fotoğrafı Kaldır"
               >
                 <X className="w-4 h-4" />

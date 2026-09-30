@@ -8,7 +8,11 @@ const source = (path: string) => readFileSync(join(process.cwd(), path), 'utf8')
 describe('dashboard overview and admin pagination regressions', () => {
   test('overview explains and exposes the available listing entitlement', () => {
     const overview = source('src/app/hesabim/page.tsx');
-    assert.match(overview, /İlan Hakkı=/);
+    assert.match(overview, /İlan Haklarım/);
+    assert.match(overview, /creditPresentation\.total/);
+    assert.match(overview, /stats\.individualCredits/);
+    assert.match(overview, /stats\.corporateCredits/);
+    assert.doesNotMatch(overview, /İlan Hakkı=|Süresi Dolan İlanlarım/);
     assert.match(overview, /Haklar yalnızca tanımlandıkları bireysel profil veya kurumsal mağaza kapsamında kullanılabilir/);
     assert.match(overview, /İlan Hakkımı Kullan/);
     assert.match(overview, /individualCredits/);
@@ -19,6 +23,7 @@ describe('dashboard overview and admin pagination regressions', () => {
     assert.match(corporate, /Aktif Boost/);
     assert.match(corporate, /formatTimeRemaining\(l\.featured_until\)/);
     assert.match(corporate, /dealer\.boost_credits/);
+    assert.doesNotMatch(corporate, /boost_credits \?\? 0\}\/3/);
   });
 
   test('personal listing actions have a symmetric fixed-width layout', () => {

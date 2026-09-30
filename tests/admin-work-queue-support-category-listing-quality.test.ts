@@ -50,7 +50,7 @@ describe('admin work queue, support categories and listing quality', () => {
   test('UI contains queue, filter, draft/preview quality and no public score', () => {
     const admin = readFileSync('src/app/yonetim/page.tsx', 'utf8'); const create = readFileSync('src/app/ilan-ver/yeni/page.tsx', 'utf8'); const dashboard = readFileSync('src/app/hesabim/ilanlarim/page.tsx', 'utf8'); const publicPage = readFileSync('src/app/ilan/[id]/page.tsx', 'utf8');
     assert.match(admin, /İlgilenmeniz Gerekenler/); assert.match(admin, /Şu an ilgilenmeniz gereken bir işlem yok/); assert.match(admin, /setActiveTab\(item\.id\)/); assert.match(admin, /ticketCategoryFilter/);
-    assert.match(create, /ListingQualityIndicator/); assert.match(create, /step === 4/); assert.match(dashboard, /Düzenlemeye Devam Et/); assert.match(dashboard, /sanboard_listing_draft_v1_/);
+    assert.equal((create.match(/<ListingQualityIndicator/g) || []).length, 1); assert.match(create, /setStep\(4\)/); assert.match(create, /setStep\(3\)/); assert.match(create, /step === 4/); assert.match(dashboard, /Düzenlemeye Devam Et/); assert.match(dashboard, /sanboard_listing_draft_v2_/);
     assert.doesNotMatch(publicPage, /ListingQualityIndicator|İlan Tamamlanma/);
   });
 });

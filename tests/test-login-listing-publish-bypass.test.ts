@@ -62,6 +62,13 @@ describe('canonical test-login listing publish bypass', () => {
     };
   }
 
+  const imageReferences = (count: number) => Array.from({ length: count }, (_, index) => ({
+    storage_path: `listings/${testProfileId}/image-${index}.webp`,
+    sort_order: index,
+    is_cover: index === 0,
+    size_bytes: 120_000,
+  }));
+
   test('canonical test account publishes ACTIVE no-charge listing with correct owner and seven-day expiry', async () => {
     const token = createSessionToken({ userId: testUserId, profileId: testProfileId, role: 'ADMIN' });
     const credits = await getCredits(new NextRequest('http://localhost/api/credits', { headers: { cookie: `sanboard_session=${token}` } }));
@@ -76,6 +83,27 @@ describe('canonical test-login listing publish bypass', () => {
     assert.equal(new Date(result.listing.expires_at).getTime() - new Date(result.listing.published_at).getTime(), 7 * 86400000);
     assert.equal(db.auditLogs.at(-1)?.event_type, 'TEST_LISTING_PAYMENT_BYPASS');
     assert.equal(db.auditLogs.at(-1)?.metadata?.charged, false);
+  });
+
+  test('vehicle publish succeeds with three metadata-only image references', async () => {
+    const response = await publishListing(request(testProfileId, testUserId, payload({ images: imageReferences(3) })));
+    assert.equal(response.status, 200);
+    const listing = (await response.json()).listing;
+    assert.equal(listing.images.length, 3);
+    assert.equal(listing.images.some((item: any) => item.storage_path.startsWith('data:')), false);
+  });
+
+  test('property publish succeeds with five metadata-only image references', async () => {
+    const response = await publishListing(request(testProfileId, testUserId, {
+      category: 'property', subcategory: 'Ev / Daire', title: 'Test mülkü', description: 'Beş görselli mülk', price: 250000,
+      images: imageReferences(5), location: 'Rockford Hills', floor: 2, room_count: '2+1', furnished: true,
+      market_value: 225000, furniture_value: 15000, building_type: 'Normal', balcony: true,
+    }));
+    assert.equal(response.status, 200);
+    const listing = (await response.json()).listing;
+    assert.equal(listing.images.length, 5);
+    assert.equal(listing.property_details.market_value, 225000);
+    assert.equal(listing.images.some((item: any) => item.storage_path.startsWith('data:')), false);
   });
 
   test('character switching remains isolated to the signed active test character', async () => {

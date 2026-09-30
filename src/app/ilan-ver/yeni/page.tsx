@@ -30,10 +30,11 @@ import { LISTING_TITLE_MAX_ERROR, LISTING_TITLE_MAX_LENGTH } from '@/lib/validat
 import { getVehicleLevelOptions, normalizeVehicleLevel, VEHICLE_LEVEL_FIELDS } from '@/lib/listings/vehicle-levels';
 import { formatTurkishInteger, isIntegerInRange, normalizeIntegerInput, normalizeTurkishIntegerInput } from '@/lib/forms/integer-input';
 import { readJsonResponse } from '@/lib/http/json-response';
+import { toListingImageReferences } from '@/lib/listings/image-references';
 
 const TITLE_MAX = LISTING_TITLE_MAX_LENGTH;
 const DESC_MAX = 100;
-const DRAFT_VERSION = 1;
+const DRAFT_VERSION = 2;
 
 export default function YeniIlanOlusturPage() {
   const router = useRouter();
@@ -182,7 +183,8 @@ export default function YeniIlanOlusturPage() {
       step, category, subcategory, title, description, price, offersEnabled, minimumOffer, location, brand, model, plate,
       mileage, engineUpgrade, transmissionUpgrade, brakeUpgrade, turbo, subwoofer,
       tradeAvailable, lockLevel, alarmLevel, antiTheftLevel, engineHealth, suspension,
-      fuelType, factoryPrice, floor, roomCount, furnished, marketValue, furnitureValue, buildingType, balcony, images,
+      fuelType, factoryPrice, floor, roomCount, furnished, marketValue, furnitureValue, buildingType, balcony,
+      images: images.map(({ preview_url: _previewUrl, ...image }) => image),
       savedAt: new Date().toISOString(),
     };
     const timer = window.setTimeout(() => {
@@ -437,7 +439,7 @@ export default function YeniIlanOlusturPage() {
       price: Number(price),
       offers_enabled: offersEnabled,
       minimum_offer_amount: offersEnabled && minimumOffer !== '' ? Number(minimumOffer) : null,
-      images,
+      images: toListingImageReferences(images),
       corporate: isCorporate,
       seller_type: isCorporate ? 'CORPORATE' : 'INDIVIDUAL',
       corporate_profile_id: isCorporate && dealer?.id ? dealer.id : null,
@@ -1155,7 +1157,6 @@ export default function YeniIlanOlusturPage() {
       {/* STEP 4: PREVIEW & PUBLISH */}
       {step === 4 && (
         <div className="space-y-6">
-          <ListingQualityIndicator quality={listingQuality} />
           <div className="surface-card p-6 rounded-2xl space-y-4">
             <h2 className="text-lg font-bold text-[var(--text-main)] flex items-center gap-2">
               <Eye className="w-5 h-5 text-[#FF8A1F]" />

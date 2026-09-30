@@ -37,6 +37,11 @@ export async function GET(
 
     return NextResponse.json({ listing });
   } catch (error: any) {
+    console.error('Listing update failed', {
+      error: error?.message || String(error),
+      contentLength: req.headers.get('content-length'),
+      contentType: req.headers.get('content-type'),
+    });
     return NextResponse.json(
       { error: error?.message || 'İlan bilgileri getirilemedi.' },
       { status: 500 }

@@ -178,6 +178,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error: any) {
+    console.error('Listing publish failed', {
+      error: error?.message || String(error),
+      contentLength: req.headers.get('content-length'),
+      contentType: req.headers.get('content-type'),
+    });
     return NextResponse.json(
       { error: error?.message || 'İlan oluşturulamadı.' },
       { status: 500 }

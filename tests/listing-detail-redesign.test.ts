@@ -18,21 +18,20 @@ describe('premium listing detail redesign', () => {
   const similarCard = source('src/components/listings/SimilarListingCard.tsx');
   const favorite = source('src/components/listings/FavoriteButton.tsx');
   const corporate = source('src/app/hesabim/kurumsal/page.tsx');
+  const layout = source('src/components/listings/detail/ListingDetailLayout.tsx');
 
-  test('vehicle and property details use distinct responsive marketplace layouts', () => {
-    assert.match(page, /data-testid="vehicle-listing-layout"/);
+  test('vehicle and property details share the same responsive marketplace layout', () => {
+    assert.match(page, /<ListingDetailLayout/);
     assert.match(page, /max-w-\[1580px\]/);
-    assert.match(page, /xl:grid-cols-\[minmax\(0,1\.55fr\)_minmax\(360px,\.9fr\)_minmax\(245px,\.58fr\)\]/);
-    assert.match(page, /data-testid="property-listing-layout"/);
-    assert.match(page, /lg:grid-cols-\[minmax\(0,1\.5fr\)_minmax\(380px,1fr\)\]/);
-    assert.match(page, /data-testid="vehicle-gallery-block"[^>]*>[\s\S]*?<ListingGallery/);
-    assert.match(page, /data-testid="vehicle-description-row"[^>]*xl:col-start-1[^>]*>[\s\S]*?<ListingDescription/);
-    assert.match(page, /data-testid="vehicle-technical-column"[^>]*xl:col-start-2[^>]*xl:row-span-2[^>]*>[\s\S]*?<VehicleDetailsPanel/);
-    assert.match(page, /data-testid="vehicle-seller-rail"[^>]*xl:col-start-3[^>]*xl:sticky[^>]*>[\s\S]*?<SellerArea/);
-    assert.ok(page.indexOf('data-testid="vehicle-seller-rail"') < page.indexOf('data-testid="vehicle-description-row"'));
-    assert.match(page, /data-testid="property-gallery-block"[^>]*>[\s\S]*?<ListingGallery/);
-    assert.match(page, /data-testid="property-right-column"[^>]*lg:sticky[^>]*>[\s\S]*?<PropertyDetailsPanel[\s\S]*?<SellerArea/);
-    assert.match(page, /data-testid="property-description-row"[^>]*>[\s\S]*?<ListingDescription/);
+    assert.match(layout, /data-testid=\{`\$\{category\}-listing-layout`\}/);
+    assert.match(layout, /data-detail-layout="vehicle-theme"/);
+    assert.match(layout, /xl:grid-cols-\[minmax\(0,1\.55fr\)_minmax\(360px,\.9fr\)_minmax\(245px,\.58fr\)\]/);
+    assert.match(layout, /data-testid=\{`\$\{category\}-gallery-block`\}/);
+    assert.match(layout, /data-testid=\{`\$\{category\}-description-row`\}/);
+    assert.match(layout, /data-testid=\{`\$\{category\}-technical-column`\}/);
+    assert.match(layout, /data-testid=\{`\$\{category\}-seller-rail`\}/);
+    assert.match(page, /isVehicle \? <VehicleDetailsPanel[\s\S]*: <PropertyDetailsPanel/);
+    assert.match(page, /variant="vehicle"/);
     assert.doesNotMatch(page, /min-h-\[calc\(100vh-5rem\)\]/);
   });
 
@@ -74,6 +73,10 @@ describe('premium listing detail redesign', () => {
     assert.match(corporate, /searchParams\.get\('listing'\)/);
     assert.match(corporate, /id="ilanlar"/);
     assert.match(corporate, /managedListingId === l\.id/);
+    assert.match(header, /data-testid="listing-metadata-row"/);
+    assert.match(favorite, /data-testid="favorite-metadata"/);
+    assert.match(favorite, /\{count\} kişi/);
+    assert.match(favorite, /ml-auto shrink-0/);
   });
 
   test('optional fields are conditional and property fields use real listing data', () => {
@@ -85,6 +88,7 @@ describe('premium listing detail redesign', () => {
     assert.match(property, /details\.building_type/);
     assert.doesNotMatch(property, /Belirtilmemiş/);
     assert.match(header, /listing\.category === 'vehicle' && listing\.location/);
+    assert.doesNotMatch(header, /listing\.category === 'property' && listing\.location/);
   });
 
   test('motorcycle suspension is hidden, ATV remains eligible, and levels are labelled', () => {

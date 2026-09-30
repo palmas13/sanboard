@@ -61,7 +61,7 @@ export default function HesabimIlanlarimPage() {
 
   useEffect(() => {
     if (!currentProfile) return;
-    const keys = [`sanboard_listing_draft_v1_${currentProfile.id}_individual`, `sanboard_listing_draft_v1_${currentProfile.id}_corporate`];
+    const keys = [`sanboard_listing_draft_v2_${currentProfile.id}_individual`, `sanboard_listing_draft_v2_${currentProfile.id}_corporate`];
     const drafts = keys.flatMap((key) => {
       try {
         const raw = localStorage.getItem(key);

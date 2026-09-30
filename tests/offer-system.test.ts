@@ -167,7 +167,7 @@ describe('Structured offer system', () => {
     for (const pattern of [/offer_threads/, /offer_events/, /ux_offer_threads_active_buyer_listing/, /ENABLE ROW LEVEL SECURITY/, /notifications_entity_type_check/, /close_listing_with_offers/, /expire_stale_offer_threads/, /pg_advisory_xact_lock/]) assert.match(sql, pattern);
   });
 
-  test('participant hide is isolated, preserves history and new activity restores visibility and unread', async () => {
+  test('participant hide is isolated, preserves history and remains hidden after reload, sync and new activity', async () => {
     await create();
     const thread = db.offerThreads[0];
     const eventCount = db.offerEvents.length;
@@ -177,9 +177,16 @@ describe('Structured offer system', () => {
     assert.equal(db.offerEvents.length, eventCount);
     assert.equal((await repo.hideOffer(thread.id, sibling)).success, false);
     await repo.actOnOffer({ threadId: thread.id, actorProfileId: seller, actorUserId: 'seller-account', action: 'COUNTER', amount: 70000 });
-    const restored = await repo.listOffers({ actorProfileId: buyer, box: 'sent' });
-    assert.equal(restored.threads.length, 1);
-    assert.equal(restored.threads[0].unread_count, 1);
+    const freshRepo = new MemoryOfferRepository();
+    assert.equal((await freshRepo.listOffers({ actorProfileId: buyer, box: 'sent' })).threads.length, 0);
+    assert.equal((await freshRepo.getOffer(thread.id, buyer)).success, false);
+    db.users = [
+      { id: 'buyer-account', provider: 'GTAWORLD', external_user_id: 'buyer-external', role: 'USER', status: 'ACTIVE', created_at: '', updated_at: '' },
+      { id: 'seller-account', provider: 'GTAWORLD', external_user_id: 'seller-external', role: 'USER', status: 'ACTIVE', created_at: '', updated_at: '' },
+    ] as any;
+    db.profiles.find((profile) => profile.id === buyer)!.external_character_id = 'buyer-character';
+    await syncExternalGameAccount({ externalAccountId: 'buyer-external', characters: [{ externalCharacterId: 'buyer-character', displayName: 'Buyer Renamed' }] });
+    assert.equal((await new MemoryOfferRepository().listOffers({ actorProfileId: buyer, box: 'sent' })).threads.length, 0);
   });
 
   test('accepted individual thread exposes the same canonical seller contact to both sides', async () => {
@@ -236,5 +243,14 @@ describe('Structured offer system', () => {
   test('corrective migration adds participant visibility without rewriting production offer migration', () => {
     const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20260928020000_offer_participant_visibility.sql'), 'utf8');
     for (const pattern of [/buyer_hidden_at/, /seller_hidden_at/, /hide_offer_thread/, /restore_offer_thread_visibility_on_event/, /get_offer_unread_count/]) assert.match(sql, pattern);
+  });
+
+  test('durable visibility migration removes automatic offer restore trigger', () => {
+    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20261002010000_persistent_user_hidden_history.sql'), 'utf8');
+    assert.match(sql, /ADD COLUMN IF NOT EXISTS buyer_hidden_at/);
+    assert.match(sql, /ADD COLUMN IF NOT EXISTS seller_hidden_at/);
+    assert.match(sql, /ADD COLUMN IF NOT EXISTS payment_history_cleared_at/);
+    assert.match(sql, /DROP TRIGGER IF EXISTS offer_event_restores_participant_visibility/);
+    assert.match(sql, /DROP FUNCTION IF EXISTS public\.restore_offer_thread_visibility_on_event/);
   });
 });
