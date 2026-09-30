@@ -14,6 +14,8 @@ describe('premium listing detail redesign', () => {
   const header = source('src/components/listings/detail/ListingDetailHeader.tsx');
   const safety = source('src/components/listings/detail/SafeShoppingCard.tsx');
   const offer = source('src/components/offers/OfferCenter.tsx');
+  const favorite = source('src/components/listings/FavoriteButton.tsx');
+  const corporate = source('src/app/hesabim/kurumsal/page.tsx');
 
   test('vehicle and property details use distinct responsive marketplace layouts', () => {
     assert.match(page, /data-testid="vehicle-listing-layout"/);
@@ -49,7 +51,8 @@ describe('premium listing detail redesign', () => {
     assert.match(seller, /data-testid=\{isCorporate \? 'corporate-seller-card' : 'individual-seller-card'\}/);
     assert.match(seller, /dealer\?\.phone/);
     assert.match(seller, /seller\?\.phone/);
-    assert.match(page, /isOwner \? <Link href="\/hesabim\/ilanlarim"/);
+    assert.match(page, /listing\.seller_type === 'CORPORATE' \? `\/hesabim\/kurumsal\?listing=/);
+    assert.match(page, /`\/hesabim\/ilanlarim\/\$\{listing\.id\}\/duzenle`/);
     assert.match(page, /listing\.offers_enabled !== false \? <OfferButton/);
     assert.match(seller, /Kurumsal Profil/);
     assert.doesNotMatch(seller, /Premium Satıcı|Onaylı Kurumsal Profil|Kurumsal Satıcı|Mesaj Gönder|İletişim Kur|Satıcıyla İletişime Geç/);
@@ -57,6 +60,14 @@ describe('premium listing detail redesign', () => {
     assert.match(safety, /data-testid="safe-shopping-card"/);
     assert.match(safety, /Güvenli alışveriş:/);
     assert.doesNotMatch(safety, /shadow-/);
+  });
+
+  test('favorite counts synchronize between mounted controls and corporate manage links retain listing context', () => {
+    assert.match(favorite, /favoriteCountSubscribers/);
+    assert.match(favorite, /subscribeFavoriteCount\(listingId/);
+    assert.match(corporate, /searchParams\.get\('listing'\)/);
+    assert.match(corporate, /id="ilanlar"/);
+    assert.match(corporate, /managedListingId === l\.id/);
   });
 
   test('optional fields are conditional and property fields use real listing data', () => {

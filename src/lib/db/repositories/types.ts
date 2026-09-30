@@ -82,7 +82,7 @@ export interface IListingRepository {
   getListingByPublicId(publicId: string, viewerProfileId?: string, viewerUserId?: string): Promise<{ listing: MemberListingDetail | PublicListingSummary | null; isLocked: boolean; isOwner: boolean }>;
   createListing(input: CreateListingInput, profileId: string, options?: ListingPublishOptions): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   updateListing(id: string, input: Partial<CreateListingInput>, profileId: string, userId?: string, role?: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
-  closeListing(id: string, profileId: string, status: 'SOLD' | 'REMOVED'): Promise<{ success: boolean; listing?: Listing; error?: string }>;
+  closeListing(id: string, profileId: string, status: 'SOLD' | 'REMOVED', closeReason?: 'SOLD' | 'CANCELLED' | 'OTHER'): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   markListingAsSold(id: string, profileId: string): Promise<{ success: boolean; error?: string }>;
   republishListing(id: string, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   removeListing?(id: string, profileId: string): Promise<{ success: boolean; error?: string }>;
@@ -105,10 +105,12 @@ export interface IListingRepository {
 }
 
 export interface INotificationRepository {
-  getUserNotifications(profileIdOrUserId: string): Promise<Notification[]>;
+  getUserNotifications(profileIdOrUserId: string, options?: { offset?: number; limit?: number }): Promise<Notification[]>;
+  getNotificationCount(profileIdOrUserId: string): Promise<number>;
   getUnreadCount(profileIdOrUserId: string): Promise<number>;
   markAsRead(profileIdOrUserId: string, notificationId: string): Promise<{ success: boolean; notification?: Notification; error?: string }>;
   markAllAsRead(profileIdOrUserId: string): Promise<{ success: boolean; count: number }>;
+  deleteNotifications(profileIdOrUserId: string, notificationIds?: string[]): Promise<{ success: boolean; count: number; error?: string }>;
   createNotification(params: {
     recipient_profile_id?: string;
     user_id?: string;

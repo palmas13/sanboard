@@ -56,7 +56,7 @@ export class MemoryListingRepository implements IListingRepository {
     return markListingAsSold(id, profileId);
   }
 
-  async closeListing(id: string, profileId: string, status: 'SOLD' | 'REMOVED') {
+  async closeListing(id: string, profileId: string, status: 'SOLD' | 'REMOVED', _closeReason?: 'SOLD' | 'CANCELLED' | 'OTHER') {
     const result = status === 'SOLD'
       ? await markListingAsSold(id, profileId)
       : await (await import('../../listings')).removeListing(id, profileId);

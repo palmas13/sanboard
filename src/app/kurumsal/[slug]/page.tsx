@@ -12,7 +12,6 @@ import {
   Mail,
   Car,
   Home,
-  ShieldCheck,
   Calendar,
   AlertCircle,
   Globe,
@@ -174,7 +173,7 @@ export default async function CorporateStorePage({ params }: PageProps) {
                 </h1>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border border-[#FF8A1F]/30 text-xs font-black shadow-sm">
                   <Crown className="w-3.5 h-3.5 fill-current" />
-                  <span>PREMIUM SATICI</span>
+                  <span>Kurumsal Galeri</span>
                 </span>
               </div>
 
@@ -197,10 +196,6 @@ export default async function CorporateStorePage({ params }: PageProps) {
                     <span>Kayıt: {formatDate(dealer.created_at)}</span>
                   </div>
                 )}
-                <div className="flex items-center gap-1 text-emerald-400 font-medium">
-                  <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                  <span>Doğrulanmış Kurumsal Üye</span>
-                </div>
               </div>
 
               {/* Social Media Links (Sections 18-23: Up to 2 non-empty valid entries) */}
@@ -210,19 +205,17 @@ export default async function CorporateStorePage({ params }: PageProps) {
                 return (
                   <div className="flex items-center gap-3 pt-1 flex-wrap">
                     {links.map((link, idx) => (
-                      <div key={idx} className="flex items-center gap-1.5">
+                      <a
+                        key={idx}
+                        href={link.url.startsWith('http') ? link.url : `https://${link.url}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--text-main)] transition-colors hover:bg-[#FF8A1F]/20 hover:text-[#FF8A1F]"
+                      >
                         <Share2 className="w-3 h-3 text-[#FF8A1F]" />
-                        <span className="text-[11px] font-bold text-[var(--text-dim)]">{link.name}:</span>
-                        <a
-                          href={link.url.startsWith('http') ? link.url : `https://${link.url}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-2.5 py-0.5 rounded-md bg-[var(--bg-surface-secondary)] hover:bg-[#FF8A1F]/20 text-[11px] font-semibold text-[var(--text-main)] hover:text-[#FF8A1F] border border-[var(--border-app)] transition-colors inline-flex items-center gap-1"
-                        >
-                          <span>{link.name}</span>
-                          <span className="text-[9px]">↗</span>
-                        </a>
-                      </div>
+                        <span>{link.name}</span>
+                        <span className="text-[9px]">↗</span>
+                      </a>
                     ))}
                   </div>
                 );

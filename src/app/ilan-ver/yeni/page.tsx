@@ -179,9 +179,12 @@ export default function YeniIlanOlusturPage() {
   }, [draftStorageKey, draftReady, step, category, subcategory, title, description, price, location, brand, model, plate, mileage, engineUpgrade, transmissionUpgrade, brakeUpgrade, turbo, subwoofer, tradeAvailable, lockLevel, alarmLevel, antiTheftLevel, engineHealth, suspension, fuelType, factoryPrice, floor, roomCount, furnished, buildingType, balcony, images]);
 
   const clearDraft = () => {
+    if (!window.confirm('Bu taslağı silmek istediğinize emin misiniz?')) return;
     if (draftStorageKey) localStorage.removeItem(draftStorageKey);
     setDraftSavedAt(null);
     setStep(1);
+    setCategory('vehicle');
+    setSubcategory('Otomobil');
     setTitle('');
     setDescription('');
     setPrice('');
@@ -190,6 +193,24 @@ export default function YeniIlanOlusturPage() {
     setModel('');
     setPlate('');
     setMileage('');
+    setEngineUpgrade('0');
+    setTransmissionUpgrade('0');
+    setBrakeUpgrade('0');
+    setTurbo(false);
+    setSubwoofer(false);
+    setTradeAvailable(false);
+    setLockLevel('');
+    setAlarmLevel('');
+    setAntiTheftLevel('');
+    setEngineHealth('');
+    setSuspension('');
+    setFuelType('BENZIN');
+    setFactoryPrice('');
+    setFloor('1');
+    setRoomCount('2+1');
+    setFurnished(false);
+    setBuildingType('Normal');
+    setBalcony(false);
     setImages([]);
   };
 
@@ -211,15 +232,22 @@ export default function YeniIlanOlusturPage() {
     }
 
     if (corpParam) {
-      // Authoritative corporate eligibility & dealer details check
+      // Authoritative corporate eligibility and store-scoped credit check.
       fetch('/api/dealers/eligibility')
         .then((res) => res.json())
-        .then((eligData) => {
+        .then(async (eligData) => {
           if (!eligData.eligible || !eligData.dealer) {
             router.replace('/hesabim/kurumsal');
             return;
           }
           setDealer(eligData.dealer);
+          const creditResponse = await fetch(`/api/credits?corporateProfileId=${encodeURIComponent(eligData.dealer.id)}`);
+          const creditData = await creditResponse.json();
+          const canBypassPayment = creditData.testPublishBypass === true;
+          setTestPublishBypass(canBypassPayment);
+          if ((creditData.scopedCorporateCredits || 0) < 1 && !canBypassPayment) {
+            router.replace('/hesabim/kurumsal');
+          }
         })
         .catch(() => {
           router.replace('/hesabim/kurumsal');
@@ -227,21 +255,20 @@ export default function YeniIlanOlusturPage() {
     }
 
     // Verify user actually has an available credit for the chosen mode (INDIVIDUAL vs CORPORATE)
+    if (corpParam) return;
     fetch('/api/credits')
       .then((res) => res.json())
       .then((data) => {
         const canBypassPayment = data.testPublishBypass === true;
         setTestPublishBypass(canBypassPayment);
-        const hasNeededCredit = corpParam
-          ? (data.corporateCredits !== undefined ? data.corporateCredits > 0 : data.availableCredits > 0)
-          : (data.individualCredits !== undefined ? data.individualCredits > 0 : data.availableCredits > 0);
+        const hasNeededCredit = data.individualCredits !== undefined ? data.individualCredits > 0 : data.availableCredits > 0;
 
         if (!hasNeededCredit && !canBypassPayment) {
-          router.replace(corpParam ? '/hesabim/kurumsal' : '/ilan-ver/paket');
+          router.replace('/ilan-ver/paket');
         }
       })
       .catch(() => {
-        router.replace(corpParam ? '/hesabim/kurumsal' : '/ilan-ver/paket');
+        router.replace('/ilan-ver/paket');
       });
   }, [isLoading, isAuthenticated, currentProfile, router]);
 

@@ -66,6 +66,17 @@ describe('SANBOARD generic character isolation package 1', () => {
     assert.equal((await getCredits(request('/api/credits'))).status, 401);
   });
 
+  test('corporate credit availability is scoped to the requested store without changing actor scope', async () => {
+    db.credits.push(
+      { id: 'credit-store-a', profile_id: alexId, payment_id: 'payment-store-a', package_id: 'package-corp', credit_type: 'CORPORATE', corporate_profile_id: 'store-a', amount: 1750, status: 'AVAILABLE', created_at: '2026-09-26T04:00:00.000Z' },
+      { id: 'credit-store-b', profile_id: alexId, payment_id: 'payment-store-b', package_id: 'package-corp', credit_type: 'CORPORATE', corporate_profile_id: 'store-b', amount: 1750, status: 'AVAILABLE', created_at: '2026-09-26T05:00:00.000Z' },
+    );
+    const response = await getCredits(request('/api/credits?corporateProfileId=store-a', alexId, alexId));
+    const body = await response.json();
+    assert.equal(body.corporateCredits, 2);
+    assert.equal(body.scopedCorporateCredits, 1);
+  });
+
   test('payment history is scoped to signed active character and ignores query/cookie actor injection', async () => {
     const alexResponse = await getPayments(request(`/api/user/payments?profileId=${jordanId}`, alexId, jordanId));
     const alexPayments = await alexResponse.json();

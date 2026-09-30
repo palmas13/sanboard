@@ -18,11 +18,16 @@ export async function GET(req: NextRequest) {
     const availableList = (result.credits || []).filter((c: any) => c.status === 'AVAILABLE');
     const individualCredits = availableList.filter((c: any) => c.credit_type === 'INDIVIDUAL').length;
     const corporateCredits = availableList.filter((c: any) => c.credit_type === 'CORPORATE').length;
+    const corporateProfileId = req.nextUrl.searchParams.get('corporateProfileId');
+    const scopedCorporateCredits = corporateProfileId
+      ? availableList.filter((c: any) => c.credit_type === 'CORPORATE' && c.corporate_profile_id === corporateProfileId).length
+      : 0;
 
     return NextResponse.json({
       availableCredits: result.available,
       individualCredits,
       corporateCredits,
+      scopedCorporateCredits,
       credits: result.credits,
       testPublishBypass,
     });

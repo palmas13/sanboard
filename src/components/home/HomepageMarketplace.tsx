@@ -1,14 +1,11 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, Building2, CalendarDays, Car, CheckCircle2, Home, MapPin, Sparkles, Store } from 'lucide-react';
+import { ArrowRight, Building2, Car, CheckCircle2, Home, Sparkles, Store } from 'lucide-react';
 import { CorporateProfile, PublicListingSummary } from '@/types';
-import { formatCurrency } from '@/lib/utils/format';
 import { resolveMediaUrl } from '@/lib/media/url';
-import { getCorporateUrl, getListingUrl } from '@/lib/urls';
+import { getCorporateUrl } from '@/lib/urls';
+import { HomepageFeaturedRotator } from './HomepageFeaturedRotator';
 import { HomepageListingRotator } from './HomepageListingRotator';
-import { FavoriteButton } from '@/components/listings/FavoriteButton';
-
-const PROPERTY_FALLBACK = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=900&auto=format&fit=crop&q=80';
 
 function SectionHeader({ icon: Icon, title, subtitle, href }: { icon: typeof Sparkles; title: string; subtitle: string; href: string }) {
   return (
@@ -22,29 +19,6 @@ function SectionHeader({ icon: Icon, title, subtitle, href }: { icon: typeof Spa
       </div>
       <Link href={href} className="homepage-see-all">Tümünü Gör <ArrowRight className="h-3 w-3" /></Link>
     </header>
-  );
-}
-
-function FeaturedListing({ listing }: { listing: PublicListingSummary }) {
-  const image = resolveMediaUrl(listing.cover_image) || PROPERTY_FALLBACK;
-  return (
-    <article className="homepage-featured-card group relative">
-      <Link href={getListingUrl(listing)} className="absolute inset-0 z-0" aria-label={`${listing.title} ilanını görüntüle`} />
-      <div className="relative aspect-[1.48/1] overflow-hidden rounded-t-[inherit]">
-        <Image src={image} alt={listing.title} fill sizes="(max-width: 639px) calc(100vw - 2rem), (max-width: 1279px) calc(50vw - 2rem), 380px" quality={90} className="object-cover object-center transition-transform duration-500 group-hover:scale-105" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-black/10" />
-        <span className="absolute left-3 top-3 rounded-md border border-white/10 bg-black/65 px-2.5 py-1.5 text-[10px] font-semibold text-white backdrop-blur-sm">Öne Çıkarılan</span>
-        <span className="pointer-events-auto absolute right-3 top-3 z-10"><FavoriteButton listingId={listing.id} initialCount={listing.favorite_count} initialIsFavorited={listing.is_favorited} size="sm" /></span>
-      </div>
-      <div className="pointer-events-none relative z-10 p-[1.125rem]">
-        <p className="text-[1.35rem] font-black tracking-tight text-[#ff8a1f]">{formatCurrency(listing.price)}</p>
-        <h3 className="mt-1.5 line-clamp-2 min-h-10 text-[15px] font-bold leading-5 text-[var(--text-main)] group-hover:text-[#ff9d45]">{listing.title}</h3>
-        <div className="mt-3 flex min-h-5 items-center justify-between gap-3 border-t border-[var(--border-app)] pt-3 text-[11px] text-[var(--text-muted)]">
-          {listing.location ? <span className="flex min-w-0 items-center gap-1"><MapPin className="h-3.5 w-3.5 shrink-0 text-[#ff8a1f]" /><span className="truncate">{listing.location}</span></span> : <span aria-hidden="true" />}
-          {listing.published_at && <span className="flex shrink-0 items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{new Intl.DateTimeFormat('tr-TR', { year: 'numeric' }).format(new Date(listing.published_at))}</span>}
-        </div>
-      </div>
-    </article>
   );
 }
 
@@ -75,10 +49,10 @@ export function HomepageMarketplace({ featuredListings, vehicleListings, propert
   return (
     <section className="mx-auto max-w-[1560px] px-4 sm:px-6 lg:px-8" aria-label="Sanboard ilan vitrini">
       <div className="homepage-marketplace-grid">
-        <div className="homepage-marketplace-column"><SectionHeader icon={Sparkles} title="Öne Çıkan İlanlar" subtitle="Öne çıkarılmış vitrin ilanları" href="/ilanlari-kesfet" />{featuredListings[0] ? <FeaturedListing listing={featuredListings[0]} /> : <div className="homepage-empty-state">Şu anda öne çıkarılmış aktif ilan bulunmuyor.</div>}</div>
-        <div className="homepage-marketplace-column"><SectionHeader icon={Car} title="Yeni Araç İlanları" subtitle="En yeni araç ilanlarını keşfet" href="/arac" /><HomepageListingRotator listings={vehicleListings} emptyMessage="Henüz yeni araç ilanı bulunmuyor." label="araç ilanları" /></div>
-        <div className="homepage-marketplace-column"><SectionHeader icon={Home} title="Yeni Mülk İlanları" subtitle="En yeni mülk ilanlarını keşfet" href="/mulk" /><HomepageListingRotator listings={propertyListings} emptyMessage="Henüz yeni mülk ilanı bulunmuyor." label="mülk ilanları" /></div>
-        <div className="homepage-marketplace-column"><SectionHeader icon={Store} title="Kurumsal Satıcılar" subtitle="Aktif üyeliğe sahip kurumsal satıcılar" href="/ilanlari-kesfet" /><CorporateSellerList sellers={corporateSellers} counts={corporateListingCounts} /></div>
+        <div className="homepage-marketplace-column"><SectionHeader icon={Sparkles} title="Öne Çıkan İlanlar" subtitle="Öne çıkarılmış vitrin ilanları" href="/ilanlari-kesfet" /><div className="homepage-marketplace-content"><HomepageFeaturedRotator listings={featuredListings} /></div></div>
+        <div className="homepage-marketplace-column"><SectionHeader icon={Car} title="Yeni Araç İlanları" subtitle="En yeni araç ilanlarını keşfet" href="/arac" /><div className="homepage-marketplace-content"><HomepageListingRotator listings={vehicleListings} emptyMessage="Henüz yeni araç ilanı bulunmuyor." label="araç ilanları" /></div></div>
+        <div className="homepage-marketplace-column"><SectionHeader icon={Home} title="Yeni Mülk İlanları" subtitle="En yeni mülk ilanlarını keşfet" href="/mulk" /><div className="homepage-marketplace-content"><HomepageListingRotator listings={propertyListings} emptyMessage="Henüz yeni mülk ilanı bulunmuyor." label="mülk ilanları" /></div></div>
+        <div className="homepage-marketplace-column"><SectionHeader icon={Store} title="Kurumsal Satıcılar" subtitle="Aktif üyeliğe sahip kurumsal satıcılar" href="/ilanlari-kesfet" /><div className="homepage-marketplace-content"><CorporateSellerList sellers={corporateSellers} counts={corporateListingCounts} /></div></div>
       </div>
     </section>
   );

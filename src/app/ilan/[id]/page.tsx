@@ -44,7 +44,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 function SellerArea({ listing, isLocked, isOwner, closedLabel }: { listing: MemberListingDetail; isLocked: boolean; isOwner: boolean; closedLabel: string | null }) {
   if (isLocked) return <><div className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-6 text-center shadow-[0_18px_55px_rgba(0,0,0,.16)]"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-surface-secondary)] text-[var(--text-dim)]"><Lock className="h-5 w-5" /></div><h2 className="mt-4 text-sm font-black">Satıcı Bilgileri Kilitli</h2><p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">Satıcıyla iletişime geçmek ve görünür iletişim bilgilerini görmek için giriş yapınız.</p><Link href={`/giris?redirect=${getListingUrl(listing)}`} className="btn-primary mt-4 w-full text-xs">Giriş Yap</Link></div><SafeShoppingCard /></>;
 
-  const actions = isOwner ? <Link href="/hesabim/ilanlarim" className="btn-primary w-full text-xs"><Settings2 className="h-4 w-4" />İlanı Yönet</Link> : !closedLabel && listing.offers_enabled !== false ? <OfferButton listing={listing} className="w-full text-xs" /> : null;
+  const manageHref = listing.seller_type === 'CORPORATE' ? `/hesabim/kurumsal?listing=${encodeURIComponent(listing.id)}#ilanlar` : `/hesabim/ilanlarim/${listing.id}/duzenle`;
+  const actions = isOwner ? <Link href={manageHref} className="btn-primary w-full text-xs"><Settings2 className="h-4 w-4" />İlanı Yönet</Link> : !closedLabel && listing.offers_enabled !== false ? <OfferButton listing={listing} className="w-full text-xs" /> : null;
   return <><SellerCard seller={listing.seller} dealer={listing.dealer} actions={actions} /><SafeShoppingCard /></>;
 }
 
@@ -69,8 +70,8 @@ export default async function ListingDetailPage({ params }: PageProps) {
   const similarListings = isVehicle ? await getOptionalSimilarListings(repo, id, 6) : [];
   const detailReady = !result.isLocked;
 
+  const favoriteProof = !closedLabel ? <FavoriteButton listingId={listing.id} initialCount={listing.favorite_count} initialIsFavorited={memberListing.is_favorited} proofText /> : <span className="inline-block min-w-[16rem]">{listing.favorite_count || 0} kişi favoriledi</span>;
   const headerActions = <div data-testid="listing-actions" className="flex flex-wrap items-center gap-1.5 [&_button]:min-h-9 [&_a]:min-h-9">
-    {!closedLabel ? <FavoriteButton listingId={listing.id} initialCount={listing.favorite_count} initialIsFavorited={memberListing.is_favorited} showCount={false} /> : null}
     <CopyListingLinkButton path={canonicalPath} />
     {!result.isOwner ? <ReportModal listingId={listing.id} /> : null}
     {isVehicle ? <CompareButton listing={listing} /> : !closedLabel ? <PropertyCompareButton listing={listing} /> : null}
@@ -79,7 +80,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
   return <main className="mx-auto w-full max-w-[1580px] space-y-4 px-3 py-4 sm:px-5 lg:px-6 lg:py-5">
     {closedLabel ? <div role="status" className="flex items-center gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/8 p-4 text-sm font-semibold text-amber-200"><CircleOff className="h-5 w-5 shrink-0" /><div><p>{closedLabel}</p><p className="mt-0.5 text-xs font-normal text-[var(--text-muted)]">İlan bilgileri arşiv amacıyla görüntüleniyor; yeni iletişim ve favori işlemleri kapalıdır.</p></div></div> : null}
 
-    <ListingDetailHeader listing={listing} categoryHref={categoryLink} categoryName={categoryName} actions={headerActions} />
+    <ListingDetailHeader listing={listing} categoryHref={categoryLink} categoryName={categoryName} actions={headerActions} favoriteProof={favoriteProof} />
 
     {isVehicle ? <section data-testid="vehicle-listing-layout" className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,.85fr)] xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,.9fr)_minmax(245px,.58fr)]">
       <div data-testid="vehicle-gallery-block" className="min-w-0 lg:col-start-1 lg:row-start-1 xl:col-start-1">

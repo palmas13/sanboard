@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
 import {
@@ -13,6 +13,7 @@ import {
   ExternalLink,
   Loader2,
   Calendar,
+  Trash2,
 } from 'lucide-react';
 import { Notification } from '@/types';
 import { formatDateTime } from '@/lib/utils/format';
@@ -27,22 +28,27 @@ export default function HesabimBildirimlerPage() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     if (!currentProfile?.id) return;
     setLoading(true);
     try {
-      const res = await fetch('/api/notifications');
+      const res = await fetch('/api/notifications?offset=0&limit=5');
       if (!res.ok) return;
       const data = await res.json();
       setNotifications(data.notifications || []);
       setUnreadCount(data.unreadCount || 0);
+      setTotalCount(data.totalCount || 0);
+      setHasMore(Boolean(data.hasMore));
     } catch {
       // Ignore
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentProfile?.id]);
 
   useEffect(() => {
     if (isAuthenticated && currentProfile?.id) {
@@ -50,9 +56,11 @@ export default function HesabimBildirimlerPage() {
     } else {
       setNotifications([]);
       setUnreadCount(0);
+      setTotalCount(0);
+      setHasMore(false);
       setLoading(false);
     }
-  }, [isAuthenticated, currentProfile?.id]);
+  }, [isAuthenticated, currentProfile?.id, fetchNotifications]);
 
   const handleMarkAsRead = async (notifId: string) => {
     if (!user) return;
@@ -103,6 +111,48 @@ export default function HesabimBildirimlerPage() {
     }
   };
 
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      // The offset is the current retained row count, so pagination remains correct after deletes.
+      const res = await fetch(`/api/notifications?offset=${notifications.length}&limit=5`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setNotifications((prev) => [...prev, ...(data.notifications || []).filter((n: Notification) => !prev.some((p) => p.id === n.id))]);
+      setUnreadCount(data.unreadCount || 0);
+      setTotalCount(data.totalCount || 0);
+      setHasMore(Boolean(data.hasMore));
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const handleDelete = async (ids?: string[]) => {
+    const previous = notifications;
+    const previousUnread = unreadCount;
+    const removed = ids ? notifications.filter((n) => ids.includes(n.id)) : notifications;
+    setNotifications((current) => ids ? current.filter((n) => !ids.includes(n.id)) : []);
+    setUnreadCount((count) => Math.max(0, count - removed.filter((n) => !n.read_at).length));
+    setTotalCount((count) => ids ? Math.max(0, count - removed.length) : 0);
+    if (!ids) setHasMore(false);
+    try {
+      const res = await fetch('/api/notifications', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ids ? { notificationIds: ids } : {}),
+      });
+      if (!res.ok) throw new Error('delete failed');
+      const data = await res.json();
+      setUnreadCount(data.unreadCount || 0);
+      setTotalCount(data.totalCount || 0);
+      setHasMore(notifications.length - removed.length < (data.totalCount || 0));
+    } catch {
+      setNotifications(previous);
+      setUnreadCount(previousUnread);
+      setTotalCount((count) => Math.max(count, previous.length));
+      setHasMore(previous.length < totalCount);
+    }
+  };
+
   const handleItemClick = (notif: Notification) => {
     if (!notif.read_at && user) {
       handleMarkAsRead(notif.id);
@@ -114,6 +164,8 @@ export default function HesabimBildirimlerPage() {
       router.push(`/ilan/${notif.entity_id}`);
     } else if (notif.entity_type === 'ticket' && notif.entity_id) {
       router.push(`/hesabim/destek/${notif.entity_id}`);
+    } else if (notif.entity_type === 'application') {
+      router.push('/hesabim/kurumsal');
     }
   };
 
@@ -163,7 +215,7 @@ export default function HesabimBildirimlerPage() {
                   : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
               }`}
             >
-              Tümü ({notifications.length})
+              Tümü ({totalCount})
             </button>
             <button
               type="button"
@@ -177,6 +229,12 @@ export default function HesabimBildirimlerPage() {
               Okunmamış ({unreadCount})
             </button>
           </div>
+
+          {totalCount > 0 && (
+            <button type="button" onClick={() => handleDelete()} className="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5">
+              <Trash2 className="w-3.5 h-3.5" /> Tümünü Temizle
+            </button>
+          )}
 
           {unreadCount > 0 && (
             <button
@@ -275,6 +333,15 @@ export default function HesabimBildirimlerPage() {
                     </button>
                   )}
 
+                  <button
+                    type="button"
+                    aria-label="Bildirimi sil"
+                    onClick={(e) => { e.stopPropagation(); handleDelete([notif.id]); }}
+                    className="btn-secondary text-xs py-1.5 px-2.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+
                   {notif.entity_id && (
                     <button
                       type="button"
@@ -287,6 +354,13 @@ export default function HesabimBildirimlerPage() {
               </div>
             );
           })}
+          {hasMore && activeTab === 'ALL' && (
+            <div className="flex justify-center pt-3">
+              <button type="button" onClick={loadMore} disabled={loadingMore} className="btn-secondary text-xs px-5 py-2">
+                {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : '5 Daha Yükle'}
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="surface-card p-12 text-center space-y-3 rounded-2xl border border-[var(--border-app)]">

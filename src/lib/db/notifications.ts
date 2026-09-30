@@ -10,11 +10,14 @@ function ensureNotifications() {
 /**
  * Get all notifications for a specific character profile, sorted newest first.
  */
-export async function getUserNotifications(profileId: string): Promise<Notification[]> {
+export async function getUserNotifications(profileId: string, options: { offset?: number; limit?: number } = {}): Promise<Notification[]> {
   ensureNotifications();
+  const offset = Math.max(0, options.offset || 0);
+  const limit = Math.min(50, Math.max(1, options.limit || 50));
   return db.notifications
     .filter((n) => n.recipient_profile_id === profileId)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(offset, offset + limit)
     .map((n) => ({
       ...n,
       is_read: Boolean(n.read_at),
@@ -24,6 +27,11 @@ export async function getUserNotifications(profileId: string): Promise<Notificat
         ? `/ilan/${n.entity_id}`
         : undefined,
     }));
+}
+
+export async function getNotificationCount(profileId: string): Promise<number> {
+  ensureNotifications();
+  return db.notifications.filter((n) => n.recipient_profile_id === profileId).length;
 }
 
 /**
@@ -91,6 +99,16 @@ export async function markAllNotificationsAsRead(profileId: string): Promise<{ s
   });
 
   return { success: true, count: updatedCount };
+}
+
+export async function deleteNotifications(profileId: string, notificationIds?: string[]): Promise<{ success: boolean; count: number }> {
+  ensureNotifications();
+  const selected = notificationIds ? new Set(notificationIds) : null;
+  const before = db.notifications.length;
+  db.notifications = db.notifications.filter((n) =>
+    n.recipient_profile_id !== profileId || (selected !== null && !selected.has(n.id))
+  );
+  return { success: true, count: before - db.notifications.length };
 }
 
 /**

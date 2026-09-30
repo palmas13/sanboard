@@ -597,6 +597,11 @@ export class SupabaseListingRepository implements IListingRepository {
       return { listing: null, isLocked: false, isOwner: false };
     }
 
+    if (listing.status === 'REMOVED') return { listing: null, isLocked: false, isOwner: false };
+    if (listing.status === 'SOLD' && listing.closed_at && Date.now() >= new Date(listing.closed_at).getTime() + 24 * 60 * 60 * 1000) {
+      return { listing: null, isLocked: false, isOwner: false };
+    }
+
     // Resolve viewer identity
     const safeViewerProfileId = viewerProfileId ? resolveProfileId(viewerProfileId) : null;
 
@@ -1093,15 +1098,15 @@ export class SupabaseListingRepository implements IListingRepository {
       .map((img: any) => img.storage_path)
       .filter((k: any) => Boolean(k) && typeof k === 'string');
 
-    await client.from('favorites').delete().eq('listing_id', listingId);
-    await client.from('listing_images').delete().eq('listing_id', listingId);
-
     const mediaType = category === 'vehicle' ? 'VEHICLE_IMAGE' : 'PROPERTY_IMAGE';
     for (const key of imageKeys) {
-      deleteMediaSafely(key, mediaType, reason).catch((err) => {
-        console.error(`Failed to clean R2 media for listing ${listingId}: ${key}`, err);
-      });
+      await deleteMediaSafely(key, mediaType, reason);
     }
+    await client.from('favorites').delete().eq('listing_id', listingId).throwOnError();
+    await client.from('listing_price_history').delete().eq('listing_id', listingId).throwOnError();
+    await client.from('vehicle_details').delete().eq('listing_id', listingId).throwOnError();
+    await client.from('property_details').delete().eq('listing_id', listingId).throwOnError();
+    await client.from('listing_images').delete().eq('listing_id', listingId).throwOnError();
   }
 
   async markListingAsSold(id: string, profileId: string): Promise<{ success: boolean; error?: string }> {
@@ -1109,7 +1114,7 @@ export class SupabaseListingRepository implements IListingRepository {
     return { success: result.success, error: result.error };
   }
 
-  async closeListing(id: string, profileId: string, status: 'SOLD' | 'REMOVED'): Promise<{ success: boolean; listing?: Listing; error?: string }> {
+  async closeListing(id: string, profileId: string, status: 'SOLD' | 'REMOVED', closeReason?: 'SOLD' | 'CANCELLED' | 'OTHER'): Promise<{ success: boolean; listing?: Listing; error?: string }> {
     if (!isUuid(id)) {
       return { success: false, error: 'Geçersiz ilan ID formatı.' };
     }
@@ -1129,6 +1134,7 @@ export class SupabaseListingRepository implements IListingRepository {
       p_actor_profile_id: safeProfileId,
       p_status: status,
       p_admin: isAdminAction,
+      p_close_reason: closeReason || (status === 'SOLD' ? 'SOLD' : 'OTHER'),
     });
     if (closeError || !closeResult?.success) return { success: false, error: closeResult?.error || closeError?.message || 'İlan kapatılamadı.' };
 
@@ -1137,13 +1143,16 @@ export class SupabaseListingRepository implements IListingRepository {
         original_listing_id: id,
         seller_profile_id: listing.seller_profile_id,
         sold_at: new Date().toISOString(),
+        title: listing.title,
+        price: listing.price,
+        description: listing.description,
+        closed_at: closeResult.listing?.closed_at || new Date().toISOString(),
       });
     }
-    await this.cleanupListingMedia(
-      id,
-      listing.category,
-      status === 'SOLD' ? 'LISTING_SOLD' : 'LISTING_REMOVED'
-    );
+    if (status === 'REMOVED') {
+      await this.cleanupListingMedia(id, listing.category, 'LISTING_REMOVED');
+      await client.from('listings').delete().eq('id', id).throwOnError();
+    }
 
     return { success: true, listing: { ...listing, ...(closeResult.listing || {}), status, images: [] } };
   }
@@ -1244,7 +1253,7 @@ export class SupabaseListingRepository implements IListingRepository {
 
     const mapStartedAt = performance.now();
     try {
-      return rows.map((item: any) => ({
+      const mappedRows = rows.map((item: any) => ({
         ...item,
         location: item.category === 'vehicle' ? null : item.location,
         previous_price: priceHistoryMap[item.id] && priceHistoryMap[item.id] !== item.price ? priceHistoryMap[item.id] : undefined,
@@ -1252,6 +1261,13 @@ export class SupabaseListingRepository implements IListingRepository {
         images: item.listing_images || [],
         status: getEffectiveListingStatus(item),
       }));
+      const { data: soldRows } = await this.getAdminClient().from('sold_listing_audit').select('original_listing_id, title, price, description, sold_at, closed_at').eq('seller_profile_id', safeProfileId).order('sold_at', { ascending: false });
+      const knownIds = new Set(mappedRows.map((item: any) => item.id));
+      return [...mappedRows, ...(soldRows || []).filter((item: any) => !knownIds.has(item.original_listing_id)).map((item: any) => ({
+        id: item.original_listing_id, listing_number: '', seller_profile_id: safeProfileId, seller_type: 'INDIVIDUAL', category: 'vehicle', subcategory: 'Otomobil',
+        title: item.title || 'Satılan ilan', description: item.description || '', price: Number(item.price) || 0, location: null, status: 'SOLD',
+        closed_at: item.closed_at || item.sold_at, created_at: item.sold_at, updated_at: item.closed_at || item.sold_at,
+      }))];
     } finally {
       onTiming?.('map', performance.now() - mapStartedAt);
     }

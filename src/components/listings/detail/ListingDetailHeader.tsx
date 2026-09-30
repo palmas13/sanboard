@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { CalendarDays, Heart, MapPin } from 'lucide-react';
+import { CalendarDays, MapPin } from 'lucide-react';
 import type { Listing, PublicListingSummary } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 
@@ -10,11 +10,13 @@ export function ListingDetailHeader({
   categoryHref,
   categoryName,
   actions,
+  favoriteProof,
 }: {
   listing: HeaderListing;
   categoryHref: string;
   categoryName: string;
   actions: React.ReactNode;
+  favoriteProof?: React.ReactNode;
 }) {
   return (
     <header data-testid="listing-detail-header" className="overflow-hidden rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] shadow-[0_16px_50px_rgba(0,0,0,.14)]">
@@ -34,15 +36,15 @@ export function ListingDetailHeader({
           <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[var(--text-muted)]">
             {listing.location ? <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-[#FF9E45]" />{listing.location}</span> : null}
             {listing.published_at ? <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" />{formatDate(listing.published_at)}</span> : null}
-            <span className="flex items-center gap-1.5"><Heart className="h-3.5 w-3.5" />{listing.favorite_count || 0} kişi favoriledi</span>
+            {favoriteProof}
           </div>
         </div>
 
         <div className="flex min-w-0 flex-col justify-center border-t border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/25 p-5 sm:p-6 lg:border-l lg:border-t-0 lg:px-6">
           <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-dim)]">Fiyat</p>
-          <div className="mt-1 flex flex-wrap items-baseline gap-3">
-            {listing.previous_price && listing.price < listing.previous_price ? <span className="text-sm font-bold text-[var(--text-muted)] line-through">{formatCurrency(listing.previous_price)}</span> : null}
-            <strong className="text-3xl font-black tracking-[-0.03em] text-[#FF9E45] sm:text-[32px]">{formatCurrency(listing.price)}</strong>
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 tabular-nums">
+            {listing.previous_price && listing.price < listing.previous_price ? <span className="order-2 text-sm font-semibold text-[var(--text-muted)] line-through decoration-1">{formatCurrency(listing.previous_price)}</span> : null}
+            <strong className="order-1 text-3xl font-black tracking-[-0.04em] text-[#FF9E45] sm:text-[32px]">{formatCurrency(listing.price)}</strong>
           </div>
           <div className="mt-3">{actions}</div>
         </div>

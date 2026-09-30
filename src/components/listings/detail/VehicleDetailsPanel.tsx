@@ -48,6 +48,8 @@ export function VehicleDetailsPanel({ listing }: { listing: MemberListingDetail 
     { label: 'Alarm Seviyesi', value: level(details.alarm_level), badge: true },
     { label: 'Hırsızlık Önleyici', value: level(details.anti_theft_level), badge: true },
   ];
+  const engineHealth = Math.min(100, Math.max(0, details.engine_health ?? 0));
+  const engineHealthTone = engineHealth >= 70 ? 'bg-[var(--color-success)] text-[var(--color-success)]' : engineHealth >= 40 ? 'bg-[var(--color-warning)] text-[var(--color-warning)]' : 'bg-[var(--color-danger)] text-[var(--color-danger)]';
   const additional: ListingInfoItem[] = [
     { label: 'Turbo', value: details.turbo ? 'Var' : 'Yok' },
     { label: 'Subwoofer', value: details.subwoofer ? 'Var' : 'Yok' },
@@ -62,12 +64,12 @@ export function VehicleDetailsPanel({ listing }: { listing: MemberListingDetail 
         <TechnicalSection title="Mekanik Durum">
           {details.engine_health !== null && details.engine_health !== undefined ? (
             <div className="mb-1.5 rounded-lg bg-[var(--bg-surface-secondary)]/55 px-2.5 py-2">
-              <div className="mb-1.5 flex items-center justify-between text-[11px]"><span className="font-semibold text-[var(--text-muted)]">Motor Sağlığı</span><strong className="text-[#FF9E45]">%{details.engine_health}</strong></div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-black/25"><div className="h-full rounded-full bg-gradient-to-r from-[#E87500] to-[#FF9E45]" style={{ width: `${Math.min(100, Math.max(0, details.engine_health))}%` }} /></div>
+              <div className="mb-1.5 flex items-center justify-between text-[11px] leading-4"><span className="font-semibold text-[var(--text-muted)]">Motor Sağlığı</span><strong className={`min-w-[3.25rem] text-right tabular-nums ${engineHealthTone.split(' ')[1]}`}>%{details.engine_health}</strong></div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-black/25" role="meter" aria-label="Motor sağlığı" aria-valuemin={0} aria-valuemax={100} aria-valuenow={engineHealth}><div className={`h-full rounded-full transition-[width] duration-300 ${engineHealthTone.split(' ')[0]}`} style={{ width: `${engineHealth}%` }} /></div>
             </div>
           ) : null}
           <dl className="grid auto-rows-fr grid-cols-2 gap-1.5">
-            {upgrades.filter((item) => item.value !== null).map((item) => <div key={item.label} className="flex h-full min-h-10 items-center justify-between gap-2 rounded-lg bg-[var(--bg-surface-secondary)]/55 px-2.5 py-2"><dt className="text-[10px] font-semibold leading-4 text-[var(--text-muted)]">{item.label}</dt><dd className="shrink-0 rounded-md bg-[#FF8A1F]/10 px-1.5 py-0.5 text-[10px] font-bold text-[#FF9E45]">{item.value}</dd></div>)}
+            {upgrades.filter((item) => item.value !== null).map((item) => <div key={item.label} className="grid h-full min-h-10 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg bg-[var(--bg-surface-secondary)]/55 px-2.5 py-2"><dt className="text-[10px] font-semibold leading-4 text-[var(--text-muted)]">{item.label}</dt><dd className="min-w-[4.25rem] shrink-0 rounded-md text-center tabular-nums bg-[#FF8A1F]/10 px-1.5 py-0.5 text-[10px] font-bold text-[#FF9E45]">{item.value}</dd></div>)}
           </dl>
         </TechnicalSection>
         <TechnicalSection title="Güvenlik Donanımı" items={security} columns="wide" />

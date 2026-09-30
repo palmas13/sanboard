@@ -44,16 +44,17 @@ describe('homepage marketplace redesign', () => {
   test('real homepage cards use canonical listing and corporate links', () => {
     const marketplace = source('src/components/home/HomepageMarketplace.tsx');
     const rotator = source('src/components/home/HomepageListingRotator.tsx');
-    assert.match(marketplace, /getListingUrl\(listing\)/);
+    const featured = source('src/components/home/HomepageFeaturedRotator.tsx');
+    assert.match(featured, /getListingUrl\(listing\)/);
     assert.match(marketplace, /getCorporateUrl\(seller\)/);
     assert.match(rotator, /getListingUrl\(listing\)/);
     assert.match(rotator, /<FavoriteButton/);
-    assert.match(marketplace, /<FavoriteButton/);
+    assert.match(featured, /<FavoriteButton/);
     assert.doesNotMatch(marketplace, /listing\.location \|\| listing\.subcategory/);
     assert.doesNotMatch(rotator, /listing\.location \|\| listing\.subcategory/);
     assert.match(rotator, /listing\.category === 'vehicle'/);
     assert.match(rotator, /<Tag/);
-    assert.match(marketplace, /quality=\{90\}/);
+    assert.match(featured, /quality=\{90\}/);
     assert.match(rotator, /quality=\{88\}/);
   });
 
@@ -86,8 +87,11 @@ describe('homepage marketplace redesign', () => {
   });
 
   test('featured showcase uses the dedicated homepage-only label', () => {
-    const marketplace = source('src/components/home/HomepageMarketplace.tsx');
-    assert.match(marketplace, />Öne Çıkarılan<\/span>/);
+    const featured = source('src/components/home/HomepageFeaturedRotator.tsx');
+    assert.match(featured, />Öne Çıkarılan<\/span>/);
+    assert.match(featured, /5000/);
+    assert.match(featured, /visibilitychange/);
+    assert.match(featured, /onFocusCapture/);
   });
 
   test('section controls use a shared two-row header rhythm without fixed link padding', () => {
@@ -98,6 +102,8 @@ describe('homepage marketplace redesign', () => {
     assert.match(css, /\.homepage-section-header \{[^}]*min-height: 58px[^}]*margin-bottom: \.65rem/);
     assert.match(css, /\.homepage-rotator-viewport \{[^}]*overflow: hidden/);
     assert.doesNotMatch(css, /\.homepage-listing-stack \{[^}]*min-height: 22rem/);
+    assert.match(css, /\.homepage-marketplace-content \{[^}]*flex: 1/);
+    assert.match(css, /\.homepage-marketplace-content > \* \{ flex: 1; \}/);
   });
 
   test('responsive four-column and reduced-motion styles remain present', () => {

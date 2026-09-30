@@ -11,9 +11,9 @@ import {
   RotateCcw,
   ExternalLink,
   Loader2,
-  X,
   Heart,
   Edit3,
+  Trash2,
 } from 'lucide-react';
 import { formatCurrency, formatTimeRemaining, formatDate } from '@/lib/utils/format';
 import { Listing } from '@/types';
@@ -25,7 +25,7 @@ type SavedListingDraft = ListingQualityInput & { savedAt?: string; images?: unkn
 
 export default function HesabimIlanlarimPage() {
   const { currentProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<'ACTIVE' | 'EXPIRED'>('ACTIVE');
+  const [activeTab, setActiveTab] = useState<'ACTIVE' | 'EXPIRED' | 'SOLD'>('ACTIVE');
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,7 +35,7 @@ export default function HesabimIlanlarimPage() {
   const [republishingId, setRepublishingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
   const [activeOfferCount, setActiveOfferCount] = useState(0);
-  const [savedDraft, setSavedDraft] = useState<{ quality: number; savedAt?: string; href: string } | null>(null);
+  const [savedDraft, setSavedDraft] = useState<{ quality: number; savedAt?: string; href: string; storageKey: string } | null>(null);
 
   const fetchListings = async () => {
     if (!currentProfile) return;
@@ -66,7 +66,7 @@ export default function HesabimIlanlarimPage() {
         if (!raw) return [];
         const draft = JSON.parse(raw) as SavedListingDraft;
         const result = calculateListingQuality({ ...draft, imageCount: Array.isArray(draft.images) ? draft.images.length : 0, hasContact: Boolean(currentProfile.phone?.trim() || currentProfile.sanmail_email?.trim()) });
-        return [{ quality: result.percentage, savedAt: draft.savedAt, href: key.endsWith('_corporate') ? '/ilan-ver/yeni?corporate=true' : '/ilan-ver/yeni' }];
+        return [{ quality: result.percentage, savedAt: draft.savedAt, href: key.endsWith('_corporate') ? '/ilan-ver/yeni?corporate=true' : '/ilan-ver/yeni', storageKey: key }];
       } catch { return []; }
     });
     setSavedDraft(drafts.sort((a, b) => new Date(b.savedAt || 0).getTime() - new Date(a.savedAt || 0).getTime())[0] || null);
@@ -74,6 +74,7 @@ export default function HesabimIlanlarimPage() {
 
   const activeListings = listings.filter((l) => l.status === 'ACTIVE');
   const expiredListings = listings.filter((l) => l.status === 'EXPIRED');
+  const soldListings = listings.filter((l) => l.status === 'SOLD');
 
   const handleConfirmClose = async () => {
     if (!closeModalListing || !currentProfile) return;
@@ -87,6 +88,7 @@ export default function HesabimIlanlarimPage() {
         body: JSON.stringify({
           listingId: closeModalListing.id,
           action: closeReason === 'SOLD' ? 'SOLD' : 'REMOVED',
+          closeReason,
         }),
       });
 
@@ -99,6 +101,13 @@ export default function HesabimIlanlarimPage() {
     } finally {
       setIsProcessingClose(false);
     }
+  };
+
+  const handleDeleteDraft = () => {
+    if (!savedDraft) return;
+    if (!window.confirm('Bu taslağı silmek istediğinize emin misiniz?')) return;
+    localStorage.removeItem(savedDraft.storageKey);
+    setSavedDraft(null);
   };
 
   const handleRepublish = async (listing: Listing) => {
@@ -155,13 +164,19 @@ export default function HesabimIlanlarimPage() {
           >
             Süresi Dolan ({expiredListings.length})
           </button>
+          <button type="button" onClick={() => setActiveTab('SOLD')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeTab === 'SOLD' ? 'bg-[var(--bg-surface)] text-[#FF8A1F] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}>
+            Satılan ({soldListings.length})
+          </button>
         </div>
       </div>
 
       {savedDraft && (
         <div className="surface-card rounded-2xl border border-[#FF8A1F]/25 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div><p className="text-sm font-bold text-[var(--text-main)]">Kaydedilmiş ilan taslağın var</p><p className="text-xs text-[var(--text-muted)]">%{savedDraft.quality} tamamlandı{savedDraft.savedAt ? ` • ${formatDate(savedDraft.savedAt)}` : ''}</p></div>
-          <Link href={savedDraft.href} className="btn-primary text-xs py-2 px-4 inline-flex items-center justify-center gap-1.5"><Edit3 className="w-3.5 h-3.5" />Düzenlemeye Devam Et</Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={handleDeleteDraft} className="btn-secondary text-xs py-2 px-4 inline-flex items-center justify-center gap-1.5 text-[var(--color-danger)]"><Trash2 className="w-3.5 h-3.5" />Taslağı Sil</button>
+            <Link href={savedDraft.href} className="btn-primary text-xs py-2 px-4 inline-flex items-center justify-center gap-1.5"><Edit3 className="w-3.5 h-3.5" />Düzenlemeye Devam Et</Link>
+          </div>
         </div>
       )}
 
@@ -266,7 +281,7 @@ export default function HesabimIlanlarimPage() {
             </div>
           </div>
         )
-      ) : expiredListings.length > 0 ? (
+      ) : activeTab === 'EXPIRED' ? (expiredListings.length > 0 ? (
         <div className="space-y-4">
           {expiredListings.map((listing) => (
             <div
@@ -312,7 +327,17 @@ export default function HesabimIlanlarimPage() {
             7 günlük yayın süresi tamamlanan ilanlarınız burada listelenir.
           </p>
         </div>
-      )}
+      )) : soldListings.length > 0 ? (
+        <div className="space-y-3">
+          {soldListings.map((listing) => <div key={listing.id} className="surface-card rounded-2xl border border-[var(--border-app)] p-4 sm:p-5">
+            <span className="text-[10px] font-black text-emerald-400">SATILDI</span>
+            <h3 className="mt-1 text-sm font-bold text-[var(--text-main)]">{listing.title}</h3>
+            <p className="mt-1 text-sm font-bold text-[#FF8A1F]">{formatCurrency(listing.price)}</p>
+            <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{listing.description}</p>
+            <p className="mt-2 text-[11px] text-[var(--text-dim)]">Kapanış: {formatDate(listing.closed_at || listing.updated_at)}</p>
+          </div>)}
+        </div>
+      ) : <div className="surface-card p-12 text-center space-y-2"><CheckCircle className="w-8 h-8 text-[var(--text-dim)] mx-auto" /><h3 className="text-sm font-bold text-[var(--text-main)]">Satılan ilanınız bulunmuyor.</h3></div>}
 
       {actionError && (
         <div className="p-3 rounded-xl bg-[var(--color-danger-subtle)] text-[var(--color-danger)] text-xs font-semibold">

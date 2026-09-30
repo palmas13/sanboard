@@ -41,7 +41,7 @@ export async function PATCH(req: NextRequest) {
   try {
     const actor = await resolveOwnedActiveProfile(req);
     if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
-    const { listingId, action } = await req.json();
+    const { listingId, action, closeReason } = await req.json();
 
     if (!listingId) {
       return NextResponse.json(
@@ -54,9 +54,15 @@ export async function PATCH(req: NextRequest) {
     if (!['SOLD', 'REMOVED', 'REPUBLISH'].includes(action)) {
       return NextResponse.json({ error: 'Geçersiz ilan işlemi.' }, { status: 400 });
     }
+    if (action !== 'REPUBLISH' && !['SOLD', 'CANCELLED', 'OTHER'].includes(closeReason)) {
+      return NextResponse.json({ error: 'Geçerli bir kapatma nedeni seçilmelidir.' }, { status: 400 });
+    }
+    if ((action === 'SOLD') !== (closeReason === 'SOLD')) {
+      return NextResponse.json({ error: 'İlan durumu ile kapatma nedeni uyuşmuyor.' }, { status: 400 });
+    }
     const result = action === 'REPUBLISH'
       ? await repo.republishListing(listingId, actor.profileId)
-      : await repo.closeListing(listingId, actor.profileId, action);
+      : await repo.closeListing(listingId, actor.profileId, action, closeReason);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }

@@ -20,17 +20,20 @@ export class SupabaseNotificationRepository implements INotificationRepository {
     return this.getClient();
   }
 
-  async getUserNotifications(profileId: string): Promise<Notification[]> {
+  async getUserNotifications(profileId: string, options: { offset?: number; limit?: number } = {}): Promise<Notification[]> {
     const client = this.getAdminClient();
     const safeId = resolveProfileId(profileId);
     if (!isUuid(safeId)) return [];
 
+    const offset = Math.max(0, options.offset || 0);
+    const limit = Math.min(50, Math.max(1, options.limit || 50));
     const { data, error } = await client
       .from('notifications')
       .select('id, recipient_profile_id, type, title, message, entity_type, entity_id, metadata, read_at, created_at')
       .eq('recipient_profile_id', safeId)
       .order('created_at', { ascending: false })
-      .limit(50);
+      .order('id', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       throw new Error(`Supabase error fetching notifications: ${error.message}`);
@@ -47,6 +50,15 @@ export class SupabaseNotificationRepository implements INotificationRepository {
     }));
 
     return mapped as Notification[];
+  }
+
+  async getNotificationCount(profileId: string): Promise<number> {
+    const safeId = resolveProfileId(profileId);
+    if (!isUuid(safeId)) return 0;
+    const { count, error } = await this.getAdminClient().from('notifications')
+      .select('*', { count: 'exact', head: true }).eq('recipient_profile_id', safeId);
+    if (error) throw new Error(`Supabase error fetching notification count: ${error.message}`);
+    return count || 0;
   }
 
   async getUnreadCount(profileId: string): Promise<number> {
@@ -112,6 +124,18 @@ export class SupabaseNotificationRepository implements INotificationRepository {
     }
 
     return { success: true, count: data?.length || 0 };
+  }
+
+  async deleteNotifications(profileId: string, notificationIds?: string[]): Promise<{ success: boolean; count: number; error?: string }> {
+    const safeId = resolveProfileId(profileId);
+    if (!isUuid(safeId)) return { success: true, count: 0 };
+    let query = this.getAdminClient().from('notifications').delete({ count: 'exact' }).eq('recipient_profile_id', safeId);
+    if (notificationIds) {
+      if (notificationIds.length === 0) return { success: true, count: 0 };
+      query = query.in('id', notificationIds);
+    }
+    const { count, error } = await query;
+    return error ? { success: false, count: 0, error: error.message } : { success: true, count: count || 0 };
   }
 
   async createNotification(params: {

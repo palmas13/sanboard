@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
 import { getListingUrl } from '@/lib/urls';
 import {
@@ -41,6 +41,8 @@ import { readJsonResponse } from '@/lib/http/json-response';
 
 export default function HesabimKurumsalPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const managedListingId = searchParams.get('listing');
   const { currentProfile } = useAuth();
   const [dealer, setDealer] = useState<DealerProfile | null>(null);
   const [application, setApplication] = useState<any | null>(null);
@@ -96,9 +98,9 @@ export default function HesabimKurumsalPage() {
       }
 
       // 2. Check if user already has an available corporate credit
-      const credRes = await fetch('/api/credits');
+      const credRes = await fetch(`/api/credits?corporateProfileId=${encodeURIComponent(eligData.dealer.id)}`);
       const credData = await credRes.json();
-      if (credData.corporateCredits && credData.corporateCredits > 0) {
+      if (credData.scopedCorporateCredits && credData.scopedCorporateCredits > 0) {
         router.push('/ilan-ver/yeni?corporate=true');
         return;
       }
@@ -827,13 +829,10 @@ export default function HesabimKurumsalPage() {
             </div>
 
             {/* STORE INVENTORY (İlan Yönetimi & Boost) */}
-            <div className="surface-card p-6 sm:p-7 rounded-2xl border border-[var(--border-app)] space-y-4">
+            <div id="ilanlar" className="surface-card scroll-mt-24 p-6 sm:p-7 rounded-2xl border border-[var(--border-app)] space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-[var(--border-app)]">
                 <div>
-                  <h3 className="text-base font-bold text-[var(--text-main)]">Kurumsal İlan Envanteri</h3>
-                  <p className="text-xs text-[var(--text-muted)]">
-                    Mağazanıza kayıtlı aktif ilanlar ve 24 saatlik öne çıkarma (boost) yönetimi.
-                  </p>
+                  <h3 className="text-base font-bold text-[var(--text-main)]">Kurumsal Profile Ait İlanlar</h3>
                 </div>
                 <span className="text-xs font-bold text-[#FF8A1F] bg-[var(--brand-orange-subtle)] px-2.5 py-1 rounded-full border border-[#FF8A1F]/20">
                   {storeListings.length} Toplam İlan
@@ -866,7 +865,7 @@ export default function HesabimKurumsalPage() {
                     return (
                       <div
                         key={l.id}
-                        className="py-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                        className={`py-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl px-2 ${managedListingId === l.id ? 'bg-[#FF8A1F]/8 ring-1 ring-[#FF8A1F]/30' : ''}`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="w-12 h-12 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] overflow-hidden shrink-0">

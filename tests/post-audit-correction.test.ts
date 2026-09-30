@@ -335,6 +335,7 @@ describe('Sanboard Post-Audit Correction Pass: Sections 36-47', () => {
       payment_id: 'pay-test-1',
       package_id: 'pkg-corporate-14-day',
       credit_type: 'CORPORATE',
+      corporate_profile_id: storeId,
       status: 'AVAILABLE',
       created_at: new Date().toISOString(),
     });
@@ -494,6 +495,7 @@ describe('Sanboard Post-Audit Correction Pass: Sections 36-47', () => {
       payment_id: 'pay-test-3',
       package_id: 'pkg-corporate-14-day',
       credit_type: 'CORPORATE',
+      corporate_profile_id: 'dealer-apex-01',
       status: 'AVAILABLE',
       created_at: new Date().toISOString(),
     });

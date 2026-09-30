@@ -2,6 +2,8 @@ import { INotificationRepository } from '../types';
 import {
   getUserNotifications,
   getUnreadNotificationCount,
+  getNotificationCount,
+  deleteNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
   createNotification,
@@ -9,8 +11,12 @@ import {
 import { NotificationType } from '@/types';
 
 export class MemoryNotificationRepository implements INotificationRepository {
-  async getUserNotifications(profileIdOrUserId: string) {
-    return getUserNotifications(profileIdOrUserId);
+  async getUserNotifications(profileIdOrUserId: string, options?: { offset?: number; limit?: number }) {
+    return getUserNotifications(profileIdOrUserId, options);
+  }
+
+  async getNotificationCount(profileIdOrUserId: string) {
+    return getNotificationCount(profileIdOrUserId);
   }
 
   async getUnreadCount(profileIdOrUserId: string) {
@@ -23,6 +29,10 @@ export class MemoryNotificationRepository implements INotificationRepository {
 
   async markAllAsRead(profileIdOrUserId: string) {
     return markAllNotificationsAsRead(profileIdOrUserId);
+  }
+
+  async deleteNotifications(profileIdOrUserId: string, notificationIds?: string[]) {
+    return deleteNotifications(profileIdOrUserId, notificationIds);
   }
 
   async createNotification(params: {

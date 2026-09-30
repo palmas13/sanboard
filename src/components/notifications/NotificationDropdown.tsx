@@ -154,6 +154,8 @@ export function NotificationDropdown() {
       router.push(`/ilan/${notif.entity_id}`);
     } else if (notif.entity_type === 'ticket' && notif.entity_id) {
       router.push(`/hesabim/destek/${notif.entity_id}`);
+    } else if (notif.entity_type === 'application') {
+      router.push('/hesabim/kurumsal');
     } else {
       router.push('/hesabim/bildirimler');
     }

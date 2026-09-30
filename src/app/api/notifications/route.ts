@@ -18,20 +18,51 @@ export async function GET(req: NextRequest) {
       return timing.respond(NextResponse.json({ unreadCount }));
     }
 
-    const [notifications, unreadCount] = await timing.measure('notifications', () => Promise.all([
-      repo.getUserNotifications(activeProfileId),
+    const offset = Math.max(0, Number.parseInt(req.nextUrl.searchParams.get('offset') || '0', 10) || 0);
+    const limit = Math.min(50, Math.max(1, Number.parseInt(req.nextUrl.searchParams.get('limit') || '5', 10) || 5));
+    const [notifications, unreadCount, totalCount] = await timing.measure('notifications', () => Promise.all([
+      repo.getUserNotifications(activeProfileId, { offset, limit }),
       repo.getUnreadCount(activeProfileId),
+      repo.getNotificationCount(activeProfileId),
     ]));
 
     return timing.respond(NextResponse.json({
       notifications,
       unreadCount,
+      totalCount,
+      hasMore: offset + notifications.length < totalCount,
+      nextOffset: offset + notifications.length,
     }));
   } catch (error: any) {
     return timing.respond(NextResponse.json(
       { error: error?.message || 'Bildirimler getirilemedi.' },
       { status: 500 }
     ));
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+    const body = await req.json().catch(() => ({}));
+    const ids = typeof body.notificationId === 'string' && body.notificationId.length > 0
+      ? [body.notificationId]
+      : body.notificationIds === undefined
+      ? undefined
+      : Array.isArray(body.notificationIds)
+      ? body.notificationIds.filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
+      : [];
+    if (ids && ids.length > 100) return NextResponse.json({ error: 'En fazla 100 bildirim silinebilir.' }, { status: 400 });
+    const repo = getNotificationRepository();
+    const result = await repo.deleteNotifications(actor.profileId, ids);
+    if (!result.success) return NextResponse.json({ error: result.error }, { status: 500 });
+    const [unreadCount, totalCount] = await Promise.all([
+      repo.getUnreadCount(actor.profileId), repo.getNotificationCount(actor.profileId),
+    ]);
+    return NextResponse.json({ success: true, count: result.count, unreadCount, totalCount });
+  } catch (error: any) {
+    return NextResponse.json({ error: error?.message || 'Bildirimler silinemedi.' }, { status: 500 });
   }
 }
 

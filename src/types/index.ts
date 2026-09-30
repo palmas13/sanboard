@@ -128,6 +128,8 @@ export interface Listing {
   previous_price?: number;
   location: string | null;
   status: ListingStatus;
+  close_reason?: 'SOLD' | 'CANCELLED' | 'OTHER' | 'ADMIN_REMOVED' | null;
+  closed_at?: string | null;
   is_featured?: boolean;
   featured_until?: string | null;
   published_at?: string;
@@ -339,6 +341,10 @@ export interface SoldListingAudit {
   seller_profile_id: string;
   payment_id?: string;
   sold_at: string;
+  title?: string;
+  price?: number;
+  description?: string;
+  closed_at?: string;
 }
 
 export type DealerStatus = 'PENDING' | 'APPROVED' | 'REJECTED';

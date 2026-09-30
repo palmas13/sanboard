@@ -432,6 +432,13 @@ export async function getListingById(
   const storeOwnerId = store?.owner_profile_id || store?.profile_id;
   const isOwner = isListingOwnedByActiveProfile(listing, viewerProfileId, storeOwnerId);
 
+  if (listing.status === 'REMOVED') {
+    return { listing: null, isLocked: false, isOwner };
+  }
+  if (listing.status === 'SOLD' && listing.closed_at && Date.now() >= new Date(listing.closed_at).getTime() + 24 * 60 * 60 * 1000) {
+    return { listing: null, isLocked: false, isOwner };
+  }
+
   // Check store moderation state for corporate listings
   if (listing.seller_type === 'CORPORATE' && store) {
     if ((store.moderation_status === 'SUSPENDED' || store.moderation_status === 'DELETED' || store.deleted_at) && !isOwner) {
@@ -583,7 +590,7 @@ export async function createListingWithCredit(
           : undefined
     );
     if (sellerType === 'CORPORATE') {
-      return effectiveCreditType === 'CORPORATE';
+      return effectiveCreditType === 'CORPORATE' && c.corporate_profile_id === corporateProfileId;
     } else {
       return effectiveCreditType === 'INDIVIDUAL';
     }
@@ -817,8 +824,8 @@ export async function markListingAsSold(
 
   listing.status = 'SOLD';
   listing.updated_at = new Date().toISOString();
-  listing.images = [];
-  db.favorites = db.favorites.filter((favorite) => favorite.listing_id !== id);
+  (listing as Listing & { close_reason?: string; closed_at?: string }).close_reason = 'SOLD';
+  (listing as Listing & { close_reason?: string; closed_at?: string }).closed_at = listing.updated_at;
   await (await import('./repositories')).getOfferRepository().closeForListing(id, 'LISTING_SOLD');
 
   // Store audit record
@@ -827,6 +834,10 @@ export async function markListingAsSold(
     original_listing_id: id,
     seller_profile_id: sellerProfileId,
     sold_at: new Date().toISOString(),
+    title: listing.title,
+    price: listing.price,
+    description: listing.description,
+    closed_at: listing.updated_at,
   });
 
   return { success: true };
@@ -876,7 +887,7 @@ export async function getUserListings(sellerProfileId: string): Promise<Listing[
   );
   const now = new Date();
 
-  return listings.map((l) => {
+  const activeHistory = listings.map((l) => {
     const isExpired = l.expires_at ? new Date(l.expires_at) <= now : false;
     const favCount = db.favorites.filter((f) => f.listing_id === l.id).length;
     return {
@@ -885,6 +896,16 @@ export async function getUserListings(sellerProfileId: string): Promise<Listing[
       favorite_count: favCount,
     };
   });
+  const soldHistory = db.soldAudits.filter((audit) => audit.seller_profile_id === sellerProfileId).map((audit) => ({
+    id: audit.original_listing_id,
+    listing_number: '', seller_profile_id: sellerProfileId, seller_type: 'INDIVIDUAL' as const,
+    category: 'vehicle' as const, subcategory: 'Otomobil' as const,
+    title: audit.title || 'Satılan ilan', description: audit.description || '', price: audit.price || 0,
+    location: null, status: 'SOLD' as const, closed_at: audit.closed_at || audit.sold_at,
+    created_at: audit.sold_at, updated_at: audit.closed_at || audit.sold_at,
+  }));
+  const knownIds = new Set(activeHistory.map((listing) => listing.id));
+  return [...activeHistory, ...soldHistory.filter((listing) => !knownIds.has(listing.id))];
 }
 
 /**

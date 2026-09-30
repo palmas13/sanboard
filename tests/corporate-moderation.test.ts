@@ -821,6 +821,7 @@ describe('Sanboard – Corporate Listing Seller Context & Admin Moderation', () 
         package_id: 'pkg-corp-14',
         amount: 1750,
         credit_type: 'CORPORATE',
+        corporate_profile_id: 'store-bum-01',
         status: 'AVAILABLE',
         created_at: new Date().toISOString(),
       });

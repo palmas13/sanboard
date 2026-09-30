@@ -206,14 +206,16 @@ describe('Sanboard Business Rules & Validation Tests', () => {
     assert.strictEqual(editAttempt.error, 'Bu ilanı düzenleme yetkiniz yok.');
   });
 
-  test('Sold listing is decommissioned and purged from public', async () => {
+  test('Sold listing leaves discovery immediately while retaining detail media for 24 hours', async () => {
     const listing = db.listings[0];
     const sellerId = listing.seller_profile_id;
 
     const soldRes = await markListingAsSold(listing.id, sellerId);
     assert.ok(soldRes.success);
     assert.strictEqual(listing.status, 'SOLD');
-    assert.strictEqual(listing.images?.length, 0);
+    assert.ok((listing.images?.length || 0) > 0);
+    assert.equal(listing.close_reason, 'SOLD');
+    assert.ok(listing.closed_at);
 
     // Verify it doesn't appear in public queries
     const publicFeed = await getPublicListings();

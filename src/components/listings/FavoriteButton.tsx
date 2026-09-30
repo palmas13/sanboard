@@ -23,6 +23,7 @@ type FavoriteState = { isFavorited: boolean; count: number };
 const favoriteStateCache = new Map<string, FavoriteState>();
 const favoriteCountCache = new Map<string, number>();
 const favoriteStateSubscribers = new Map<string, Set<(state: FavoriteState) => void>>();
+const favoriteCountSubscribers = new Map<string, Set<(count: number) => void>>();
 const hydrationQueue = new Map<string, Map<string, Set<(state: FavoriteState) => void>>>();
 let hydrationScheduled = false;
 
@@ -31,6 +32,17 @@ function publishFavoriteState(cacheKey: string, state: FavoriteState) {
   favoriteCountCache.set(listingId, state.count);
   favoriteStateCache.set(cacheKey, state);
   favoriteStateSubscribers.get(cacheKey)?.forEach((subscriber) => subscriber(state));
+  favoriteCountSubscribers.get(listingId)?.forEach((subscriber) => subscriber(state.count));
+}
+
+function subscribeFavoriteCount(listingId: string, subscriber: (count: number) => void) {
+  const subscribers = favoriteCountSubscribers.get(listingId) || new Set();
+  subscribers.add(subscriber);
+  favoriteCountSubscribers.set(listingId, subscribers);
+  return () => {
+    subscribers.delete(subscriber);
+    if (subscribers.size === 0) favoriteCountSubscribers.delete(listingId);
+  };
 }
 
 function subscribeFavoriteState(cacheKey: string, subscriber: (state: FavoriteState) => void) {
@@ -108,6 +120,10 @@ export function FavoriteButton({
   const [errorMessage, setErrorMessage] = useState('');
   const mutationPendingRef = useRef(false);
   const mutationVersionRef = useRef(0);
+
+  useEffect(() => subscribeFavoriteCount(listingId, (nextCount) => {
+    if (!mutationPendingRef.current) setCount(nextCount);
+  }), [listingId]);
 
   // Public props provide aggregate count; authenticated membership is hydrated in one batch request.
   // Private profile-scoped responses can explicitly mark both values authoritative and skip that request.

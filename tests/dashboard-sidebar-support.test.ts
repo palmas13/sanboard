@@ -59,6 +59,7 @@ describe('dashboard sidebar and support conversation regressions', () => {
     assert.match(layoutSource, /corporateEligibility !== null/);
     assert.match(layoutSource, /corporateResolved && corporateLabel/);
     assert.match(layoutSource, /<span>\{corporateLabel\}<\/span>/);
+    assert.match(layoutSource, /href: '\/hesabim\/bildirimler', label: 'Bildirimler'/);
   });
 
   test('corporate normal styling is neutral and active styling is route-derived', () => {

@@ -91,6 +91,7 @@ describe('Sanboard – Individual vs Corporate System & Lifecycle', () => {
         profile_id: 'char-mavis-01',
         package_id: 'pkg-2',
         credit_type: 'CORPORATE',
+        corporate_profile_id: 'dealer-apex-01',
         status: 'AVAILABLE',
         created_at: new Date().toISOString(),
       } as any,
