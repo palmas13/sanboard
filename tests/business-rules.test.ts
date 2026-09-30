@@ -4,8 +4,12 @@ import {
   baseListingSchema,
   vehicleListingSchema,
   propertyListingSchema,
+  LISTING_DESCRIPTION_MAX_ERROR,
+  LISTING_DESCRIPTION_MAX_LENGTH,
   LISTING_TITLE_MAX_ERROR,
 } from '@/lib/validations/listing';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { formatCurrency, formatTimeRemaining, generateListingNumber } from '@/lib/utils/format';
 import {
   sanitizeListingForPublic,
@@ -49,11 +53,9 @@ describe('Sanboard Business Rules & Validation Tests', () => {
     assert.equal(result.error?.issues[0]?.message, LISTING_TITLE_MAX_ERROR);
   });
 
-  test('Description length constraint: max 100 characters', () => {
-    const invalidDesc = 'B'.repeat(101);
-    const result = baseListingSchema.safeParse({
+  test('Description length constraint accepts 200 and rejects 201 characters', () => {
+    const base = {
       title: 'Geçerli Başlık',
-      description: invalidDesc,
       price: 50000,
       location: 'Vinewood',
       images: [
@@ -64,8 +66,18 @@ describe('Sanboard Business Rules & Validation Tests', () => {
           sort_order: 0,
         },
       ],
-    });
-    assert.strictEqual(result.success, false);
+    };
+    assert.equal(baseListingSchema.safeParse({ ...base, description: 'B'.repeat(LISTING_DESCRIPTION_MAX_LENGTH) }).success, true);
+    const result = baseListingSchema.safeParse({ ...base, description: 'B'.repeat(LISTING_DESCRIPTION_MAX_LENGTH + 1) });
+    assert.equal(result.success, false);
+    assert.equal(result.error?.issues[0]?.message, LISTING_DESCRIPTION_MAX_ERROR);
+  });
+
+  test('Description length migration expands listings column to 200 characters', () => {
+    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20260930230000_listing_description_length.sql'), 'utf8');
+    assert.match(sql, /ALTER TABLE public\.listings/);
+    assert.match(sql, /ALTER COLUMN description TYPE VARCHAR\(200\)/);
+    assert.match(sql, /USING left\(description, 200\)/);
   });
 
   test('Photo constraint: max 3 photos, each max 2MB, exactly one cover', () => {

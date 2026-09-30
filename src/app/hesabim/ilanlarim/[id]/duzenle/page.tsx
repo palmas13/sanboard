@@ -19,13 +19,13 @@ import { CustomSelect } from '@/components/ui/CustomSelect';
 import { formatTimeRemaining } from '@/lib/utils/format';
 import { readJsonResponse } from '@/lib/http/json-response';
 import { getVehicleBrandsByCategory, getVehicleModels, isMotorcycleCategory, isValidVehicleSelection, reconcileVehicleSelection, VEHICLE_CATEGORIES, VehicleCategory } from '@/lib/constants/vehicleCategories';
-import { LISTING_TITLE_MAX_ERROR, LISTING_TITLE_MAX_LENGTH } from '@/lib/validations/listing';
+import { LISTING_DESCRIPTION_MAX_LENGTH, LISTING_TITLE_MAX_ERROR, LISTING_TITLE_MAX_LENGTH } from '@/lib/validations/listing';
 import { getVehicleLevelOptions, normalizeVehicleLevel, VEHICLE_LEVEL_FIELDS } from '@/lib/listings/vehicle-levels';
 import { formatTurkishInteger, isIntegerInRange, normalizeIntegerInput, normalizeTurkishIntegerInput } from '@/lib/forms/integer-input';
 import { toListingImageReferences } from '@/lib/listings/image-references';
 
 const TITLE_MAX = LISTING_TITLE_MAX_LENGTH;
-const DESC_MAX = 100;
+const DESC_MAX = LISTING_DESCRIPTION_MAX_LENGTH;
 
 export default function IlanDuzenlePage({
   params,
@@ -439,12 +439,15 @@ export default function IlanDuzenlePage({
             <div className="space-y-1.5">
               <div className="flex justify-between">
                 <label className="text-xs font-semibold text-[var(--text-muted)]">İlan Açıklaması</label>
-                <span className="text-[11px] text-[var(--text-dim)]">{description.length}/{DESC_MAX}</span>
+                <span className={`text-[11px] ${description.length > DESC_MAX ? 'font-semibold text-[var(--color-danger)]' : 'text-[var(--text-dim)]'}`}>
+                  {description.length}/{DESC_MAX}
+                </span>
               </div>
               <textarea
                 rows={3}
                 value={description}
-                onChange={(e) => setDescription(e.target.value.slice(0, DESC_MAX))}
+                maxLength={DESC_MAX}
+                onChange={(e) => setDescription(e.target.value)}
                 className="form-input text-sm resize-none"
               />
             </div>

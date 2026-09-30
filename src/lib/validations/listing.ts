@@ -4,6 +4,8 @@ import { isMotorcycleCategory, isValidVehicleSelection, VEHICLE_CATEGORIES } fro
 
 export const LISTING_TITLE_MAX_LENGTH = 40;
 export const LISTING_TITLE_MAX_ERROR = 'İlan başlığı en fazla 40 karakter olabilir.';
+export const LISTING_DESCRIPTION_MAX_LENGTH = 200;
+export const LISTING_DESCRIPTION_MAX_ERROR = 'Açıklama en fazla 200 karakter olabilir';
 
 export const vehicleCategories = VEHICLE_CATEGORIES;
 
@@ -62,7 +64,7 @@ export const baseListingFields = {
   description: z
     .string()
     .trim()
-    .max(100, 'Açıklama en fazla 100 karakter olabilir'),
+    .max(LISTING_DESCRIPTION_MAX_LENGTH, LISTING_DESCRIPTION_MAX_ERROR),
   price: z
     .number({ message: 'Geçerli bir fiyat giriniz' })
     .positive('Fiyat 0\'dan büyük olmalıdır')

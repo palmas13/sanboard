@@ -125,7 +125,7 @@ export interface Listing {
   category: ListingCategory;
   subcategory: VehicleCategory | PropertyType;
   title: string; // max 60
-  description: string; // max 100
+  description: string; // max 200
   price: number;
   offers_enabled?: boolean;
   minimum_offer_amount?: number | null;

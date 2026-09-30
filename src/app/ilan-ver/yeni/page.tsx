@@ -26,14 +26,14 @@ import { resolveMediaUrl } from '@/lib/media/url';
 import { getListingUrl } from '@/lib/urls';
 import { calculateListingQuality } from '@/lib/listings/quality';
 import { ListingQualityIndicator } from '@/components/listings/ListingQualityIndicator';
-import { LISTING_TITLE_MAX_ERROR, LISTING_TITLE_MAX_LENGTH } from '@/lib/validations/listing';
+import { LISTING_DESCRIPTION_MAX_LENGTH, LISTING_TITLE_MAX_ERROR, LISTING_TITLE_MAX_LENGTH } from '@/lib/validations/listing';
 import { getVehicleLevelOptions, normalizeVehicleLevel, VEHICLE_LEVEL_FIELDS } from '@/lib/listings/vehicle-levels';
 import { formatTurkishInteger, isIntegerInRange, normalizeIntegerInput, normalizeTurkishIntegerInput } from '@/lib/forms/integer-input';
 import { readJsonResponse } from '@/lib/http/json-response';
 import { toListingImageReferences } from '@/lib/listings/image-references';
 
 const TITLE_MAX = LISTING_TITLE_MAX_LENGTH;
-const DESC_MAX = 100;
+const DESC_MAX = LISTING_DESCRIPTION_MAX_LENGTH;
 const DRAFT_VERSION = 2;
 
 export default function YeniIlanOlusturPage() {
@@ -703,7 +703,7 @@ export default function YeniIlanOlusturPage() {
               />
             </div>
 
-            {/* Description with live counter (max 100) */}
+            {/* Description with live counter */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-[var(--text-muted)]">

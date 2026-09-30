@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db/store';
 import { createSessionToken } from '@/lib/auth/session';
 import { GET, PUT } from '@/app/api/user/listings/[id]/route';
+import { LISTING_DESCRIPTION_MAX_ERROR } from '@/lib/validations/listing';
 
 const accountId = '11111111-1111-4111-8111-111111111111';
 const profileId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -59,5 +60,30 @@ describe('listing edit ownership and validation context', () => {
     }), { params: Promise.resolve({ id: 'corporate-listing' }) });
     assert.equal(response.status, 400);
     assert.equal(db.listings[0].vehicle_details?.transmission_upgrade, 0);
+  });
+
+  test('corporate edit API accepts 200 and rejects 201 description characters', async () => {
+    const payload = {
+      category: 'vehicle', subcategory: 'Otomobil', title: 'Kurumsal Araç', price: 1000,
+      offers_enabled: true, minimum_offer_amount: null, images: db.listings[0].images,
+      brand: 'Annis', model: 'Elegy Retro', plate: 'LS 123', mileage: 100,
+      engine_upgrade: 0, transmission_upgrade: 0, brake_upgrade: 0,
+      turbo: false, subwoofer: false, trade_available: false,
+    };
+
+    const validResponse = await PUT(request('PUT', {
+      ...payload,
+      description: 'A'.repeat(200),
+    }), { params: Promise.resolve({ id: 'corporate-listing' }) });
+    assert.equal(validResponse.status, 200);
+    assert.equal(db.listings[0].description.length, 200);
+
+    const invalidResponse = await PUT(request('PUT', {
+      ...payload,
+      description: 'A'.repeat(201),
+    }), { params: Promise.resolve({ id: 'corporate-listing' }) });
+    assert.equal(invalidResponse.status, 400);
+    assert.equal((await invalidResponse.json()).error, LISTING_DESCRIPTION_MAX_ERROR);
+    assert.equal(db.listings[0].description.length, 200);
   });
 });
