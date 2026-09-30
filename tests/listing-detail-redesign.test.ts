@@ -18,15 +18,14 @@ describe('premium listing detail redesign', () => {
   test('vehicle and property details use distinct responsive marketplace layouts', () => {
     assert.match(page, /data-testid="vehicle-listing-layout"/);
     assert.match(page, /max-w-\[1500px\]/);
-    assert.match(page, /xl:grid-cols-\[minmax\(0,1\.55fr\)_minmax\(330px,\.85fr\)_minmax\(285px,\.72fr\)\]/);
+    assert.match(page, /xl:grid-cols-\[minmax\(0,1\.6fr\)_minmax\(310px,\.78fr\)_minmax\(260px,\.62fr\)\]/);
     assert.match(page, /data-testid="property-listing-layout"/);
     assert.match(page, /lg:grid-cols-\[minmax\(0,1\.5fr\)_minmax\(380px,1fr\)\]/);
     assert.match(page, /data-testid="vehicle-gallery-block"[^>]*>[\s\S]*?<ListingGallery/);
+    assert.match(page, /data-testid="vehicle-primary-column"[^>]*>[\s\S]*data-testid="vehicle-gallery-block"[\s\S]*?<ListingGallery[\s\S]*data-testid="vehicle-description-row"[\s\S]*?<ListingDescription/);
     assert.match(page, /data-testid="vehicle-technical-column"[^>]*xl:col-start-2[^>]*>[\s\S]*?<VehicleDetailsPanel/);
     assert.match(page, /data-testid="vehicle-seller-rail"[^>]*xl:col-start-3[^>]*xl:sticky[^>]*>[\s\S]*?<SellerArea/);
-    assert.match(page, /data-testid="vehicle-description-row"[^>]*xl:col-span-2[^>]*>[\s\S]*?<ListingDescription/);
-    assert.match(page, /data-testid="vehicle-gallery-block"[^>]*>[\s\S]*?<ListingGallery[^>]*\/>\s*<\/div>\s*<aside data-testid="vehicle-seller-rail"/);
-    assert.ok(page.indexOf('data-testid="vehicle-description-row"') > page.indexOf('data-testid="vehicle-technical-column"'));
+    assert.ok(page.indexOf('data-testid="vehicle-description-row"') < page.indexOf('data-testid="vehicle-technical-column"'));
     assert.match(page, /data-testid="property-gallery-block"[^>]*>[\s\S]*?<ListingGallery/);
     assert.match(page, /data-testid="property-right-column"[^>]*lg:sticky[^>]*>[\s\S]*?<PropertyDetailsPanel[\s\S]*?<SellerArea/);
     assert.match(page, /data-testid="property-description-row"[^>]*>[\s\S]*?<ListingDescription/);
@@ -35,11 +34,14 @@ describe('premium listing detail redesign', () => {
 
   test('vehicle technical information is grouped inside one outer panel', () => {
     assert.match(vehicle, /data-testid="vehicle-details-panel"/);
-    assert.match(vehicle, />Teknik Özellikler</);
+    assert.doesNotMatch(vehicle, />Teknik Özellikler</);
     assert.match(vehicle, /<TechnicalSection title="Temel Bilgiler"/);
     assert.match(vehicle, /<TechnicalSection title="Mekanik Durum"/);
     assert.match(vehicle, /<TechnicalSection title="Güvenlik Donanımı"/);
-    assert.match(vehicle, /<TechnicalSection title="Ek Donanım & Satış"/);
+    assert.match(vehicle, /<TechnicalSection title="Ek Donanım"/);
+    assert.doesNotMatch(vehicle, /label: 'Kategori'/);
+    assert.doesNotMatch(vehicle, /label: 'İlan Tarihi'/);
+    assert.doesNotMatch(vehicle, /label: 'Yakıt Türü'/);
     assert.doesNotMatch(vehicle, /<ListingInfoSection/);
   });
 
@@ -49,14 +51,16 @@ describe('premium listing detail redesign', () => {
     assert.match(seller, /seller\?\.phone/);
     assert.match(page, /isOwner \? <Link href="\/hesabim\/ilanlarim"/);
     assert.match(page, /listing\.offers_enabled !== false \? <OfferButton/);
-    assert.match(seller, /Satıcıyla İletişime Geç/);
+    assert.match(seller, /Mesaj Gönder/);
+    assert.match(seller, /Kurumsal Profil/);
+    assert.doesNotMatch(seller, /Premium Satıcı|Onaylı Kurumsal Profil|Kurumsal Satıcı/);
     assert.match(seller, /dealer\?\.address/);
-    assert.match(seller, /dealer\?\.is_premium/);
     assert.match(safety, /Sanboard üzerinden iletişim kurun/);
   });
 
   test('optional fields are conditional and property fields use real listing data', () => {
     assert.match(header, /listing\.location \?/);
+    assert.doesNotMatch(header, /listing\.subcategory/);
     assert.match(property, /value: listing\.location/);
     assert.match(property, /details\.property_type/);
     assert.match(property, /details\.room_count/);
@@ -72,7 +76,7 @@ describe('premium listing detail redesign', () => {
     assert.doesNotMatch(vehicle, /Seviye Spor/);
   });
 
-  test('gallery renders thumbnails, counter, arrows, fullscreen and keyboard controls', () => {
+  test('gallery renders thumbnails, counter, arrows and click-to-open keyboard controls without a redundant expand icon', () => {
     assert.match(gallery, /data-testid="listing-gallery"/);
     assert.match(gallery, /aria-label="İlan fotoğrafları"/);
     assert.match(gallery, /selectedIdx \+ 1/);
@@ -81,6 +85,7 @@ describe('premium listing detail redesign', () => {
     assert.match(gallery, /Escape/);
     assert.match(gallery, /quality=\{92\}/);
     assert.match(gallery, /useCallback/);
+    assert.doesNotMatch(gallery, /<Expand/);
   });
 
   test('favorite, share and report actions remain available in the header', () => {

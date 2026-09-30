@@ -948,64 +948,54 @@ export default function HesabimKurumsalPage() {
         )
       ) : dealer?.status === 'APPROVED' ? (
         /* CASE 2: APPROVED BUT SUBSCRIPTION INACTIVE OR EXPIRED */
-        <div className="surface-card p-6 sm:p-8 rounded-2xl border border-[#FF8A1F]/30 max-w-xl mx-auto space-y-6 text-center shadow-xl">
-          <div className="w-14 h-14 mx-auto rounded-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] flex items-center justify-center">
-            <Crown className="w-7 h-7 fill-current" />
-          </div>
-
-          <div className="space-y-1.5">
-            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <BadgeCheck className="w-4 h-4" />
+        <div className="surface-card mx-auto max-w-2xl overflow-hidden rounded-3xl border border-[#FF8A1F]/25 shadow-[0_24px_80px_rgba(0,0,0,.22)]">
+          <div className="border-b border-[var(--border-app)] bg-gradient-to-br from-[#FF8A1F]/10 via-transparent to-transparent p-6 sm:p-8">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-400">
+              <BadgeCheck className="h-3.5 w-3.5" />
               <span>Başvurunuz Onaylandı</span>
             </span>
-            <h2 className="text-xl font-black text-[var(--text-main)]">
-              {dealer.company_name} Kurumsal Paket
-            </h2>
-            <p className="text-xs text-[var(--text-muted)] max-w-md mx-auto">
-              Kurumsal mağaza başvurunuz onaylanmıştır. Kurumsal mağaza avantajlarından yararlanmak için üyeliğinizi aktif edin.
+            <h2 className="mt-4 text-2xl font-black tracking-[-0.025em] text-[var(--text-main)] sm:text-3xl">Kurumsal Üyeliğinizi Aktifleştirin</h2>
+            <p className="mt-2 text-sm font-semibold text-[#FF9E45]">{dealer.company_name} Kurumsal Paket</p>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--text-muted)]">
+              Kurumsal mağaza başvurunuz onaylandı. Aşağıdaki ödeme ile üyeliğinizi aktifleştirerek mağaza avantajlarını kullanabilirsiniz.
             </p>
           </div>
 
-          {/* Package details */}
-          <div className="p-5 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] text-left space-y-3">
-            <h4 className="text-xs font-bold text-[#FF8A1F] uppercase tracking-wider">Kurumsal Paket Avantajları</h4>
-            <ul className="text-xs text-[var(--text-main)] space-y-2">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span><strong>İndirimli İlan Ücreti:</strong> İlan başı $1.750 (Bireysel $2.000 yerine)</span>
+          <div className="space-y-6 p-6 sm:p-8">
+            <div className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/55 p-4 sm:p-5">
+              <h3 className="text-sm font-bold text-[var(--text-main)]">Kurumsal Paket Avantajları</h3>
+              <ul className="mt-4 space-y-3 text-xs leading-5 text-[var(--text-muted)] sm:text-sm">
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                <span><strong className="text-[var(--text-main)]">İndirimli ilan:</strong> İlan başına $1.750.</span>
               </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span><strong>2 Kat Daha Uzun Süre:</strong> 14 gün yayında kalma süresi (Bireysel 7 gün yerine)</span>
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                <span><strong className="text-[var(--text-main)]">14 gün yayın:</strong> İlanlarınız daha uzun süre yayında kalır.</span>
               </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span><strong>Öne Çıkarma (Boost):</strong> Her 30 günlük dönemde 3 adet 24 saatlik öne çıkarma hakkı</span>
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                <span><strong className="text-[var(--text-main)]">3 öne çıkarma hakkı:</strong> Her 30 günlük dönemde 24 saatlik boost.</span>
               </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span><strong>Kamuya Açık Mağaza Vitrini:</strong> Özel logo, banner, sosyal medya ve /premium URL</span>
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                <span><strong className="text-[var(--text-main)]">Mağaza vitrini:</strong> Logo, banner, sosyal medya ve özel mağaza adresi.</span>
               </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span><strong>Takipçi Sistemi:</strong> Oyuncular mağazanızı takip edebilir ve yeni ilanlarınızdan anında haberdar olur</span>
+              <li className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                <span><strong className="text-[var(--text-main)]">Takipçi sistemi:</strong> Yeni ilanlarınız takipçilerinize ulaşır.</span>
               </li>
-            </ul>
-          </div>
+              </ul>
+            </div>
 
-          <button
-            type="button"
-            onClick={handleActivateSubscription}
-            disabled={actionLoading}
-            className="w-full btn-primary text-xs py-3 flex items-center justify-center gap-2 shadow-lg cursor-pointer"
-          >
-            {actionLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Zap className="w-4 h-4" />
-            )}
-            <span>Üyeliği Aktif Et (Fleeca ile Öde)</span>
-          </button>
+            <div>
+              <button type="button" onClick={handleActivateSubscription} disabled={actionLoading} className="btn-primary flex w-full cursor-pointer items-center justify-center gap-2 py-3.5 text-sm shadow-lg">
+                {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+                <span>Kurumsal Üyeliği Aktifleştir</span>
+              </button>
+              <p className="mt-2 text-center text-[11px] text-[var(--text-dim)]">Ödeme Fleeca üzerinden tamamlanacaktır.</p>
+            </div>
+          </div>
         </div>
       ) : dealer?.status === 'PENDING' || application?.status === 'PENDING' ? (
         /* CASE 3: PENDING */

@@ -1,9 +1,8 @@
-import { CalendarDays, CarFront, Fuel, Gauge, Hash, Sparkles, Tag } from 'lucide-react';
+import { CarFront, Gauge, Hash, Sparkles, Tag } from 'lucide-react';
 import type { MemberListingDetail } from '@/types';
-import { formatCurrency, formatDate, formatNumber } from '@/lib/utils/format';
+import { formatCurrency, formatNumber } from '@/lib/utils/format';
 import type { ListingInfoItem } from './ListingInfoSection';
 
-const fuelLabels: Record<string, string> = { BENZIN: 'Benzin', DIZEL: 'Dizel', ELEKTRIK: 'Elektrik' };
 const level = (value: unknown) => {
   const numericValue = typeof value === 'number' ? value : typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : Number.NaN;
   return Number.isInteger(numericValue) && numericValue >= 0 && numericValue <= 4 ? `Seviye ${numericValue}` : null;
@@ -16,8 +15,8 @@ function TechnicalSection({ title, items, children, first = false }: { title: st
   return (
     <section data-testid={`vehicle-technical-section-${title.toLocaleLowerCase('tr-TR').replaceAll(' ', '-')}`} className={first ? '' : 'border-t border-[var(--border-app)] pt-4'}>
       <h3 className="mb-3 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]"><Sparkles className="h-3.5 w-3.5 text-[#FF8A1F]" />{title}</h3>
-      {children || <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-        {visibleItems?.map(({ label, value, icon: Icon, accent, badge }) => <div key={label} className="flex min-h-12 items-center gap-2.5 rounded-xl border border-white/[0.035] bg-[var(--bg-surface-secondary)]/45 px-3 py-2">
+      {children || <dl className="grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+        {visibleItems?.map(({ label, value, icon: Icon, accent, badge }) => <div key={label} className="flex h-full min-h-12 items-center gap-2.5 rounded-xl border border-white/[0.05] bg-[var(--bg-surface-secondary)]/50 px-3 py-2.5">
           {Icon ? <Icon className="h-4 w-4 shrink-0 text-[#FF9E45]" /> : null}
           <div className="min-w-0 flex-1"><dt className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{label}</dt><dd className={`mt-0.5 break-words text-xs font-bold ${accent ? 'text-[#FF9E45]' : 'text-[var(--text-main)]'}`}>{badge ? <span className="inline-flex rounded-full border border-[#FF8A1F]/25 bg-[#FF8A1F]/10 px-2 py-0.5 text-[11px] font-black text-[#FF9E45]">{value}</span> : value}</dd></div>
         </div>)}
@@ -33,11 +32,8 @@ export function VehicleDetailsPanel({ listing }: { listing: MemberListingDetail 
   const basic: ListingInfoItem[] = [
     { label: 'Marka', value: details.brand, icon: CarFront },
     { label: 'Model', value: details.model, icon: Tag },
-    { label: 'Kategori', value: details.vehicle_category, icon: Tag },
-    { label: 'İlan Tarihi', value: listing.published_at ? formatDate(listing.published_at) : null, icon: CalendarDays },
     { label: 'Plaka', value: details.plate, icon: Hash },
     { label: 'Kilometre', value: Number.isFinite(details.mileage) ? `${formatNumber(details.mileage)} km` : null, icon: Gauge },
-    { label: 'Yakıt Türü', value: details.fuel_type ? fuelLabels[details.fuel_type] || details.fuel_type : null, icon: Fuel },
   ];
   const upgrades: ListingInfoItem[] = [
     { label: 'Motor Yükseltme', value: level(details.engine_upgrade), badge: true },
@@ -61,7 +57,6 @@ export function VehicleDetailsPanel({ listing }: { listing: MemberListingDetail 
 
   return (
     <section data-testid="vehicle-details-panel" className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-4 shadow-[0_16px_45px_rgba(0,0,0,.1)] sm:p-5">
-      <h2 className="mb-4 text-xs font-black uppercase tracking-[0.16em] text-[var(--text-main)]">Teknik Özellikler</h2>
       <div className="space-y-4">
         <TechnicalSection title="Temel Bilgiler" items={basic} first />
         <TechnicalSection title="Mekanik Durum">
@@ -71,12 +66,12 @@ export function VehicleDetailsPanel({ listing }: { listing: MemberListingDetail 
               <div className="h-2 overflow-hidden rounded-full bg-black/25"><div className="h-full rounded-full bg-gradient-to-r from-[#E87500] to-[#FF9E45]" style={{ width: `${Math.min(100, Math.max(0, details.engine_health))}%` }} /></div>
             </div>
           ) : null}
-          <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-            {upgrades.filter((item) => item.value !== null).map((item) => <div key={item.label} className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/[0.035] bg-[var(--bg-surface-secondary)]/45 px-3 py-2"><dt className="text-xs font-bold text-[var(--text-muted)]">{item.label}</dt><dd className="shrink-0 rounded-full border border-[#FF8A1F]/25 bg-[#FF8A1F]/10 px-2.5 py-1 text-xs font-black text-[#FF9E45]">{item.value}</dd></div>)}
+          <dl className="grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+            {upgrades.filter((item) => item.value !== null).map((item) => <div key={item.label} className="flex h-full min-h-12 items-center justify-between gap-3 rounded-xl border border-white/[0.05] bg-[var(--bg-surface-secondary)]/50 px-3 py-2.5"><dt className="text-xs font-bold text-[var(--text-muted)]">{item.label}</dt><dd className="shrink-0 rounded-full border border-[#FF8A1F]/25 bg-[#FF8A1F]/10 px-2.5 py-1 text-xs font-black text-[#FF9E45]">{item.value}</dd></div>)}
           </dl>
         </TechnicalSection>
         <TechnicalSection title="Güvenlik Donanımı" items={security} />
-        <TechnicalSection title="Ek Donanım & Satış" items={additional} />
+        <TechnicalSection title="Ek Donanım" items={additional} />
       </div>
     </section>
   );

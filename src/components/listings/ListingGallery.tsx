@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Expand, ImageIcon, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ImageIcon, X } from 'lucide-react';
 import type { ListingImage } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { sortListingImages } from '@/lib/listings/images';
@@ -36,7 +36,7 @@ export function ListingGallery({ images, title, isLocked = false, variant = 'veh
       <Image src={imageUrl} alt={title} fill priority quality={92} sizes={variant === 'property' ? '(min-width: 1280px) 58vw, (min-width: 1024px) 56vw, 100vw' : '(min-width: 1440px) 47vw, (min-width: 1280px) 45vw, (min-width: 768px) 100vw, 100vw'} className="object-cover" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-24 bg-gradient-to-t from-black/55 to-transparent" />
       <span className="absolute bottom-3 left-3 z-30 rounded-full bg-black/65 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-md">{selectedIdx + 1} / {visibleImages.length}</span>
-      {!isLocked ? <span className="absolute right-3 top-3 z-30 rounded-full border border-white/10 bg-black/60 p-2 text-white backdrop-blur-md"><Expand className="h-4 w-4" /></span> : <span className="absolute left-3 top-3 z-30 rounded-full bg-black/65 px-3 py-1.5 text-xs font-bold text-white">Vitrin Fotoğrafı</span>}
+      {isLocked ? <span className="absolute left-3 top-3 z-30 rounded-full bg-black/65 px-3 py-1.5 text-xs font-bold text-white">Vitrin Fotoğrafı</span> : null}
       {visibleImages.length > 1 ? <><button type="button" aria-label="Önceki fotoğraf" onClick={(event) => { event.stopPropagation(); move(-1); }} className="absolute left-3 top-1/2 z-30 -translate-y-1/2 rounded-full border border-white/10 bg-black/60 p-2.5 text-white backdrop-blur-md transition hover:border-[#FF8A1F]/50 hover:text-[#FF9E45]"><ChevronLeft className="h-5 w-5" /></button><button type="button" aria-label="Sonraki fotoğraf" onClick={(event) => { event.stopPropagation(); move(1); }} className="absolute right-3 top-1/2 z-30 -translate-y-1/2 rounded-full border border-white/10 bg-black/60 p-2.5 text-white backdrop-blur-md transition hover:border-[#FF8A1F]/50 hover:text-[#FF9E45]"><ChevronRight className="h-5 w-5" /></button></> : null}
     </div>
     {!isLocked && visibleImages.length > 1 ? <div className="flex gap-2.5 overflow-x-auto pb-1" aria-label="İlan fotoğrafları">{visibleImages.map((image, index) => <button key={image.id} type="button" onClick={() => setSelectedIdx(index)} aria-label={`${index + 1}. fotoğrafı göster`} aria-current={selectedIdx === index} className={`relative aspect-[16/10] w-24 shrink-0 overflow-hidden rounded-xl border-2 transition sm:w-28 ${selectedIdx === index ? 'border-[#FF8A1F] opacity-100' : 'border-transparent opacity-60 hover:opacity-90'}`}><Image src={resolveMediaUrl(image.storage_path)} alt={`${title} - ${index + 1}`} fill quality={72} sizes="112px" className="object-cover" /></button>)}</div> : null}

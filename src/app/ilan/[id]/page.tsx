@@ -81,17 +81,19 @@ export default async function ListingDetailPage({ params }: PageProps) {
 
     <ListingDetailHeader listing={listing} categoryHref={categoryLink} categoryName={categoryName} actions={headerActions} />
 
-    {isVehicle ? <section data-testid="vehicle-listing-layout" className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 xl:grid-cols-[minmax(0,1.55fr)_minmax(330px,.85fr)_minmax(285px,.72fr)]">
-      <div data-testid="vehicle-gallery-block" className="min-w-0 md:col-span-2 xl:col-span-1 xl:col-start-1 xl:row-start-1">
-        <ListingGallery images={galleryImages} title={listing.title} isLocked={result.isLocked} variant="vehicle" />
+    {isVehicle ? <section data-testid="vehicle-listing-layout" className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,.72fr)] xl:grid-cols-[minmax(0,1.6fr)_minmax(310px,.78fr)_minmax(260px,.62fr)]">
+      <div data-testid="vehicle-primary-column" className="min-w-0 space-y-5 lg:col-start-1 xl:col-start-1">
+        <div data-testid="vehicle-gallery-block">
+          <ListingGallery images={galleryImages} title={listing.title} isLocked={result.isLocked} variant="vehicle" />
+        </div>
+        {detailReady ? <div data-testid="vehicle-description-row"><ListingDescription listing={memberListing} /></div> : null}
       </div>
-      <aside data-testid="vehicle-seller-rail" className="order-2 min-w-0 space-y-3 md:col-start-2 md:row-start-2 xl:order-none xl:col-start-3 xl:row-span-2 xl:row-start-1 xl:sticky xl:top-24">
-        <SellerArea listing={memberListing} isLocked={result.isLocked} isOwner={result.isOwner} closedLabel={closedLabel} />
-      </aside>
-      <div data-testid="vehicle-technical-column" className="order-3 min-w-0 md:col-start-1 md:row-start-2 xl:order-none xl:col-start-2 xl:row-start-1">
+      <div data-testid="vehicle-technical-column" className="min-w-0 lg:col-start-2 lg:row-start-1 xl:col-start-2">
         {detailReady ? <VehicleDetailsPanel listing={memberListing} /> : <div className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-6 text-sm text-[var(--text-muted)]">Teknik detayları görmek için giriş yapınız.</div>}
       </div>
-      {detailReady ? <div data-testid="vehicle-description-row" className="order-4 min-w-0 md:col-span-2 xl:order-none xl:col-span-2 xl:col-start-1 xl:row-start-2"><ListingDescription listing={memberListing} /></div> : null}
+      <aside data-testid="vehicle-seller-rail" className="min-w-0 space-y-3 lg:col-start-2 xl:col-start-3 xl:row-start-1 xl:sticky xl:top-24">
+        <SellerArea listing={memberListing} isLocked={result.isLocked} isOwner={result.isOwner} closedLabel={closedLabel} />
+      </aside>
     </section> : <section data-testid="property-listing-layout" className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(380px,1fr)]">
       <div data-testid="property-gallery-block" className="min-w-0 lg:col-start-1 lg:row-start-1">
         <ListingGallery images={galleryImages} title={listing.title} isLocked={result.isLocked} variant="property" />

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { CharacterProfile, DealerProfile } from '@/types';
-import { Phone, Mail, Copy, Check, ShieldCheck, Crown, Building2, MapPin, MessageCircle } from 'lucide-react';
+import { Phone, Mail, Copy, Check, ShieldCheck, Building2, MapPin, MessageCircle } from 'lucide-react';
 import { resolveAvatarUrl, resolveMediaUrl } from '@/lib/media/url';
 import { getCorporateUrl } from '@/lib/urls';
 
@@ -69,23 +69,23 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
   };
 
   return (
-    <div data-testid={isCorporate ? 'corporate-seller-card' : 'individual-seller-card'} className={`surface-card rounded-2xl border p-4 shadow-[0_18px_55px_rgba(0,0,0,.16)] sm:p-5 ${
-      isCorporate ? 'border-[#FF8A1F]/25 bg-gradient-to-b from-[var(--bg-surface)] to-[var(--bg-surface-secondary)]' : 'border-[var(--border-app)]'
+    <div data-testid={isCorporate ? 'corporate-seller-card' : 'individual-seller-card'} className={`surface-card rounded-2xl border p-4 shadow-[0_16px_45px_rgba(0,0,0,.14)] ${
+      isCorporate ? 'border-[#FF8A1F]/20 bg-gradient-to-b from-[var(--bg-surface)] to-[var(--bg-surface-secondary)]/70' : 'border-[var(--border-app)]'
     }`}>
       {/* Header Profile / Store Info */}
-      <div className="flex items-center gap-3.5 border-b border-[var(--border-app)] pb-3">
+      <div className="flex items-center gap-3 border-b border-[var(--border-app)] pb-4">
         <Link href={publicUrl} className="shrink-0 group">
           {displayAvatar && !imgError ? (
             <img
               src={displayAvatar}
               alt={displayName}
               onError={() => setImgError(true)}
-              className={`w-14 h-14 object-cover border-2 shadow-sm transition-transform group-hover:scale-105 ${
-                isCorporate ? 'rounded-2xl border-[#FF8A1F] ring-2 ring-[#FF8A1F]/20' : 'rounded-full border-[var(--border-app)] group-hover:border-[#FF8A1F]'
+              className={`h-12 w-12 object-cover shadow-sm transition-colors ${
+                isCorporate ? 'rounded-xl border border-[#FF8A1F]/35' : 'rounded-full border border-[var(--border-app)] group-hover:border-[#FF8A1F]'
               }`}
             />
           ) : (
-            <div className={`w-14 h-14 flex items-center justify-center font-bold text-base shadow-sm transition-transform group-hover:scale-105 ${
+            <div className={`flex h-12 w-12 items-center justify-center text-sm font-bold shadow-sm transition-colors ${
               isCorporate
                 ? 'rounded-2xl bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border-2 border-[#FF8A1F]'
                 : 'rounded-full bg-[var(--bg-surface-secondary)] text-[var(--text-main)] border border-[var(--border-app)] group-hover:border-[#FF8A1F]'
@@ -95,31 +95,21 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
           )}
         </Link>
         <div className="space-y-1 min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider">
-              {isCorporate ? 'Kurumsal Satıcı' : 'İlan Sahibi'}
-            </span>
-            {isCorporate && dealer?.is_premium && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border border-[#FF8A1F]/30 text-[10px] font-black">
-                <Crown className="w-3 h-3 fill-current" />
-                <span>Premium Satıcı</span>
-              </span>
-            )}
-          </div>
+          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#FF9E45]">{isCorporate ? 'Kurumsal Profil' : 'İlan Sahibi'}</span>
           <Link href={publicUrl} className="block group">
             <h3 className="font-extrabold text-base text-[var(--text-main)] truncate group-hover:text-[#FF8A1F] transition-colors">
               {displayName}
             </h3>
           </Link>
-          <div className="flex items-center gap-1 text-[11px] text-[var(--color-success)] font-medium">
+          <div className="flex items-center gap-1 text-[10px] font-medium text-[var(--text-muted)]">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-            <span>{isCorporate ? 'Onaylı Kurumsal Profil' : 'Onaylı Karakter'}</span>
+            <span>{isCorporate ? 'Doğrulanmış mağaza' : 'Doğrulanmış profil'}</span>
           </div>
         </div>
       </div>
 
       {/* Contact Details & Action CTAs */}
-      <div className="mt-4 space-y-2">
+      <div className="mt-3 space-y-2">
         {/* Phone */}
         {displayPhone ? (
           <div className="flex items-center justify-between rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] px-3 py-2.5">
@@ -127,7 +117,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
               <Phone className="w-4 h-4 text-[#FF8A1F] shrink-0" />
               <div>
                 <p className="text-[10px] text-[var(--text-dim)]">
-                  {isCorporate ? 'Kurumsal Telefon' : 'Telefon'}
+                  Telefon
                 </p>
                 <p className="text-xs font-bold text-[var(--text-main)] font-mono">{displayPhone}</p>
               </div>
@@ -150,7 +140,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
               <Mail className="w-4 h-4 text-[#FF8A1F] shrink-0" />
               <div className="truncate">
                 <p className="text-[10px] text-[var(--text-dim)]">
-                  {isCorporate ? 'Kurumsal SanMail' : 'SanMail'}
+                  SanMail
                 </p>
                 <p className="text-xs font-bold text-[var(--text-main)] truncate">{displayMail}</p>
               </div>
@@ -182,7 +172,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
             className="btn-primary flex w-full items-center justify-center gap-1.5 py-2.5 text-xs"
           >
             <MessageCircle className="h-3.5 w-3.5" />
-            <span>Satıcıyla İletişime Geç</span>
+            <span>Mesaj Gönder</span>
           </a>
         ) : displayMail ? (
           <button
@@ -191,22 +181,22 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
             className="btn-primary flex w-full cursor-pointer items-center justify-center gap-1.5 py-2.5 text-xs"
           >
             <Mail className="w-3.5 h-3.5 text-[#FF8A1F]" />
-            <span>{copiedMail ? 'SanMail Kopyalandı!' : 'Satıcıyla İletişime Geç'}</span>
+            <span>{copiedMail ? 'SanMail Kopyalandı!' : 'Mesaj Gönder'}</span>
           </button>
         ) : displayPhone ? (
           <button type="button" onClick={handleCopyPhone} className="btn-primary flex w-full cursor-pointer items-center justify-center gap-1.5 py-2.5 text-xs">
-            <Phone className="h-3.5 w-3.5" /><span>{copiedPhone ? 'Telefon Kopyalandı!' : 'Satıcıyla İletişime Geç'}</span>
+            <Phone className="h-3.5 w-3.5" /><span>{copiedPhone ? 'Telefon Kopyalandı!' : 'İletişim Kur'}</span>
           </button>
         ) : null}
 
-        {/* Corporate Only: [ Mağaza Profilini Görüntüle ] CTA Button */}
+        {/* Corporate store CTA */}
         {isCorporate && publicStoreUrl && (
           <Link
             href={publicStoreUrl}
             className="btn-secondary mt-1 flex w-full items-center justify-center gap-1.5 py-2.5 text-xs"
           >
             <Building2 className="w-3.5 h-3.5" />
-            <span>Mağaza Profilini Görüntüle</span>
+            <span>Mağazaya Git</span>
           </Link>
         )}
         {actions ? <div className="grid gap-2 border-t border-[var(--border-app)] pt-3">{actions}</div> : null}
