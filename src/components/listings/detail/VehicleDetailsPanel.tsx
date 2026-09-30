@@ -8,17 +8,17 @@ const level = (value: unknown) => {
   return Number.isInteger(numericValue) && numericValue >= 0 && numericValue <= 4 ? `Seviye ${numericValue}` : null;
 };
 
-function TechnicalSection({ title, items, children, first = false }: { title: string; items?: ListingInfoItem[]; children?: React.ReactNode; first?: boolean }) {
+function TechnicalSection({ title, items, children, first = false, columns = 'standard' }: { title: string; items?: ListingInfoItem[]; children?: React.ReactNode; first?: boolean; columns?: 'standard' | 'wide' }) {
   const visibleItems = items?.filter((item) => item.value !== null && item.value !== undefined && item.value !== '');
   if (!children && !visibleItems?.length) return null;
 
   return (
-    <section data-testid={`vehicle-technical-section-${title.toLocaleLowerCase('tr-TR').replaceAll(' ', '-')}`} className={first ? '' : 'border-t border-[var(--border-app)] pt-4'}>
-      <h3 className="mb-3 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-[var(--text-muted)]"><Sparkles className="h-3.5 w-3.5 text-[#FF8A1F]" />{title}</h3>
-      {children || <dl className="grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-        {visibleItems?.map(({ label, value, icon: Icon, accent, badge }) => <div key={label} className="flex h-full min-h-12 items-center gap-2.5 rounded-xl border border-white/[0.05] bg-[var(--bg-surface-secondary)]/50 px-3 py-2.5">
-          {Icon ? <Icon className="h-4 w-4 shrink-0 text-[#FF9E45]" /> : null}
-          <div className="min-w-0 flex-1"><dt className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-dim)]">{label}</dt><dd className={`mt-0.5 break-words text-xs font-bold ${accent ? 'text-[#FF9E45]' : 'text-[var(--text-main)]'}`}>{badge ? <span className="inline-flex rounded-full border border-[#FF8A1F]/25 bg-[#FF8A1F]/10 px-2 py-0.5 text-[11px] font-black text-[#FF9E45]">{value}</span> : value}</dd></div>
+    <section data-testid={`vehicle-technical-section-${title.toLocaleLowerCase('tr-TR').replaceAll(' ', '-')}`} className={first ? '' : 'border-t border-[var(--border-app)]/80 pt-3.5'}>
+      <h3 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-[var(--text-main)]"><Sparkles className="h-3.5 w-3.5 text-[#FF8A1F]" />{title}</h3>
+      {children || <dl className={`grid auto-rows-fr grid-cols-2 gap-1.5 ${columns === 'wide' ? 'sm:grid-cols-3' : ''}`}>
+        {visibleItems?.map(({ label, value, icon: Icon, accent, badge }) => <div key={label} className="flex h-full min-h-10 items-center gap-2 rounded-lg bg-[var(--bg-surface-secondary)]/55 px-2.5 py-2">
+          {Icon ? <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" /> : null}
+          <div className="min-w-0 flex-1"><dt className="text-[9px] font-semibold text-[var(--text-dim)]">{label}</dt><dd className={`mt-px break-words text-[11px] font-bold leading-4 ${accent ? 'text-[#FF9E45]' : 'text-[var(--text-main)]'}`}>{badge ? <span className="inline-flex rounded-md bg-[#FF8A1F]/10 px-1.5 py-0.5 text-[10px] font-bold text-[#FF9E45]">{value}</span> : value}</dd></div>
         </div>)}
       </dl>}
     </section>
@@ -56,22 +56,22 @@ export function VehicleDetailsPanel({ listing }: { listing: MemberListingDetail 
   ];
 
   return (
-    <section data-testid="vehicle-details-panel" className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-4 shadow-[0_16px_45px_rgba(0,0,0,.1)] sm:p-5">
-      <div className="space-y-4">
+    <section data-testid="vehicle-details-panel" className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-4 shadow-[0_12px_36px_rgba(0,0,0,.09)]">
+      <div className="space-y-3.5">
         <TechnicalSection title="Temel Bilgiler" items={basic} first />
         <TechnicalSection title="Mekanik Durum">
           {details.engine_health !== null && details.engine_health !== undefined ? (
-            <div className="mb-2 rounded-xl border border-white/[0.035] bg-[var(--bg-surface-secondary)]/45 p-3">
-              <div className="mb-2 flex items-center justify-between text-xs"><span className="font-bold text-[var(--text-muted)]">Motor Sağlığı</span><strong className="text-[#FF9E45]">%{details.engine_health}</strong></div>
-              <div className="h-2 overflow-hidden rounded-full bg-black/25"><div className="h-full rounded-full bg-gradient-to-r from-[#E87500] to-[#FF9E45]" style={{ width: `${Math.min(100, Math.max(0, details.engine_health))}%` }} /></div>
+            <div className="mb-1.5 rounded-lg bg-[var(--bg-surface-secondary)]/55 px-2.5 py-2">
+              <div className="mb-1.5 flex items-center justify-between text-[11px]"><span className="font-semibold text-[var(--text-muted)]">Motor Sağlığı</span><strong className="text-[#FF9E45]">%{details.engine_health}</strong></div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-black/25"><div className="h-full rounded-full bg-gradient-to-r from-[#E87500] to-[#FF9E45]" style={{ width: `${Math.min(100, Math.max(0, details.engine_health))}%` }} /></div>
             </div>
           ) : null}
-          <dl className="grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-            {upgrades.filter((item) => item.value !== null).map((item) => <div key={item.label} className="flex h-full min-h-12 items-center justify-between gap-3 rounded-xl border border-white/[0.05] bg-[var(--bg-surface-secondary)]/50 px-3 py-2.5"><dt className="text-xs font-bold text-[var(--text-muted)]">{item.label}</dt><dd className="shrink-0 rounded-full border border-[#FF8A1F]/25 bg-[#FF8A1F]/10 px-2.5 py-1 text-xs font-black text-[#FF9E45]">{item.value}</dd></div>)}
+          <dl className="grid auto-rows-fr grid-cols-2 gap-1.5">
+            {upgrades.filter((item) => item.value !== null).map((item) => <div key={item.label} className="flex h-full min-h-10 items-center justify-between gap-2 rounded-lg bg-[var(--bg-surface-secondary)]/55 px-2.5 py-2"><dt className="text-[10px] font-semibold leading-4 text-[var(--text-muted)]">{item.label}</dt><dd className="shrink-0 rounded-md bg-[#FF8A1F]/10 px-1.5 py-0.5 text-[10px] font-bold text-[#FF9E45]">{item.value}</dd></div>)}
           </dl>
         </TechnicalSection>
-        <TechnicalSection title="Güvenlik Donanımı" items={security} />
-        <TechnicalSection title="Ek Donanım" items={additional} />
+        <TechnicalSection title="Güvenlik Donanımı" items={security} columns="wide" />
+        <TechnicalSection title="Ek Donanım" items={additional} columns="wide" />
       </div>
     </section>
   );

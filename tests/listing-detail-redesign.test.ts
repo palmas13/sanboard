@@ -17,15 +17,15 @@ describe('premium listing detail redesign', () => {
 
   test('vehicle and property details use distinct responsive marketplace layouts', () => {
     assert.match(page, /data-testid="vehicle-listing-layout"/);
-    assert.match(page, /max-w-\[1500px\]/);
-    assert.match(page, /xl:grid-cols-\[minmax\(0,1\.6fr\)_minmax\(310px,\.78fr\)_minmax\(260px,\.62fr\)\]/);
+    assert.match(page, /max-w-\[1580px\]/);
+    assert.match(page, /xl:grid-cols-\[minmax\(0,1\.55fr\)_minmax\(360px,\.9fr\)_minmax\(245px,\.58fr\)\]/);
     assert.match(page, /data-testid="property-listing-layout"/);
     assert.match(page, /lg:grid-cols-\[minmax\(0,1\.5fr\)_minmax\(380px,1fr\)\]/);
     assert.match(page, /data-testid="vehicle-gallery-block"[^>]*>[\s\S]*?<ListingGallery/);
-    assert.match(page, /data-testid="vehicle-primary-column"[^>]*>[\s\S]*data-testid="vehicle-gallery-block"[\s\S]*?<ListingGallery[\s\S]*data-testid="vehicle-description-row"[\s\S]*?<ListingDescription/);
-    assert.match(page, /data-testid="vehicle-technical-column"[^>]*xl:col-start-2[^>]*>[\s\S]*?<VehicleDetailsPanel/);
+    assert.match(page, /data-testid="vehicle-description-row"[^>]*xl:col-start-1[^>]*>[\s\S]*?<ListingDescription/);
+    assert.match(page, /data-testid="vehicle-technical-column"[^>]*xl:col-start-2[^>]*xl:row-span-2[^>]*>[\s\S]*?<VehicleDetailsPanel/);
     assert.match(page, /data-testid="vehicle-seller-rail"[^>]*xl:col-start-3[^>]*xl:sticky[^>]*>[\s\S]*?<SellerArea/);
-    assert.ok(page.indexOf('data-testid="vehicle-description-row"') < page.indexOf('data-testid="vehicle-technical-column"'));
+    assert.ok(page.indexOf('data-testid="vehicle-seller-rail"') < page.indexOf('data-testid="vehicle-description-row"'));
     assert.match(page, /data-testid="property-gallery-block"[^>]*>[\s\S]*?<ListingGallery/);
     assert.match(page, /data-testid="property-right-column"[^>]*lg:sticky[^>]*>[\s\S]*?<PropertyDetailsPanel[\s\S]*?<SellerArea/);
     assert.match(page, /data-testid="property-description-row"[^>]*>[\s\S]*?<ListingDescription/);
@@ -51,11 +51,12 @@ describe('premium listing detail redesign', () => {
     assert.match(seller, /seller\?\.phone/);
     assert.match(page, /isOwner \? <Link href="\/hesabim\/ilanlarim"/);
     assert.match(page, /listing\.offers_enabled !== false \? <OfferButton/);
-    assert.match(seller, /Mesaj Gönder/);
     assert.match(seller, /Kurumsal Profil/);
-    assert.doesNotMatch(seller, /Premium Satıcı|Onaylı Kurumsal Profil|Kurumsal Satıcı/);
+    assert.doesNotMatch(seller, /Premium Satıcı|Onaylı Kurumsal Profil|Kurumsal Satıcı|Mesaj Gönder|İletişim Kur|Satıcıyla İletişime Geç/);
     assert.match(seller, /dealer\?\.address/);
-    assert.match(safety, /Sanboard üzerinden iletişim kurun/);
+    assert.match(safety, /data-testid="safe-shopping-card"/);
+    assert.match(safety, /Güvenli alışveriş:/);
+    assert.doesNotMatch(safety, /shadow-/);
   });
 
   test('optional fields are conditional and property fields use real listing data', () => {

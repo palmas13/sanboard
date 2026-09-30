@@ -69,31 +69,29 @@ export default async function ListingDetailPage({ params }: PageProps) {
   const similarListings = isVehicle ? await getOptionalSimilarListings(repo, id, 6) : [];
   const detailReady = !result.isLocked;
 
-  const headerActions = <div data-testid="listing-actions" className="flex flex-wrap gap-2">
+  const headerActions = <div data-testid="listing-actions" className="flex flex-wrap items-center gap-1.5 [&_button]:min-h-9 [&_a]:min-h-9">
     {!closedLabel ? <FavoriteButton listingId={listing.id} initialCount={listing.favorite_count} initialIsFavorited={memberListing.is_favorited} showCount={false} /> : null}
     <CopyListingLinkButton path={canonicalPath} />
     {!result.isOwner ? <ReportModal listingId={listing.id} /> : null}
     {isVehicle ? <CompareButton listing={listing} /> : !closedLabel ? <PropertyCompareButton listing={listing} /> : null}
   </div>;
 
-  return <main className="mx-auto w-full max-w-[1500px] space-y-5 px-3 py-4 sm:px-5 lg:px-7 lg:py-6">
+  return <main className="mx-auto w-full max-w-[1580px] space-y-4 px-3 py-4 sm:px-5 lg:px-6 lg:py-5">
     {closedLabel ? <div role="status" className="flex items-center gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/8 p-4 text-sm font-semibold text-amber-200"><CircleOff className="h-5 w-5 shrink-0" /><div><p>{closedLabel}</p><p className="mt-0.5 text-xs font-normal text-[var(--text-muted)]">İlan bilgileri arşiv amacıyla görüntüleniyor; yeni iletişim ve favori işlemleri kapalıdır.</p></div></div> : null}
 
     <ListingDetailHeader listing={listing} categoryHref={categoryLink} categoryName={categoryName} actions={headerActions} />
 
-    {isVehicle ? <section data-testid="vehicle-listing-layout" className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,.72fr)] xl:grid-cols-[minmax(0,1.6fr)_minmax(310px,.78fr)_minmax(260px,.62fr)]">
-      <div data-testid="vehicle-primary-column" className="min-w-0 space-y-5 lg:col-start-1 xl:col-start-1">
-        <div data-testid="vehicle-gallery-block">
-          <ListingGallery images={galleryImages} title={listing.title} isLocked={result.isLocked} variant="vehicle" />
-        </div>
-        {detailReady ? <div data-testid="vehicle-description-row"><ListingDescription listing={memberListing} /></div> : null}
+    {isVehicle ? <section data-testid="vehicle-listing-layout" className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,.85fr)] xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,.9fr)_minmax(245px,.58fr)]">
+      <div data-testid="vehicle-gallery-block" className="min-w-0 lg:col-start-1 lg:row-start-1 xl:col-start-1">
+        <ListingGallery images={galleryImages} title={listing.title} isLocked={result.isLocked} variant="vehicle" />
       </div>
-      <div data-testid="vehicle-technical-column" className="min-w-0 lg:col-start-2 lg:row-start-1 xl:col-start-2">
-        {detailReady ? <VehicleDetailsPanel listing={memberListing} /> : <div className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-6 text-sm text-[var(--text-muted)]">Teknik detayları görmek için giriş yapınız.</div>}
-      </div>
-      <aside data-testid="vehicle-seller-rail" className="min-w-0 space-y-3 lg:col-start-2 xl:col-start-3 xl:row-start-1 xl:sticky xl:top-24">
+      <aside data-testid="vehicle-seller-rail" className="min-w-0 space-y-2.5 lg:col-start-2 lg:row-start-1 xl:col-start-3 xl:row-start-1 xl:sticky xl:top-20">
         <SellerArea listing={memberListing} isLocked={result.isLocked} isOwner={result.isOwner} closedLabel={closedLabel} />
       </aside>
+      {detailReady ? <div data-testid="vehicle-description-row" className="min-w-0 lg:col-start-1 lg:row-start-2 xl:col-start-1"><ListingDescription listing={memberListing} /></div> : null}
+      <div data-testid="vehicle-technical-column" className="min-w-0 lg:col-start-2 lg:row-start-2 xl:col-start-2 xl:row-start-1 xl:row-span-2">
+        {detailReady ? <VehicleDetailsPanel listing={memberListing} /> : <div className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-6 text-sm text-[var(--text-muted)]">Teknik detayları görmek için giriş yapınız.</div>}
+      </div>
     </section> : <section data-testid="property-listing-layout" className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(380px,1fr)]">
       <div data-testid="property-gallery-block" className="min-w-0 lg:col-start-1 lg:row-start-1">
         <ListingGallery images={galleryImages} title={listing.title} isLocked={result.isLocked} variant="property" />
