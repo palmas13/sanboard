@@ -58,7 +58,7 @@ export function VehicleDetailsPanel({ listing }: { listing: MemberListingDetail 
   ];
 
   return (
-    <section data-testid="vehicle-details-panel" className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-4 shadow-[0_12px_36px_rgba(0,0,0,.09)]">
+    <section data-testid="vehicle-details-panel" className="h-full rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-4 shadow-[0_12px_36px_rgba(0,0,0,.09)]">
       <div className="space-y-3.5">
         <TechnicalSection title="Temel Bilgiler" items={basic} first />
         <TechnicalSection title="Mekanik Durum">

@@ -6,6 +6,7 @@ import { redactPrivateContact } from '@/lib/profiles/contact-privacy';
 import { MemoryPaymentRepository } from '@/lib/db/repositories/memory/memory-payment-repo';
 import { db } from '@/lib/db/store';
 import { syncExternalGameAccount } from '@/lib/auth/gtaworld-sync';
+import { getPaymentProductLabel } from '@/lib/payments/presentation';
 
 const source = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
 
@@ -30,6 +31,32 @@ describe('dashboard experience refinement regressions', () => {
     assert.deepEqual(await new MemoryPaymentRepository().getUserPayments('profile'), []);
     await syncExternalGameAccount({ externalAccountId: 'payment-account', characters: [{ externalCharacterId: 'payment-character', displayName: 'Buyer Updated' }] });
     assert.deepEqual(await new MemoryPaymentRepository().getUserPayments('profile'), []);
+  });
+
+  test('payment history projects canonical product metadata and distinguishes equal-priced products', async () => {
+    process.env.DATA_STORE = 'memory';
+    db.profiles = [{ id: 'profile', user_id: 'user', full_name: 'Buyer', avatar_url: '', created_at: '', updated_at: '' } as any];
+    db.packages = [
+      { id: 'standard', code: 'STANDARD_7_DAY', name: '7 Günlük Standart İlan', price: 2000, duration_days: 7, active: true, seller_type: 'INDIVIDUAL' },
+      { id: 'boost', code: 'LISTING_BOOST_24_HOUR', name: '24 Saat Öne Çıkarma', price: 2000, duration_days: 1, active: true, seller_type: 'CORPORATE' },
+    ] as any;
+    db.payments = [
+      { id: 'standard-payment', profile_id: 'profile', package_id: 'standard', order_id: 'standard-order', provider: 'FLEECA', amount: 2000, status: 'SUCCESS', entitlement_type: 'LISTING_CREDIT', purpose: 'LISTING_PUBLICATION', created_at: '2026-09-30T12:00:00.000Z' },
+      { id: 'boost-payment', profile_id: 'profile', package_id: 'boost', order_id: 'boost-order', provider: 'FLEECA', amount: 2000, status: 'SUCCESS', entitlement_type: 'LISTING_BOOST', purpose: 'LISTING_BOOST', created_at: '2026-09-30T13:00:00.000Z' },
+    ] as any;
+
+    const payments = await new MemoryPaymentRepository().getUserPayments('profile');
+    assert.equal(payments[0].package_code, 'LISTING_BOOST_24_HOUR');
+    assert.equal(payments[0].package_name, '24 Saat Öne Çıkarma');
+    assert.equal(payments[1].package_code, 'STANDARD_7_DAY');
+    assert.deepEqual(payments.map(getPaymentProductLabel), ['İlan Öne Çıkarma', 'Bireysel İlan Hakkı']);
+    assert.equal(payments[0].amount, payments[1].amount);
+
+    const supabaseRepo = source('src/lib/db/repositories/supabase/supabase-payment-repo.ts');
+    assert.match(supabaseRepo, /package:packages\(code, name\)/);
+    assert.match(supabaseRepo, /package_code: paymentPackage\?\.code/);
+    assert.match(supabaseRepo, /package_name: paymentPackage\?\.name/);
+    assert.match(source('src/app/hesabim/odemeler/page.tsx'), /getPaymentProductLabel\(pay\)/);
   });
 
   test('public application route requires contact and location without accepting profile identity', () => {
@@ -100,6 +127,7 @@ describe('dashboard experience refinement regressions', () => {
     const vehicles = source('src/app/arac/page.tsx');
     const properties = source('src/app/mulk/page.tsx');
     const popular = source('src/components/home/PopularShowcase.tsx');
+    const corporateProfile = source('src/app/kurumsal/[slug]/page.tsx');
     assert.doesNotMatch(profile, /<h3[^>]*>Kimlik<\/h3>/);
     assert.doesNotMatch(profile, /<h3[^>]*>İletişim<\/h3>/);
     assert.match(navbar, /Keşfet Akışı/);
@@ -109,6 +137,10 @@ describe('dashboard experience refinement regressions', () => {
     assert.match(properties, /<span>Mülk İlanları<\/span>/);
     assert.doesNotMatch(properties, /Los Santos Mülk İlanları/);
     assert.doesNotMatch(popular, /Canlı Vitrin/);
+    assert.match(corporateProfile, /Araç İlanları \(\{vehicleSummaries\.length\}\)/);
+    assert.match(corporateProfile, /Mülk İlanları \(\{propertySummaries\.length\}\)/);
+    assert.match(corporateProfile, /dealer\.is_verified && <BadgeCheck aria-label="Doğrulanmış kurumsal profil"/);
+    assert.doesNotMatch(corporateProfile, /Kurumsal Galeri|Araç Galerisi|Emlak Portföyü/);
   });
 
   test('property view switch preserves URL-owned filters and renders both modes', () => {

@@ -6,7 +6,7 @@ import { getDealerRepository, getListingRepository } from '@/lib/db/repositories
 import { ListingCard } from '@/components/listings/ListingCard';
 import { CorporateStoreFollow } from '@/components/dealers/CorporateStoreFollow';
 import {
-  Crown,
+  BadgeCheck,
   MapPin,
   Phone,
   Mail,
@@ -175,10 +175,7 @@ export default async function CorporateStorePage({ params }: PageProps) {
                 <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)]">
                   {dealer.company_name}
                 </h1>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border border-[#FF8A1F]/30 text-xs font-black shadow-sm">
-                  <Crown className="w-3.5 h-3.5 fill-current" />
-                  <span>Kurumsal Galeri</span>
-                </span>
+                {dealer.is_verified && <BadgeCheck aria-label="Doğrulanmış kurumsal profil" className="h-5 w-5 shrink-0 text-[#FF8A1F]" />}
               </div>
 
               {dealer.description && (
@@ -261,7 +258,7 @@ export default async function CorporateStorePage({ params }: PageProps) {
             <div className="flex items-center justify-between pb-2 border-b border-[var(--border-app)]">
               <h2 className="text-lg font-bold text-[var(--text-main)] flex items-center gap-2">
                 <Car className="w-5 h-5 text-[#FF8A1F]" />
-                <span>Araç Galerisi ({vehicleSummaries.length})</span>
+                <span>Araç İlanları ({vehicleSummaries.length})</span>
               </h2>
             </div>
 
@@ -283,7 +280,7 @@ export default async function CorporateStorePage({ params }: PageProps) {
             <div className="flex items-center justify-between pb-2 border-b border-[var(--border-app)]">
               <h2 className="text-lg font-bold text-[var(--text-main)] flex items-center gap-2">
                 <Home className="w-5 h-5 text-[#FF8A1F]" />
-                <span>Emlak Portföyü ({propertySummaries.length})</span>
+                <span>Mülk İlanları ({propertySummaries.length})</span>
               </h2>
             </div>
 

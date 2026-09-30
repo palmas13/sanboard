@@ -132,6 +132,7 @@ export interface IOfferRepository {
   getOffer(threadId: string, actorProfileId: string): Promise<{ success: boolean; thread?: OfferThread; error?: string }>;
   actOnOffer(input: { threadId: string; actorProfileId: string; actorUserId: string; action: 'COUNTER' | 'ACCEPT' | 'REJECT' | 'WITHDRAW'; amount?: number }): Promise<{ success: boolean; thread?: OfferThread; error?: string; code?: string }>;
   markRead(threadId: string, actorProfileId: string): Promise<{ success: boolean; unreadCount: number; error?: string }>;
+  markAllRead(actorProfileId: string, box: 'received' | 'sent'): Promise<{ success: boolean; count: number; unreadCounts: { total: number; received: number; sent: number }; error?: string }>;
   hideOffer(threadId: string, actorProfileId: string): Promise<{ success: boolean; unreadCount: number; error?: string }>;
   getActiveThreadForListing(listingId: string, actorProfileId: string): Promise<OfferThread | null>;
   getUnreadCount(actorProfileId: string): Promise<number>;

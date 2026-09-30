@@ -72,7 +72,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
   const detailReady = !result.isLocked;
 
   const favoriteProof = !closedLabel ? <FavoriteButton listingId={listing.id} initialCount={listing.favorite_count} initialIsFavorited={memberListing.is_favorited} proofText /> : <span className="inline-block min-w-[16rem]">{listing.favorite_count || 0} kişi favoriledi</span>;
-  const headerActions = <div data-testid="listing-actions" className="flex flex-wrap items-center gap-1.5 [&_button]:min-h-8 [&_button]:px-2.5 [&_a]:min-h-8 [&_a]:px-2.5">
+  const headerActions = <div data-testid="listing-actions" className="flex flex-wrap items-center justify-center gap-1.5 [&_button]:min-h-8 [&_button]:px-2.5 [&_a]:min-h-8 [&_a]:px-2.5">
     <CopyListingLinkButton path={canonicalPath} />
     {isVehicle ? <CompareButton listing={listing} /> : !closedLabel ? <PropertyCompareButton listing={listing} /> : null}
   </div>;
@@ -85,7 +85,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
 
     <ListingDetailLayout
       category={isVehicle ? 'vehicle' : 'property'}
-      gallery={<ListingGallery images={galleryImages} title={listing.title} isLocked={result.isLocked} variant="vehicle" />}
+      gallery={<ListingGallery images={galleryImages} title={listing.title} isLocked={result.isLocked} variant={isVehicle ? 'vehicle' : 'property'} />}
       seller={<SellerArea listing={memberListing} isLocked={result.isLocked} isOwner={result.isOwner} closedLabel={closedLabel} />}
       description={detailReady ? <ListingDescription listing={memberListing} reportAction={descriptionReport} /> : undefined}
       details={detailReady

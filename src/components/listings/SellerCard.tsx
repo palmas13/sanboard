@@ -96,7 +96,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
           <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#FF9E45]">{isCorporate ? 'Kurumsal Profil' : 'İlan Sahibi'}</span>
           <Link href={publicUrl} className="block group">
             <h3 className="flex items-center gap-1.5 truncate font-extrabold text-base text-[var(--text-main)] transition-colors group-hover:text-[#FF8A1F]">
-              <span className="truncate">{displayName}</span>{isCorporate ? <BadgeCheck aria-label="Doğrulanmış kurumsal profil" className="h-4 w-4 shrink-0 text-[#FF8A1F]" /> : null}
+              <span className="truncate">{displayName}</span>{isCorporate && dealer?.is_verified ? <BadgeCheck aria-label="Doğrulanmış kurumsal profil" className="h-4 w-4 shrink-0 text-[#FF8A1F]" /> : null}
             </h3>
           </Link>
           {!isCorporate ? <div className="flex items-center gap-1 text-[10px] font-medium text-[var(--text-muted)]"><BadgeCheck className="h-3.5 w-3.5 shrink-0" /><span>Doğrulanmış profil</span></div> : null}
@@ -107,7 +107,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
       <div className="mt-3 space-y-1.5">
         {/* Phone */}
         {displayPhone ? (
-          <div className="flex items-center justify-between rounded-xl bg-[var(--bg-surface-secondary)]/65 px-3 py-2">
+          <div className="flex min-h-14 items-center justify-between rounded-xl bg-[var(--bg-surface-secondary)]/65 px-3 py-2">
             <div className="flex items-center gap-2.5">
               <Phone className="w-4 h-4 text-[#FF8A1F] shrink-0" />
               <div>
@@ -130,7 +130,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
 
         {/* SanMail */}
         {displayMail ? (
-          <div className="flex items-center justify-between rounded-xl bg-[var(--bg-surface-secondary)]/65 px-3 py-2">
+          <div className="flex min-h-14 items-center justify-between rounded-xl bg-[var(--bg-surface-secondary)]/65 px-3 py-2">
             <div className="flex items-center gap-2.5 truncate mr-2">
               <Mail className="w-4 h-4 text-[#FF8A1F] shrink-0" />
               <div className="truncate">
@@ -152,7 +152,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
         ) : null}
 
         {displayLocation ? (
-          <div className="flex items-start gap-2.5 rounded-xl bg-[var(--bg-surface-secondary)]/65 px-3 py-2">
+          <div className="flex min-h-14 items-center gap-2.5 rounded-xl bg-[var(--bg-surface-secondary)]/65 px-3 py-2">
             <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#FF8A1F]" />
             <div className="min-w-0"><p className="text-[10px] text-[var(--text-dim)]">Konum</p><p className="mt-0.5 text-sm font-bold leading-5 text-[var(--text-main)]">{displayLocation}</p></div>
           </div>

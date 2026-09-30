@@ -207,6 +207,8 @@ export interface Payment {
   entitlement_type?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' | 'LISTING_BOOST';
   purpose?: 'LISTING_PUBLICATION' | 'LISTING_BOOST' | 'CORPORATE_SUBSCRIPTION';
   target_listing_id?: string | null;
+  package_code?: string | null;
+  package_name?: string | null;
   entitlement_applied_at?: string | null;
   processed_at?: string | null;
   amount: number; // 2000

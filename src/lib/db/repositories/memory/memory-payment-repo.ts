@@ -15,7 +15,8 @@ export class MemoryPaymentRepository implements IPaymentRepository {
   async createPaymentOrder(profileId: string, packageId: string, options?: { idempotencyKey?: string; corporateProfileId?: string | null; purpose?: import('@/lib/payments/pricing').PaymentPurpose; targetListingId?: string | null }) {
     const res = await createCheckoutOrder(profileId, packageId, options);
     if (res.error) throw new Error(res.error);
-    return { orderId: res.orderId, amount: res.amount, packageName: res.packageName };
+    const payment = db.payments.find((item) => item.order_id === res.orderId);
+    return { orderId: res.orderId, amount: res.amount, packageName: res.packageName, entitlementType: payment?.entitlement_type };
   }
 
   async attachProviderPayment(orderId: string, providerPaymentId: string) {
@@ -62,13 +63,20 @@ export class MemoryPaymentRepository implements IPaymentRepository {
     return db.payments
       .filter((p) => p.profile_id === profileId && (!clearedAt || new Date(p.created_at) > new Date(clearedAt)))
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .map(({ id, order_id, amount, status, created_at }) => ({
-        id,
-        order_id,
-        amount,
-        status,
-        created_at,
-      }));
+      .map(({ id, order_id, package_id, amount, status, entitlement_type, purpose, created_at }) => {
+        const paymentPackage = db.packages.find((item) => item.id === package_id);
+        return {
+          id,
+          order_id,
+          amount,
+          status,
+          entitlement_type,
+          purpose,
+          package_code: paymentPackage?.code || null,
+          package_name: paymentPackage?.name || null,
+          created_at,
+        };
+      });
   }
 
   async clearUserPaymentHistory(profileId: string) {

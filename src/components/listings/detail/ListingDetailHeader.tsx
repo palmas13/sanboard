@@ -43,13 +43,13 @@ export function ListingDetailHeader({
           </div>
         </div>
 
-        <div className="flex min-w-0 flex-col justify-center border-t border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/25 p-5 sm:p-6 lg:border-l lg:border-t-0 lg:px-6">
+        <div className="flex min-w-0 flex-col items-center justify-center border-t border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/25 p-5 text-center sm:p-6 lg:border-l lg:border-t-0 lg:px-6">
           <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-dim)]">Fiyat</p>
-          <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 tabular-nums">
+          <div className="mt-1 flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1 tabular-nums">
             {listing.previous_price && listing.price < listing.previous_price ? <span className="order-2 text-sm font-semibold text-[var(--text-muted)] line-through decoration-1">{formatCurrency(listing.previous_price)}</span> : null}
-            <strong className="order-1 text-3xl font-black tracking-[-0.04em] text-[#FF9E45] sm:text-[32px]">{formatCurrency(listing.price)}</strong>
+            <strong className="order-1 text-[34px] font-black leading-none tracking-[-0.04em] text-[#FF9E45] sm:text-[38px] xl:text-[40px]">{formatCurrency(listing.price)}</strong>
           </div>
-          <div className="mt-3">{actions}</div>
+          <div className="mt-4 flex w-full justify-center">{actions}</div>
         </div>
       </div>
     </header>

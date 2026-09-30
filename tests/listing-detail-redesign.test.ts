@@ -23,16 +23,28 @@ describe('premium listing detail redesign', () => {
   test('vehicle and property details share the same responsive marketplace layout', () => {
     assert.match(page, /<ListingDetailLayout/);
     assert.match(page, /max-w-\[1580px\]/);
-    assert.match(layout, /data-testid=\{`\$\{category\}-listing-layout`\}/);
-    assert.match(layout, /data-detail-layout="vehicle-theme"/);
-    assert.match(layout, /xl:grid-cols-\[minmax\(0,1\.55fr\)_minmax\(360px,\.9fr\)_minmax\(245px,\.58fr\)\]/);
-    assert.match(layout, /data-testid=\{`\$\{category\}-gallery-block`\}/);
-    assert.match(layout, /data-testid=\{`\$\{category\}-description-row`\}/);
-    assert.match(layout, /data-testid=\{`\$\{category\}-technical-column`\}/);
-    assert.match(layout, /data-testid=\{`\$\{category\}-seller-rail`\}/);
+    assert.match(layout, /data-testid="vehicle-listing-layout"/);
+    assert.match(layout, /data-testid="vehicle-content-column"[\s\S]*data-testid="vehicle-gallery-block"[\s\S]*data-testid="vehicle-description-row"/);
+    assert.match(layout, /xl:grid-cols-\[minmax\(0,1\.7fr\)_minmax\(340px,\.95fr\)_minmax\(260px,\.7fr\)\]/);
+    assert.match(layout, /data-testid="vehicle-technical-column"/);
+    assert.match(layout, /data-testid="vehicle-seller-rail"/);
+    assert.match(layout, /data-testid="property-listing-layout"/);
+    assert.match(layout, /xl:grid-cols-\[minmax\(0,1\.7fr\)_minmax\(300px,1fr\)_minmax\(260px,\.75fr\)\]/);
+    assert.match(layout, /data-testid="property-gallery-block"/);
+    assert.match(layout, /data-testid="property-technical-column"[^>]*xl:col-start-2 xl:row-start-1/);
+    assert.match(layout, /data-testid="property-seller-rail"/);
+    assert.match(layout, /data-testid="property-description-row"[^>]*xl:col-start-1 xl:row-start-2/);
     assert.match(page, /isVehicle \? <VehicleDetailsPanel[\s\S]*: <PropertyDetailsPanel/);
-    assert.match(page, /variant="vehicle"/);
+    assert.match(page, /variant=\{isVehicle \? 'vehicle' : 'property'\}/);
     assert.doesNotMatch(page, /min-h-\[calc\(100vh-5rem\)\]/);
+    assert.doesNotMatch(layout, /h-\[\d|row-span-2[^\n]*property-technical-column/);
+  });
+
+  test('price and header actions remain centered in the emphasized price block', () => {
+    assert.match(header, /items-center justify-center[\s\S]*text-center/);
+    assert.match(header, /text-\[34px\][\s\S]*sm:text-\[38px\][\s\S]*xl:text-\[40px\]/);
+    assert.match(header, /mt-4 flex w-full justify-center/);
+    assert.match(page, /data-testid="listing-actions"[^>]*justify-center/);
   });
 
   test('vehicle technical information is grouped inside one outer panel', () => {
@@ -58,6 +70,7 @@ describe('premium listing detail redesign', () => {
     assert.match(seller, /Kurumsal Profil/);
     assert.doesNotMatch(seller, /Premium Satıcı|Onaylı Kurumsal Profil|Kurumsal Satıcı|Mesaj Gönder|İletişim Kur|Satıcıyla İletişime Geç/);
     assert.match(seller, /dealer\?\.address/);
+    assert.match(seller, /isCorporate && dealer\?\.is_verified \? <BadgeCheck/);
     assert.match(seller, /Doğrulanmış kurumsal profil/);
     assert.doesNotMatch(seller, /Doğrulanmış mağaza/);
     assert.match(safety, /data-testid="safe-shopping-card"/);
@@ -107,6 +120,9 @@ describe('premium listing detail redesign', () => {
     assert.match(gallery, /ArrowRight/);
     assert.match(gallery, /Escape/);
     assert.match(gallery, /quality=\{92\}/);
+    assert.match(gallery, /const aspect = variant === 'property'/);
+    assert.match(gallery, /\(min-width: 1280px\) 52vw, 100vw/);
+    assert.doesNotMatch(gallery, /aspect-\[4\/3\]/);
     assert.match(gallery, /useCallback/);
     assert.doesNotMatch(gallery, /<Expand/);
     assert.doesNotMatch(gallery, /fotoğrafı göster/);

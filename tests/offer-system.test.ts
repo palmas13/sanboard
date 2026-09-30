@@ -233,6 +233,62 @@ describe('Structured offer system', () => {
     assert.deepEqual(await repo.getUnreadCounts(buyer), { total: 0, received: 0, sent: 0 });
   });
 
+  test('bulk read is box-scoped, durable and cannot affect another profile', async () => {
+    await create();
+    const receivedThread = db.offerThreads[0];
+    db.profiles.push({ id: 'offer-other-seller', user_id: 'other-account', full_name: 'Other Seller', avatar_url: '', sanmail_email: '', phone: '', created_at: '', updated_at: '' } as any);
+    db.listings.push({ ...db.listings[0], id: 'offer-other-listing', listing_number: '#OTHER', seller_profile_id: 'offer-other-seller', title: 'Other listing' } as any);
+    assert.equal((await repo.createOffer({ listingId: 'offer-other-listing', amount: 60000, actorProfileId: seller, actorUserId: 'seller-account' })).success, true);
+    const sentThread = db.offerThreads.find((thread) => thread.listing_id === 'offer-other-listing')!;
+    assert.equal((await repo.actOnOffer({ threadId: sentThread.id, actorProfileId: 'offer-other-seller', actorUserId: 'other-account', action: 'COUNTER', amount: 70000 })).success, true);
+
+    assert.deepEqual(await repo.getUnreadCounts(seller), { total: 2, received: 1, sent: 1 });
+    const sentReadCursorBeforeReceivedBulkRead = sentThread.buyer_last_read_at;
+    const receivedResult = await repo.markAllRead(seller, 'received');
+    assert.equal(receivedResult.count, 1);
+    assert.deepEqual(receivedResult.unreadCounts, { total: 1, received: 0, sent: 1 });
+    assert.ok(receivedThread.seller_last_read_at);
+    assert.equal(receivedThread.seller_last_read_at, db.offerEvents.filter((event) => event.thread_id === receivedThread.id && event.actor_profile_id !== seller).map((event) => event.created_at).sort().at(-1));
+    assert.equal(sentThread.buyer_last_read_at, sentReadCursorBeforeReceivedBulkRead);
+    assert.deepEqual(await new MemoryOfferRepository().getUnreadCounts(seller), { total: 1, received: 0, sent: 1 });
+
+    const outsiderResult = await repo.markAllRead(sibling, 'sent');
+    assert.equal(outsiderResult.count, 0);
+    assert.deepEqual(await repo.getUnreadCounts(seller), { total: 1, received: 0, sent: 1 });
+
+    const sentResult = await repo.markAllRead(seller, 'sent');
+    assert.equal(sentResult.count, 1);
+    assert.deepEqual(sentResult.unreadCounts, { total: 0, received: 0, sent: 0 });
+    assert.ok(sentThread.buyer_last_read_at);
+  });
+
+  test('bulk-read migration preserves box semantics and service-role boundary', () => {
+    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20260930220000_offer_box_bulk_read.sql'), 'utf8');
+    assert.match(sql, /p_box IS NULL OR p_box NOT IN \('received', 'sent'\)/);
+    assert.match(sql, /p_box = 'received'[\s\S]*seller_profile_id = p_actor_profile_id[\s\S]*seller_hidden_at IS NULL/);
+    assert.match(sql, /ELSE[\s\S]*buyer_profile_id = p_actor_profile_id[\s\S]*buyer_hidden_at IS NULL/);
+    assert.match(sql, /actor_profile_id IS DISTINCT FROM p_actor_profile_id/);
+    assert.match(sql, /MAX\(e\.created_at\) AS read_at/);
+    assert.match(sql, /SET seller_last_read_at = u\.read_at/);
+    assert.match(sql, /SET buyer_last_read_at = u\.read_at/);
+    assert.doesNotMatch(sql, /SET (?:seller|buyer)_last_read_at = v_now/);
+    assert.match(sql, /ALTER COLUMN created_at SET DEFAULT clock_timestamp\(\)/);
+    assert.doesNotMatch(sql, /assign_offer_event_created_at/);
+    assert.doesNotMatch(sql, /CREATE TRIGGER/);
+    assert.match(sql, /CREATE OR REPLACE FUNCTION public\.mark_offer_thread_read[\s\S]*MAX\(e\.created_at\)[\s\S]*GREATEST\(COALESCE\(buyer_last_read_at[\s\S]*GREATEST\(COALESCE\(seller_last_read_at/);
+    assert.match(sql, /CREATE OR REPLACE FUNCTION public\.hide_offer_thread[\s\S]*MAX\(e\.created_at\)[\s\S]*GREATEST\(COALESCE\(buyer_last_read_at[\s\S]*GREATEST\(COALESCE\(seller_last_read_at/);
+    assert.equal((sql.match(/IF p_actor_profile_id IS NULL/g) || []).length, 3);
+    assert.match(sql, /p_actor_profile_id IS NULL[\s\S]*Teklif bulunamadı/);
+    assert.equal((sql.match(/PERFORM 1[\s\S]*?ORDER BY t\.id\s+FOR UPDATE;/g) || []).length, 2);
+    assert.match(sql, /CREATE OR REPLACE FUNCTION public\.close_offers_for_listing[\s\S]*ORDER BY t\.id\s+FOR UPDATE OF t[\s\S]*INSERT INTO public\.offer_events/);
+    assert.match(sql, /CREATE OR REPLACE FUNCTION public\.record_offer_listing_price_change[\s\S]*ORDER BY t\.id\s+FOR UPDATE OF t[\s\S]*INSERT INTO public\.offer_events/);
+    assert.match(sql, /CREATE OR REPLACE FUNCTION public\.expire_stale_offer_threads[\s\S]*ORDER BY t\.id\s+FOR UPDATE OF t[\s\S]*INSERT INTO public\.offer_events/);
+    assert.equal((sql.match(/ORDER BY t\.id\s+FOR UPDATE(?: OF t)?/g) || []).length, 5);
+    assert.match(sql, /FOR UPDATE/);
+    assert.match(sql, /REVOKE ALL ON FUNCTION public\.mark_offer_box_read\(UUID, TEXT\) FROM PUBLIC, anon, authenticated/);
+    assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.mark_offer_box_read\(UUID, TEXT\) TO service_role/);
+  });
+
   test('offer API ignores client supplied contact identity fields', () => {
     const route = readFileSync(join(process.cwd(), 'src/app/api/offers/[id]/route.ts'), 'utf8');
     const repos = readFileSync(join(process.cwd(), 'src/lib/db/repositories/memory/memory-offer-repo.ts'), 'utf8') + readFileSync(join(process.cwd(), 'src/lib/db/repositories/supabase/supabase-offer-repo.ts'), 'utf8');

@@ -5,6 +5,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { CreditCard, CheckCircle2, Clock, XCircle, Loader2, Trash2, ShieldCheck } from 'lucide-react';
 import { formatCurrency, formatDateTime } from '@/lib/utils/format';
 import { Payment } from '@/types';
+import { getPaymentProductLabel } from '@/lib/payments/presentation';
 
 export default function HesabimOdemelerPage() {
   const { currentProfile } = useAuth();
@@ -83,7 +84,7 @@ export default function HesabimOdemelerPage() {
                     {formatDateTime(pay.created_at)}
                   </td>
                   <td className="py-3 px-4 font-medium text-[var(--text-main)]">
-                    7 Günlük Standart İlan
+                    {getPaymentProductLabel(pay)}
                   </td>
                   <td className="py-3 px-4 font-bold text-[#FF8A1F]">
                     {formatCurrency(pay.amount)}

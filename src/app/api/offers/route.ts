@@ -15,3 +15,5 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(result);
 }
 export async function POST(req: NextRequest){const actor=await resolveOwnedActiveProfile(req);if(!actor.ok)return NextResponse.json({error:actor.error},{status:actor.status});const body=await req.json().catch(()=>({}));const result=await getOfferRepository().createOffer({listingId:String(body.listingId||''),amount:Number(body.amount),actorProfileId:actor.profileId,actorUserId:actor.userId});return NextResponse.json(result,{status:result.success?200:400});}
+
+export async function PATCH(req: NextRequest){const actor=await resolveOwnedActiveProfile(req);if(!actor.ok)return NextResponse.json({error:actor.error},{status:actor.status});const body=await req.json().catch(()=>({}));if(body.action!=='MARK_ALL_READ'||(body.box!=='received'&&body.box!=='sent'))return NextResponse.json({error:'Geçersiz toplu okuma isteği.'},{status:400});const result=await getOfferRepository().markAllRead(actor.profileId,body.box);return NextResponse.json(result.success?result:{error:result.error},{status:result.success?200:400});}

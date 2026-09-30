@@ -13,6 +13,7 @@ export function ListingGallery({ images, title, isLocked = false, variant = 'veh
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const currentImage = visibleImages[selectedIdx] || visibleImages[0];
+  const aspect = variant === 'property' ? 'aspect-[16/10] xl:aspect-[16/9]' : 'aspect-[16/10] xl:aspect-[16/9.25]';
   const move = useCallback((direction: number) => setSelectedIdx((current) => (current + direction + visibleImages.length) % visibleImages.length), [visibleImages.length]);
 
   useEffect(() => {
@@ -26,14 +27,13 @@ export function ListingGallery({ images, title, isLocked = false, variant = 'veh
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [lightboxOpen, move, visibleImages.length]);
 
-  if (!currentImage) return <div className={`flex w-full items-center justify-center rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] text-sm font-semibold text-[var(--text-muted)] ${variant === 'property' ? 'aspect-[4/3]' : 'aspect-[16/10]'}`}><ImageIcon className="mr-2 h-5 w-5" />Fotoğraf bulunamadı</div>;
+  if (!currentImage) return <div className={`flex w-full items-center justify-center rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] text-sm font-semibold text-[var(--text-muted)] ${aspect}`}><ImageIcon className="mr-2 h-5 w-5" />Fotoğraf bulunamadı</div>;
   const imageUrl = resolveMediaUrl(currentImage.storage_path);
-  const aspect = variant === 'property' ? 'aspect-[4/3] lg:aspect-[16/10]' : 'aspect-[16/10] xl:aspect-[16/9.25]';
 
   return <div data-testid="listing-gallery">
     <div aria-label="İlan fotoğrafları" className={`group relative w-full overflow-hidden rounded-2xl border border-white/8 bg-black/30 shadow-[0_18px_55px_rgba(0,0,0,.2)] ${aspect}`}>
       <button type="button" aria-label="Fotoğrafı tam ekran aç" disabled={isLocked} onClick={() => setLightboxOpen(true)} className="absolute inset-0 z-10 disabled:cursor-default" />
-      <Image src={imageUrl} alt={title} fill priority quality={92} sizes={variant === 'property' ? '(min-width: 1280px) 58vw, (min-width: 1024px) 56vw, 100vw' : '(min-width: 1440px) 47vw, (min-width: 1280px) 45vw, (min-width: 768px) 100vw, 100vw'} className="object-cover" />
+      <Image src={imageUrl} alt={title} fill priority quality={92} sizes={variant === 'property' ? '(min-width: 1280px) 52vw, 100vw' : '(min-width: 1440px) 47vw, (min-width: 1280px) 45vw, (min-width: 768px) 100vw, 100vw'} className="object-cover" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-24 bg-gradient-to-t from-black/55 to-transparent" />
       <span className="absolute bottom-2.5 left-2.5 z-30 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white/90 backdrop-blur-md">{selectedIdx + 1} / {visibleImages.length}</span>
       {isLocked ? <span className="absolute left-3 top-3 z-30 rounded-full bg-black/65 px-3 py-1.5 text-xs font-bold text-white">Vitrin Fotoğrafı</span> : null}

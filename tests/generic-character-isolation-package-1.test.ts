@@ -81,7 +81,9 @@ describe('SANBOARD generic character isolation package 1', () => {
     const alexResponse = await getPayments(request(`/api/user/payments?profileId=${jordanId}`, alexId, jordanId));
     const alexPayments = await alexResponse.json();
     assert.deepEqual(alexPayments.map((payment: { id: string }) => payment.id), ['payment-A']);
-    assert.deepEqual(Object.keys(alexPayments[0]).sort(), ['amount', 'created_at', 'id', 'order_id', 'status']);
+    assert.deepEqual(Object.keys(alexPayments[0]).sort(), ['amount', 'created_at', 'id', 'order_id', 'package_code', 'package_name', 'status']);
+    assert.equal(alexPayments[0].package_code, null);
+    assert.equal(alexPayments[0].package_name, null);
     assert.equal(alexPayments[0].external_payment_id, undefined);
     assert.equal(alexPayments[0].entitlement_applied_at, undefined);
 

@@ -200,7 +200,7 @@ export class SupabasePaymentRepository implements IPaymentRepository {
 
     let query = client
       .from('payments')
-      .select('id, order_id, amount, status, created_at')
+      .select('id, order_id, amount, status, entitlement_type, purpose, created_at, package:packages(code, name)')
       .eq('profile_id', safeProfileId);
     if (profile?.payment_history_cleared_at) {
       query = query.gt('created_at', profile.payment_history_cleared_at);
@@ -210,7 +210,20 @@ export class SupabasePaymentRepository implements IPaymentRepository {
     if (error) {
       throw new Error(`Supabase error fetching payments: ${error.message}`);
     }
-    return data || [];
+    return (data || []).map((payment: any) => {
+      const paymentPackage = Array.isArray(payment.package) ? payment.package[0] : payment.package;
+      return {
+        id: payment.id,
+        order_id: payment.order_id,
+        amount: payment.amount,
+        status: payment.status,
+        entitlement_type: payment.entitlement_type,
+        purpose: payment.purpose,
+        package_code: paymentPackage?.code || null,
+        package_name: paymentPackage?.name || null,
+        created_at: payment.created_at,
+      };
+    });
   }
 
   async clearUserPaymentHistory(profileId: string) {

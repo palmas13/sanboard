@@ -48,6 +48,24 @@ describe('OfferCenter chat UX', () => {
     assert.match(offerRoute, /unreadCount:counts\.total,unreadCounts:counts/);
   });
 
+  test('active offer box exposes an accessible persistent bulk-read action', () => {
+    assert.match(center, /const markAllRead = useCallback/);
+    assert.match(center, /method: 'PATCH'/);
+    assert.match(center, /action: 'MARK_ALL_READ', box: requestedBox/);
+    assert.match(center, /unreadCounts\[box\] > 0/);
+    assert.match(center, /Tümünü okundu olarak işaretle/);
+    assert.match(center, /disabled=\{busy\}/);
+    assert.match(center, /focus-visible:ring-2/);
+    assert.match(center, /setUnreadCounts\(data\.unreadCounts\); await load\(\)/);
+    assert.match(center, /role="tab" aria-selected=\{box === item\} disabled=\{busy\}/);
+    assert.doesNotMatch(center, /setRows\(\(previous\) => previous\.map\(\(row\) => \(\{ \.\.\.row, unread_count: 0 \}\)\)\)/);
+    assert.match(center, /setUnreadCounts\(data\.unreadCounts\)/);
+    assert.match(offerRoute, /resolveOwnedActiveProfile/);
+    assert.match(offerRoute, /body\.action!==['"]MARK_ALL_READ['"]/);
+    assert.match(offerRoute, /body\.box!==['"]received['"]&&body\.box!==['"]sent['"]/);
+    assert.match(offerRoute, /markAllRead\(actor\.profileId,body\.box\)/);
+  });
+
   test('thread rows expose balanced metadata, unread styling and isolated trash action', () => {
     assert.match(center, /data-offer-row-meta/);
     assert.match(center, /w-\[92px\]/);
