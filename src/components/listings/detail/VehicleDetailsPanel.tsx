@@ -14,11 +14,11 @@ function TechnicalSection({ title, items, children, first = false, columns = 'st
 
   return (
     <section data-testid={`vehicle-technical-section-${title.toLocaleLowerCase('tr-TR').replaceAll(' ', '-')}`} className={first ? '' : 'border-t border-[var(--border-app)]/80 pt-3.5'}>
-      <h3 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-[var(--text-main)]"><Sparkles className="h-3.5 w-3.5 text-[#FF8A1F]" />{title}</h3>
+      <h3 className="mb-3 flex items-center gap-1.5 text-[13px] font-black text-[var(--text-main)]"><Sparkles className="h-4 w-4 text-[#FF8A1F]" />{title}</h3>
       {children || <dl className={`grid auto-rows-fr grid-cols-2 gap-1.5 ${columns === 'wide' ? 'sm:grid-cols-3' : ''}`}>
         {visibleItems?.map(({ label, value, icon: Icon, accent, badge }) => <div key={label} className="flex h-full min-h-10 items-center gap-2 rounded-lg bg-[var(--bg-surface-secondary)]/55 px-2.5 py-2">
-          {Icon ? <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" /> : null}
-          <div className="min-w-0 flex-1"><dt className="text-[9px] font-semibold text-[var(--text-dim)]">{label}</dt><dd className={`mt-px break-words text-[11px] font-bold leading-4 ${accent ? 'text-[#FF9E45]' : 'text-[var(--text-main)]'}`}>{badge ? <span className="inline-flex rounded-md bg-[#FF8A1F]/10 px-1.5 py-0.5 text-[10px] font-bold text-[#FF9E45]">{value}</span> : value}</dd></div>
+          {Icon ? <Icon className="h-4 w-4 shrink-0 text-[#FF8A1F]" /> : null}
+          <div className="min-w-0 flex-1"><dt className="text-[10px] font-semibold text-[var(--text-dim)]">{label}</dt><dd className={`mt-px break-words text-xs font-bold leading-4 ${accent ? 'text-[#FF9E45]' : 'text-[var(--text-main)]'}`}>{badge ? <span className="inline-flex rounded-md bg-[#FF8A1F]/10 px-1.5 py-0.5 text-[11px] font-bold text-[#FF9E45]">{value}</span> : value}</dd></div>
         </div>)}
       </dl>}
     </section>

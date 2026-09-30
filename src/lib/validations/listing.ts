@@ -139,10 +139,20 @@ export const propertyListingSchema = z.object({
     message: 'Geçerli bir oda sayısı seçiniz',
   }),
   furnished: z.boolean().default(false),
+  market_value: z.number().int('Market değeri tam sayı olmalıdır').positive('Market değeri 0’dan büyük olmalıdır').max(1_000_000_000, 'Market değeri çok yüksek'),
+  furniture_value: z.number().int('Eşya bedeli tam sayı olmalıdır').positive('Eşya bedeli 0’dan büyük olmalıdır').max(1_000_000_000, 'Eşya bedeli çok yüksek').optional().nullable(),
   building_type: z.enum(buildingTypes).default('Normal'),
   balcony: z.boolean().default(false),
-}).refine((value) => value.minimum_offer_amount == null || value.minimum_offer_amount <= value.price, {
-  message: 'Minimum teklif ilan fiyatından yüksek olamaz.', path: ['minimum_offer_amount'],
+}).superRefine((value, ctx) => {
+  if (value.minimum_offer_amount != null && value.minimum_offer_amount > value.price) {
+    ctx.addIssue({ code: 'custom', message: 'Minimum teklif ilan fiyatından yüksek olamaz.', path: ['minimum_offer_amount'] });
+  }
+  if (value.furnished && value.furniture_value == null) {
+    ctx.addIssue({ code: 'custom', message: 'Eşyalı mülklerde eşya bedeli zorunludur.', path: ['furniture_value'] });
+  }
+  if (!value.furnished && value.furniture_value != null) {
+    ctx.addIssue({ code: 'custom', message: 'Eşyalı olmayan mülklerde eşya bedeli girilemez.', path: ['furniture_value'] });
+  }
 });
 
 export const listingUnionSchema = z.union([vehicleListingSchema, propertyListingSchema]);

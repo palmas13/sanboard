@@ -320,13 +320,15 @@ describe('Sanboard Stabilization Pass: Auth, Role, Favorites, Notifications & Da
       assert.strictEqual(res.status, 401);
     });
 
-    test('Supabase bootstrap uses canonical support tickets and row-based available credit count', () => {
+    test('Supabase bootstrap uses canonical support tickets and store-scoped row-based credit counts', () => {
       const source = readFileSync(join(process.cwd(), 'src/app/api/account/bootstrap/route.ts'), 'utf8');
       assert.match(source, /\.from\('support_tickets'\)/);
       assert.doesNotMatch(source, /\.from\('tickets'\)/);
       assert.match(source, /\.from\('listing_credits'\)[\s\S]*\.eq\('status', 'AVAILABLE'\)/);
       assert.doesNotMatch(source, /\.select\('balance'\)/);
-      assert.match(source, /const availableCredits = creditRes\.count \|\| 0/);
+      assert.match(source, /const individualCredits = availableCreditRows\.filter/);
+      assert.match(source, /credit\.credit_type === 'CORPORATE' && credit\.corporate_profile_id === corporateStoreId/);
+      assert.match(source, /const availableCredits = individualCredits \+ corporateCredits/);
     });
   });
 

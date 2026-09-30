@@ -303,7 +303,8 @@ a {
 .homepage-compact-listing { position: relative; display: flex; min-width: 0; min-height: 7.9rem; gap: .8rem; border: 1px solid var(--border-app); border-radius: .85rem; background: color-mix(in srgb, var(--bg-surface) 88%, transparent); padding: .58rem; transition: border-color 180ms ease, background-color 180ms ease; }
 .homepage-compact-listing:hover { border-color: rgba(255,138,31,.38); background: var(--bg-surface); }
 .homepage-rotator-viewport { min-height: calc(3 * 7.9rem + 2 * .8rem); overflow: hidden; }
-.homepage-featured-viewport { overflow: hidden; }
+.homepage-featured-viewport { display: flex; min-height: 0; overflow: hidden; }
+.homepage-featured-viewport > * { flex: 1; }
 .homepage-featured-enter { animation: homepage-featured-enter 260ms ease-out both; }
 @keyframes homepage-featured-enter { from { opacity: 0; } to { opacity: 1; } }
 .homepage-listing-stack { display: grid; align-content: start; gap: .8rem; }

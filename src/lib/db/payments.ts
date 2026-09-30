@@ -2,6 +2,9 @@ import { db } from './store';
 import { ListingCredit, Payment } from '@/types';
 import { getPaymentRepository } from './repositories';
 import { getPaymentPrice, type PaymentPurpose } from '@/lib/payments/pricing';
+import { addCalendarMonth } from '@/lib/subscriptions/calendar-month';
+
+export { addCalendarMonth } from '@/lib/subscriptions/calendar-month';
 
 /**
  * Creates checkout order securely on server.
@@ -151,15 +154,15 @@ export async function completePaymentOrder(
     const legacyPeriodMissing = !periodStart && !periodEnd && wasActiveAndUnexpired;
     const startsNewPeriod = !wasActiveAndUnexpired || Boolean(periodEnd && periodEnd <= now);
     dealer.subscription_status = 'ACTIVE';
-    const nextSubscriptionEnd = new Date(base.getTime() + 30 * 86400000);
+    const nextSubscriptionEnd = addCalendarMonth(base);
     dealer.subscription_expires_at = nextSubscriptionEnd.toISOString();
     if (startsNewPeriod) {
       dealer.current_period_start = now.toISOString();
-      dealer.current_period_end = new Date(Math.min(now.getTime() + 30 * 86400000, nextSubscriptionEnd.getTime())).toISOString();
+      dealer.current_period_end = new Date(Math.min(addCalendarMonth(now).getTime(), nextSubscriptionEnd.getTime())).toISOString();
       dealer.boost_credits = 3;
     } else if (legacyPeriodMissing) {
       dealer.current_period_start = now.toISOString();
-      dealer.current_period_end = new Date(Math.min(now.getTime() + 30 * 86400000, currentEnd.getTime())).toISOString();
+      dealer.current_period_end = new Date(Math.min(addCalendarMonth(now).getTime(), currentEnd.getTime())).toISOString();
     }
     dealer.updated_at = now.toISOString();
     payment.entitlement_applied_at = now.toISOString();

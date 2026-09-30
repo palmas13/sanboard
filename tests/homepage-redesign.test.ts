@@ -88,10 +88,23 @@ describe('homepage marketplace redesign', () => {
 
   test('featured showcase uses the dedicated homepage-only label', () => {
     const featured = source('src/components/home/HomepageFeaturedRotator.tsx');
-    assert.match(featured, />Öne Çıkarılan<\/span>/);
+    assert.match(featured, /<FeaturedBadge/);
+    assert.doesNotMatch(featured, />Öne Çıkarılan</);
+    assert.match(featured, /listing\.description/);
+    assert.match(featured, /listing\.subcategory/);
+    assert.match(featured, /formatCurrency\(listing\.price\)/);
+    assert.match(featured, /day: '2-digit', month: 'short', year: 'numeric'/);
     assert.match(featured, /5000/);
     assert.match(featured, /visibilitychange/);
     assert.match(featured, /onFocusCapture/);
+  });
+
+  test('discovery surfaces use the requested headings and preserve descenders', () => {
+    const discovery = source('src/app/ilanlari-kesfet/page.tsx');
+    const info = source('src/app/kesfet/page.tsx');
+    assert.match(discovery, /Sanboard&apos;da keşfet/);
+    assert.match(discovery, /pb-2[\s\S]*leading-\[1\.03\]/);
+    assert.match(info, />Keşfet Akışı<\/h1>/);
   });
 
   test('section controls use a shared two-row header rhythm without fixed link padding', () => {

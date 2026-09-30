@@ -5,6 +5,7 @@ import { uploadCorporateLogo, uploadCorporateBanner, getStorageProvider } from '
 import { normalizePhone } from '@/lib/utils/format';
 import { normalizeSocialMedia } from '@/lib/dealers/social';
 import { notifyNewFollowerBestEffort } from '../../follow-notifications';
+import { addCalendarMonth } from '@/lib/subscriptions/calendar-month';
 
 function mapCorporateProfile(data: any): CorporateProfile | null {
   if (!data) return null;
@@ -494,7 +495,7 @@ export class SupabaseDealerRepository implements IDealerRepository {
 
   async activateSubscription(dealerId: string): Promise<{ success: boolean; dealer?: CorporateProfile; error?: string }> {
     const client = this.getAdminClient();
-    const expiresAt = new Date(Date.now() + 30 * 86400000).toISOString();
+    const expiresAt = addCalendarMonth(new Date()).toISOString();
 
     const { data, error } = await client
       .from('corporate_profiles')

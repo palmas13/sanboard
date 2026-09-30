@@ -226,6 +226,8 @@ describe('SANBOARD Business Logic Phase 1 regressions', () => {
       floor: 1,
       room_count: '1+1',
       furnished: false,
+      market_value: 100000,
+      furniture_value: null,
       building_type: 'Normal',
       balcony: false,
     };

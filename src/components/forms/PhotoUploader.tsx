@@ -14,12 +14,11 @@ export interface UploadedImage {
 interface PhotoUploaderProps {
   images: UploadedImage[];
   onChange: (images: UploadedImage[]) => void;
+  maxImages?: number;
 }
 
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2 MB
-const MAX_IMAGES = 3;
-
-export function PhotoUploader({ images, onChange }: PhotoUploaderProps) {
+export function PhotoUploader({ images, onChange, maxImages = 3 }: PhotoUploaderProps) {
   const [error, setError] = useState<string>('');
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -27,8 +26,8 @@ export function PhotoUploader({ images, onChange }: PhotoUploaderProps) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    if (images.length + files.length > MAX_IMAGES) {
-      setError(`En fazla ${MAX_IMAGES} fotoğraf yükleyebilirsiniz.`);
+    if (images.length + files.length > maxImages) {
+      setError(`En fazla ${maxImages} fotoğraf yükleyebilirsiniz.`);
       return;
     }
 
@@ -89,7 +88,7 @@ export function PhotoUploader({ images, onChange }: PhotoUploaderProps) {
       <div className="flex flex-col sm:flex-row items-center gap-4">
         <label
           className={`flex-1 w-full border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors ${
-            images.length >= MAX_IMAGES
+            images.length >= maxImages
               ? 'border-[var(--border-app)] opacity-50 cursor-not-allowed bg-[var(--bg-surface-secondary)]/50'
               : 'border-[var(--border-app)] hover:border-[#FF8A1F] bg-[var(--bg-surface-secondary)]/30 hover:bg-[var(--bg-surface-secondary)]/60'
           }`}
@@ -100,14 +99,14 @@ export function PhotoUploader({ images, onChange }: PhotoUploaderProps) {
               Fotoğraflarını buraya yükle
             </p>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">
-              JPG, PNG, WEBP • Maksimum 3 fotoğraf • Fotoğraf başına 2 MB
+              JPG, PNG, WEBP • Maksimum {maxImages} fotoğraf • Fotoğraf başına 2 MB
             </p>
           </div>
           <input
             type="file"
             accept="image/png, image/jpeg, image/webp"
             multiple
-            disabled={images.length >= MAX_IMAGES}
+            disabled={images.length >= maxImages}
             onChange={handleFileUpload}
             className="hidden"
           />
@@ -170,7 +169,7 @@ export function PhotoUploader({ images, onChange }: PhotoUploaderProps) {
         ))}
 
         {/* Empty Slots */}
-        {Array.from({ length: Math.max(0, MAX_IMAGES - images.length) }).map((_, idx) => (
+        {Array.from({ length: Math.max(0, maxImages - images.length) }).map((_, idx) => (
           <div
             key={idx}
             className="aspect-[16/10] rounded-xl border border-dashed border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/20 flex flex-col items-center justify-center gap-1 text-[var(--text-dim)]"

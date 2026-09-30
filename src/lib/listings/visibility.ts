@@ -13,7 +13,12 @@ export function getEffectiveListingStatus(
 
 export function isPublicListingVisible(
   listing: Pick<Listing, 'status' | 'expires_at' | 'seller_type' | 'corporate_profile_id'>,
-  corporate?: { moderation_status?: string | null; deleted_at?: string | null } | null,
+  corporate?: {
+    moderation_status?: string | null;
+    deleted_at?: string | null;
+    subscription_status?: string | null;
+    subscription_expires_at?: string | null;
+  } | null,
   now = new Date()
 ): boolean {
   if (getEffectiveListingStatus(listing, now) !== 'ACTIVE') return false;
@@ -21,6 +26,9 @@ export function isPublicListingVisible(
   return Boolean(
     listing.corporate_profile_id &&
     corporate?.moderation_status === 'ACTIVE' &&
+    corporate.subscription_status === 'ACTIVE' &&
+    Boolean(corporate.subscription_expires_at) &&
+    new Date(corporate.subscription_expires_at!).getTime() > now.getTime() &&
     !corporate.deleted_at
   );
 }

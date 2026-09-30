@@ -45,12 +45,12 @@ describe('SANBOARD backend final hardening package 1', () => {
       { id: morgan, user_id: accountY, full_name: 'Morgan Hale', avatar_url: '', sanmail_email: '', phone: '', role: 'USER', created_at: '', updated_at: '' },
     ];
     db.dealers = [
-      { id: 'store-alex', profile_id: alex, owner_profile_id: alex, company_name: 'Alex Store', slug: 'alex', description: '', logo_url: '', banner_url: '', status: 'APPROVED', subscription_status: 'ACTIVE', moderation_status: 'ACTIVE', boost_credits: 0, created_at: '', updated_at: '' },
-      { id: 'store-jordan', profile_id: jordan, owner_profile_id: jordan, company_name: 'Jordan Store', slug: 'jordan', description: '', logo_url: '', banner_url: '', status: 'APPROVED', subscription_status: 'ACTIVE', moderation_status: 'ACTIVE', boost_credits: 0, created_at: '', updated_at: '' },
+      { id: 'store-alex', profile_id: alex, owner_profile_id: alex, company_name: 'Alex Store', slug: 'alex', description: '', logo_url: '', banner_url: '', status: 'APPROVED', subscription_status: 'ACTIVE', subscription_expires_at: '2099-01-01T00:00:00.000Z', moderation_status: 'ACTIVE', boost_credits: 0, created_at: '', updated_at: '' },
+      { id: 'store-jordan', profile_id: jordan, owner_profile_id: jordan, company_name: 'Jordan Store', slug: 'jordan', description: '', logo_url: '', banner_url: '', status: 'APPROVED', subscription_status: 'ACTIVE', subscription_expires_at: '2099-01-01T00:00:00.000Z', moderation_status: 'ACTIVE', boost_credits: 0, created_at: '', updated_at: '' },
     ];
     db.listings = [
-      { id: 'listing-alex', listing_number: '#A', seller_profile_id: alex, corporate_profile_id: 'store-alex', seller_type: 'CORPORATE', category: 'vehicle', subcategory: 'Otomobil', title: 'Alex', description: '', price: 1, location: '', status: 'ACTIVE', created_at: '', updated_at: '' },
-      { id: 'listing-jordan', listing_number: '#J', seller_profile_id: jordan, corporate_profile_id: 'store-jordan', seller_type: 'CORPORATE', category: 'vehicle', subcategory: 'Otomobil', title: 'Jordan', description: '', price: 1, location: '', status: 'ACTIVE', created_at: '', updated_at: '' },
+      { id: 'listing-alex', listing_number: '#A', seller_profile_id: alex, corporate_profile_id: 'store-alex', seller_type: 'CORPORATE', category: 'vehicle', subcategory: 'Otomobil', title: 'Alex', description: '', price: 1, location: '', status: 'ACTIVE', expires_at: '2099-01-01T00:00:00.000Z', created_at: '', updated_at: '' },
+      { id: 'listing-jordan', listing_number: '#J', seller_profile_id: jordan, corporate_profile_id: 'store-jordan', seller_type: 'CORPORATE', category: 'vehicle', subcategory: 'Otomobil', title: 'Jordan', description: '', price: 1, location: '', status: 'ACTIVE', expires_at: '2099-01-01T00:00:00.000Z', created_at: '', updated_at: '' },
     ];
     db.favorites = [];
     db.credits = [];
@@ -82,7 +82,7 @@ describe('SANBOARD backend final hardening package 1', () => {
   });
 
   test('user listings exposes real sub-stage timings without changing the response body', async () => {
-    db.listings.push({ id: 'personal-alex-active', listing_number: '#PA', seller_profile_id: alex, seller_type: 'INDIVIDUAL', category: 'vehicle', subcategory: 'Otomobil', title: 'Personal Active', description: '', price: 1, location: '', status: 'ACTIVE', created_at: '', updated_at: '' });
+    db.listings.push({ id: 'personal-alex-active', listing_number: '#PA', seller_profile_id: alex, seller_type: 'INDIVIDUAL', category: 'vehicle', subcategory: 'Otomobil', title: 'Personal Active', description: '', price: 1, location: '', status: 'ACTIVE', expires_at: '2099-01-01T00:00:00.000Z', created_at: '', updated_at: '' });
 
     const response = await getUserListings(request('/api/user/listings', alex));
     assert.equal(response.status, 200);

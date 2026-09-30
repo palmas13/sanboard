@@ -7,9 +7,10 @@ import { useRouter } from 'next/navigation';
 
 interface ReportModalProps {
   listingId: string;
+  compact?: boolean;
 }
 
-export function ReportModal({ listingId }: ReportModalProps) {
+export function ReportModal({ listingId, compact = false }: ReportModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [reason, setReason] = useState('Yanlış bilgi');
   const [description, setDescription] = useState('');
@@ -69,10 +70,12 @@ export function ReportModal({ listingId }: ReportModalProps) {
       <button
         type="button"
         onClick={handleOpen}
-        className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[var(--border-app)] bg-transparent px-3.5 py-2 text-xs font-semibold text-[var(--text-muted)] transition-colors hover:border-red-400/35 hover:text-red-300 cursor-pointer"
+        className={compact ? 'inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-[var(--text-dim)] transition-colors hover:bg-red-400/10 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/50' : 'inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-[var(--border-app)] bg-transparent px-3.5 py-2 text-xs font-semibold text-[var(--text-muted)] transition-colors hover:border-red-400/35 hover:text-red-300'}
+        aria-label={compact ? 'Bu ilanı raporla.' : 'İlanı şikayet et'}
+        title={compact ? 'Bu ilanı raporla.' : undefined}
       >
         <Flag className="w-3.5 h-3.5" />
-        <span>Şikayet Et</span>
+        {!compact ? <span>Şikayet Et</span> : null}
       </button>
 
       {isOpen && (

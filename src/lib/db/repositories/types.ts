@@ -61,6 +61,8 @@ export interface CreateListingInput {
   floor?: number;
   room_count?: string;
   furnished?: boolean;
+  market_value?: number;
+  furniture_value?: number | null;
   building_type?: 'Normal' | 'Dubleks';
   balcony?: boolean;
 }
@@ -93,6 +95,7 @@ export interface IListingRepository {
       duration: number
     ) => void
   ): Promise<Listing[]>;
+  clearUserListingHistory(profileId: string, status: 'EXPIRED' | 'SOLD'): Promise<{ success: boolean; clearedAt?: string; error?: string }>;
   getCorporateListings(
     corporateProfileId: string,
     onTiming?: (stage: 'db' | 'enrich', duration: number) => void

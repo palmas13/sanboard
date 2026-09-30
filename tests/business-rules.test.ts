@@ -271,6 +271,8 @@ describe('Sanboard Business Rules & Validation Tests', () => {
       floor: 4,
       room_count: '3+1' as const,
       furnished: true,
+      market_value: 420000,
+      furniture_value: 30000,
       building_type: 'Normal' as const,
       balcony: true,
       images: [

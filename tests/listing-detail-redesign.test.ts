@@ -14,6 +14,8 @@ describe('premium listing detail redesign', () => {
   const header = source('src/components/listings/detail/ListingDetailHeader.tsx');
   const safety = source('src/components/listings/detail/SafeShoppingCard.tsx');
   const offer = source('src/components/offers/OfferCenter.tsx');
+  const similar = source('src/components/listings/SimilarListings.tsx');
+  const similarCard = source('src/components/listings/SimilarListingCard.tsx');
   const favorite = source('src/components/listings/FavoriteButton.tsx');
   const corporate = source('src/app/hesabim/kurumsal/page.tsx');
 
@@ -57,8 +59,12 @@ describe('premium listing detail redesign', () => {
     assert.match(seller, /Kurumsal Profil/);
     assert.doesNotMatch(seller, /Premium Satıcı|Onaylı Kurumsal Profil|Kurumsal Satıcı|Mesaj Gönder|İletişim Kur|Satıcıyla İletişime Geç/);
     assert.match(seller, /dealer\?\.address/);
+    assert.match(seller, /Doğrulanmış kurumsal profil/);
+    assert.doesNotMatch(seller, /Doğrulanmış mağaza/);
     assert.match(safety, /data-testid="safe-shopping-card"/);
     assert.match(safety, /Güvenli alışveriş:/);
+    assert.match(safety, /Hızlı Karşılaştır/);
+    assert.match(safety, /Güvenli Teklif/);
     assert.doesNotMatch(safety, /shadow-/);
   });
 
@@ -78,6 +84,7 @@ describe('premium listing detail redesign', () => {
     assert.match(property, /details\.room_count/);
     assert.match(property, /details\.building_type/);
     assert.doesNotMatch(property, /Belirtilmemiş/);
+    assert.match(header, /listing\.category === 'vehicle' && listing\.location/);
   });
 
   test('motorcycle suspension is hidden, ATV remains eligible, and levels are labelled', () => {
@@ -88,7 +95,7 @@ describe('premium listing detail redesign', () => {
     assert.doesNotMatch(vehicle, /Seviye Spor/);
   });
 
-  test('gallery renders thumbnails, counter, arrows and click-to-open keyboard controls without a redundant expand icon', () => {
+  test('gallery renders counter, arrows and click-to-open keyboard controls without thumbnails or a redundant expand icon', () => {
     assert.match(gallery, /data-testid="listing-gallery"/);
     assert.match(gallery, /aria-label="İlan fotoğrafları"/);
     assert.match(gallery, /selectedIdx \+ 1/);
@@ -98,14 +105,25 @@ describe('premium listing detail redesign', () => {
     assert.match(gallery, /quality=\{92\}/);
     assert.match(gallery, /useCallback/);
     assert.doesNotMatch(gallery, /<Expand/);
+    assert.doesNotMatch(gallery, /fotoğrafı göster/);
   });
 
   test('favorite, share and report actions remain available in the header', () => {
     assert.match(page, /data-testid="listing-actions"/);
     assert.match(page, /FavoriteButton/);
     assert.match(page, /CopyListingLinkButton/);
-    assert.match(page, /ReportModal/);
+    assert.match(page, /<ReportModal listingId=\{listing\.id\} compact/);
+    const headerActionBlock = page.slice(page.indexOf('const headerActions'), page.indexOf('const descriptionReport'));
+    assert.doesNotMatch(headerActionBlock, /<ReportModal/);
+    assert.match(source('src/components/listings/ReportModal.tsx'), /Bu ilanı raporla\./);
     assert.match(page, /ListingDetailHeader/);
+  });
+
+  test('similar listings use the compact horizontal visual and exact title', () => {
+    assert.match(similar, />\s*Benzer İlanlar\s*</);
+    assert.doesNotMatch(similar, /Benzer İlanları İnceleyin/);
+    assert.match(similarCard, /className="flex min-h-32"/);
+    assert.match(similarCard, /w-\[42%\]/);
   });
 
   test('minimum offer copy is conditional and below-minimum input is blocked client-side', () => {

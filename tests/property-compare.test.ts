@@ -31,6 +31,8 @@ const property = (id: string, status: Listing['status'] = 'ACTIVE'): Listing => 
     floor: 3,
     room_count: '2+1',
     furnished: true,
+    market_value: 125000,
+    furniture_value: 15000,
     building_type: 'Normal',
     balcony: true,
   },

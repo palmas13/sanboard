@@ -33,7 +33,10 @@ export const revalidate = 60; // 1-minute ISR for public store vitrin
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const dealer = await getDealerRepository().getDealerBySlug(slug);
-  if (!dealer) return {};
+  const now = Date.now();
+  if (!dealer || dealer.status !== 'APPROVED' || dealer.moderation_status !== 'ACTIVE'
+    || dealer.subscription_status !== 'ACTIVE' || !dealer.subscription_expires_at
+    || new Date(dealer.subscription_expires_at).getTime() <= now || dealer.deleted_at) return {};
   const canonical = getAbsoluteUrl(getCorporateUrl(dealer));
   const image = resolveMediaUrl(dealer.logo_path || dealer.logo_url);
   return {
@@ -52,9 +55,10 @@ export default async function CorporateStorePage({ params }: PageProps) {
   if (
     !dealer ||
     dealer.status !== 'APPROVED' ||
-    dealer.subscription_status === 'INACTIVE' ||
-    dealer.moderation_status === 'DELETED' ||
-    dealer.moderation_status === 'SUSPENDED' ||
+    dealer.subscription_status !== 'ACTIVE' ||
+    !dealer.subscription_expires_at ||
+    new Date(dealer.subscription_expires_at).getTime() <= Date.now() ||
+    dealer.moderation_status !== 'ACTIVE' ||
     dealer.deleted_at
   ) {
     notFound();

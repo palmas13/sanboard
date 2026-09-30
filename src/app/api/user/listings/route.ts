@@ -83,3 +83,18 @@ export async function PATCH(req: NextRequest) {
     );
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const actor = await resolveOwnedActiveProfile(req);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+    const { status } = await req.json().catch(() => ({}));
+    if (status !== 'EXPIRED' && status !== 'SOLD') {
+      return NextResponse.json({ error: 'Yalnızca süresi dolan veya satılan ilan geçmişi temizlenebilir.' }, { status: 400 });
+    }
+    const result = await getListingRepository().clearUserListingHistory(actor.profileId, status);
+    return NextResponse.json(result.success ? result : { error: result.error }, { status: result.success ? 200 : 400 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error?.message || 'İlan geçmişi temizlenemedi.' }, { status: 500 });
+  }
+}

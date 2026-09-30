@@ -4,6 +4,7 @@ import {
   FleecaProviderNotConfiguredError,
   getFleecaPaymentProvider,
 } from '@/lib/integrations/fleeca';
+import { canRenewCorporateSubscription } from '@/lib/subscriptions/calendar-month';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { setPaymentCorrelationCookie } from '@/lib/payments/correlation';
 import { getPaymentPrice, type PaymentPurpose } from '@/lib/payments/pricing';
@@ -75,6 +76,9 @@ export async function POST(req: NextRequest) {
       }
       if (dealer.status !== 'APPROVED' || dealer.moderation_status === 'DELETED') {
         return NextResponse.json({ error: 'Bu mağaza için üyelik satın alınamaz.' }, { status: 403 });
+      }
+      if (!canRenewCorporateSubscription(dealer.subscription_status, dealer.subscription_expires_at)) {
+        return NextResponse.json({ error: 'Üyelik yalnızca bitiş tarihine 7 gün veya daha az kaldığında yenilenebilir.' }, { status: 409 });
       }
       corporateProfileId = dealer.id;
     }

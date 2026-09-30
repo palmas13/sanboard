@@ -11,7 +11,6 @@ import {
   Heart,
   User,
   CreditCard,
-  PlusCircle,
   Building2,
   LifeBuoy,
   Crown,
@@ -19,8 +18,7 @@ import {
   ArrowRight,
   Bell,
 } from 'lucide-react';
-import { getCorporateSidebarLabel, resolveCorporateHeaderActions } from '@/lib/dealers/status';
-import { getCorporateUrl } from '@/lib/urls';
+import { getCorporateSidebarLabel } from '@/lib/dealers/status';
 
 export default function HesabimLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -94,13 +92,6 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
   const isCorporateIdentity = corporateLabel === 'Kurumsal Profil';
   const isKurumsalPage = pathname === '/hesabim/kurumsal' || pathname.startsWith('/hesabim/kurumsal/');
 
-  // Section 7, 8, 9: Canonical eligibility resolver for header actions
-  const { canOpenStore, canCreateCorporateListing } = resolveCorporateHeaderActions({
-    eligibility: corporateEligibility as any,
-    activeProfileId: currentProfile?.id,
-    isCorporatePage: isKurumsalPage,
-  });
-
   const menuItems = [
     { href: '/hesabim', label: 'Genel Bakış', icon: LayoutDashboard, iconAccent: 'text-orange-400 bg-orange-400/10' },
     { href: '/hesabim/profil', label: 'Profilim', icon: User, iconAccent: 'text-blue-400 bg-blue-400/10' },
@@ -162,38 +153,6 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-          {canOpenStore && (
-            <Link
-              href={getCorporateUrl(corporateEligibility!.dealer!)}
-              className="btn-secondary text-xs py-2.5 px-4 shadow-sm"
-              target="_blank"
-            >
-              <span>Mağazamı Aç</span>
-            </Link>
-          )}
-
-          {isKurumsalPage ? (
-            canCreateCorporateListing && (
-              <Link
-                href="/ilan-ver/yeni?corporate=true"
-                className="btn-primary text-xs py-2.5 px-4 shadow-sm flex items-center gap-2"
-              >
-                <PlusCircle className="w-4 h-4" />
-                <span>Yeni İlan Ver</span>
-              </Link>
-            )
-          ) : (
-            <Link
-              href="/ilan-ver"
-              className="btn-primary text-xs py-2.5 px-4 shadow-sm flex items-center gap-2"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span>Yeni İlan Ver</span>
-            </Link>
-          )}
-        </div>
       </div>
 
       {/* Main Grid: Shared Alignments (Sidebar + Content) */}

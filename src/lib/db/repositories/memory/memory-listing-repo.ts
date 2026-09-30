@@ -85,6 +85,16 @@ export class MemoryListingRepository implements IListingRepository {
     return listings;
   }
 
+  async clearUserListingHistory(profileId: string, status: 'EXPIRED' | 'SOLD') {
+    const profile = db.profiles.find((item) => item.id === profileId);
+    if (!profile) return { success: false, error: 'Profil bulunamadı.' };
+    const clearedAt = new Date().toISOString();
+    if (status === 'EXPIRED') profile.expired_listing_history_cleared_at = clearedAt;
+    else profile.sold_listing_history_cleared_at = clearedAt;
+    profile.updated_at = clearedAt;
+    return { success: true, clearedAt };
+  }
+
   async getCorporateListings(
     corporateProfileId: string,
     onTiming?: (stage: 'db' | 'enrich', duration: number) => void

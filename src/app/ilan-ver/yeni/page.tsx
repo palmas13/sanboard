@@ -29,6 +29,7 @@ import { ListingQualityIndicator } from '@/components/listings/ListingQualityInd
 import { LISTING_TITLE_MAX_ERROR, LISTING_TITLE_MAX_LENGTH } from '@/lib/validations/listing';
 import { getVehicleLevelOptions, normalizeVehicleLevel, VEHICLE_LEVEL_FIELDS } from '@/lib/listings/vehicle-levels';
 import { formatTurkishInteger, isIntegerInRange, normalizeIntegerInput, normalizeTurkishIntegerInput } from '@/lib/forms/integer-input';
+import { readJsonResponse } from '@/lib/http/json-response';
 
 const TITLE_MAX = LISTING_TITLE_MAX_LENGTH;
 const DESC_MAX = 100;
@@ -99,6 +100,8 @@ export default function YeniIlanOlusturPage() {
   const [floor, setFloor] = useState('1');
   const [roomCount, setRoomCount] = useState('2+1');
   const [furnished, setFurnished] = useState(false);
+  const [marketValue, setMarketValue] = useState('');
+  const [furnitureValue, setFurnitureValue] = useState('');
   const [buildingType, setBuildingType] = useState('Normal');
   const [balcony, setBalcony] = useState(false);
 
@@ -159,6 +162,8 @@ export default function YeniIlanOlusturPage() {
         setFloor(draft.floor || '1');
         setRoomCount(draft.roomCount || '2+1');
         setFurnished(Boolean(draft.furnished));
+        setMarketValue(normalizeTurkishIntegerInput(String(draft.marketValue || '')) || '');
+        setFurnitureValue(normalizeTurkishIntegerInput(String(draft.furnitureValue || '')) || '');
         setBuildingType(draft.buildingType || 'Normal');
         setBalcony(Boolean(draft.balcony));
         setImages(Array.isArray(draft.images) ? draft.images : []);
@@ -177,7 +182,7 @@ export default function YeniIlanOlusturPage() {
       step, category, subcategory, title, description, price, offersEnabled, minimumOffer, location, brand, model, plate,
       mileage, engineUpgrade, transmissionUpgrade, brakeUpgrade, turbo, subwoofer,
       tradeAvailable, lockLevel, alarmLevel, antiTheftLevel, engineHealth, suspension,
-      fuelType, factoryPrice, floor, roomCount, furnished, buildingType, balcony, images,
+      fuelType, factoryPrice, floor, roomCount, furnished, marketValue, furnitureValue, buildingType, balcony, images,
       savedAt: new Date().toISOString(),
     };
     const timer = window.setTimeout(() => {
@@ -189,7 +194,7 @@ export default function YeniIlanOlusturPage() {
       setDraftSavedAt(draft.savedAt);
     }, 400);
     return () => window.clearTimeout(timer);
-  }, [draftStorageKey, draftReady, step, category, subcategory, title, description, price, offersEnabled, minimumOffer, location, brand, model, plate, mileage, engineUpgrade, transmissionUpgrade, brakeUpgrade, turbo, subwoofer, tradeAvailable, lockLevel, alarmLevel, antiTheftLevel, engineHealth, suspension, fuelType, factoryPrice, floor, roomCount, furnished, buildingType, balcony, images]);
+  }, [draftStorageKey, draftReady, step, category, subcategory, title, description, price, offersEnabled, minimumOffer, location, brand, model, plate, mileage, engineUpgrade, transmissionUpgrade, brakeUpgrade, turbo, subwoofer, tradeAvailable, lockLevel, alarmLevel, antiTheftLevel, engineHealth, suspension, fuelType, factoryPrice, floor, roomCount, furnished, marketValue, furnitureValue, buildingType, balcony, images]);
 
   const clearDraft = () => {
     if (!window.confirm('Bu taslağı silmek istediğinize emin misiniz?')) return;
@@ -224,6 +229,8 @@ export default function YeniIlanOlusturPage() {
     setFloor('1');
     setRoomCount('2+1');
     setFurnished(false);
+    setMarketValue('');
+    setFurnitureValue('');
     setBuildingType('Normal');
     setBalcony(false);
     setImages([]);
@@ -323,6 +330,14 @@ export default function YeniIlanOlusturPage() {
         errors.push('Mülk konumu zorunludur.');
         invalid.location = true;
       }
+      if (!isIntegerInRange(marketValue, 1, 1_000_000_000)) {
+        errors.push('Market değeri 0’dan büyük bir tam sayı olmalıdır.');
+        invalid.marketValue = true;
+      }
+      if (furnished && !isIntegerInRange(furnitureValue, 1, 1_000_000_000)) {
+        errors.push('Eşyalı mülklerde eşya bedeli 0’dan büyük bir tam sayı olmalıdır.');
+        invalid.furnitureValue = true;
+      }
     }
 
     if (category === 'vehicle') {
@@ -391,6 +406,8 @@ export default function YeniIlanOlusturPage() {
       errors.push('En az 1 adet fotoğraf yüklemelisiniz.');
     } else if (!images.some((img) => img.is_cover)) {
       errors.push('Lütfen bir fotoğrafı vitrin fotoğrafı olarak seçiniz.');
+    } else if (images.length > (category === 'property' ? 5 : 3)) {
+      errors.push(`${category === 'property' ? 'Mülk' : 'Araç'} ilanlarında en fazla ${category === 'property' ? 5 : 3} fotoğraf yükleyebilirsiniz.`);
     }
 
     if (errors.length > 0) {
@@ -406,7 +423,7 @@ export default function YeniIlanOlusturPage() {
   };
 
   const handlePublish = async () => {
-    if (!currentProfile) return;
+    if (!currentProfile || submitting) return;
     setSubmitting(true);
     setError('');
     setErrorSummary([]);
@@ -449,6 +466,8 @@ export default function YeniIlanOlusturPage() {
       payload.floor = Number(floor);
       payload.room_count = roomCount;
       payload.furnished = furnished;
+      payload.market_value = Number(marketValue);
+      payload.furniture_value = furnished ? Number(furnitureValue) : null;
       payload.building_type = buildingType;
       payload.balcony = balcony;
     }
@@ -460,8 +479,7 @@ export default function YeniIlanOlusturPage() {
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'İlan yayınlanamadı.');
+      const data = await readJsonResponse<{ listing: any }>(res, 'İlan yayınlanamadı.');
 
       if (draftStorageKey) localStorage.removeItem(draftStorageKey);
       router.push(`${getListingUrl(data.listing)}?success=true`);
@@ -1026,7 +1044,11 @@ export default function YeniIlanOlusturPage() {
                     <input
                       type="checkbox"
                       checked={furnished}
-                      onChange={(e) => setFurnished(e.target.checked)}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setFurnished(checked);
+                        if (!checked) setFurnitureValue('');
+                      }}
                       className="w-4 h-4 accent-[#FF8A1F]"
                     />
                     <span className="text-xs font-semibold text-[var(--text-main)]">Eşyalı: Evet</span>
@@ -1041,6 +1063,31 @@ export default function YeniIlanOlusturPage() {
                     />
                     <span className="text-xs font-semibold text-[var(--text-main)]">Balkon / Teras: Var</span>
                   </label>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-[var(--text-muted)]">Market Değeri ($)</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={formatTurkishInteger(marketValue)}
+                      onChange={(e) => updateMoney(e.target.value, setMarketValue)}
+                      className={`form-input text-sm ${invalidFields.marketValue ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
+                    />
+                  </div>
+                  {furnished && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-[var(--text-muted)]">Eşya Bedeli ($)</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={formatTurkishInteger(furnitureValue)}
+                        onChange={(e) => updateMoney(e.target.value, setFurnitureValue)}
+                        className={`form-input text-sm ${invalidFields.furnitureValue ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1076,13 +1123,13 @@ export default function YeniIlanOlusturPage() {
                 İlan Fotoğrafları
               </h2>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                En az 1, en fazla 3 fotoğraf ekleyin. Bir fotoğrafı vitrin (kapak) görseli olarak seçin.
+                En az 1, en fazla {category === 'property' ? 5 : 3} fotoğraf ekleyin. Bir fotoğrafı vitrin (kapak) görseli olarak seçin.
               </p>
             </div>
-            <span className="badge-tag">{images.length} / 3 Fotoğraf</span>
+            <span className="badge-tag">{images.length} / {category === 'property' ? 5 : 3} Fotoğraf</span>
           </div>
 
-          <PhotoUploader images={images} onChange={setImages} />
+          <PhotoUploader images={images} onChange={setImages} maxImages={category === 'property' ? 5 : 3} />
 
           <div className="flex justify-between pt-4 border-t border-[var(--border-app)]">
             <button

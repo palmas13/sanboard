@@ -100,7 +100,7 @@ describe('SANBOARD payment / boost integrity package 1', () => {
       db.payments = [];
       const order = await createCheckoutOrder(alex, 'CORPORATE_SUBSCRIPTION_30_DAY', { corporateProfileId: store, idempotencyKey: `renew-${credits}` });
       assert.equal((await completePaymentOrder(order.orderId, `external-${credits}`, clock)).success, true);
-      assert.equal(db.dealers[0].subscription_expires_at, '2026-11-25T12:00:00.000Z');
+      assert.equal(db.dealers[0].subscription_expires_at, '2026-11-26T12:00:00.000Z');
       assert.equal(db.dealers[0].boost_credits, credits);
     }
   });
@@ -216,7 +216,7 @@ describe('SANBOARD payment / boost integrity package 1', () => {
         idempotencyKey: `legacy-renew-${credits}`,
       });
       assert.equal((await completePaymentOrder(order.orderId, `legacy-external-${credits}`, clock)).success, true);
-      assert.equal(db.dealers[0].subscription_expires_at, '2026-11-25T12:00:00.000Z');
+      assert.equal(db.dealers[0].subscription_expires_at, '2026-11-26T12:00:00.000Z');
       assert.equal(db.dealers[0].boost_credits, credits);
       assert.equal(db.dealers[0].current_period_start, clock.toISOString());
       assert.equal(db.dealers[0].current_period_end, '2026-10-26T12:00:00.000Z');

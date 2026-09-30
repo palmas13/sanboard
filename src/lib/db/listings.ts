@@ -71,6 +71,7 @@ export function sanitizeListingForPublic(listing: Listing): PublicListingSummary
     category: listing.category,
     subcategory: listing.subcategory,
     title: listing.title,
+    description: listing.description,
     price: listing.price,
     previous_price: listing.previous_price,
     location: listing.location,
@@ -122,7 +123,7 @@ export async function getPublicListings(filters: ListingFilterParams = {}): Prom
   result = result.filter((l) => {
     if (l.seller_type === 'CORPORATE' && l.corporate_profile_id) {
       const store = (db.dealers || []).find((d) => d.id === l.corporate_profile_id);
-      if (store && (store.moderation_status === 'SUSPENDED' || store.moderation_status === 'DELETED')) {
+      if (!store || !isPublicListingVisible(l, store, new Date())) {
         return false;
       }
     }
@@ -266,7 +267,7 @@ export async function getSimilarListings(
     // Filter out corporate listings from suspended or deleted stores
     if (l.seller_type === 'CORPORATE' && l.corporate_profile_id) {
       const store = (db.dealers || []).find((d) => d.id === l.corporate_profile_id);
-      if (store && (store.moderation_status === 'SUSPENDED' || store.moderation_status === 'DELETED' || store.deleted_at)) {
+      if (!store || !isPublicListingVisible(l, store, now)) {
         return false;
       }
     }
@@ -426,9 +427,9 @@ export async function getListingById(
     return { listing: null, isLocked: false, isOwner };
   }
 
-  // Check store moderation state for corporate listings
-  if (listing.seller_type === 'CORPORATE' && store) {
-    if ((store.moderation_status === 'SUSPENDED' || store.moderation_status === 'DELETED' || store.deleted_at) && !isOwner) {
+  // Owners retain dashboard access; public viewers require a live store subscription.
+  if (listing.seller_type === 'CORPORATE') {
+    if (!isPublicListingVisible(listing, store, new Date()) && !isOwner) {
       return { listing: null, isLocked: false, isOwner: false };
     }
   }
@@ -641,6 +642,8 @@ export async function createListingWithCredit(
       floor: Number(input.floor),
       room_count: input.room_count,
       furnished: Boolean(input.furnished),
+      market_value: Number(input.market_value),
+      furniture_value: input.furnished && input.furniture_value != null ? Number(input.furniture_value) : null,
       building_type: input.building_type || 'Normal',
       balcony: Boolean(input.balcony),
     } : undefined,
@@ -734,6 +737,8 @@ export async function updateListing(
     listing.property_details.floor = Number(input.floor ?? listing.property_details.floor);
     listing.property_details.room_count = input.room_count || listing.property_details.room_count;
     listing.property_details.furnished = Boolean(input.furnished);
+    if (input.market_value !== undefined) listing.property_details.market_value = Number(input.market_value);
+    listing.property_details.furniture_value = input.furnished && input.furniture_value != null ? Number(input.furniture_value) : null;
     listing.property_details.building_type = input.building_type || listing.property_details.building_type;
     listing.property_details.balcony = Boolean(input.balcony);
   }
@@ -873,6 +878,9 @@ export async function getUserListings(sellerProfileId: string): Promise<Listing[
     (l) => l.seller_profile_id === sellerProfileId && l.seller_type === 'INDIVIDUAL' && !l.corporate_profile_id
   );
   const now = new Date();
+  const profile = db.profiles.find((item) => item.id === sellerProfileId);
+  const expiredCutoff = profile?.expired_listing_history_cleared_at ? new Date(profile.expired_listing_history_cleared_at).getTime() : 0;
+  const soldCutoff = profile?.sold_listing_history_cleared_at ? new Date(profile.sold_listing_history_cleared_at).getTime() : 0;
 
   const activeHistory = listings.map((l) => {
     const isExpired = l.expires_at ? new Date(l.expires_at) <= now : false;
@@ -891,8 +899,14 @@ export async function getUserListings(sellerProfileId: string): Promise<Listing[
     location: null, status: 'SOLD' as const, closed_at: audit.closed_at || audit.sold_at,
     created_at: audit.sold_at, updated_at: audit.closed_at || audit.sold_at,
   }));
-  const knownIds = new Set(activeHistory.map((listing) => listing.id));
-  return [...activeHistory, ...soldHistory.filter((listing) => !knownIds.has(listing.id))];
+  const visibleListings = activeHistory.filter((listing) => {
+    if (listing.status === 'ACTIVE') return true;
+    if (listing.status === 'SOLD') return new Date(listing.closed_at || listing.updated_at || listing.created_at).getTime() > soldCutoff;
+    if (listing.status === 'EXPIRED') return new Date(listing.expires_at || listing.updated_at || listing.created_at).getTime() > expiredCutoff;
+    return true;
+  });
+  const knownIds = new Set(visibleListings.map((listing) => listing.id));
+  return [...visibleListings, ...soldHistory.filter((listing) => !knownIds.has(listing.id) && new Date(listing.closed_at || listing.updated_at).getTime() > soldCutoff)];
 }
 
 /**

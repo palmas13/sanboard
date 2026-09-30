@@ -6,6 +6,7 @@ import { normalizeSocialMedia } from '../dealers/social';
 import { recordAuditEvent } from '../audit';
 import { notifyNewFollowerBestEffort } from './follow-notifications';
 import { slugify } from '../urls';
+import { addCalendarMonth } from '../subscriptions/calendar-month';
 
 export function ensureDealers() {
   if (!db.dealers) {
@@ -276,7 +277,7 @@ export async function activateSubscription(dealerId: string): Promise<{ success:
   if (!dealer) return { success: false, error: 'Kurumsal mağaza bulunamadı.' };
 
   dealer.subscription_status = 'ACTIVE';
-  dealer.subscription_expires_at = new Date(Date.now() + 30 * 86400000).toISOString();
+  dealer.subscription_expires_at = addCalendarMonth(new Date()).toISOString();
   dealer.boost_credits = 3;
   dealer.updated_at = new Date().toISOString();
 

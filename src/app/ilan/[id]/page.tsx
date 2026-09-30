@@ -71,11 +71,11 @@ export default async function ListingDetailPage({ params }: PageProps) {
   const detailReady = !result.isLocked;
 
   const favoriteProof = !closedLabel ? <FavoriteButton listingId={listing.id} initialCount={listing.favorite_count} initialIsFavorited={memberListing.is_favorited} proofText /> : <span className="inline-block min-w-[16rem]">{listing.favorite_count || 0} kişi favoriledi</span>;
-  const headerActions = <div data-testid="listing-actions" className="flex flex-wrap items-center gap-1.5 [&_button]:min-h-9 [&_a]:min-h-9">
+  const headerActions = <div data-testid="listing-actions" className="flex flex-wrap items-center gap-1.5 [&_button]:min-h-8 [&_button]:px-2.5 [&_a]:min-h-8 [&_a]:px-2.5">
     <CopyListingLinkButton path={canonicalPath} />
-    {!result.isOwner ? <ReportModal listingId={listing.id} /> : null}
     {isVehicle ? <CompareButton listing={listing} /> : !closedLabel ? <PropertyCompareButton listing={listing} /> : null}
   </div>;
+  const descriptionReport = !result.isOwner ? <ReportModal listingId={listing.id} compact /> : null;
 
   return <main className="mx-auto w-full max-w-[1580px] space-y-4 px-3 py-4 sm:px-5 lg:px-6 lg:py-5">
     {closedLabel ? <div role="status" className="flex items-center gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/8 p-4 text-sm font-semibold text-amber-200"><CircleOff className="h-5 w-5 shrink-0" /><div><p>{closedLabel}</p><p className="mt-0.5 text-xs font-normal text-[var(--text-muted)]">İlan bilgileri arşiv amacıyla görüntüleniyor; yeni iletişim ve favori işlemleri kapalıdır.</p></div></div> : null}
@@ -89,7 +89,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
       <aside data-testid="vehicle-seller-rail" className="min-w-0 space-y-2.5 lg:col-start-2 lg:row-start-1 xl:col-start-3 xl:row-start-1 xl:sticky xl:top-20">
         <SellerArea listing={memberListing} isLocked={result.isLocked} isOwner={result.isOwner} closedLabel={closedLabel} />
       </aside>
-      {detailReady ? <div data-testid="vehicle-description-row" className="min-w-0 lg:col-start-1 lg:row-start-2 xl:col-start-1"><ListingDescription listing={memberListing} /></div> : null}
+      {detailReady ? <div data-testid="vehicle-description-row" className="min-w-0 self-stretch lg:col-start-1 lg:row-start-2 xl:col-start-1"><ListingDescription listing={memberListing} reportAction={descriptionReport} /></div> : null}
       <div data-testid="vehicle-technical-column" className="min-w-0 lg:col-start-2 lg:row-start-2 xl:col-start-2 xl:row-start-1 xl:row-span-2">
         {detailReady ? <VehicleDetailsPanel listing={memberListing} /> : <div className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-6 text-sm text-[var(--text-muted)]">Teknik detayları görmek için giriş yapınız.</div>}
       </div>
@@ -101,7 +101,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
         {detailReady ? <PropertyDetailsPanel listing={memberListing} /> : null}
         <SellerArea listing={memberListing} isLocked={result.isLocked} isOwner={result.isOwner} closedLabel={closedLabel} />
       </aside>
-      {detailReady ? <div data-testid="property-description-row" className="min-w-0 lg:col-start-1 lg:row-start-2"><ListingDescription listing={memberListing} /></div> : null}
+      {detailReady ? <div data-testid="property-description-row" className="min-w-0 self-stretch lg:col-start-1 lg:row-start-2"><ListingDescription listing={memberListing} reportAction={descriptionReport} /></div> : null}
     </section>}
 
     {isVehicle && similarListings.length > 0 ? <SimilarListings listings={similarListings} /> : null}

@@ -49,6 +49,8 @@ export interface CharacterProfile {
   phone_visibility?: ContactVisibility;
   sanmail_visibility?: ContactVisibility;
   payment_history_cleared_at?: string | null;
+  expired_listing_history_cleared_at?: string | null;
+  sold_listing_history_cleared_at?: string | null;
   role?: UserRole;
   is_dealer?: boolean;
   dealer_id?: string;
@@ -107,6 +109,8 @@ export interface PropertyDetails {
   floor: number;
   room_count: RoomCount;
   furnished: boolean;
+  market_value?: number | null;
+  furniture_value?: number | null;
   building_type: BuildingType;
   balcony: boolean;
 }
@@ -157,6 +161,7 @@ export interface PublicListingSummary {
   category: ListingCategory;
   subcategory: string;
   title: string;
+  description?: string;
   price: number;
   previous_price?: number;
   location: string | null;

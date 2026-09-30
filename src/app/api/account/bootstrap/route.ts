@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
             .eq('profile_id', profileId),
           client
             .from('listing_credits')
-            .select('*', { count: 'exact', head: true })
+            .select('credit_type, corporate_profile_id')
             .eq('profile_id', profileId)
             .eq('status', 'AVAILABLE'),
           client
@@ -73,7 +73,13 @@ export async function GET(req: NextRequest) {
         totalReceivedFavorites = count || 0;
       }
 
-      const availableCredits = creditRes.count || 0;
+      const availableCreditRows = creditRes.data || [];
+      const individualCredits = availableCreditRows.filter((credit: any) => credit.credit_type === 'INDIVIDUAL' || !credit.credit_type).length;
+      const corporateStoreId = corpRes.data?.id;
+      const corporateCredits = corporateStoreId
+        ? availableCreditRows.filter((credit: any) => credit.credit_type === 'CORPORATE' && credit.corporate_profile_id === corporateStoreId).length
+        : 0;
+      const availableCredits = individualCredits + corporateCredits;
       const favoritesCount = favsCountRes.count || 0;
       const openTickets = ticketCountRes.count || 0;
 
@@ -89,6 +95,8 @@ export async function GET(req: NextRequest) {
         },
         credits: {
           availableCredits,
+          individualCredits,
+          corporateCredits,
         },
         corporate: {
           isDealer: Boolean(corpRes.data && (corpRes.data.status === 'APPROVED' || corpRes.data.moderation_status === 'ACTIVE')),
@@ -111,12 +119,15 @@ export async function GET(req: NextRequest) {
     const totalReceivedFavorites = db.favorites.filter((f) => personalListingIds.has(f.listing_id)).length;
 
     const favoritesCount = db.favorites.filter((f) => f.profile_id === profileId).length;
-    const availableCredits = db.credits.filter(
-      (c) => c.profile_id === profileId && c.status === 'AVAILABLE'
-    ).length;
     const corpStore = (db.dealers || []).find(
       (d) => (d.owner_profile_id === profileId || d.profile_id === profileId) && d.moderation_status !== 'DELETED' && !d.deleted_at
     );
+    const availableCreditRows = db.credits.filter((c) => c.profile_id === profileId && c.status === 'AVAILABLE');
+    const individualCredits = availableCreditRows.filter((credit) => credit.credit_type === 'INDIVIDUAL' || !credit.credit_type).length;
+    const corporateCredits = corpStore
+      ? availableCreditRows.filter((credit) => credit.credit_type === 'CORPORATE' && credit.corporate_profile_id === corpStore.id).length
+      : 0;
+    const availableCredits = individualCredits + corporateCredits;
     const openTickets = db.tickets.filter(
       (t) => t.profile_id === profileId && t.status === 'OPEN'
     ).length;
@@ -133,6 +144,8 @@ export async function GET(req: NextRequest) {
       },
       credits: {
         availableCredits,
+        individualCredits,
+        corporateCredits,
       },
       corporate: {
         isDealer: Boolean(corpStore && corpStore.status === 'APPROVED'),

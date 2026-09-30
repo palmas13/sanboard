@@ -41,6 +41,7 @@ import type { TicketCategory } from '@/types';
 import { getTicketCategoryLabel, normalizeTicketCategory, TICKET_CATEGORIES } from '@/lib/tickets/categories';
 
 type AdminTab = 'overview' | 'listings' | 'payments' | 'reports' | 'dealers' | 'tickets' | 'settings';
+const ADMIN_PAGE_SIZE = 20;
 
 const navItems: Array<{ id: AdminTab; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: 'overview', label: 'Genel Bakış', icon: LayoutDashboard },
@@ -69,6 +70,9 @@ export default function AdminPage() {
 
   // Search filter inside admin listings
   const [searchListingQuery, setSearchListingQuery] = useState('');
+  const [visibleCounts, setVisibleCounts] = useState<Record<string, number>>({});
+  const visibleCount = (key: string) => visibleCounts[key] || ADMIN_PAGE_SIZE;
+  const loadMore = (key: string) => setVisibleCounts((current) => ({ ...current, [key]: visibleCount(key) + ADMIN_PAGE_SIZE }));
 
   // Ticket filter & detail modal state
   const [ticketStatusFilter, setTicketStatusFilter] = useState<'ALL' | 'OPEN' | 'ANSWERED' | 'CLOSED'>('ALL');
@@ -135,6 +139,10 @@ export default function AdminPage() {
     }
     fetchData();
   }, [isLoading, isAuthenticated, router]);
+
+  useEffect(() => {
+    setVisibleCounts({});
+  }, [activeTab, corporateSubTab, searchListingQuery, ticketStatusFilter, ticketCategoryFilter]);
 
   if (isLoading) {
     return (
@@ -577,7 +585,7 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-app)]">
-                {filteredListings.map((l: any) => (
+                {filteredListings.slice(0, visibleCount('listings')).map((l: any) => (
                   <tr key={l.id} className="hover:bg-[var(--bg-surface-secondary)]/30 transition-colors">
                     <td className="py-3 px-4 font-medium text-[var(--text-main)] max-w-xs truncate">{l.title}</td>
                     <td className="py-3 px-4">
@@ -615,6 +623,7 @@ export default function AdminPage() {
               </tbody>
             </table>
           </div>
+          {visibleCount('listings') < filteredListings.length && <button type="button" onClick={() => loadMore('listings')} className="btn-secondary mx-auto flex px-5 py-2.5 text-xs">Daha Fazla Göster</button>}
         </div>
       )}
 
@@ -690,7 +699,7 @@ export default function AdminPage() {
                         </td>
                       </tr>
                     ) : (data?.applications || []).length > 0 ? (
-                      (data?.applications || []).map((app: any) => (
+                      (data?.applications || []).slice(0, visibleCount('applications')).map((app: any) => (
                         <tr key={app.id} className="hover:bg-[var(--bg-surface-secondary)]/30 transition-colors">
                           <td className="py-3 px-4 font-bold text-[var(--text-main)]">
                             {app.company_name}
@@ -745,6 +754,7 @@ export default function AdminPage() {
                   </tbody>
                 </table>
               </div>
+              {visibleCount('applications') < (data?.applications || []).length && <button type="button" onClick={() => loadMore('applications')} className="btn-secondary mx-auto flex px-5 py-2.5 text-xs">Daha Fazla Göster</button>}
             </div>
           )}
 
@@ -793,7 +803,7 @@ export default function AdminPage() {
                     ) : (data?.dealers || []).filter((d: any) => showDeletedStores || d.moderation_status !== 'DELETED').length > 0 ? (
                       (data?.dealers || [])
                         .filter((d: any) => showDeletedStores || d.moderation_status !== 'DELETED')
-                        .map((d: any) => {
+                        .slice(0, visibleCount('dealers')).map((d: any) => {
                           const isSuspended = d.moderation_status === 'SUSPENDED';
                           const isDeleted = d.moderation_status === 'DELETED';
                           const isSubActive = d.subscription_status === 'ACTIVE';
@@ -886,6 +896,7 @@ export default function AdminPage() {
                   </tbody>
                 </table>
               </div>
+              {visibleCount('dealers') < (data?.dealers || []).filter((d: any) => showDeletedStores || !(d.moderation_status === 'DELETED' || d.deleted_at)).length && <button type="button" onClick={() => loadMore('dealers')} className="btn-secondary mx-auto flex px-5 py-2.5 text-xs">Daha Fazla Göster</button>}
             </div>
           )}
         </div>
@@ -950,7 +961,7 @@ export default function AdminPage() {
               </thead>
               <tbody className="divide-y divide-[var(--border-app)]">
                 {filteredTickets.length > 0 ? (
-                  filteredTickets.map((t: any) => (
+                  filteredTickets.slice(0, visibleCount('tickets')).map((t: any) => (
                     <tr key={t.id} className="hover:bg-[var(--bg-surface-secondary)]/30 transition-colors">
                       <td className="py-3 px-4 font-mono font-semibold text-[var(--text-main)]">{t.id}</td>
                       <td className="py-3 px-4 font-bold text-[var(--text-main)] max-w-sm truncate">{t.subject}</td>
@@ -998,6 +1009,7 @@ export default function AdminPage() {
               </tbody>
             </table>
           </div>
+          {visibleCount('tickets') < filteredTickets.length && <button type="button" onClick={() => loadMore('tickets')} className="btn-secondary mx-auto flex px-5 py-2.5 text-xs">Daha Fazla Göster</button>}
         </div>
       )}
 
@@ -1017,7 +1029,7 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-app)]">
-                {(data?.payments || []).map((pay: any) => (
+                {(data?.payments || []).slice(0, visibleCount('payments')).map((pay: any) => (
                   <tr key={pay.id} className="hover:bg-[var(--bg-surface-secondary)]/30 transition-colors">
                     <td className="py-3 px-4 font-mono font-semibold text-[var(--text-main)]">{pay.order_id}</td>
                     <td className="py-3 px-4 text-[var(--text-muted)]">{formatDateTime(pay.created_at)}</td>
@@ -1033,6 +1045,7 @@ export default function AdminPage() {
               </tbody>
             </table>
           </div>
+          {visibleCount('payments') < (data?.payments || []).length && <button type="button" onClick={() => loadMore('payments')} className="btn-secondary mx-auto flex px-5 py-2.5 text-xs">Daha Fazla Göster</button>}
         </div>
       )}
 
@@ -1042,7 +1055,7 @@ export default function AdminPage() {
           <h3 className="font-bold text-base text-[var(--text-main)]">Kullanıcı Şikayetleri</h3>
           {reports.length > 0 ? (
             <div className="space-y-3">
-              {reports.map((rep: any) => (
+              {reports.slice(0, visibleCount('reports')).map((rep: any) => (
                 <div
                   key={rep.id}
                   className="p-3 rounded-xl bg-[var(--bg-surface-secondary)]/50 border border-[var(--border-app)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
@@ -1099,6 +1112,7 @@ export default function AdminPage() {
               Bekleyen kullanıcı şikayeti bulunmuyor.
             </p>
           )}
+          {visibleCount('reports') < reports.length && <button type="button" onClick={() => loadMore('reports')} className="btn-secondary mx-auto flex px-5 py-2.5 text-xs">Daha Fazla Göster</button>}
         </div>
       )}
 

@@ -36,6 +36,8 @@ export default function HesabimIlanlarimPage() {
   const [actionError, setActionError] = useState('');
   const [activeOfferCount, setActiveOfferCount] = useState(0);
   const [savedDraft, setSavedDraft] = useState<{ quality: number; savedAt?: string; href: string; storageKey: string } | null>(null);
+  const [clearHistoryStatus, setClearHistoryStatus] = useState<'EXPIRED' | 'SOLD' | null>(null);
+  const [clearingHistory, setClearingHistory] = useState(false);
 
   const fetchListings = async () => {
     if (!currentProfile) return;
@@ -75,6 +77,27 @@ export default function HesabimIlanlarimPage() {
   const activeListings = listings.filter((l) => l.status === 'ACTIVE');
   const expiredListings = listings.filter((l) => l.status === 'EXPIRED');
   const soldListings = listings.filter((l) => l.status === 'SOLD');
+
+  const clearHistory = async () => {
+    if (!clearHistoryStatus) return;
+    setClearingHistory(true);
+    setActionError('');
+    try {
+      const response = await fetch('/api/user/listings', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: clearHistoryStatus }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.error || 'Liste temizlenemedi.');
+      setListings((current) => current.filter((listing) => listing.status !== clearHistoryStatus));
+      setClearHistoryStatus(null);
+    } catch (error: any) {
+      setActionError(error.message || 'Liste temizlenemedi.');
+    } finally {
+      setClearingHistory(false);
+    }
+  };
 
   const handleConfirmClose = async () => {
     if (!closeModalListing || !currentProfile) return;
@@ -170,6 +193,14 @@ export default function HesabimIlanlarimPage() {
         </div>
       </div>
 
+      {!loading && ((activeTab === 'EXPIRED' && expiredListings.length > 0) || (activeTab === 'SOLD' && soldListings.length > 0)) && (
+        <div className="flex justify-end">
+          <button type="button" onClick={() => setClearHistoryStatus(activeTab as 'EXPIRED' | 'SOLD')} className="btn-secondary inline-flex items-center gap-1.5 px-3 py-2 text-xs text-[var(--color-danger)]">
+            <Trash2 className="h-3.5 w-3.5" />Listeyi Temizle
+          </button>
+        </div>
+      )}
+
       {savedDraft && (
         <div className="surface-card rounded-2xl border border-[#FF8A1F]/25 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div><p className="text-sm font-bold text-[var(--text-main)]">Kaydedilmiş ilan taslağın var</p><p className="text-xs text-[var(--text-muted)]">%{savedDraft.quality} tamamlandı{savedDraft.savedAt ? ` • ${formatDate(savedDraft.savedAt)}` : ''}</p></div>
@@ -208,7 +239,7 @@ export default function HesabimIlanlarimPage() {
                     />
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="badge-tag text-[10px]">{listing.subcategory}</span>
+                        <span className="badge-tag inline-flex h-5 items-center px-1.5 py-0 text-[10px] leading-none">{listing.subcategory}</span>
                       </div>
                       <h3 className="font-bold text-sm text-[var(--text-main)] line-clamp-1">
                         {listing.title}
@@ -229,10 +260,10 @@ export default function HesabimIlanlarimPage() {
                     </div>
                   </div>
 
-                  <div className="flex sm:flex-col items-center gap-2 w-full sm:w-auto shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[var(--border-app)]">
+                  <div className="grid grid-cols-3 sm:grid-cols-1 items-stretch gap-2 w-full sm:w-32 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[var(--border-app)]">
                     <Link
                       href={`/hesabim/ilanlarim/${listing.id}/duzenle`}
-                      className="flex-1 sm:flex-none btn-secondary text-xs py-2 px-3 flex items-center justify-center gap-1 text-[#FF8A1F] hover:bg-[var(--brand-orange-subtle)]"
+                      className="btn-secondary text-xs py-2 px-3 flex items-center justify-center gap-1 text-[#FF8A1F] hover:bg-[var(--brand-orange-subtle)]"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                       <span>Düzenle</span>
@@ -240,7 +271,7 @@ export default function HesabimIlanlarimPage() {
 
                     <Link
                       href={getListingUrl(listing)}
-                      className="flex-1 sm:flex-none btn-secondary text-xs py-2 px-3 flex items-center justify-center gap-1"
+                      className="btn-secondary text-xs py-2 px-3 flex items-center justify-center gap-1"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                       <span>İlanı Gör</span>
@@ -255,7 +286,7 @@ export default function HesabimIlanlarimPage() {
                         const data = await response.json().catch(() => ({}));
                         setActiveOfferCount(response.ok ? Number(data.activeCount || 0) : 0);
                       }}
-                      className="flex-1 sm:flex-none btn-danger text-xs py-2 px-3 flex items-center justify-center gap-1 cursor-pointer"
+                      className="btn-danger text-xs py-2 px-3 flex items-center justify-center gap-1 cursor-pointer"
                     >
                       <CheckCircle className="w-3.5 h-3.5" />
                       <span>İlanı Kapat</span>
@@ -403,6 +434,15 @@ export default function HesabimIlanlarimPage() {
                 <span>İlanı Kapat</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {clearHistoryStatus && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" role="dialog" aria-modal="true" aria-labelledby="clear-listing-history-title">
+          <div className="surface-card w-full max-w-md rounded-2xl border border-[var(--border-app)] p-6 shadow-2xl">
+            <h3 id="clear-listing-history-title" className="text-lg font-bold text-[var(--text-main)]">Listeyi görünümden temizle?</h3>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{clearHistoryStatus === 'SOLD' ? 'Satılan' : 'Süresi dolan'} ilanlar yalnızca bu karakter profilinin görünümünden kaldırılır. Aktif ilanlar, diğer karakterler ve denetim kayıtları etkilenmez.</p>
+            <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setClearHistoryStatus(null)} disabled={clearingHistory} className="btn-secondary px-4 py-2 text-xs">Vazgeç</button><button type="button" onClick={clearHistory} disabled={clearingHistory} className="btn-danger px-4 py-2 text-xs">{clearingHistory ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Listeyi Temizle'}</button></div>
           </div>
         </div>
       )}

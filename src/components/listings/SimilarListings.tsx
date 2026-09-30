@@ -62,11 +62,11 @@ export function SimilarListings({ listings, className = '' }: SimilarListingsPro
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-[#FF8A1F]" />
             <h3 className="text-base sm:text-lg font-bold text-[var(--text-main)]">
-              Benzer İlanları İnceleyin
+              Benzer İlanlar
             </h3>
           </div>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
-            Bu araca yakın özellik ve bütçedeki diğer seçenekler
+            Aynı kategori, marka, model ve bütçeye yakın diğer seçenekler
           </p>
         </div>
 

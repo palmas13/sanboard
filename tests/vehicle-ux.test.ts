@@ -175,6 +175,8 @@ describe('Sanboard – Vehicle UX Overhaul, Similar Listings & Comparison Tests'
       floor: 2,
       room_count: '4+1',
       furnished: true,
+      market_value: 900000,
+      furniture_value: 50000,
       building_type: 'Normal',
       balcony: true,
     },
@@ -203,6 +205,7 @@ describe('Sanboard – Vehicle UX Overhaul, Similar Listings & Comparison Tests'
         status: 'APPROVED',
         moderation_status: 'ACTIVE',
         subscription_status: 'ACTIVE',
+        subscription_expires_at: new Date(Date.now() + 86400000).toISOString(),
         social_media: [],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -620,7 +623,12 @@ describe('Sanboard – Vehicle UX Overhaul, Similar Listings & Comparison Tests'
     assert.strictEqual(isPublicCorporateListingVisible({
       seller_type: 'CORPORATE',
       corporate_profile_id: 'dealer-1',
-      corporate: [{ moderation_status: 'ACTIVE', deleted_at: null }],
+      corporate: [{
+        moderation_status: 'ACTIVE',
+        deleted_at: null,
+        subscription_status: 'ACTIVE',
+        subscription_expires_at: new Date(Date.now() + 86400000).toISOString(),
+      }],
     }), true);
   });
 

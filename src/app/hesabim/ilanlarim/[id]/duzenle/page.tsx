@@ -17,6 +17,7 @@ import {
 import { PhotoUploader, UploadedImage } from '@/components/forms/PhotoUploader';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { formatTimeRemaining } from '@/lib/utils/format';
+import { readJsonResponse } from '@/lib/http/json-response';
 import { getVehicleBrandsByCategory, getVehicleModels, isMotorcycleCategory, isValidVehicleSelection, reconcileVehicleSelection, VEHICLE_CATEGORIES, VehicleCategory } from '@/lib/constants/vehicleCategories';
 import { LISTING_TITLE_MAX_ERROR, LISTING_TITLE_MAX_LENGTH } from '@/lib/validations/listing';
 import { getVehicleLevelOptions, normalizeVehicleLevel, VEHICLE_LEVEL_FIELDS } from '@/lib/listings/vehicle-levels';
@@ -73,6 +74,8 @@ export default function IlanDuzenlePage({
   const [floor, setFloor] = useState('1');
   const [roomCount, setRoomCount] = useState('2+1');
   const [furnished, setFurnished] = useState(false);
+  const [marketValue, setMarketValue] = useState('');
+  const [furnitureValue, setFurnitureValue] = useState('');
   const [buildingType, setBuildingType] = useState('Normal');
   const [balcony, setBalcony] = useState(false);
 
@@ -120,11 +123,7 @@ export default function IlanDuzenlePage({
       setError('');
       try {
         const res = await fetch(`/api/user/listings/${id}`);
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.error || 'İlan yüklenemedi.');
-        }
+        const data = await readJsonResponse<{ listing: any }>(res, 'İlan yüklenemedi.');
 
         const l = data.listing;
         setListingData(l);
@@ -164,6 +163,8 @@ export default function IlanDuzenlePage({
           setFloor(String(pd.floor ?? '1'));
           setRoomCount(pd.room_count || '2+1');
           setFurnished(Boolean(pd.furnished));
+          setMarketValue(pd.market_value != null ? normalizeTurkishIntegerInput(String(pd.market_value)) || '' : '');
+          setFurnitureValue(pd.furniture_value != null ? normalizeTurkishIntegerInput(String(pd.furniture_value)) || '' : '');
           setBuildingType(pd.building_type || 'Normal');
           setBalcony(Boolean(pd.balcony));
         }
@@ -204,6 +205,10 @@ export default function IlanDuzenlePage({
       setError('En az 1 adet fotoğraf yüklemelisiniz.');
       return;
     }
+    if (images.length > (category === 'property' ? 5 : 3)) {
+      setError(`${category === 'property' ? 'Mülk' : 'Araç'} ilanlarında en fazla ${category === 'property' ? 5 : 3} fotoğraf kullanılabilir.`);
+      return;
+    }
 
     if (category === 'vehicle') {
       if (!brand) {
@@ -231,6 +236,14 @@ export default function IlanDuzenlePage({
     if (category === 'property') {
       if (!location.trim()) {
         setError('Mülk konumu zorunludur.');
+        return;
+      }
+      if (!isIntegerInRange(marketValue, 1, 1_000_000_000)) {
+        setError('Market değeri 0’dan büyük bir tam sayı olmalıdır.');
+        return;
+      }
+      if (furnished && !isIntegerInRange(furnitureValue, 1, 1_000_000_000)) {
+        setError('Eşyalı mülklerde eşya bedeli 0’dan büyük bir tam sayı olmalıdır.');
         return;
       }
     }
@@ -297,6 +310,8 @@ export default function IlanDuzenlePage({
         payload.floor = Number(floor);
         payload.room_count = roomCount;
         payload.furnished = furnished;
+        payload.market_value = Number(marketValue);
+        payload.furniture_value = furnished ? Number(furnitureValue) : null;
         payload.building_type = buildingType;
         payload.balcony = balcony;
       }
@@ -307,10 +322,7 @@ export default function IlanDuzenlePage({
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'İlan güncellenemedi.');
-      }
+      await readJsonResponse<{ success: boolean; listing: any }>(res, 'İlan güncellenemedi.');
 
       setSuccess(true);
       setTimeout(() => {
@@ -736,7 +748,11 @@ export default function IlanDuzenlePage({
                 <input
                   type="checkbox"
                   checked={furnished}
-                  onChange={(e) => setFurnished(e.target.checked)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setFurnished(checked);
+                    if (!checked) setFurnitureValue('');
+                  }}
                   className="rounded border-[var(--border-app)] text-[#FF8A1F] focus:ring-[#FF8A1F]"
                 />
                 <span className="text-xs font-semibold text-[var(--text-main)]">Eşyalı</span>
@@ -752,6 +768,19 @@ export default function IlanDuzenlePage({
                 <span className="text-xs font-semibold text-[var(--text-main)]">Balkonlu</span>
               </label>
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Market Değeri ($)</label>
+                <input type="text" inputMode="numeric" value={formatTurkishInteger(marketValue)} onChange={(e) => updateMoney(e.target.value, setMarketValue)} className="form-input text-sm" />
+              </div>
+              {furnished && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[var(--text-muted)]">Eşya Bedeli ($)</label>
+                  <input type="text" inputMode="numeric" value={formatTurkishInteger(furnitureValue)} onChange={(e) => updateMoney(e.target.value, setFurnitureValue)} className="form-input text-sm" />
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -760,7 +789,7 @@ export default function IlanDuzenlePage({
           <h3 className="text-sm font-bold text-[var(--text-dim)] uppercase tracking-wider border-b border-[var(--border-app)] pb-2">
             3. Fotoğraflar
           </h3>
-          <PhotoUploader images={images} onChange={setImages} />
+          <PhotoUploader images={images} onChange={setImages} maxImages={category === 'property' ? 5 : 3} />
         </div>
 
         {/* SUBMIT BUTTON */}

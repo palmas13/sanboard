@@ -39,10 +39,10 @@ export default function ExplorePage() {
         <header className="mx-auto max-w-3xl text-center">
           <div className="explore-reveal inline-flex items-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.28em] text-[#FF9D45]">
             <span className="h-px w-8 bg-gradient-to-r from-transparent to-[#FF8A1F]" />
-            Sanboard seçkisi
+            Sanboard&apos;da keşfet
             <span className="h-px w-8 bg-gradient-to-l from-transparent to-[#FF8A1F]" />
           </div>
-          <h1 className="explore-reveal explore-delay-1 mt-7 text-balance text-[clamp(2.6rem,7vw,5.25rem)] font-black leading-[0.96] tracking-[-0.055em] text-[var(--text-main)]">
+          <h1 className="explore-reveal explore-delay-1 mt-7 pb-2 text-balance text-[clamp(2.6rem,7vw,5.25rem)] font-black leading-[1.03] tracking-[-0.055em] text-[var(--text-main)]">
             Aradığın şey,
             <span className="block bg-gradient-to-r from-[#FFB267] via-[#FF8A1F] to-[#DE6800] bg-clip-text text-transparent">bir seçim uzağında.</span>
           </h1>

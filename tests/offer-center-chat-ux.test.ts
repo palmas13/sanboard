@@ -10,6 +10,12 @@ const styles = source('src/app/globals.css');
 const offerRoute = source('src/app/api/offers/route.ts');
 
 describe('OfferCenter chat UX', () => {
+  test('offer center guidance uses the concise requested copy', () => {
+    assert.match(center, /Teklif görüşmelerini bu pencereden görüntüleyebilirsin\./);
+    assert.match(center, /Tekliflerindeki son hareketler bu pencerede görünecektir\./);
+    assert.doesNotMatch(center, /Yapılandırılmış teklif görüşmeleri|Yeni hareketler burada sohbet listesi gibi görünecek\./);
+  });
+
   test('amount formatter uses Turkish grouping and API receives raw numeric amount', () => {
     assert.equal(formatNumber(2000), '2.000');
     assert.equal(formatNumber(20000), '20.000');

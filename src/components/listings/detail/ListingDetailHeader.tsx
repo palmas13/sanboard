@@ -34,7 +34,7 @@ export function ListingDetailHeader({
             {listing.title}
           </h1>
           <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[var(--text-muted)]">
-            {listing.location ? <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-[#FF9E45]" />{listing.location}</span> : null}
+            {listing.category === 'vehicle' && listing.location ? <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-[#FF9E45]" />{listing.location}</span> : null}
             {listing.published_at ? <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" />{formatDate(listing.published_at)}</span> : null}
             {favoriteProof}
           </div>

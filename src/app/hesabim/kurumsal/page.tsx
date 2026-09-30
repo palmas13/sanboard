@@ -38,6 +38,7 @@ import { formatDate, formatTimeRemaining } from '@/lib/utils/format';
 import { isListingActivelyFeatured } from '@/lib/listings/featured';
 import { normalizeSocialMedia } from '@/lib/dealers/social';
 import { readJsonResponse } from '@/lib/http/json-response';
+import { canRenewCorporateSubscription } from '@/lib/subscriptions/calendar-month';
 
 export default function HesabimKurumsalPage() {
   const router = useRouter();
@@ -82,6 +83,10 @@ export default function HesabimKurumsalPage() {
     dealer?.subscription_status === 'EXPIRED' ||
     (dealer?.subscription_expires_at ? new Date(dealer.subscription_expires_at) <= new Date() : false)
   );
+  const canRenewSubscription = Boolean(dealer && canRenewCorporateSubscription(
+    dealer.subscription_status,
+    dealer.subscription_expires_at,
+  ));
 
   const handleCorporateCreateListing = async () => {
     if (!currentProfile) return;
@@ -774,11 +779,13 @@ export default function HesabimKurumsalPage() {
             </div>
 
             {/* Subscription Expired Alert */}
-            {isSubscriptionExpired && (
+            {canRenewSubscription && (
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <span>Kurumsal üyelik süreniz sona ermiştir. Yeni kurumsal ilan veremez ve öne çıkarma yapamazsınız.</span>
+                  <span>{isSubscriptionExpired
+                    ? 'Kurumsal üyelik süreniz sona ermiştir. Yeni kurumsal ilan veremez ve öne çıkarma yapamazsınız.'
+                    : 'Kurumsal üyeliğinizin bitmesine 7 gün veya daha az kaldı. Üyeliğinizi mevcut bitiş tarihinden itibaren uzatabilirsiniz.'}</span>
                 </div>
                 <button
                   type="button"
@@ -906,8 +913,8 @@ export default function HesabimKurumsalPage() {
                         {/* Actions */}
                         <div className="flex items-center gap-2 self-end sm:self-center shrink-0 text-xs">
                           {isBoosted ? (
-                            <span className="px-3 py-1.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[11px] font-bold">
-                              Aktif Boost
+                            <span className="px-3 py-1.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[11px] font-bold" title={l.featured_until ? `Bitiş: ${formatDate(l.featured_until)}` : undefined}>
+                              Aktif Boost{l.featured_until ? ` · ${formatTimeRemaining(l.featured_until).text}` : ''}
                             </span>
                           ) : (
                             <button

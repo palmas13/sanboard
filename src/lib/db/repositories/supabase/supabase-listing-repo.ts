@@ -19,8 +19,10 @@ export function isPublicCorporateListingVisible(item: any): boolean {
   if (!corporate) return false;
 
   return (
-    corporate.moderation_status !== 'SUSPENDED' &&
-    corporate.moderation_status !== 'DELETED' &&
+    corporate.moderation_status === 'ACTIVE' &&
+    corporate.subscription_status === 'ACTIVE' &&
+    Boolean(corporate.subscription_expires_at) &&
+    new Date(corporate.subscription_expires_at).getTime() > Date.now() &&
     !corporate.deleted_at
   );
 }
@@ -122,6 +124,7 @@ export class SupabaseListingRepository implements IListingRepository {
         category,
         subcategory,
         title,
+        description,
         price,
         location,
         published_at,
@@ -129,9 +132,9 @@ export class SupabaseListingRepository implements IListingRepository {
         featured_until,
         seller_type,
         corporate_profile_id,
-        corporate:corporate_profiles (moderation_status, deleted_at),
+        corporate:corporate_profiles (moderation_status, deleted_at, subscription_status, subscription_expires_at),
         vehicle_details (brand, model, mileage, turbo, subwoofer, trade_available),
-        property_details (room_count, furnished, building_type, balcony),
+        property_details (room_count, furnished, market_value, furniture_value, building_type, balcony),
         listing_images (storage_path, is_cover, sort_order)
       `)
       .eq('status', 'ACTIVE')
@@ -157,6 +160,7 @@ export class SupabaseListingRepository implements IListingRepository {
           category,
           subcategory,
           title,
+          description,
           price,
           location,
           published_at,
@@ -217,16 +221,7 @@ export class SupabaseListingRepository implements IListingRepository {
     }
 
     const filteredRows = (rows || []).filter((item: any) => {
-      // Exclude listings from suspended or deleted corporate stores (Section 14 & 16)
-      if (item.seller_type === 'CORPORATE' && item.corporate) {
-        if (
-          item.corporate.moderation_status === 'SUSPENDED' ||
-          item.corporate.moderation_status === 'DELETED' ||
-          item.corporate.deleted_at
-        ) {
-          return false;
-        }
-      }
+      if (!this.isPublicCorporateListingVisible(item)) return false;
       const vehicle = Array.isArray(item.vehicle_details) ? item.vehicle_details[0] : item.vehicle_details;
       const property = Array.isArray(item.property_details) ? item.property_details[0] : item.property_details;
       const normalizedQuery = params?.query?.trim().toLocaleLowerCase('tr-TR');
@@ -265,6 +260,7 @@ export class SupabaseListingRepository implements IListingRepository {
         category: item.category,
         subcategory: item.subcategory,
         title: item.title,
+        description: item.description,
         price: item.price,
         previous_price: prevPrice && prevPrice !== item.price ? prevPrice : undefined,
         location: item.category === 'vehicle' ? null : item.location,
@@ -382,7 +378,7 @@ export class SupabaseListingRepository implements IListingRepository {
         expires_at,
         seller_type,
         corporate_profile_id,
-        corporate:corporate_profiles (moderation_status, deleted_at),
+        corporate:corporate_profiles (moderation_status, deleted_at, subscription_status, subscription_expires_at),
         vehicle_details (*)
       `)
       .eq('id', currentListingId)
@@ -413,7 +409,7 @@ export class SupabaseListingRepository implements IListingRepository {
         featured_until,
         seller_type,
         corporate_profile_id,
-        corporate:corporate_profiles (moderation_status, deleted_at),
+        corporate:corporate_profiles (moderation_status, deleted_at, subscription_status, subscription_expires_at),
         vehicle_details (*),
         listing_images (storage_path, is_cover, sort_order)
       `;
@@ -608,10 +604,9 @@ export class SupabaseListingRepository implements IListingRepository {
       }
     }
 
-    // Check store moderation state for corporate listings (Section 2 & 12)
-    if (listing.seller_type === 'CORPORATE' && listing.corporate) {
-      const corpMod = listing.corporate.moderation_status;
-      if ((corpMod === 'SUSPENDED' || corpMod === 'DELETED' || listing.corporate.deleted_at) && !isOwner) {
+    // Owners retain dashboard access; public viewers require a live store subscription.
+    if (listing.seller_type === 'CORPORATE') {
+      if (!this.isPublicCorporateListingVisible(listing) && !isOwner) {
         return { listing: null, isLocked: false, isOwner: false };
       }
     }
@@ -752,7 +747,8 @@ export class SupabaseListingRepository implements IListingRepository {
       suspension: input.subcategory === 'Motosiklet' ? null : (input.suspension || null), fuel_type: input.fuel_type || null, factory_price: input.factory_price ?? null,
     } : {
       property_type: input.subcategory, floor: input.floor || 1, room_count: input.room_count || '1+1',
-      furnished: Boolean(input.furnished), building_type: input.building_type || 'Normal', balcony: Boolean(input.balcony),
+      furnished: Boolean(input.furnished), market_value: input.market_value, furniture_value: input.furnished ? (input.furniture_value ?? null) : null,
+      building_type: input.building_type || 'Normal', balcony: Boolean(input.balcony),
     };
 
     if (options.paymentMode === 'TEST_BYPASS') {
@@ -1011,6 +1007,8 @@ export class SupabaseListingRepository implements IListingRepository {
       if (input.room_count !== undefined) propUpdate.room_count = input.room_count;
       if (input.building_type !== undefined) propUpdate.building_type = input.building_type;
       if (input.furnished !== undefined) propUpdate.furnished = Boolean(input.furnished);
+      if (input.market_value !== undefined) propUpdate.market_value = Number(input.market_value);
+      if (input.furniture_value !== undefined || input.furnished === false) propUpdate.furniture_value = input.furnished === false ? null : input.furniture_value;
       if (input.balcony !== undefined) propUpdate.balcony = Boolean(input.balcony);
 
       if (Object.keys(propUpdate).length > 0) {
@@ -1164,6 +1162,13 @@ export class SupabaseListingRepository implements IListingRepository {
     const client = this.getClient();
     const safeProfileId = resolveProfileId(profileId);
     if (!isUuid(safeProfileId)) return [];
+    const { data: historyProfile } = await this.getAdminClient()
+      .from('character_profiles')
+      .select('expired_listing_history_cleared_at, sold_listing_history_cleared_at')
+      .eq('id', safeProfileId)
+      .maybeSingle();
+    const expiredCutoff = historyProfile?.expired_listing_history_cleared_at ? new Date(historyProfile.expired_listing_history_cleared_at).getTime() : 0;
+    const soldCutoff = historyProfile?.sold_listing_history_cleared_at ? new Date(historyProfile.sold_listing_history_cleared_at).getTime() : 0;
 
     const queryStartedAt = performance.now();
     let data;
@@ -1191,7 +1196,7 @@ export class SupabaseListingRepository implements IListingRepository {
         created_at,
         updated_at,
         vehicle_details (listing_id, vehicle_category, brand, model, plate, mileage, engine_upgrade, transmission_upgrade, brake_upgrade, turbo, subwoofer, trade_available, lock_level, alarm_level, anti_theft_level, engine_health, suspension, fuel_type, factory_price),
-        property_details (listing_id, property_type, floor, room_count, furnished, building_type, balcony),
+        property_details (listing_id, property_type, floor, room_count, furnished, market_value, furniture_value, building_type, balcony),
         listing_images (id, listing_id, storage_path, sort_order, is_cover, size_bytes, created_at)
       `)
         .eq('seller_profile_id', safeProfileId)
@@ -1254,8 +1259,14 @@ export class SupabaseListingRepository implements IListingRepository {
         status: getEffectiveListingStatus(item),
       }));
       const { data: soldRows } = await this.getAdminClient().from('sold_listing_audit').select('original_listing_id, title, price, description, sold_at, closed_at').eq('seller_profile_id', safeProfileId).order('sold_at', { ascending: false });
-      const knownIds = new Set(mappedRows.map((item: any) => item.id));
-      return [...mappedRows, ...(soldRows || []).filter((item: any) => !knownIds.has(item.original_listing_id)).map((item: any) => ({
+      const visibleRows = mappedRows.filter((item: any) => {
+        if (item.status === 'ACTIVE') return true;
+        if (item.status === 'SOLD') return new Date(item.closed_at || item.updated_at || item.created_at).getTime() > soldCutoff;
+        if (item.status === 'EXPIRED') return new Date(item.expires_at || item.updated_at || item.created_at).getTime() > expiredCutoff;
+        return true;
+      });
+      const knownIds = new Set(visibleRows.map((item: any) => item.id));
+      return [...visibleRows, ...(soldRows || []).filter((item: any) => !knownIds.has(item.original_listing_id) && new Date(item.closed_at || item.sold_at).getTime() > soldCutoff).map((item: any) => ({
         id: item.original_listing_id, listing_number: '', seller_profile_id: safeProfileId, seller_type: 'INDIVIDUAL', category: 'vehicle', subcategory: 'Otomobil',
         title: item.title || 'Satılan ilan', description: item.description || '', price: Number(item.price) || 0, location: null, status: 'SOLD',
         closed_at: item.closed_at || item.sold_at, created_at: item.sold_at, updated_at: item.closed_at || item.sold_at,
@@ -1263,6 +1274,21 @@ export class SupabaseListingRepository implements IListingRepository {
     } finally {
       onTiming?.('map', performance.now() - mapStartedAt);
     }
+  }
+
+  async clearUserListingHistory(profileId: string, status: 'EXPIRED' | 'SOLD') {
+    const safeProfileId = resolveProfileId(profileId);
+    if (!isUuid(safeProfileId)) return { success: false, error: 'Profil bulunamadı.' };
+    const clearedAt = new Date().toISOString();
+    const column = status === 'EXPIRED' ? 'expired_listing_history_cleared_at' : 'sold_listing_history_cleared_at';
+    const { data, error } = await this.getAdminClient()
+      .from('character_profiles')
+      .update({ [column]: clearedAt, updated_at: clearedAt })
+      .eq('id', safeProfileId)
+      .select('id')
+      .maybeSingle();
+    if (error || !data) return { success: false, error: error?.message || 'İlan geçmişi temizlenemedi.' };
+    return { success: true, clearedAt };
   }
 
   async getCorporateListings(
@@ -1549,7 +1575,7 @@ export class SupabaseListingRepository implements IListingRepository {
           created_at,
           updated_at,
           vehicle_details (listing_id, vehicle_category, brand, model, plate, mileage, engine_upgrade, transmission_upgrade, brake_upgrade, turbo, subwoofer, trade_available, lock_level, alarm_level, anti_theft_level, engine_health, suspension, fuel_type, factory_price),
-          property_details (listing_id, property_type, floor, room_count, furnished, building_type, balcony),
+          property_details (listing_id, property_type, floor, room_count, furnished, market_value, furniture_value, building_type, balcony),
           listing_images (id, listing_id, storage_path, sort_order, is_cover, size_bytes, created_at)
         )
       `)

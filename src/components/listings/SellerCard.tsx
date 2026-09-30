@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { CharacterProfile, DealerProfile } from '@/types';
-import { Phone, Mail, Copy, Check, ShieldCheck, Building2, MapPin } from 'lucide-react';
+import { Phone, Mail, Copy, Check, BadgeCheck, Building2, MapPin } from 'lucide-react';
 import { resolveAvatarUrl, resolveMediaUrl } from '@/lib/media/url';
 import { getCorporateUrl } from '@/lib/urls';
 
@@ -95,14 +95,11 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
         <div className="space-y-1 min-w-0 flex-1">
           <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#FF9E45]">{isCorporate ? 'Kurumsal Profil' : 'İlan Sahibi'}</span>
           <Link href={publicUrl} className="block group">
-            <h3 className="font-extrabold text-base text-[var(--text-main)] truncate group-hover:text-[#FF8A1F] transition-colors">
-              {displayName}
+            <h3 className="flex items-center gap-1.5 truncate font-extrabold text-base text-[var(--text-main)] transition-colors group-hover:text-[#FF8A1F]">
+              <span className="truncate">{displayName}</span>{isCorporate ? <BadgeCheck aria-label="Doğrulanmış kurumsal profil" className="h-4 w-4 shrink-0 text-[#FF8A1F]" /> : null}
             </h3>
           </Link>
-          <div className="flex items-center gap-1 text-[10px] font-medium text-[var(--text-muted)]">
-            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-            <span>{isCorporate ? 'Doğrulanmış mağaza' : 'Doğrulanmış profil'}</span>
-          </div>
+          {!isCorporate ? <div className="flex items-center gap-1 text-[10px] font-medium text-[var(--text-muted)]"><BadgeCheck className="h-3.5 w-3.5 shrink-0" /><span>Doğrulanmış profil</span></div> : null}
         </div>
       </div>
 
@@ -117,7 +114,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
                 <p className="text-[10px] text-[var(--text-dim)]">
                   Telefon
                 </p>
-                <p className="text-xs font-bold text-[var(--text-main)] font-mono">{displayPhone}</p>
+                <p className="text-sm font-bold text-[var(--text-main)] font-mono">{displayPhone}</p>
               </div>
             </div>
             <button
@@ -140,7 +137,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
                 <p className="text-[10px] text-[var(--text-dim)]">
                   SanMail
                 </p>
-                <p className="text-xs font-bold text-[var(--text-main)] truncate">{displayMail}</p>
+                <p className="text-sm font-bold text-[var(--text-main)] truncate">{displayMail}</p>
               </div>
             </div>
             <button
@@ -157,7 +154,7 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
         {displayLocation ? (
           <div className="flex items-start gap-2.5 rounded-xl bg-[var(--bg-surface-secondary)]/65 px-3 py-2">
             <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#FF8A1F]" />
-            <div className="min-w-0"><p className="text-[10px] text-[var(--text-dim)]">Konum</p><p className="mt-0.5 text-xs font-bold leading-5 text-[var(--text-main)]">{displayLocation}</p></div>
+            <div className="min-w-0"><p className="text-[10px] text-[var(--text-dim)]">Konum</p><p className="mt-0.5 text-sm font-bold leading-5 text-[var(--text-main)]">{displayLocation}</p></div>
           </div>
         ) : null}
 
