@@ -20,6 +20,7 @@ import { formatTimeRemaining } from '@/lib/utils/format';
 import { getVehicleBrandsByCategory, getVehicleModels, isMotorcycleCategory, isValidVehicleSelection, reconcileVehicleSelection, VEHICLE_CATEGORIES, VehicleCategory } from '@/lib/constants/vehicleCategories';
 import { LISTING_TITLE_MAX_ERROR, LISTING_TITLE_MAX_LENGTH } from '@/lib/validations/listing';
 import { getVehicleLevelOptions, normalizeVehicleLevel, VEHICLE_LEVEL_FIELDS } from '@/lib/listings/vehicle-levels';
+import { formatTurkishInteger, isIntegerInRange, normalizeIntegerInput, normalizeTurkishIntegerInput } from '@/lib/forms/integer-input';
 
 const TITLE_MAX = LISTING_TITLE_MAX_LENGTH;
 const DESC_MAX = 100;
@@ -82,6 +83,16 @@ export default function IlanDuzenlePage({
   const vehicleBrands = React.useMemo(() => getVehicleBrandsByCategory(vehicleCategory), [vehicleCategory]);
   const availableModels = React.useMemo(() => getVehicleModels(vehicleCategory, brand), [vehicleCategory, brand]);
 
+  const updateInteger = (value: string, setter: React.Dispatch<React.SetStateAction<string>>) => {
+    const normalized = normalizeIntegerInput(value);
+    if (normalized !== null) setter(normalized);
+  };
+
+  const updateMoney = (value: string, setter: React.Dispatch<React.SetStateAction<string>>) => {
+    const normalized = normalizeTurkishIntegerInput(value);
+    if (normalized !== null) setter(normalized);
+  };
+
   const handleBrandChange = (newBrand: string) => {
     setBrand(newBrand);
     setModel('');
@@ -121,9 +132,9 @@ export default function IlanDuzenlePage({
         setSubcategory(l.subcategory);
         setTitle(l.title);
         setDescription(l.description);
-        setPrice(String(l.price));
+        setPrice(normalizeTurkishIntegerInput(String(l.price)) || '');
         setOffersEnabled(l.offers_enabled !== false);
-        setMinimumOffer(l.minimum_offer_amount ? String(l.minimum_offer_amount) : '');
+        setMinimumOffer(l.minimum_offer_amount ? normalizeTurkishIntegerInput(String(l.minimum_offer_amount)) || '' : '');
         setLocation(l.location || '');
         setImages(l.images || []);
 
@@ -132,7 +143,7 @@ export default function IlanDuzenlePage({
           setBrand(vd.brand || '');
           setModel(vd.model || '');
           setPlate(vd.plate || '');
-          setMileage(String(vd.mileage ?? ''));
+          setMileage(normalizeIntegerInput(String(vd.mileage ?? '')) || '');
           setEngineUpgrade(normalizeVehicleLevel(vd.engine_upgrade, 'engine_upgrade'));
           setTransmissionUpgrade(normalizeVehicleLevel(vd.transmission_upgrade, 'transmission_upgrade'));
           setBrakeUpgrade(normalizeVehicleLevel(vd.brake_upgrade, 'brake_upgrade'));
@@ -142,10 +153,10 @@ export default function IlanDuzenlePage({
           setLockLevel(normalizeVehicleLevel(vd.lock_level, 'lock_level'));
           setAlarmLevel(normalizeVehicleLevel(vd.alarm_level, 'alarm_level'));
           setAntiTheftLevel(normalizeVehicleLevel(vd.anti_theft_level, 'anti_theft_level'));
-          setEngineHealth(vd.engine_health !== null && vd.engine_health !== undefined ? String(vd.engine_health) : '');
+          setEngineHealth(vd.engine_health !== null && vd.engine_health !== undefined ? normalizeIntegerInput(String(vd.engine_health)) || '' : '');
           setSuspension(isMotorcycleCategory(l.subcategory as VehicleCategory) ? '' : normalizeVehicleLevel(vd.suspension, 'suspension'));
           setFuelType(vd.fuel_type || 'BENZIN');
-          setFactoryPrice(vd.factory_price !== null && vd.factory_price !== undefined ? String(vd.factory_price) : '');
+          setFactoryPrice(vd.factory_price !== null && vd.factory_price !== undefined ? normalizeTurkishIntegerInput(String(vd.factory_price)) || '' : '');
         }
 
         if (l.category === 'property' && l.property_details) {
@@ -211,8 +222,8 @@ export default function IlanDuzenlePage({
         setError('Araç plakası zorunludur.');
         return;
       }
-      if (mileage === '' || Number(mileage) < 0) {
-        setError('Geçerli bir kilometre giriniz.');
+      if (mileage === '' || !isIntegerInRange(mileage, 0, Number.MAX_SAFE_INTEGER)) {
+        setError('Kilometre 0 veya daha büyük bir tam sayı olmalıdır.');
         return;
       }
     }
@@ -241,8 +252,8 @@ export default function IlanDuzenlePage({
       };
 
       if (category === 'vehicle') {
-        if (engineHealth !== '' && (Number(engineHealth) < 0 || Number(engineHealth) > 100)) {
-          setError('Motor sağlığı %0 ile %100 arasında olmalıdır.');
+        if (engineHealth !== '' && !isIntegerInRange(engineHealth, 0, 100)) {
+          setError('Motor sağlığı %0 ile %100 arasında bir tam sayı olmalıdır.');
           return;
         }
         if (lockLevel !== '' && Number(lockLevel) < 0) {
@@ -257,8 +268,8 @@ export default function IlanDuzenlePage({
           setError('Hırsızlık önleme seviyesi 0 veya daha büyük olmalıdır.');
           return;
         }
-        if (factoryPrice !== '' && Number(factoryPrice) < 0) {
-          setError('Fabrika çıkış fiyatı 0 veya daha büyük olmalıdır.');
+        if (factoryPrice !== '' && !isIntegerInRange(factoryPrice, 1, 1_000_000_000)) {
+          setError('Fabrika çıkış fiyatı 0’dan büyük bir tam sayı olmalıdır.');
           return;
         }
 
@@ -429,10 +440,10 @@ export default function IlanDuzenlePage({
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-[var(--text-muted)]">Fiyat ($)</label>
                 <input
-                  type="number"
-                  min="1"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
+                  type="text"
+                  inputMode="numeric"
+                  value={formatTurkishInteger(price)}
+                  onChange={(e) => updateMoney(e.target.value, setPrice)}
                   required
                   className="form-input text-sm font-bold text-[#FF8A1F]"
                 />
@@ -455,7 +466,7 @@ export default function IlanDuzenlePage({
             </div>
             <div className="space-y-3 rounded-xl border border-[var(--border-app)] p-4">
               <label className="flex items-center justify-between gap-4 text-xs font-semibold text-[var(--text-muted)]"><span><b className="block text-[var(--text-main)]">Tekliflere Açık</b>Fiyat pazarlığını aç veya kapat.</span><input type="checkbox" checked={offersEnabled} onChange={(e)=>setOffersEnabled(e.target.checked)} className="h-5 w-5 accent-[#FF8A1F]" /></label>
-              {offersEnabled&&<label className="block text-xs font-semibold text-[var(--text-muted)]">Minimum Teklif (opsiyonel)<input type="number" min="1" max={price||undefined} value={minimumOffer} onChange={(e)=>setMinimumOffer(e.target.value)} className="form-input mt-2" /></label>}
+              {offersEnabled&&<label className="block text-xs font-semibold text-[var(--text-muted)]">Minimum Teklif (opsiyonel)<input type="text" inputMode="numeric" value={formatTurkishInteger(minimumOffer)} onChange={(e)=>updateMoney(e.target.value, setMinimumOffer)} className="form-input mt-2" /></label>}
             </div>
 
             {/* MÜLK İÇİN KONUM (Araç ilanlarında konum bulunmaz!) */}
@@ -466,7 +477,6 @@ export default function IlanDuzenlePage({
                   type="text"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Örn: Vinewood Hills, Rockford Plaza..."
                   required
                   className="form-input text-sm"
                 />
@@ -527,10 +537,10 @@ export default function IlanDuzenlePage({
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-[var(--text-muted)]">Kilometre</label>
                 <input
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
                   value={mileage}
-                  onChange={(e) => setMileage(e.target.value)}
+                  onChange={(e) => updateInteger(e.target.value, setMileage)}
                   required
                   className="form-input text-sm"
                 />
@@ -571,12 +581,10 @@ export default function IlanDuzenlePage({
                 <div className="space-y-1">
                   <label className="text-[11px] text-[var(--text-dim)] font-medium">Motor Sağlığı (%0 - 100)</label>
                   <input
-                    type="number"
-                    min="0"
-                    max="100"
+                    type="text"
+                    inputMode="numeric"
                     value={engineHealth}
-                    onChange={(e) => setEngineHealth(e.target.value)}
-                    placeholder="Örn: 100"
+                    onChange={(e) => updateInteger(e.target.value, setEngineHealth)}
                     className="form-input text-sm"
                   />
                 </div>
@@ -667,11 +675,10 @@ export default function IlanDuzenlePage({
               <div className="space-y-1.5 pt-2 max-w-sm">
                 <label className="text-xs font-semibold text-[var(--text-muted)]">Fabrika Çıkış Fiyatı ($)</label>
                 <input
-                  type="number"
-                  min="0"
-                  value={factoryPrice}
-                  onChange={(e) => setFactoryPrice(e.target.value)}
-                  placeholder="Örn: 85000"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatTurkishInteger(factoryPrice)}
+                  onChange={(e) => updateMoney(e.target.value, setFactoryPrice)}
                   className="form-input text-sm"
                 />
               </div>

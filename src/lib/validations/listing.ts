@@ -106,10 +106,10 @@ export const vehicleListingSchema = z.object({
   lock_level: vehicleLevelSchema('lock_level').optional().nullable(),
   alarm_level: vehicleLevelSchema('alarm_level').optional().nullable(),
   anti_theft_level: vehicleLevelSchema('anti_theft_level').optional().nullable(),
-  engine_health: z.number().int().min(0).max(100).optional().nullable(),
+  engine_health: z.number().int('Motor sağlığı tam sayı olmalıdır').min(0, 'Motor sağlığı 0’dan küçük olamaz').max(100, 'Motor sağlığı 100’den büyük olamaz').optional().nullable(),
   suspension: vehicleLevelSchema('suspension').optional().nullable(),
   fuel_type: z.enum(['BENZIN', 'DIZEL', 'ELEKTRIK']).optional().nullable(),
-  factory_price: z.number().min(0).optional().nullable(),
+  factory_price: z.number().int('Fabrika çıkış fiyatı tam sayı olmalıdır').positive('Fabrika çıkış fiyatı 0’dan büyük olmalıdır').optional().nullable(),
 }).superRefine((value, ctx) => {
   if (value.minimum_offer_amount != null && value.minimum_offer_amount > value.price) {
     ctx.addIssue({ code: 'custom', message: 'Minimum teklif ilan fiyatından yüksek olamaz.', path: ['minimum_offer_amount'] });

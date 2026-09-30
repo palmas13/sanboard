@@ -12,11 +12,14 @@ interface VehicleListingsViewProps {
 }
 
 const STORAGE_KEY_VIEW = 'sanboard_vehicle_view';
+const PAGE_SIZE = 8;
 
 export function VehicleListingsView({ listings }: VehicleListingsViewProps) {
   // Vehicle page default is LIST
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-  const [isHydrated, setIsHydrated] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  useEffect(() => setVisibleCount(PAGE_SIZE), [listings]);
 
   // Restore saved view mode preference
   useEffect(() => {
@@ -25,17 +28,16 @@ export function VehicleListingsView({ listings }: VehicleListingsViewProps) {
       if (saved === 'grid' || saved === 'list') {
         setViewMode(saved);
       }
-    } catch (e) {
+    } catch {
       // Ignore storage access error
     }
-    setIsHydrated(true);
   }, []);
 
   const handleViewChange = (newMode: 'list' | 'grid') => {
     setViewMode(newMode);
     try {
       localStorage.setItem(STORAGE_KEY_VIEW, newMode);
-    } catch (e) {
+    } catch {
       // Ignore storage access error
     }
   };
@@ -57,13 +59,13 @@ export function VehicleListingsView({ listings }: VehicleListingsViewProps) {
       {listings.length > 0 ? (
         viewMode === 'list' ? (
           <div className="space-y-3">
-            {listings.map((listing) => (
+            {listings.slice(0, visibleCount).map((listing) => (
               <VehicleListingRow key={listing.id} listing={listing} />
             ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-            {listings.map((listing) => (
+            {listings.slice(0, visibleCount).map((listing) => (
               <ListingCard key={listing.id} listing={listing} />
             ))}
           </div>
@@ -76,6 +78,13 @@ export function VehicleListingsView({ listings }: VehicleListingsViewProps) {
           <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
             Filtre kriterlerinizi genişleterek veya arama kelimesini değiştirerek tekrar deneyebilirsiniz.
           </p>
+        </div>
+      )}
+      {visibleCount < listings.length && (
+        <div className="flex justify-center pt-2">
+          <button type="button" onClick={() => setVisibleCount((count) => Math.min(count + PAGE_SIZE, listings.length))} className="btn-secondary px-5 py-2.5 text-sm">
+            Daha Fazla Göster
+          </button>
         </div>
       )}
     </div>

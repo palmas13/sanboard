@@ -18,6 +18,16 @@ export async function GET(req: NextRequest) {
     const location = searchParams.get('location') || undefined;
     const brand = searchParams.get('brand') || undefined;
     const model = searchParams.get('model') || undefined;
+    const minMileage = searchParams.get('minMileage') ? Number(searchParams.get('minMileage')) : undefined;
+    const maxMileage = searchParams.get('maxMileage') ? Number(searchParams.get('maxMileage')) : undefined;
+    const turbo = searchParams.get('turbo') as 'all' | 'yes' | 'no' | null;
+    const subwoofer = searchParams.get('subwoofer') as 'all' | 'yes' | 'no' | null;
+    const trade = searchParams.get('trade') as 'all' | 'yes' | 'no' | null;
+    const sellerType = searchParams.get('sellerType') as 'all' | 'INDIVIDUAL' | 'CORPORATE' | null;
+    const roomCount = searchParams.get('roomCount') || undefined;
+    const furnished = searchParams.get('furnished') as 'all' | 'yes' | 'no' | null;
+    const balcony = searchParams.get('balcony') as 'all' | 'yes' | 'no' | null;
+    const buildingType = searchParams.get('buildingType') as 'all' | 'Normal' | 'Dubleks' | null;
     const sort = searchParams.get('sort') as any;
 
     const repo = getListingRepository();
@@ -30,6 +40,16 @@ export async function GET(req: NextRequest) {
       location,
       brand,
       model,
+      minMileage,
+      maxMileage,
+      turbo: turbo || undefined,
+      subwoofer: subwoofer || undefined,
+      trade: trade || undefined,
+      sellerType: sellerType || undefined,
+      roomCount,
+      furnished: furnished || undefined,
+      balcony: balcony || undefined,
+      buildingType: buildingType || undefined,
       sort,
     });
 

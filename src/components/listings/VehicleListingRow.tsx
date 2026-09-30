@@ -1,12 +1,13 @@
 import React from 'react';
 import Link from 'next/link';
-import { Calendar, Sparkles } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { FavoriteButton } from './FavoriteButton';
 import { CompareButton } from '@/components/compare/CompareButton';
 import { PublicListingSummary } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { getListingUrl } from '@/lib/urls';
+import { FeaturedBadge } from './FeaturedBadge';
 
 interface VehicleListingRowProps {
   listing: PublicListingSummary;
@@ -42,10 +43,7 @@ export function VehicleListingRow({ listing, className = '' }: VehicleListingRow
               className="w-full h-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.025]"
             />
             {listing.is_featured && (
-              <span className="absolute top-1.5 left-1.5 badge-tag bg-gradient-to-r from-amber-500 to-[#FF8A1F] text-white border-amber-400/30 font-extrabold text-[9px] tracking-wider uppercase px-1.5 py-0.5 shadow-md flex items-center gap-1">
-                <Sparkles className="w-2.5 h-2.5 text-white fill-white" />
-                ÖNE ÇIKAN
-              </span>
+              <FeaturedBadge className="absolute left-1.5 top-1.5 h-6 w-6" />
             )}
           </div>
 
@@ -107,10 +105,7 @@ export function VehicleListingRow({ listing, className = '' }: VehicleListingRow
             />
             <div className="absolute top-2 left-2 flex items-center gap-1.5 flex-wrap">
               {listing.is_featured && (
-                <span className="badge-tag bg-gradient-to-r from-amber-500 to-[#FF8A1F] text-white border-amber-400/30 font-extrabold text-[9px] uppercase px-1.5 py-0.5 shadow-md flex items-center gap-1">
-                  <Sparkles className="w-2.5 h-2.5 text-white fill-white" />
-                  ÖNE ÇIKAN
-                </span>
+                <FeaturedBadge className="h-6 w-6" />
               )}
             </div>
             <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 pointer-events-auto">

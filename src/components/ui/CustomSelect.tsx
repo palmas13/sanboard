@@ -173,7 +173,7 @@ export function CustomSelect({
           role="listbox"
           tabIndex={-1}
           aria-labelledby={selectId}
-          className="absolute z-50 mt-1.5 w-full max-h-60 overflow-y-auto rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface)] shadow-2xl p-1.5 space-y-0.5 animate-in fade-in duration-100 focus:outline-none"
+          className="themed-scrollbar absolute z-50 mt-1.5 w-full max-h-60 overflow-y-auto rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface)] shadow-2xl p-1.5 space-y-0.5 animate-in fade-in duration-100 focus:outline-none"
         >
           {normalizedOptions.length === 0 ? (
             <li className="px-3 py-2 text-xs text-[var(--text-dim)] text-center">

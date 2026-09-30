@@ -3,6 +3,7 @@
 import React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowUpDown, LayoutGrid, List } from 'lucide-react';
+import { CustomSelect } from '@/components/ui/CustomSelect';
 
 interface ListingSortBarProps {
   totalCount: number;
@@ -73,17 +74,19 @@ export function ListingSortBar({
         <div className="flex items-center gap-2">
           <ArrowUpDown className="w-3.5 h-3.5 text-[var(--text-muted)]" />
           <span className="text-xs text-[var(--text-muted)]">Sıralama:</span>
-          <select
+          <CustomSelect
             value={currentSort}
-            onChange={(e) => handleSortChange(e.target.value)}
-            className="form-input text-xs py-1.5 px-2.5 w-auto"
-          >
-            <option value="newest">En Yeni</option>
-            <option value="oldest">En Eski</option>
-            <option value="price_asc">Fiyat: Düşük → Yüksek</option>
-            <option value="price_desc">Fiyat: Yüksek → Düşük</option>
-            <option value="popular">En Çok Favorilenen</option>
-          </select>
+            onChange={handleSortChange}
+            aria-label="İlan sıralaması"
+            className="w-full min-w-0 sm:w-56"
+            options={[
+              { value: 'newest', label: 'En Yeni' },
+              { value: 'oldest', label: 'En Eski' },
+              { value: 'price_asc', label: 'Fiyat: Düşük → Yüksek' },
+              { value: 'price_desc', label: 'Fiyat: Yüksek → Düşük' },
+              { value: 'popular', label: 'En Çok Favorilenen' },
+            ]}
+          />
         </div>
       </div>
     </div>

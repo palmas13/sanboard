@@ -9,6 +9,7 @@ import { getEffectiveListingStatus } from '@/lib/listings/visibility';
 import { getListingCoverPath, sortListingImages } from '@/lib/listings/images';
 import { isListingPublicId } from '@/lib/urls';
 import { redactPrivateContact } from '@/lib/profiles/contact-privacy';
+import { sortPublicListings } from '@/lib/listings/public-sort';
 
 export function isPublicCorporateListingVisible(item: any): boolean {
   if (item.seller_type !== 'CORPORATE') return true;
@@ -129,6 +130,8 @@ export class SupabaseListingRepository implements IListingRepository {
         seller_type,
         corporate_profile_id,
         corporate:corporate_profiles (moderation_status, deleted_at),
+        vehicle_details (brand, model, mileage, turbo, subwoofer, trade_available),
+        property_details (room_count, furnished, building_type, balcony),
         listing_images (storage_path, is_cover, sort_order)
       `)
       .eq('status', 'ACTIVE')
@@ -138,22 +141,9 @@ export class SupabaseListingRepository implements IListingRepository {
     if (params?.subcategory && params.subcategory !== 'all') query = query.eq('subcategory', params.subcategory);
     if (params?.minPrice !== undefined) query = query.gte('price', params.minPrice);
     if (params?.maxPrice !== undefined) query = query.lte('price', params.maxPrice);
-    if (params?.query) {
-      query = query.ilike('title', `%${params.query}%`);
-    }
     if (params?.location && params.location !== 'all') {
       query = query.ilike('location', `%${params.location}%`);
     }
-
-    if (params?.sort === 'price_asc') {
-      query = query.order('price', { ascending: true });
-    } else if (params?.sort === 'price_desc') {
-      query = query.order('price', { ascending: false });
-    } else {
-      query = query.order('published_at', { ascending: false });
-    }
-
-    query = query.limit(60);
 
     let { data, error } = await query;
 
@@ -179,18 +169,7 @@ export class SupabaseListingRepository implements IListingRepository {
       if (params?.subcategory && params.subcategory !== 'all') fallbackQuery = fallbackQuery.eq('subcategory', params.subcategory);
       if (params?.minPrice !== undefined) fallbackQuery = fallbackQuery.gte('price', params.minPrice);
       if (params?.maxPrice !== undefined) fallbackQuery = fallbackQuery.lte('price', params.maxPrice);
-      if (params?.query) fallbackQuery = fallbackQuery.ilike('title', `%${params.query}%`);
       if (params?.location && params.location !== 'all') fallbackQuery = fallbackQuery.ilike('location', `%${params.location}%`);
-
-      if (params?.sort === 'price_asc') {
-        fallbackQuery = fallbackQuery.order('price', { ascending: true });
-      } else if (params?.sort === 'price_desc') {
-        fallbackQuery = fallbackQuery.order('price', { ascending: false });
-      } else {
-        fallbackQuery = fallbackQuery.order('published_at', { ascending: false });
-      }
-
-      fallbackQuery = fallbackQuery.limit(60);
 
       const retryRes = await fallbackQuery;
       data = retryRes.data as any;
@@ -248,6 +227,25 @@ export class SupabaseListingRepository implements IListingRepository {
           return false;
         }
       }
+      const vehicle = Array.isArray(item.vehicle_details) ? item.vehicle_details[0] : item.vehicle_details;
+      const property = Array.isArray(item.property_details) ? item.property_details[0] : item.property_details;
+      const normalizedQuery = params?.query?.trim().toLocaleLowerCase('tr-TR');
+
+      if (normalizedQuery && ![item.title, vehicle?.brand, vehicle?.model]
+        .filter(Boolean)
+        .some((value) => String(value).toLocaleLowerCase('tr-TR').includes(normalizedQuery))) return false;
+      if (params?.brand && params.brand !== 'all' && vehicle?.brand?.toLocaleLowerCase('tr-TR') !== params.brand.toLocaleLowerCase('tr-TR')) return false;
+      if (params?.model && params.model !== 'all' && vehicle?.model?.toLocaleLowerCase('tr-TR') !== params.model.toLocaleLowerCase('tr-TR')) return false;
+      if (params?.minMileage !== undefined && (!Number.isFinite(Number(vehicle?.mileage)) || Number(vehicle.mileage) < params.minMileage)) return false;
+      if (params?.maxMileage !== undefined && (!Number.isFinite(Number(vehicle?.mileage)) || Number(vehicle.mileage) > params.maxMileage)) return false;
+      if (params?.turbo && params.turbo !== 'all' && Boolean(vehicle?.turbo) !== (params.turbo === 'yes')) return false;
+      if (params?.subwoofer && params.subwoofer !== 'all' && Boolean(vehicle?.subwoofer) !== (params.subwoofer === 'yes')) return false;
+      if (params?.trade && params.trade !== 'all' && Boolean(vehicle?.trade_available) !== (params.trade === 'yes')) return false;
+      if (params?.sellerType && params.sellerType !== 'all' && (item.seller_type || 'INDIVIDUAL') !== params.sellerType) return false;
+      if (params?.roomCount && params.roomCount !== 'all' && property?.room_count !== params.roomCount) return false;
+      if (params?.furnished && params.furnished !== 'all' && Boolean(property?.furnished) !== (params.furnished === 'yes')) return false;
+      if (params?.balcony && params.balcony !== 'all' && Boolean(property?.balcony) !== (params.balcony === 'yes')) return false;
+      if (params?.buildingType && params.buildingType !== 'all' && property?.building_type !== params.buildingType) return false;
       return true;
     });
 
@@ -278,18 +276,12 @@ export class SupabaseListingRepository implements IListingRepository {
         featured_until: item.featured_until,
         seller_type: item.seller_type,
         corporate_profile_id: item.corporate_profile_id,
+        brand: (Array.isArray(item.vehicle_details) ? item.vehicle_details[0] : item.vehicle_details)?.brand,
+        model: (Array.isArray(item.vehicle_details) ? item.vehicle_details[0] : item.vehicle_details)?.model,
       };
     });
 
-    // Boosted listings appear first before normal listings
-    listings.sort((a, b) => {
-      if (Boolean(a.is_featured) !== Boolean(b.is_featured)) {
-        return a.is_featured ? -1 : 1;
-      }
-      return 0;
-    });
-
-    return listings;
+    return sortPublicListings(listings, params?.sort);
   }
   async getCompareListings(ids: string[]): Promise<(Listing | null)[]> {
     if (!ids || ids.length === 0) return [];

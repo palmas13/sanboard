@@ -32,7 +32,7 @@ export function MobileFilterDrawer({ category }: MobileFilterDrawerProps) {
           />
 
           {/* Drawer content */}
-          <div className="relative w-full max-w-sm h-full bg-[var(--bg-surface)] border-l border-[var(--border-app)] p-5 overflow-y-auto z-10 animate-in slide-in-from-right duration-200 shadow-2xl">
+          <div className="themed-scrollbar relative w-full max-w-sm h-full bg-[var(--bg-surface)] border-l border-[var(--border-app)] p-5 overflow-y-auto z-10 animate-in slide-in-from-right duration-200 shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-app)] mb-4">
               <h3 className="font-bold text-base text-[var(--text-main)]">Filtreler</h3>
               <button

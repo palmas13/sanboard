@@ -119,6 +119,20 @@ a {
   background: var(--border-app-hover);
 }
 
+.themed-scrollbar {
+  scrollbar-color: color-mix(in srgb, var(--brand-orange) 70%, var(--border-app)) var(--bg-surface-secondary);
+  scrollbar-width: thin;
+}
+.themed-scrollbar::-webkit-scrollbar-track {
+  background: var(--bg-surface-secondary);
+  border-radius: 999px;
+}
+.themed-scrollbar::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--brand-orange) 70%, var(--border-app));
+  border: 2px solid var(--bg-surface-secondary);
+  border-radius: 999px;
+}
+
 /* Design System Utilities */
 .surface-card {
   background-color: var(--bg-surface);

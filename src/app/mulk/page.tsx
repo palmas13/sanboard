@@ -23,6 +23,7 @@ export default async function PropertyListingsPage({ searchParams }: PageProps) 
   const furnished = typeof resolvedParams.furnished === 'string' ? (resolvedParams.furnished as any) : undefined;
   const balcony = typeof resolvedParams.balcony === 'string' ? (resolvedParams.balcony as any) : undefined;
   const buildingType = typeof resolvedParams.buildingType === 'string' ? (resolvedParams.buildingType as any) : undefined;
+  const sellerType = typeof resolvedParams.sellerType === 'string' ? (resolvedParams.sellerType as any) : undefined;
   const sort = typeof resolvedParams.sort === 'string' ? (resolvedParams.sort as any) : 'newest';
 
   const repo = getListingRepository();
@@ -37,6 +38,7 @@ export default async function PropertyListingsPage({ searchParams }: PageProps) 
     furnished,
     balcony,
     buildingType,
+    sellerType,
     sort,
   });
 

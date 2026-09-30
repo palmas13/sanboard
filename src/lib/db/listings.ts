@@ -22,6 +22,7 @@ import { getListingCoverPath, sortListingImages } from '../listings/images';
 import { isListingPublicId } from '../urls';
 import { redactPrivateContact } from '../profiles/contact-privacy';
 import { getSupabaseAdminClient } from './supabase-client';
+import { sortPublicListings } from '@/lib/listings/public-sort';
 
 export interface ListingFilterParams {
   category?: ListingCategory;
@@ -222,28 +223,14 @@ export async function getPublicListings(filters: ListingFilterParams = {}): Prom
   // 10. Sorting (Featured listings always appear first!)
   const getFavCount = (id: string) => db.favorites.filter((f) => f.listing_id === id).length;
 
-  result.sort((a, b) => {
-    const aFeatured = Boolean(a.is_featured && (!a.featured_until || new Date(a.featured_until) > now));
-    const bFeatured = Boolean(b.is_featured && (!b.featured_until || new Date(b.featured_until) > now));
-
-    if (aFeatured !== bFeatured) {
-      return aFeatured ? -1 : 1;
-    }
-
-    switch (filters.sort) {
-      case 'price_asc':
-        return a.price - b.price;
-      case 'price_desc':
-        return b.price - a.price;
-      case 'popular':
-        return getFavCount(b.id) - getFavCount(a.id);
-      case 'oldest':
-        return new Date(a.published_at || a.created_at).getTime() - new Date(b.published_at || b.created_at).getTime();
-      case 'newest':
-      default:
-        return new Date(b.published_at || b.created_at).getTime() - new Date(a.published_at || a.created_at).getTime();
-    }
-  });
+  result = sortPublicListings(
+    result.map((listing) => ({
+      ...listing,
+      is_featured: Boolean(listing.is_featured && (!listing.featured_until || new Date(listing.featured_until) > now)),
+    })),
+    filters.sort,
+    (listing) => getFavCount(listing.id)
+  );
 
   return result.map(sanitizeListingForPublic);
 }

@@ -1,12 +1,13 @@
 import React from 'react';
 import Link from 'next/link';
-import { Calendar, MapPin, Sparkles } from 'lucide-react';
+import { Calendar, MapPin } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { FavoriteButton } from './FavoriteButton';
 import type { PublicListingSummary } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { getListingUrl } from '@/lib/urls';
 import { PropertyCompareButton } from '@/components/compare/PropertyCompareButton';
+import { FeaturedBadge } from './FeaturedBadge';
 
 export function PropertyListingRow({ listing }: { listing: PublicListingSummary }) {
   const displayImage = resolveMediaUrl(listing.cover_image) || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&auto=format&fit=crop&q=80';
@@ -17,7 +18,7 @@ export function PropertyListingRow({ listing }: { listing: PublicListingSummary 
       <div className="relative z-10 flex flex-col gap-4 p-3 pointer-events-none sm:min-h-[135px] sm:flex-row sm:items-center">
         <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden rounded-lg bg-[var(--bg-surface-secondary)] sm:h-[115px] sm:w-[180px] lg:w-[200px]">
           <img src={displayImage} alt={listing.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.025] motion-reduce:transition-none motion-reduce:group-hover:transform-none" />
-          {listing.is_featured && <span className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded bg-gradient-to-r from-amber-500 to-[#FF8A1F] px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-white"><Sparkles className="h-2.5 w-2.5" />Öne Çıkan</span>}
+          {listing.is_featured && <FeaturedBadge className="absolute left-1.5 top-1.5 h-6 w-6" />}
         </div>
         <div className="min-w-0 flex-1 space-y-1">
           <h3 className="truncate text-base font-bold text-[var(--text-main)] transition-colors group-hover:text-[#FF8A1F]">{listing.title}</h3>

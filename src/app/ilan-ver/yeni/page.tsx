@@ -28,6 +28,7 @@ import { calculateListingQuality } from '@/lib/listings/quality';
 import { ListingQualityIndicator } from '@/components/listings/ListingQualityIndicator';
 import { LISTING_TITLE_MAX_ERROR, LISTING_TITLE_MAX_LENGTH } from '@/lib/validations/listing';
 import { getVehicleLevelOptions, normalizeVehicleLevel, VEHICLE_LEVEL_FIELDS } from '@/lib/listings/vehicle-levels';
+import { formatTurkishInteger, isIntegerInRange, normalizeIntegerInput, normalizeTurkishIntegerInput } from '@/lib/forms/integer-input';
 
 const TITLE_MAX = LISTING_TITLE_MAX_LENGTH;
 const DESC_MAX = 100;
@@ -110,6 +111,16 @@ export default function YeniIlanOlusturPage() {
     ? `sanboard_listing_draft_v${DRAFT_VERSION}_${currentProfile.id}_${isCorporate ? 'corporate' : 'individual'}`
     : null;
 
+  const updateInteger = (value: string, setter: React.Dispatch<React.SetStateAction<string>>) => {
+    const normalized = normalizeIntegerInput(value);
+    if (normalized !== null) setter(normalized);
+  };
+
+  const updateMoney = (value: string, setter: React.Dispatch<React.SetStateAction<string>>) => {
+    const normalized = normalizeTurkishIntegerInput(value);
+    if (normalized !== null) setter(normalized);
+  };
+
   useEffect(() => {
     if (!draftStorageKey) return;
     setDraftReady(false);
@@ -123,13 +134,15 @@ export default function YeniIlanOlusturPage() {
         setSubcategory(restoredSubcategory);
         setTitle(draft.title || '');
         setDescription(draft.description || '');
-        setPrice(draft.price || '');
+        setPrice(normalizeTurkishIntegerInput(String(draft.price || '')) || '');
+        setOffersEnabled(draft.offersEnabled !== false);
+        setMinimumOffer(normalizeTurkishIntegerInput(String(draft.minimumOffer || '')) || '');
         setLocation(draft.location || '');
         const restoredVehicle = reconcileVehicleSelection(restoredSubcategory as VehicleCategory, draft.brand || '', draft.model || '');
         setBrand(restoredVehicle.brand);
         setModel(restoredVehicle.model);
         setPlate(draft.plate || '');
-        setMileage(draft.mileage || '');
+        setMileage(normalizeIntegerInput(String(draft.mileage || '')) || '');
         setEngineUpgrade(normalizeVehicleLevel(draft.engineUpgrade, 'engine_upgrade'));
         setTransmissionUpgrade(normalizeVehicleLevel(draft.transmissionUpgrade, 'transmission_upgrade'));
         setBrakeUpgrade(normalizeVehicleLevel(draft.brakeUpgrade, 'brake_upgrade'));
@@ -139,10 +152,10 @@ export default function YeniIlanOlusturPage() {
         setLockLevel(normalizeVehicleLevel(draft.lockLevel, 'lock_level'));
         setAlarmLevel(normalizeVehicleLevel(draft.alarmLevel, 'alarm_level'));
         setAntiTheftLevel(normalizeVehicleLevel(draft.antiTheftLevel, 'anti_theft_level'));
-        setEngineHealth(draft.engineHealth || '');
+        setEngineHealth(normalizeIntegerInput(String(draft.engineHealth || '')) || '');
         setSuspension(isMotorcycleCategory(restoredSubcategory as VehicleCategory) ? '' : normalizeVehicleLevel(draft.suspension, 'suspension'));
         setFuelType(draft.fuelType || 'BENZIN');
-        setFactoryPrice(draft.factoryPrice || '');
+        setFactoryPrice(normalizeTurkishIntegerInput(String(draft.factoryPrice || '')) || '');
         setFloor(draft.floor || '1');
         setRoomCount(draft.roomCount || '2+1');
         setFurnished(Boolean(draft.furnished));
@@ -161,7 +174,7 @@ export default function YeniIlanOlusturPage() {
   useEffect(() => {
     if (!draftStorageKey || !draftReady) return;
     const draft = {
-      step, category, subcategory, title, description, price, location, brand, model, plate,
+      step, category, subcategory, title, description, price, offersEnabled, minimumOffer, location, brand, model, plate,
       mileage, engineUpgrade, transmissionUpgrade, brakeUpgrade, turbo, subwoofer,
       tradeAvailable, lockLevel, alarmLevel, antiTheftLevel, engineHealth, suspension,
       fuelType, factoryPrice, floor, roomCount, furnished, buildingType, balcony, images,
@@ -176,7 +189,7 @@ export default function YeniIlanOlusturPage() {
       setDraftSavedAt(draft.savedAt);
     }, 400);
     return () => window.clearTimeout(timer);
-  }, [draftStorageKey, draftReady, step, category, subcategory, title, description, price, location, brand, model, plate, mileage, engineUpgrade, transmissionUpgrade, brakeUpgrade, turbo, subwoofer, tradeAvailable, lockLevel, alarmLevel, antiTheftLevel, engineHealth, suspension, fuelType, factoryPrice, floor, roomCount, furnished, buildingType, balcony, images]);
+  }, [draftStorageKey, draftReady, step, category, subcategory, title, description, price, offersEnabled, minimumOffer, location, brand, model, plate, mileage, engineUpgrade, transmissionUpgrade, brakeUpgrade, turbo, subwoofer, tradeAvailable, lockLevel, alarmLevel, antiTheftLevel, engineHealth, suspension, fuelType, factoryPrice, floor, roomCount, furnished, buildingType, balcony, images]);
 
   const clearDraft = () => {
     if (!window.confirm('Bu taslağı silmek istediğinize emin misiniz?')) return;
@@ -188,6 +201,8 @@ export default function YeniIlanOlusturPage() {
     setTitle('');
     setDescription('');
     setPrice('');
+    setOffersEnabled(true);
+    setMinimumOffer('');
     setLocation('');
     setBrand('');
     setModel('');
@@ -328,12 +343,12 @@ export default function YeniIlanOlusturPage() {
         errors.push('Plaka bilgisi zorunludur.');
         invalid.plate = true;
       }
-      if (mileage === '' || Number(mileage) < 0) {
-        errors.push('Kilometre negatif olamaz.');
+      if (mileage === '' || !isIntegerInRange(mileage, 0, Number.MAX_SAFE_INTEGER)) {
+        errors.push('Kilometre 0 veya daha büyük bir tam sayı olmalıdır.');
         invalid.mileage = true;
       }
-      if (engineHealth !== '' && (Number(engineHealth) < 0 || Number(engineHealth) > 100)) {
-        errors.push('Motor sağlığı %0 ile %100 arasında olmalıdır.');
+      if (engineHealth !== '' && !isIntegerInRange(engineHealth, 0, 100)) {
+        errors.push('Motor sağlığı %0 ile %100 arasında bir tam sayı olmalıdır.');
         invalid.engineHealth = true;
       }
       if (lockLevel !== '' && Number(lockLevel) < 0) {
@@ -348,8 +363,8 @@ export default function YeniIlanOlusturPage() {
         errors.push('Hırsızlık önleme seviyesi 0 veya daha büyük olmalıdır.');
         invalid.antiTheftLevel = true;
       }
-      if (factoryPrice !== '' && Number(factoryPrice) < 0) {
-        errors.push('Fabrika çıkış fiyatı 0 veya daha büyük olmalıdır.');
+      if (factoryPrice !== '' && !isIntegerInRange(factoryPrice, 1, 1_000_000_000)) {
+        errors.push('Fabrika çıkış fiyatı 0’dan büyük bir tam sayı olmalıdır.');
         invalid.factoryPrice = true;
       }
     }
@@ -661,7 +676,6 @@ export default function YeniIlanOlusturPage() {
               </div>
               <input
                 type="text"
-                placeholder="Örn: FULL GELİŞTİRME • DÜŞÜK KM • TEMİZ SCHAFTER V12"
                 maxLength={TITLE_MAX}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -680,7 +694,6 @@ export default function YeniIlanOlusturPage() {
                 </span>
               </div>
               <textarea
-                placeholder="Örn: Garaj arabasıdır, motor ve yürüyen aksamı kusursuzdur."
                 maxLength={DESC_MAX}
                 rows={2}
                 value={description}
@@ -697,10 +710,10 @@ export default function YeniIlanOlusturPage() {
                     Satış Fiyatı ($)
                   </label>
                   <input
-                    type="number"
-                    placeholder="75000"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
+                    type="text"
+                    inputMode="numeric"
+                    value={formatTurkishInteger(price)}
+                    onChange={(e) => updateMoney(e.target.value, setPrice)}
                     className={`form-input text-sm ${invalidFields.price ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
                   />
                 </div>
@@ -711,7 +724,6 @@ export default function YeniIlanOlusturPage() {
                   </label>
                   <input
                     type="text"
-                    placeholder="Örn: Rockford Hills, Vinewood..."
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     className={`form-input text-sm ${invalidFields.location ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
@@ -724,10 +736,10 @@ export default function YeniIlanOlusturPage() {
                   Satış Fiyatı ($)
                 </label>
                 <input
-                  type="number"
-                  placeholder="75000"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
+                  type="text"
+                  inputMode="numeric"
+                  value={formatTurkishInteger(price)}
+                  onChange={(e) => updateMoney(e.target.value, setPrice)}
                   className={`form-input text-sm max-w-sm ${invalidFields.price ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
                 />
               </div>
@@ -739,7 +751,7 @@ export default function YeniIlanOlusturPage() {
                 <input type="checkbox" checked={offersEnabled} onChange={(e) => setOffersEnabled(e.target.checked)} className="h-5 w-5 accent-[#FF8A1F]" />
               </label>
               {offersEnabled && <label className="block text-xs font-semibold text-[var(--text-muted)]">Minimum Teklif (opsiyonel)
-                <input type="number" min="1" max={price || undefined} value={minimumOffer} onChange={(e) => setMinimumOffer(e.target.value)} className={`form-input mt-2 ${invalidFields.minimumOffer ? 'border-red-500' : ''}`} placeholder="Örn: 80000" />
+                <input type="text" inputMode="numeric" value={formatTurkishInteger(minimumOffer)} onChange={(e) => updateMoney(e.target.value, setMinimumOffer)} className={`form-input mt-2 ${invalidFields.minimumOffer ? 'border-red-500' : ''}`} />
               </label>}
             </div>
 
@@ -788,7 +800,6 @@ export default function YeniIlanOlusturPage() {
                       <label className="text-xs font-semibold text-[var(--text-muted)]">Plaka</label>
                       <input
                         type="text"
-                        placeholder="62LS901"
                         value={plate}
                         onChange={(e) => setPlate(e.target.value.toUpperCase())}
                         className={`form-input text-sm uppercase font-mono font-bold ${invalidFields.plate ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
@@ -798,11 +809,10 @@ export default function YeniIlanOlusturPage() {
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold text-[var(--text-muted)]">Kilometre</label>
                       <input
-                        type="number"
-                        min="0"
-                        placeholder="4200"
+                        type="text"
+                        inputMode="numeric"
                         value={mileage}
-                        onChange={(e) => setMileage(e.target.value)}
+                        onChange={(e) => updateInteger(e.target.value, setMileage)}
                         className={`form-input text-sm ${invalidFields.mileage ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
                       />
                     </div>
@@ -848,12 +858,10 @@ export default function YeniIlanOlusturPage() {
                     <div className="space-y-1">
                       <label className="text-[11px] text-[var(--text-dim)] font-medium">Motor Sağlığı (%0 - 100)</label>
                       <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        placeholder="100"
+                        type="text"
+                        inputMode="numeric"
                         value={engineHealth}
-                        onChange={(e) => setEngineHealth(e.target.value)}
+                        onChange={(e) => updateInteger(e.target.value, setEngineHealth)}
                         className={`form-input text-sm ${invalidFields.engineHealth ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
                       />
                     </div>
@@ -954,11 +962,10 @@ export default function YeniIlanOlusturPage() {
                   <div className="space-y-1.5 pt-1 max-w-sm">
                     <label className="text-xs font-semibold text-[var(--text-muted)]">Fabrika Çıkış Fiyatı ($)</label>
                     <input
-                      type="number"
-                      min="0"
-                      placeholder="Örn: 85000"
-                      value={factoryPrice}
-                      onChange={(e) => setFactoryPrice(e.target.value)}
+                      type="text"
+                      inputMode="numeric"
+                      value={formatTurkishInteger(factoryPrice)}
+                      onChange={(e) => updateMoney(e.target.value, setFactoryPrice)}
                       className={`form-input text-sm ${invalidFields.factoryPrice ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
                     />
                   </div>
@@ -995,7 +1002,6 @@ export default function YeniIlanOlusturPage() {
                     <label className="text-xs font-semibold text-[var(--text-muted)]">Kaçıncı Kat</label>
                     <input
                       type="number"
-                      placeholder="1"
                       value={floor}
                       onChange={(e) => setFloor(e.target.value)}
                       className="form-input text-sm"
