@@ -1,4 +1,5 @@
--- Migration: 20260924020000_vehicle_location_and_favorites.sql
+-- Migration: 20261002020000_account_level_favorites_price_rpc_reconciliation.sql
+-- Forward-only reconciliation for environments where the original migration has already been applied.
 -- Description: Allow NULL location for vehicles, keep prices as BIGINT, migrate
 -- favorites to account ownership, and provide the canonical atomic price update RPC.
 
