@@ -47,11 +47,11 @@ function getPriceProximityScore(currentPrice: bigint, candidatePrice: bigint): n
     ? candidatePrice - currentPrice
     : currentPrice - candidatePrice;
   const basisPoints = (distance * BigInt(10_000)) / base;
+  const cappedBasisPoints = basisPoints > BigInt(10_000) ? BigInt(10_000) : basisPoints;
 
-  if (basisPoints <= BigInt(1_000)) return 100;
-  if (basisPoints <= BigInt(2_500)) return 65;
-  if (basisPoints <= BigInt(4_000)) return 35;
-  return 10;
+  // A continuous score keeps actual price distance meaningful instead of placing
+  // every candidate in a small number of coarse price buckets.
+  return Number((BigInt(10_000) - cappedBasisPoints) * BigInt(300) / BigInt(10_000));
 }
 
 export function rankSimilarListings<T extends SimilarityListing>(
@@ -85,8 +85,8 @@ export function rankSimilarListings<T extends SimilarityListing>(
       return {
         listing: candidate,
         score:
-          (sameModel ? 400 : 0) +
-          (sameBrand ? 250 : 0) +
+          (sameModel ? 160 : 0) +
+          (sameBrand ? 100 : 0) +
           getPriceProximityScore(currentPrice, candidatePrice),
         priceDistance,
       };

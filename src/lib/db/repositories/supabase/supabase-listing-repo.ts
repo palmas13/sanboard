@@ -446,14 +446,17 @@ export class SupabaseListingRepository implements IListingRepository {
       .neq('id', currentListingId);
 
     const candidateQueries: PromiseLike<any>[] = [
+      // The primary pool is deliberately brand/model agnostic. Supplemental
+      // lookups below may recover strong matches, but never replace this broad
+      // canonical-category pool.
+      createCandidateQuery()
+        .order('published_at', { ascending: false })
+        .limit(100),
       createCandidateQuery()
         .gte('price', minPrice)
         .lte('price', maxPrice)
         .order('published_at', { ascending: false })
-        .limit(40),
-      createCandidateQuery()
-        .order('published_at', { ascending: false })
-        .limit(20),
+        .limit(100),
     ];
 
     const detailQueries: PromiseLike<any>[] = [];

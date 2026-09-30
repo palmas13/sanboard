@@ -410,7 +410,92 @@ describe('Sanboard – Vehicle UX Overhaul, Similar Listings & Comparison Tests'
       10
     );
 
-    assert.deepStrictEqual(ranked.map((listing) => listing.id), ['model-close', 'model-far', 'brand-far', 'price-only']);
+    assert.deepStrictEqual(ranked.map((listing) => listing.id), ['model-close', 'model-far', 'price-only', 'brand-far']);
+  });
+
+  it('11bb. ATV recommendations keep every public ATV eligible and fill beyond brand/model matches', async () => {
+    const current: Listing = {
+      ...TEST_VEHICLE_A,
+      id: 'atv-current',
+      subcategory: 'ATV',
+      title: 'Current Nagasaki Blazer',
+      price: 50000,
+      seller_type: 'INDIVIDUAL',
+      vehicle_details: {
+        ...TEST_VEHICLE_A.vehicle_details!,
+        listing_id: 'atv-current',
+        vehicle_category: 'ATV',
+        brand: 'Nagasaki',
+        model: 'Blazer',
+      },
+    };
+    const atv = (id: string, brand: string, model: string, price: number): Listing => ({
+      ...current,
+      id,
+      title: `${brand} ${model}`,
+      price,
+      vehicle_details: { ...current.vehicle_details!, listing_id: id, brand, model },
+    });
+    const motorcycle = {
+      ...atv('other-motorcycle', 'Nagasaki', 'Blazer', 50000),
+      subcategory: 'Motosiklet' as const,
+      vehicle_details: {
+        ...current.vehicle_details!,
+        listing_id: 'other-motorcycle',
+        vehicle_category: 'Motosiklet' as const,
+      },
+    };
+    const automobile = {
+      ...atv('other-automobile', 'Nagasaki', 'Blazer', 50000),
+      subcategory: 'Otomobil' as const,
+      vehicle_details: {
+        ...current.vehicle_details!,
+        listing_id: 'other-automobile',
+        vehicle_category: 'Otomobil' as const,
+      },
+    };
+
+    db.listings = [
+      current,
+      atv('blazer-45', 'Nagasaki', 'Blazer', 45000),
+      atv('blazer-50', 'Nagasaki', 'Blazer', 50000),
+      atv('verus-49', 'Dinka', 'Verus', 49000),
+      atv('street-blazer-52', 'Nagasaki', 'Street Blazer', 52000),
+      atv('other-atv-55', 'Other', 'Trail Quad', 55000),
+      atv('other-atv-60', 'Other', 'Utility Quad', 60000),
+      motorcycle,
+      automobile,
+    ];
+
+    const similar = await getSimilarListings(current.id, 10);
+    const ids = similar.map((listing) => listing.id);
+
+    assert.deepStrictEqual(ids.slice(0, 2), ['blazer-50', 'blazer-45']);
+    assert.equal(ids.includes(current.id), false);
+    assert.equal(ids.includes('other-motorcycle'), false);
+    assert.equal(ids.includes('other-automobile'), false);
+    assert.deepStrictEqual(new Set(ids), new Set([
+      'blazer-45',
+      'blazer-50',
+      'verus-49',
+      'street-blazer-52',
+      'other-atv-55',
+      'other-atv-60',
+    ]));
+    assert.ok(ids.indexOf('street-blazer-52') < ids.indexOf('other-atv-55'), 'Same brand remains a bonus');
+    assert.ok(ids.indexOf('verus-49') < ids.indexOf('other-atv-60'), 'Price proximity ranks weaker matches');
+  });
+
+  it('11bc. an extreme same-model price mismatch does not always beat a close same-category listing', () => {
+    const ranked = rankSimilarListings(
+      { id: 'current', category: 'vehicle', subcategory: 'ATV', price: 50000, brand: 'Nagasaki', model: 'Blazer' },
+      [
+        { id: 'far-blazer', category: 'vehicle' as const, subcategory: 'ATV', price: 150000, brand: 'Nagasaki', model: 'Blazer' },
+        { id: 'close-verus', category: 'vehicle' as const, subcategory: 'ATV', price: 50000, brand: 'Dinka', model: 'Verus' },
+      ]
+    );
+
+    assert.deepStrictEqual(ranked.map((listing) => listing.id), ['close-verus', 'far-blazer']);
   });
 
   it('11c. deterministic ties use newest date and then stable id ordering', () => {
@@ -653,7 +738,7 @@ describe('Sanboard – Vehicle UX Overhaul, Similar Listings & Comparison Tests'
     assert.strictEqual(source.includes('listing.year'), false);
   });
 
-  it('28. Supabase similar listings use bounded same-category and same-subcategory candidate queries', () => {
+  it('28. Supabase similar listings use a broad bounded canonical-category pool', () => {
     const source = fs.readFileSync(
       path.join(process.cwd(), 'src/lib/db/repositories/supabase/supabase-listing-repo.ts'),
       'utf8'
@@ -664,8 +749,13 @@ describe('Sanboard – Vehicle UX Overhaul, Similar Listings & Comparison Tests'
     assert.ok(source.includes('const { minPrice, maxPrice } = getSimilarPriceRange(currentPrice);'));
     assert.ok(source.includes(".gte('price', minPrice)"));
     assert.ok(source.includes(".lte('price', maxPrice)"));
-    assert.strictEqual(source.includes('.limit(50)'), false);
+    assert.ok(source.includes(".order('published_at', { ascending: false })\n        .limit(100)"));
     assert.ok(source.includes(".neq('id', currentListingId)"));
+    const primaryPoolStart = source.indexOf('const candidateQueries');
+    const supplementalStart = source.indexOf('const detailQueries');
+    const primaryPool = source.slice(primaryPoolStart, supplementalStart);
+    assert.strictEqual(primaryPool.includes(".ilike('brand'"), false);
+    assert.strictEqual(primaryPool.includes(".ilike('model'"), false);
   });
 
   it('29. Supabase similar listings validate public visibility and fetch only compact-card fields', () => {

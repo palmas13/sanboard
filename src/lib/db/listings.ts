@@ -244,8 +244,8 @@ export async function getPublicListings(filters: ListingFilterParams = {}): Prom
  * - Excludes current listing (ASLA kendi benzer ilanları içinde görünmemeli)
  * - Excludes REMOVED, SOLD, EXPIRED, DRAFT
  * - Excludes listings from SUSPENDED or DELETED corporate stores
- * - Requires the same canonical category and subcategory
- * - Ranks vehicle brand/model matches strongly, then numeric price proximity
+ * - Requires the same broad market and canonical vehicle/property category
+ * - Uses vehicle brand/model only as ranking bonuses alongside price proximity
  * - Supports property listings without depending on vehicle details
  */
 export async function getSimilarListings(
@@ -266,6 +266,7 @@ export async function getSimilarListings(
   if (!isPublicListingVisible(current, currentStore, now)) return [];
 
   // Eligibility is identical to public discovery and enforced before ranking.
+  // Brand/model never narrow this canonical-category pool.
   const candidates = db.listings.filter((l) => {
     if (l.id === currentListingId) return false;
     if (l.category !== current.category || l.subcategory !== current.subcategory) return false;
