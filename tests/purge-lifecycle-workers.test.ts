@@ -156,11 +156,11 @@ describe('lifecycle scheduler contract', () => {
   });
 
   test('GitHub Actions schedules frequent workers with independent authenticated GET jobs', () => {
-    assert.match(workflow, /cron: '\*\/5 \* \* \* \*'/);
-    assert.match(workflow, /cron: '\*\/10 \* \* \* \*'/);
-    assert.match(workflow, /listing-purge:[\s\S]*github\.event\.schedule == '\*\/5 \* \* \* \*'[\s\S]*\/api\/internal\/listing-purge/);
-    assert.match(workflow, /media-cleanup:[\s\S]*github\.event\.schedule == '\*\/5 \* \* \* \*'[\s\S]*\/api\/internal\/media-cleanup/);
-    assert.match(workflow, /expiry-lifecycle:[\s\S]*github\.event\.schedule == '\*\/10 \* \* \* \*'[\s\S]*\/api\/internal\/expiry-lifecycle/);
+    assert.match(workflow, /cron: '2-57\/5 \* \* \* \*'/);
+    assert.match(workflow, /cron: '7-57\/10 \* \* \* \*'/);
+    assert.match(workflow, /listing-purge:[\s\S]*github\.event\.schedule == '2-57\/5 \* \* \* \*'[\s\S]*\/api\/internal\/listing-purge/);
+    assert.match(workflow, /media-cleanup:[\s\S]*github\.event\.schedule == '2-57\/5 \* \* \* \*'[\s\S]*\/api\/internal\/media-cleanup/);
+    assert.match(workflow, /expiry-lifecycle:[\s\S]*github\.event\.schedule == '7-57\/10 \* \* \* \*'[\s\S]*\/api\/internal\/expiry-lifecycle/);
     assert.equal((workflow.match(/--request GET/g) || []).length, 3);
     assert.equal((workflow.match(/curl --fail-with-body --silent --show-error/g) || []).length, 3);
     assert.equal((workflow.match(/Authorization: Bearer \$CRON_SECRET/g) || []).length, 3);
