@@ -148,6 +148,9 @@ describe('purge migration contract', () => {
 describe('lifecycle scheduler contract', () => {
   const vercel = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'vercel.json'), 'utf8'));
   const workflow = fs.readFileSync(path.join(process.cwd(), '.github/workflows/lifecycle-workers.yml'), 'utf8');
+  const cronMigration = fs.readFileSync(path.join(process.cwd(), 'supabase/migrations/20261002040000_supabase_cron_lifecycle_workers.sql'), 'utf8');
+  const postflight = fs.readFileSync(path.join(process.cwd(), 'supabase/scripts/supabase_cron_lifecycle_postflight.sql'), 'utf8');
+  const diagnostics = fs.readFileSync(path.join(process.cwd(), 'supabase/scripts/supabase_cron_lifecycle_diagnostics.sql'), 'utf8');
 
   test('Vercel Hobby keeps only the daily orphan reconciliation cron', () => {
     assert.deepEqual(vercel.crons, [
@@ -155,17 +158,46 @@ describe('lifecycle scheduler contract', () => {
     ]);
   });
 
-  test('GitHub Actions schedules frequent workers with independent authenticated GET jobs', () => {
-    assert.match(workflow, /cron: '2-57\/5 \* \* \* \*'/);
-    assert.match(workflow, /cron: '7-57\/10 \* \* \* \*'/);
-    assert.match(workflow, /listing-purge:[\s\S]*github\.event\.schedule == '2-57\/5 \* \* \* \*'[\s\S]*\/api\/internal\/listing-purge/);
-    assert.match(workflow, /media-cleanup:[\s\S]*github\.event\.schedule == '2-57\/5 \* \* \* \*'[\s\S]*\/api\/internal\/media-cleanup/);
-    assert.match(workflow, /expiry-lifecycle:[\s\S]*github\.event\.schedule == '7-57\/10 \* \* \* \*'[\s\S]*\/api\/internal\/expiry-lifecycle/);
+  test('GitHub Actions is a manual-only fallback with the existing worker calls unchanged', () => {
+    assert.match(workflow, /workflow_dispatch:/);
+    assert.doesNotMatch(workflow, /^\s*schedule:/m);
+    assert.doesNotMatch(workflow, /github\.event\.schedule/);
+    assert.match(workflow, /listing-purge:[\s\S]*\/api\/internal\/listing-purge/);
+    assert.match(workflow, /media-cleanup:[\s\S]*\/api\/internal\/media-cleanup/);
+    assert.match(workflow, /expiry-lifecycle:[\s\S]*\/api\/internal\/expiry-lifecycle/);
     assert.equal((workflow.match(/--request GET/g) || []).length, 3);
     assert.equal((workflow.match(/curl --fail-with-body --silent --show-error/g) || []).length, 3);
     assert.equal((workflow.match(/Authorization: Bearer \$CRON_SECRET/g) || []).length, 3);
     assert.equal((workflow.match(/vars\.SANBOARD_PRODUCTION_URL/g) || []).length, 3);
     assert.equal((workflow.match(/secrets\.CRON_SECRET/g) || []).length, 3);
     assert.doesNotMatch(workflow, /https:\/\/[^$"\s]+\/api\/internal/);
+  });
+
+  test('Supabase Cron independently schedules all workers through pg_net and Vault', () => {
+    assert.match(cronMigration, /CREATE EXTENSION IF NOT EXISTS pg_cron/);
+    assert.match(cronMigration, /CREATE EXTENSION IF NOT EXISTS pg_net/);
+    assert.match(cronMigration, /cron\.schedule\(\s*'sanboard-listing-purge',\s*'\*\/5 \* \* \* \*'/);
+    assert.match(cronMigration, /cron\.schedule\(\s*'sanboard-media-cleanup',\s*'\*\/5 \* \* \* \*'/);
+    assert.match(cronMigration, /cron\.schedule\(\s*'sanboard-expiry-lifecycle',\s*'\*\/10 \* \* \* \*'/);
+    assert.equal((cronMigration.match(/net\.http_get/g) || []).length, 3);
+    assert.equal((cronMigration.match(/vault\.decrypted_secrets/g) || []).length, 8);
+    assert.equal((cronMigration.match(/timeout_milliseconds := 30000/g) || []).length, 3);
+    assert.equal((cronMigration.match(/'Accept', 'application\/json'/g) || []).length, 3);
+    assert.match(cronMigration, /'Authorization', 'Bearer ' \|\|/);
+    assert.doesNotMatch(cronMigration, /'https:\/\/[^']+'/);
+    assert.doesNotMatch(cronMigration, /Bearer [A-Za-z0-9_-]{16,}/);
+  });
+
+  test('scheduler verification scripts are read-only and never decrypt Vault values', () => {
+    const executablePostflight = postflight.replace(/^\s*--.*$/gm, '');
+    const executableDiagnostics = diagnostics.replace(/^\s*--.*$/gm, '');
+    assert.match(postflight, /'OVERALL'/);
+    assert.match(postflight, /cron\.job_run_details/);
+    assert.match(diagnostics, /LIMIT 20/);
+    assert.match(executablePostflight, /FROM vault\.secrets/);
+    assert.doesNotMatch(executablePostflight, /SELECT\s+decrypted_secret/i);
+    assert.doesNotMatch(executableDiagnostics, /SELECT\s+decrypted_secret/i);
+    assert.doesNotMatch(executablePostflight, /\b(INSERT|UPDATE|DELETE|ALTER|DROP|CREATE|TRUNCATE|PERFORM)\b/i);
+    assert.doesNotMatch(executableDiagnostics, /\b(INSERT|UPDATE|DELETE|ALTER|DROP|CREATE|TRUNCATE|PERFORM)\b/i);
   });
 });
