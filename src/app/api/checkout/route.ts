@@ -52,6 +52,19 @@ export async function POST(req: NextRequest) {
     let corporateProfileId: string | null = null;
     let purpose: PaymentPurpose = 'LISTING_PUBLICATION';
 
+    if (requestedPackage === 'STANDARD_7_DAY') {
+      const creditResult = await getPaymentRepository().getUserCredits(activeProfileId);
+      const hasIndividualCredit = (creditResult.credits || []).some(
+        (credit: any) => credit.status === 'AVAILABLE' && (credit.credit_type === 'INDIVIDUAL' || !credit.credit_type)
+      );
+      if (hasIndividualCredit) {
+        return NextResponse.json(
+          { error: 'Kullanılabilir bireysel ilan hakkınız bulunuyor.', code: 'ENTITLEMENT_AVAILABLE' },
+          { status: 409 }
+        );
+      }
+    }
+
     // Corporate package validation & eligibility resolution (Section 1 & 4)
     if (requestedPackage === 'CORPORATE_14_DAY') {
       const { resolveCorporateEligibility } = await import('@/lib/dealers/eligibility');
@@ -67,6 +80,18 @@ export async function POST(req: NextRequest) {
       }
       chargeProfileId = eligibility.dealer.owner_profile_id || activeProfileId;
       corporateProfileId = eligibility.dealer.id;
+      const creditResult = await getPaymentRepository().getUserCredits(chargeProfileId);
+      const hasCorporateCredit = (creditResult.credits || []).some(
+        (credit: any) => credit.status === 'AVAILABLE'
+          && credit.credit_type === 'CORPORATE'
+          && credit.corporate_profile_id === corporateProfileId
+      );
+      if (hasCorporateCredit) {
+        return NextResponse.json(
+          { error: 'Kullanılabilir kurumsal ilan hakkınız bulunuyor.', code: 'ENTITLEMENT_AVAILABLE' },
+          { status: 409 }
+        );
+      }
     } else if (requestedPackage === 'CORPORATE_SUBSCRIPTION_30_DAY') {
       purpose = 'CORPORATE_SUBSCRIPTION';
       const dealerRepo = getDealerRepository();

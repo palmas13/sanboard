@@ -42,9 +42,9 @@ export default function PaymentResultPage() {
       ? 'Ödeme başarılı. Kurumsal üyeliğiniz tanımlandı.'
       : 'Ödeme başarılı. 1 ilan hakkı hesabınıza tanımlandı.';
   const link = purpose === 'CORPORATE_SUBSCRIPTION' ? '/hesabim/kurumsal'
-    : purpose === 'LISTING_BOOST' && targetListingId ? `/ilan/${targetListingId}` : '/ilan-ver/yeni';
+    : purpose === 'LISTING_BOOST' && targetListingId ? `/ilan/${targetListingId}` : '/ilan-ver/paket';
   const linkText = purpose === 'CORPORATE_SUBSCRIPTION' ? 'Kurumsal Panele Dön'
-    : purpose === 'LISTING_BOOST' ? 'İlana Dön' : 'İlan Ver';
+    : purpose === 'LISTING_BOOST' ? 'İlana Dön' : 'İlan Hakkını Kullan';
 
   return <div className="min-h-[70vh] flex items-center justify-center px-4">
     <div className="surface-card max-w-lg w-full rounded-2xl border border-[var(--border-app)] p-8 text-center space-y-5">

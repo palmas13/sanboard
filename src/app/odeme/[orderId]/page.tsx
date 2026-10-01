@@ -146,7 +146,7 @@ export default function FleecaCheckoutPage() {
 
               <button
                 type="button"
-                onClick={() => router.push(order?.entitlementType === 'CORPORATE_SUBSCRIPTION' ? '/hesabim/kurumsal' : '/ilan-ver/yeni')}
+                onClick={() => router.push(order?.entitlementType === 'CORPORATE_SUBSCRIPTION' ? '/hesabim/kurumsal' : '/ilan-ver/paket')}
                 className="w-full btn-primary py-3.5 text-sm font-bold flex items-center justify-center gap-2 shadow-lg"
               >
                 <span>{order?.entitlementType === 'CORPORATE_SUBSCRIPTION' ? 'Kurumsal Panele Dön' : 'İlanını Oluştur'}</span>
