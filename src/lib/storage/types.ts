@@ -25,6 +25,16 @@ export interface StorageDeleteResult {
   error?: string;
 }
 
+export interface StorageCopyResult {
+  success: boolean;
+  sourceKey: string;
+  destinationKey: string;
+  destinationExists: boolean;
+  sizeBytes?: number;
+  mimeType?: string;
+  error?: string;
+}
+
 export interface StorageDeleteManyItemResult extends StorageDeleteResult {
   /** The key (or URL) supplied by the caller. */
   key: string;
@@ -44,6 +54,9 @@ export interface StorageProvider {
     fileBuffer: Buffer | Uint8Array,
     options: StorageUploadOptions
   ): Promise<StorageUploadResult>;
+
+  /** Copies one exact object without deleting the source and verifies the destination. */
+  copy?(sourceKey: string, destinationKey: string): Promise<StorageCopyResult>;
 
   /**
    * Deletes a file from storage by its key/path.

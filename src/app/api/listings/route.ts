@@ -5,6 +5,7 @@ import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { revalidatePath } from 'next/cache';
 import { canBypassTestPayment } from '@/lib/auth/test-login';
 import { recordAuditEvent } from '@/lib/audit';
+import { finalizeListingMedia } from '@/lib/listings/finalize-media';
 
 // Public listings search endpoint
 export async function GET(req: NextRequest) {
@@ -117,6 +118,20 @@ export async function POST(req: NextRequest) {
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+
+    if (result.listing && process.env.DATA_STORE === 'supabase') {
+      try {
+        const mediaFinalization = await finalizeListingMedia(result.listing.id, { uploadOwnerId: trustedProfileId });
+        if (mediaFinalization.failedCount > 0) {
+          console.error('Listing media finalization partially failed', mediaFinalization);
+        }
+      } catch (finalizeError) {
+        console.error('Listing media finalization failed without invalidating the listing', {
+          listingId: result.listing.id,
+          error: finalizeError instanceof Error ? finalizeError.message : String(finalizeError),
+        });
+      }
     }
 
     if (testPublishBypass && result.listing) {

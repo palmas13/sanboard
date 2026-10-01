@@ -4,6 +4,8 @@ import {
   DeleteObjectCommand,
   DeleteObjectsCommand,
   ListObjectsV2Command,
+  CopyObjectCommand,
+  HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 import {
   StorageProvider,
@@ -12,6 +14,7 @@ import {
   StorageDeleteResult,
   StorageDeleteManyItemResult,
   StorageDeleteManyResult,
+  StorageCopyResult,
 } from './types';
 
 const ALLOWED_STORAGE_PREFIXES = [
@@ -133,6 +136,65 @@ export class CloudflareR2StorageProvider implements StorageProvider {
         key: '',
         sizeBytes: fileBuffer.byteLength,
         error: err?.message || 'Cloudflare R2 yükleme işlemi başarısız oldu.',
+      };
+    }
+  }
+
+  async copy(sourceKey: string, destinationKey: string): Promise<StorageCopyResult> {
+    const source = sourceKey.replace(/^\/+/, '');
+    const destination = destinationKey.replace(/^\/+/, '');
+    const invalid = !source || !destination || source.includes('..') || destination.includes('..') || source.includes('\\') || destination.includes('\\');
+    const allowed = ALLOWED_STORAGE_PREFIXES.some((prefix) => source.startsWith(prefix))
+      && ALLOWED_STORAGE_PREFIXES.some((prefix) => destination.startsWith(prefix));
+    if (invalid || !allowed) {
+      return { success: false, sourceKey: source, destinationKey: destination, destinationExists: false, error: 'Geçersiz dosya anahtarı.' };
+    }
+    if (!this.isAvailable() || !this.client) {
+      return { success: false, sourceKey: source, destinationKey: destination, destinationExists: false, error: 'Cloudflare R2 is not configured.' };
+    }
+
+    try {
+      const sourceMetadata = await this.client.send(new HeadObjectCommand({ Bucket: this.bucketName, Key: source }));
+      try {
+        const existing = await this.client.send(new HeadObjectCommand({ Bucket: this.bucketName, Key: destination }));
+        if (existing.ContentLength === sourceMetadata.ContentLength && existing.ETag === sourceMetadata.ETag) {
+          return {
+            success: true,
+            sourceKey: source,
+            destinationKey: destination,
+            destinationExists: true,
+            sizeBytes: existing.ContentLength,
+            mimeType: existing.ContentType,
+          };
+        }
+      } catch (error: any) {
+        const status = error?.$metadata?.httpStatusCode;
+        if (status !== 404 && error?.name !== 'NotFound' && error?.name !== 'NoSuchKey') throw error;
+      }
+
+      await this.client.send(new CopyObjectCommand({
+        Bucket: this.bucketName,
+        Key: destination,
+        CopySource: `${this.bucketName}/${encodeURIComponent(source).replace(/%2F/g, '/')}`,
+        MetadataDirective: 'COPY',
+      }));
+      const verified = await this.client.send(new HeadObjectCommand({ Bucket: this.bucketName, Key: destination }));
+      if (verified.ContentLength !== sourceMetadata.ContentLength) throw new Error('Copied object size verification failed.');
+      return {
+        success: true,
+        sourceKey: source,
+        destinationKey: destination,
+        destinationExists: true,
+        sizeBytes: verified.ContentLength,
+        mimeType: verified.ContentType,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        sourceKey: source,
+        destinationKey: destination,
+        destinationExists: false,
+        error: error?.message || 'Dosya kopyalanamadı.',
       };
     }
   }

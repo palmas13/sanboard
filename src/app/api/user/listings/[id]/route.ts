@@ -3,6 +3,7 @@ import { getListingRepository } from '@/lib/db/repositories';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { revalidatePath } from 'next/cache';
 import { listingUnionSchema } from '@/lib/validations/listing';
+import { finalizeListingMedia } from '@/lib/listings/finalize-media';
 
 export async function GET(
   req: NextRequest,
@@ -82,6 +83,20 @@ export async function PUT(
     if (!result.success) {
       const isForbidden = result.error?.includes('yetkiniz yok');
       return NextResponse.json({ error: result.error }, { status: isForbidden ? 403 : 400 });
+    }
+
+    if (process.env.DATA_STORE === 'supabase') {
+      try {
+        const mediaFinalization = await finalizeListingMedia(id, { uploadOwnerId: actor.profileId });
+        if (mediaFinalization.failedCount > 0) {
+          console.error('Edited listing media finalization partially failed', mediaFinalization);
+        }
+      } catch (finalizeError) {
+        console.error('Edited listing media finalization failed without invalidating the edit', {
+          listingId: id,
+          error: finalizeError instanceof Error ? finalizeError.message : String(finalizeError),
+        });
+      }
     }
 
     // Invalidate Next.js cache so homepage, category, and detail pages update instantly
