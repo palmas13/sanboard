@@ -773,7 +773,10 @@ export async function markListingAsSold(
   const listing = db.listings.find((l) => l.id === id);
   if (!listing) return { success: false, error: 'İlan bulunamadı.' };
 
-  if (listing.seller_profile_id !== sellerProfileId) {
+  const store = listing.corporate_profile_id
+    ? db.dealers.find((dealer) => dealer.id === listing.corporate_profile_id)
+    : undefined;
+  if (!isListingOwnedByActiveProfile(listing, sellerProfileId, store?.owner_profile_id || store?.profile_id)) {
     return { success: false, error: 'Bu işlem için yetkiniz yok.' };
   }
 
@@ -816,7 +819,13 @@ export async function removeListing(
   const listing = db.listings.find((l) => l.id === id);
   if (!listing) return { success: false, error: 'İlan bulunamadı.' };
 
-  if (requesterProfileId !== 'SYSTEM_ADMIN' && listing.seller_profile_id !== requesterProfileId) {
+  const store = listing.corporate_profile_id
+    ? db.dealers.find((dealer) => dealer.id === listing.corporate_profile_id)
+    : undefined;
+  if (
+    requesterProfileId !== 'SYSTEM_ADMIN' &&
+    !isListingOwnedByActiveProfile(listing, requesterProfileId, store?.owner_profile_id || store?.profile_id)
+  ) {
     return { success: false, error: 'Bu işlem için yetkiniz yok.' };
   }
 
@@ -826,6 +835,8 @@ export async function removeListing(
 
   listing.status = 'REMOVED';
   listing.updated_at = new Date().toISOString();
+  listing.close_reason = requesterProfileId === 'SYSTEM_ADMIN' ? 'ADMIN_REMOVED' : 'OTHER';
+  listing.closed_at = listing.updated_at;
   listing.images = [];
   db.favorites = db.favorites.filter((favorite) => favorite.listing_id !== id);
   await (await import('./repositories')).getOfferRepository().closeForListing(id, requesterProfileId === 'SYSTEM_ADMIN' ? 'LISTING_REMOVED_BY_ADMIN' : 'LISTING_REMOVED_BY_SELLER');

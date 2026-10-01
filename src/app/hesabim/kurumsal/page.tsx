@@ -31,8 +31,9 @@ import {
   ArrowLeft,
   Trash2,
   Plus,
+  CheckCircle,
 } from 'lucide-react';
-import { DealerProfile } from '@/types';
+import { DealerProfile, Listing } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { formatDate, formatTimeRemaining } from '@/lib/utils/format';
 import { isListingActivelyFeatured } from '@/lib/listings/featured';
@@ -61,6 +62,10 @@ export default function HesabimKurumsalPage() {
   });
   const [followerCount, setFollowerCount] = useState<number>(0);
   const [storeListings, setStoreListings] = useState<any[]>([]);
+  const [closeModalListing, setCloseModalListing] = useState<Listing | null>(null);
+  const [closeReason, setCloseReason] = useState<'SOLD' | 'CANCELLED' | 'OTHER'>('SOLD');
+  const [activeOfferCount, setActiveOfferCount] = useState(0);
+  const [isProcessingClose, setIsProcessingClose] = useState(false);
 
   // Edit profile fields (for approved dealers)
   const [editCompanyName, setEditCompanyName] = useState('');
@@ -274,6 +279,42 @@ export default function HesabimKurumsalPage() {
       setError(err.message || 'Öne çıkarma başarısız.');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const openCloseListingModal = async (listing: Listing) => {
+    setCloseReason('SOLD');
+    setActiveOfferCount(0);
+    setCloseModalListing(listing);
+    const response = await fetch(`/api/offers?listingId=${encodeURIComponent(listing.id)}`);
+    const data = await response.json().catch(() => ({}));
+    setActiveOfferCount(response.ok ? Number(data.activeCount || 0) : 0);
+  };
+
+  const handleConfirmClose = async () => {
+    if (!closeModalListing || !currentProfile) return;
+    setIsProcessingClose(true);
+    setError('');
+    setSuccess('');
+    try {
+      const response = await fetch('/api/user/listings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listingId: closeModalListing.id,
+          action: closeReason === 'SOLD' ? 'SOLD' : 'REMOVED',
+          closeReason,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.error || 'İlan kapatılamadı.');
+      setCloseModalListing(null);
+      setSuccess(closeReason === 'SOLD' ? 'İlan satıldı olarak kapatıldı.' : 'İlan yayından kaldırıldı.');
+      await fetchDealer();
+    } catch (err: any) {
+      setError(err.message || 'İlan kapatılamadı.');
+    } finally {
+      setIsProcessingClose(false);
     }
   };
 
@@ -943,6 +984,15 @@ export default function HesabimKurumsalPage() {
                           <Link href={`/hesabim/ilanlarim/${l.id}/duzenle`} className="text-[#FF8A1F] hover:underline font-medium">
                             Düzenle
                           </Link>
+                          {l.status === 'ACTIVE' && !remaining.isExpired && (
+                            <button
+                              type="button"
+                              onClick={() => openCloseListingModal(l)}
+                              className="text-[var(--color-danger)] hover:underline font-medium"
+                            >
+                              İlanı Kapat
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -1063,6 +1113,41 @@ export default function HesabimKurumsalPage() {
           </div>
 
           <Link href="/hesabim/kurumsal/basvuru" className="btn-primary inline-flex items-center gap-2 px-6 py-3 text-xs"><Building2 className="h-4 w-4" />Başvuruyu Başlat</Link>
+        </div>
+      )}
+      {closeModalListing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" role="dialog" aria-modal="true" aria-labelledby="corporate-close-listing-title">
+          <div className="surface-card w-full max-w-md rounded-2xl border border-[var(--border-app)] p-6 shadow-2xl space-y-4">
+            <div>
+              <h3 id="corporate-close-listing-title" className="text-lg font-bold text-[var(--text-main)]">İlanı Kapat</h3>
+              <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Satıldı seçeneği ilanı hemen yayından kaldırır ve 24 saat sonra temizleme için uygun hale getirir. Diğer seçenekler kalıcı kaldırma işini hemen başlatır.</p>
+            </div>
+            <div className="rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] p-3 text-xs font-semibold text-[var(--text-main)] truncate">
+              {closeModalListing.title}
+            </div>
+            {activeOfferCount > 0 && (
+              <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-semibold text-amber-300">Bu ilan için {activeOfferCount} aktif teklif bulunuyor. İlan kapatıldığında bu tekliflerin tamamı da kapatılacak.</p>
+            )}
+            <div className="grid gap-2">
+              {([
+                ['SOLD', 'Satıldı'],
+                ['CANCELLED', 'Satıştan vazgeçildi'],
+                ['OTHER', 'Diğer nedenle kapat'],
+              ] as const).map(([value, label]) => (
+                <label key={value} className="flex cursor-pointer items-center gap-2 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] p-3 text-xs font-semibold text-[var(--text-main)]">
+                  <input type="radio" name="corporateCloseReason" value={value} checked={closeReason === value} onChange={() => setCloseReason(value)} className="accent-[#FF8A1F]" />
+                  {label}
+                </label>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2.5 border-t border-[var(--border-app)] pt-4">
+              <button type="button" onClick={() => setCloseModalListing(null)} disabled={isProcessingClose} className="btn-secondary px-4 py-2 text-xs">Vazgeç</button>
+              <button type="button" onClick={handleConfirmClose} disabled={isProcessingClose} className="btn-danger flex items-center gap-1.5 px-4 py-2 text-xs">
+                {isProcessingClose ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
+                <span>İlanı Kapat</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
