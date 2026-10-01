@@ -2,8 +2,8 @@ name: Lifecycle Workers
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
-    - cron: '*/10 * * * *'
+    - cron: '2-57/5 * * * *'
+    - cron: '7-57/10 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -12,7 +12,7 @@ permissions:
 jobs:
   listing-purge:
     name: Listing purge (every 5 minutes)
-    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '*/5 * * * *'
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '2-57/5 * * * *'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
@@ -36,7 +36,7 @@ jobs:
 
   media-cleanup:
     name: Media cleanup (every 5 minutes)
-    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '*/5 * * * *'
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '2-57/5 * * * *'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
@@ -60,7 +60,7 @@ jobs:
 
   expiry-lifecycle:
     name: Expiry lifecycle (every 10 minutes)
-    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '*/10 * * * *'
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '7-57/10 * * * *'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
