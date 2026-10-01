@@ -201,3 +201,17 @@ describe('lifecycle scheduler contract', () => {
     assert.doesNotMatch(executableDiagnostics, /\b(INSERT|UPDATE|DELETE|ALTER|DROP|CREATE|TRUNCATE|PERFORM)\b/i);
   });
 });
+
+describe('orphan reconciliation queue migration contract', () => {
+  const migration = fs.readFileSync(path.join(process.cwd(), 'supabase/migrations/20261002050000_orphan_reconciliation_queue.sql'), 'utf8');
+
+  test('deduplicates exact keys and rechecks references before queue mutation', () => {
+    assert.match(migration, /canonical_sanboard_media_key\(k\)/);
+    assert.match(migration, /is_media_key_referenced\(clean_key\)/);
+    assert.match(migration, /idempotency_key = 'orphan:' \|\| clean_key/);
+    assert.match(migration, /status IN \('PENDING', 'PROCESSING', 'RETRY', 'FAILED'\)/);
+    assert.match(migration, /RETURN 'ALREADY_QUEUED'/);
+    assert.match(migration, /reason = 'ORPHAN_RECONCILIATION'/);
+    assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.enqueue_orphan_media_cleanup_job\(text, text\) TO service_role/);
+  });
+});

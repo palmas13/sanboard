@@ -4,13 +4,23 @@ import { extractObjectKey } from '../src/lib/media/url';
 import { isValidSanboardStorageKey } from '../src/lib/storage/lifecycle';
 import { db } from '../src/lib/db/store';
 import { runMediaCleanupWorker } from '../src/lib/lifecycle/media-cleanup-worker';
+import type { StorageProvider } from '../src/lib/storage/types';
+import type { RpcClient } from '../src/lib/lifecycle/worker-utils';
+import { rpc } from '../src/lib/lifecycle/worker-utils';
 
-interface ScanReport {
+export interface ScanReport {
   scannedCount: number;
   referencedCount: number;
   orphanCount: number;
+  eligibleCount: number;
+  enqueuedCount: number;
+  alreadyQueuedCount: number;
+  skippedYoungCount: number;
+  skippedReferencedCount: number;
+  failedCount: number;
+  dryRun: boolean;
+  durationMs: number;
   orphanBytes: number;
-  skippedDueToGraceCount: number;
   categories: {
     avatars: string[];
     listings: string[];
@@ -74,25 +84,40 @@ export async function runOrphanScan(options: {
   graceHours?: number;
   quiet?: boolean;
   maxObjects?: number;
+  dependencies?: {
+    storage?: StorageProvider;
+    client?: RpcClient;
+    collectReferences?: () => Promise<Set<string>>;
+    now?: () => number;
+  };
 }) {
+  const startedAt = Date.now();
   const execute = Boolean(options.execute);
   const graceHours = options.graceHours !== undefined ? options.graceHours : 24;
   if (!Number.isFinite(graceHours) || graceHours < 1) throw new Error('graceHours must be at least 1.');
   const maxObjects = Math.max(1, Math.min(10_000, Math.floor(options.maxObjects || 5_000)));
   const gracePeriodMs = graceHours * 60 * 60 * 1000;
-  const now = Date.now();
+  const now = options.dependencies?.now?.() ?? Date.now();
 
-  const storage = getStorageProvider();
+  const storage = options.dependencies?.storage || getStorageProvider();
   const prefixes = ['avatars/', 'listings/', 'dealers/logos/', 'dealers/banners/'];
 
-  const referencedKeys = await collectDbReferences();
+  const collectReferences = options.dependencies?.collectReferences || collectDbReferences;
+  const referencedKeys = await collectReferences();
 
   const report: ScanReport = {
     scannedCount: 0,
     referencedCount: 0,
     orphanCount: 0,
+    eligibleCount: 0,
+    enqueuedCount: 0,
+    alreadyQueuedCount: 0,
+    skippedYoungCount: 0,
+    skippedReferencedCount: 0,
+    failedCount: 0,
+    dryRun: !execute,
+    durationMs: 0,
     orphanBytes: 0,
-    skippedDueToGraceCount: 0,
     categories: {
       avatars: [],
       listings: [],
@@ -119,8 +144,13 @@ export async function runOrphanScan(options: {
         }
         report.scannedCount++;
 
+        if (!isValidSanboardStorageKey(item.key) || item.key.endsWith('/')) {
+          continue;
+        }
+
         if (referencedKeys.has(item.key)) {
           report.referencedCount++;
+          report.skippedReferencedCount++;
           continue;
         }
 
@@ -129,12 +159,13 @@ export async function runOrphanScan(options: {
         const modified = item.lastModified?.getTime();
         const itemAgeMs = modified && Number.isFinite(modified) ? now - modified : -1;
         if (itemAgeMs < gracePeriodMs) {
-          report.skippedDueToGraceCount++;
+          report.skippedYoungCount++;
           continue;
         }
 
         // It is an unreferenced orphan candidate
         report.orphanCount++;
+        report.eligibleCount++;
         report.orphanBytes += item.size;
         orphanCandidates.push({ key: item.key, size: item.size });
 
@@ -157,12 +188,12 @@ export async function runOrphanScan(options: {
     console.log('====================================================');
     console.log('         SANBOARD R2 MEDIA CLEANUP SCANNER          ');
     console.log('====================================================');
-    console.log(`Mode:               ${execute ? 'EXECUTE (PHYSICAL DELETION)' : 'DRY-RUN (NO DELETION)'}`);
+    console.log(`Mode:               ${execute ? 'EXECUTE (DURABLE QUEUE)' : 'DRY-RUN (NO QUEUE MUTATION)'}`);
     console.log(`Grace Period:       ${graceHours} hours`);
     console.log(`Objects Scanned:    ${report.scannedCount}`);
     console.log(`Valid Referenced:   ${report.referencedCount}`);
     console.log(`Orphan Candidates:  ${report.orphanCount}`);
-    console.log(`Grace-Skipped:      ${report.skippedDueToGraceCount}`);
+    console.log(`Grace-Skipped:      ${report.skippedYoungCount}`);
     console.log(`Candidate Size:     ${(report.orphanBytes / (1024 * 1024)).toFixed(2)} MB (${report.orphanBytes} bytes)`);
     console.log('----------------------------------------------------');
     console.log(`- Avatar Orphans:   ${report.categories.avatars.length}`);
@@ -187,36 +218,51 @@ export async function runOrphanScan(options: {
 
   if (execute) {
     if (orphanCandidates.length === 0) {
-      console.log('Nothing to delete.');
+      report.durationMs = Date.now() - startedAt;
       return report;
     }
 
-    console.log('\n[EXECUTE] Re-validating active references before deletion...');
-    const reCheckedRefs = await collectDbReferences();
-    let deletedCount = 0;
-    let deletedBytes = 0;
+    const client = options.dependencies?.client || getSupabaseAdminClient();
+    if (!client) throw new Error('Supabase admin credentials are required to enqueue orphan cleanup jobs.');
+    const reCheckedRefs = await collectReferences();
 
     for (const candidate of orphanCandidates) {
       if (reCheckedRefs.has(candidate.key)) {
-        console.log(`Skipped newly referenced object: ${candidate.key}`);
+        report.referencedCount++;
+        report.skippedReferencedCount++;
         continue;
       }
       try {
-        const result = await storage.delete(candidate.key);
-        if (!result.success) throw new Error(result.error || 'Storage delete failed.');
-        deletedCount++;
-        deletedBytes += candidate.size;
-      } catch (err: any) {
-        console.error(`Failed to delete ${candidate.key}:`, err.message);
+        const result = await rpc(client, 'enqueue_orphan_media_cleanup_job', {
+          k: candidate.key,
+          t: mediaTypeForKey(candidate.key),
+        });
+        if (result === 'ENQUEUED') report.enqueuedCount++;
+        else if (result === 'ALREADY_QUEUED') report.alreadyQueuedCount++;
+        else if (result === 'REFERENCED') {
+          report.referencedCount++;
+          report.skippedReferencedCount++;
+        } else {
+          throw new Error(`Unexpected orphan enqueue result: ${String(result)}`);
+        }
+      } catch (error) {
+        report.failedCount++;
+        if (!options.quiet) console.error(`Failed to enqueue ${candidate.key}:`, error instanceof Error ? error.message : error);
       }
     }
-
-    console.log(`Successfully deleted ${deletedCount} orphan objects (${(deletedBytes / (1024 * 1024)).toFixed(2)} MB).`);
   } else if (!options.quiet) {
-    console.log('\n[DRY-RUN] No objects were deleted. Use --execute to delete candidate orphans.');
+    console.log('\n[DRY-RUN] No cleanup jobs were enqueued. Use --execute to enqueue candidates.');
   }
 
+  report.durationMs = Date.now() - startedAt;
   return report;
+}
+
+function mediaTypeForKey(key: string): string {
+  if (key.startsWith('avatars/')) return 'AVATAR';
+  if (key.startsWith('dealers/logos/')) return 'CORPORATE_LOGO';
+  if (key.startsWith('dealers/banners/')) return 'CORPORATE_BANNER';
+  return 'LISTING_IMAGE';
 }
 
 if (process.argv[1]?.endsWith('media-cleanup.ts')) {
