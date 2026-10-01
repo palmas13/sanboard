@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
 import { getListingUrl } from '@/lib/urls';
@@ -15,7 +16,6 @@ import {
   AlertTriangle,
   LifeBuoy,
   Loader2,
-  ExternalLink,
   ListPlus,
   Users,
   Calendar,
@@ -32,14 +32,41 @@ import {
   Trash2,
   Plus,
   CheckCircle,
+  EllipsisVertical,
+  Eye,
+  Search,
 } from 'lucide-react';
 import { DealerProfile, Listing } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
-import { formatDate, formatTimeRemaining } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatTimeRemaining } from '@/lib/utils/format';
 import { isListingActivelyFeatured } from '@/lib/listings/featured';
 import { normalizeSocialMedia } from '@/lib/dealers/social';
 import { readJsonResponse } from '@/lib/http/json-response';
-import { canRenewCorporateSubscription } from '@/lib/subscriptions/calendar-month';
+import { canRenewCorporateSubscription, CORPORATE_PERIOD_BOOST_ALLOWANCE } from '@/lib/subscriptions/calendar-month';
+type ListingTypeFilter = 'all' | 'vehicle' | 'property';
+type ListingStatusFilter = 'all' | 'ACTIVE' | 'EXPIRED' | 'SOLD';
+
+function getSubscriptionRemainingLabel(expiresAt?: string | null) {
+  if (!expiresAt) return 'Aktif üyelik';
+  const remainingMs = new Date(expiresAt).getTime() - Date.now();
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) return 'Süresi doldu';
+  const days = Math.max(1, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+  return `${days} gün kaldı`;
+}
+
+function getListingCover(listing: Listing) {
+  const cover = listing.images?.find((image) => image.is_cover) || listing.images?.[0];
+  return cover ? resolveMediaUrl(cover.storage_path) : '';
+}
+
+function getListingStatusPresentation(listing: Listing) {
+  if (listing.status === 'SOLD') return { label: 'Satıldı', className: 'border-blue-400/20 bg-blue-400/10 text-blue-300' };
+  if (listing.status === 'REMOVED') return { label: 'Yayından kaldırıldı', className: 'border-red-400/20 bg-red-400/10 text-red-300' };
+  if (listing.status === 'EXPIRED' || formatTimeRemaining(listing.expires_at).isExpired) {
+    return { label: 'Süresi doldu', className: 'border-amber-400/20 bg-amber-400/10 text-amber-300' };
+  }
+  return { label: 'Aktif', className: 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' };
+}
 
 export default function HesabimKurumsalPage() {
   const router = useRouter();
@@ -61,7 +88,11 @@ export default function HesabimKurumsalPage() {
     activeListings: 0,
   });
   const [followerCount, setFollowerCount] = useState<number>(0);
-  const [storeListings, setStoreListings] = useState<any[]>([]);
+  const [storeListings, setStoreListings] = useState<Listing[]>([]);
+  const [listingTypeFilter, setListingTypeFilter] = useState<ListingTypeFilter>('all');
+  const [listingStatusFilter, setListingStatusFilter] = useState<ListingStatusFilter>('all');
+  const [listingSearch, setListingSearch] = useState('');
+  const [openListingMenuId, setOpenListingMenuId] = useState<string | null>(null);
   const [closeModalListing, setCloseModalListing] = useState<Listing | null>(null);
   const [closeReason, setCloseReason] = useState<'SOLD' | 'CANCELLED' | 'OTHER'>('SOLD');
   const [activeOfferCount, setActiveOfferCount] = useState(0);
@@ -83,6 +114,7 @@ export default function HesabimKurumsalPage() {
 
   const logoInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
+  const listingMenuRef = useRef<HTMLDivElement>(null);
 
   const isSubscriptionExpired = Boolean(
     dealer?.subscription_status === 'EXPIRED' ||
@@ -92,6 +124,33 @@ export default function HesabimKurumsalPage() {
     dealer.subscription_status,
     dealer.subscription_expires_at,
   ));
+  const filteredListings = useMemo(() => {
+    const normalizedSearch = listingSearch.trim().toLocaleLowerCase('tr-TR');
+    return storeListings.filter((listing) => {
+      const matchesType = listingTypeFilter === 'all' || listing.category === listingTypeFilter;
+      const matchesStatus = listingStatusFilter === 'all' || listing.status === listingStatusFilter;
+      const searchable = [listing.title, listing.subcategory, listing.listing_number]
+        .filter(Boolean)
+        .join(' ')
+        .toLocaleLowerCase('tr-TR');
+      return matchesType && matchesStatus && (!normalizedSearch || searchable.includes(normalizedSearch));
+    });
+  }, [listingSearch, listingStatusFilter, listingTypeFilter, storeListings]);
+
+  useEffect(() => {
+    if (!openListingMenuId) return;
+    const closeMenu = (event: MouseEvent | KeyboardEvent) => {
+      if (event instanceof KeyboardEvent && event.key !== 'Escape') return;
+      if (event instanceof MouseEvent && listingMenuRef.current?.contains(event.target as Node)) return;
+      setOpenListingMenuId(null);
+    };
+    document.addEventListener('mousedown', closeMenu);
+    document.addEventListener('keydown', closeMenu);
+    return () => {
+      document.removeEventListener('mousedown', closeMenu);
+      document.removeEventListener('keydown', closeMenu);
+    };
+  }, [openListingMenuId]);
 
   const handleCorporateCreateListing = async () => {
     if (!currentProfile) return;
@@ -775,20 +834,17 @@ export default function HesabimKurumsalPage() {
 
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#FF8A1F] text-black shadow-sm">
-                        <Crown className="w-3 h-3 fill-current" />
-                        PREMIUM SATICI
-                      </span>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        <BadgeCheck className="w-3 h-3" />
-                        ONAYLI KURUMSAL PROFİL
-                      </span>
+                      <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-main)] tracking-tight">
+                        {dealer.company_name}
+                      </h1>
+                      {dealer.is_verified !== false && (
+                        <BadgeCheck className="h-5 w-5 shrink-0 text-emerald-400" aria-label="Doğrulanmış kurumsal profil" />
+                      )}
                     </div>
-
-                    {/* Section 36: No visible #ID near company name */}
-                    <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-main)] tracking-tight">
-                      {dealer.company_name}
-                    </h1>
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[#FF9E45]">
+                      <Crown className="h-3 w-3" />
+                      Premium Satıcı
+                    </span>
 
                     <p className="text-xs text-[var(--text-muted)] max-w-xl line-clamp-2">
                       {dealer.description || 'Los Santos kurumsal vitrin sayfası ve lisanslı işletme.'}
@@ -839,52 +895,89 @@ export default function HesabimKurumsalPage() {
               </div>
             )}
 
-            {/* COMPACT STATS GRID (Section 14: Aktif İlan, Toplam Takipçi, Kalan Öne Çıkarma Hakkı, Üyelik Bitiş Tarihi) */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="surface-card p-4 rounded-xl border border-[var(--border-app)] space-y-1">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="surface-card rounded-xl border border-[var(--border-app)] p-4 transition-colors hover:border-[#FF8A1F]/25">
                 <div className="flex items-center justify-between text-[var(--text-muted)]">
                   <span className="text-xs font-semibold">Aktif İlan</span>
                   <ListPlus className="w-4 h-4 text-[var(--color-success)]" />
                 </div>
-                <p className="text-2xl font-black text-[var(--text-main)]">{stats.activeListings}</p>
+                <p className="mt-2 text-3xl font-black tabular-nums text-[var(--text-main)]">{stats.activeListings}</p>
+                <p className="mt-1 text-[11px] text-[var(--text-dim)]">Şu anda yayında</p>
               </div>
 
-              <div className="surface-card p-4 rounded-xl border border-[var(--border-app)] space-y-1">
+              <div className="surface-card rounded-xl border border-[var(--border-app)] p-4 transition-colors hover:border-[#FF8A1F]/25">
                 <div className="flex items-center justify-between text-[var(--text-muted)]">
                   <span className="text-xs font-semibold">Toplam Takipçi</span>
                   <Users className="w-4 h-4 text-[#FF8A1F]" />
                 </div>
-                <p className="text-2xl font-black text-[var(--text-main)]">{followerCount}</p>
+                <p className="mt-2 text-3xl font-black tabular-nums text-[var(--text-main)]">{followerCount}</p>
+                <p className="mt-1 text-[11px] text-[var(--text-dim)]">Mağazanızı takip edenler</p>
               </div>
 
-              <div className="surface-card p-4 rounded-xl border border-[var(--border-app)] space-y-1">
+              <div className="surface-card rounded-xl border border-[var(--border-app)] p-4 transition-colors hover:border-[#FF8A1F]/25">
                 <div className="flex items-center justify-between text-[var(--text-muted)]">
                   <span className="text-xs font-semibold">Kalan Öne Çıkarma</span>
                   <Sparkles className="w-4 h-4 text-amber-400" />
                 </div>
-                <p className="text-2xl font-black tabular-nums text-[var(--text-main)]">{dealer.boost_credits ?? 0}</p>
+                <p className="mt-2 text-3xl font-black tabular-nums text-[var(--text-main)]">
+                  {dealer.boost_credits ?? 0}<span className="ml-1 text-base font-bold text-[var(--text-dim)]">/ {CORPORATE_PERIOD_BOOST_ALLOWANCE}</span>
+                </p>
+                <p className="mt-1 text-[11px] text-[var(--text-dim)]">Mevcut üyelik döneminde</p>
               </div>
 
-              <div className="surface-card p-4 rounded-xl border border-[var(--border-app)] space-y-1">
+              <div className="surface-card rounded-xl border border-[var(--border-app)] p-4 transition-colors hover:border-[#FF8A1F]/25">
                 <div className="flex items-center justify-between text-[var(--text-muted)]">
-                  <span className="text-xs font-semibold">Üyelik Bitiş Tarihi</span>
+                  <span className="text-xs font-semibold">Üyelik</span>
                   <Calendar className="w-4 h-4 text-[#FF8A1F]" />
                 </div>
-                <p className="text-sm font-extrabold text-[var(--text-main)] truncate mt-1">
-                  {dealer.subscription_expires_at ? formatDate(dealer.subscription_expires_at) : 'Aktif'}
+                <p className="mt-2 text-lg font-black text-[var(--text-main)]">
+                  {getSubscriptionRemainingLabel(dealer.subscription_expires_at)}
+                </p>
+                <p className="mt-1 truncate text-[11px] text-[var(--text-dim)]">
+                  {dealer.subscription_expires_at ? formatDate(dealer.subscription_expires_at) : 'Bitiş tarihi bulunmuyor'}
                 </p>
               </div>
             </div>
 
-            {/* STORE INVENTORY (İlan Yönetimi & Boost) */}
-            <div id="ilanlar" className="surface-card scroll-mt-24 p-6 sm:p-7 rounded-2xl border border-[var(--border-app)] space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-[var(--border-app)]">
-                <div>
-                  <h3 className="text-base font-bold text-[var(--text-main)]">Kurumsal Profile Ait İlanlar</h3>
+            <div id="ilanlar" className="surface-card scroll-mt-24 space-y-5 rounded-2xl border border-[var(--border-app)] p-4 sm:p-6">
+              <div className="flex flex-col gap-4 border-b border-[var(--border-app)] pb-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-lg font-black text-[var(--text-main)]">Kurumsal İlanlar</h2>
+                      <span className="text-xs font-bold text-[#FF9E45]">{stats.activeListings} aktif</span>
+                    </div>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">Mağaza vitrininizi yönetin, ilan durumlarını hızlıca takip edin.</p>
+                  </div>
+                  <label className="relative block w-full sm:w-72">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-dim)]" />
+                    <input
+                      type="search"
+                      value={listingSearch}
+                      onChange={(event) => setListingSearch(event.target.value)}
+                      placeholder="İlanlarda ara"
+                      aria-label="Kurumsal ilanlarda ara"
+                      className="form-input h-10 w-full pl-9 text-xs"
+                    />
+                  </label>
                 </div>
-                <span className="text-xs font-bold text-[#FF8A1F] bg-[var(--brand-orange-subtle)] px-2.5 py-1 rounded-full border border-[#FF8A1F]/20">
-                  {storeListings.length} Toplam İlan
-                </span>
+
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex flex-wrap gap-2" role="group" aria-label="İlan türü filtresi">
+                    {([['all', 'Tümü'], ['vehicle', 'Araç'], ['property', 'Mülk']] as const).map(([value, label]) => (
+                      <button key={value} type="button" onClick={() => setListingTypeFilter(value)} className={`rounded-lg border px-3 py-1.5 text-[11px] font-bold transition-colors ${listingTypeFilter === value ? 'border-[#FF8A1F]/40 bg-[var(--brand-orange-subtle)] text-[#FF9E45]' : 'border-[var(--border-app)] text-[var(--text-muted)] hover:border-[var(--border-app-hover)] hover:text-[var(--text-main)]'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-2" role="group" aria-label="İlan durumu filtresi">
+                    {([['all', 'Tümü'], ['ACTIVE', 'Aktif'], ['EXPIRED', 'Süresi Dolan'], ['SOLD', 'Satılan']] as const).map(([value, label]) => (
+                      <button key={value} type="button" onClick={() => setListingStatusFilter(value)} className={`rounded-lg border px-3 py-1.5 text-[11px] font-bold transition-colors ${listingStatusFilter === value ? 'border-[#FF8A1F]/40 bg-[var(--brand-orange-subtle)] text-[#FF9E45]' : 'border-[var(--border-app)] text-[var(--text-muted)] hover:border-[var(--border-app-hover)] hover:text-[var(--text-main)]'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               {storeListings.length === 0 ? (
@@ -905,94 +998,115 @@ export default function HesabimKurumsalPage() {
                     <span>Kurumsal İlan Ver</span>
                   </button>
                 </div>
+              ) : filteredListings.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-[var(--border-app)] py-10 text-center">
+                  <Search className="mx-auto h-5 w-5 text-[var(--text-dim)]" />
+                  <p className="mt-2 text-xs font-semibold text-[var(--text-muted)]">Bu filtrelerle eşleşen ilan bulunamadı.</p>
+                  <button type="button" onClick={() => { setListingSearch(''); setListingTypeFilter('all'); setListingStatusFilter('all'); }} className="mt-3 text-xs font-bold text-[#FF9E45] hover:text-[#FFB46E]">
+                    Filtreleri temizle
+                  </button>
+                </div>
               ) : (
-                <div className="divide-y divide-[var(--border-app)]">
-                  {storeListings.map((l: any) => {
+                <div className="space-y-3">
+                  {filteredListings.map((l) => {
                     const isBoosted = isListingActivelyFeatured(l);
                     const remaining = formatTimeRemaining(l.expires_at);
+                    const coverImage = getListingCover(l);
+                    const status = getListingStatusPresentation(l);
+                    const canManageActiveListing = l.status === 'ACTIVE' && !remaining.isExpired;
+                    const boostDisabledReason = isSubscriptionExpired
+                      ? 'Abonelik süreniz dolduğu için boost kullanılamaz'
+                      : !canManageActiveListing
+                        ? 'Yalnızca yayındaki ilanlar öne çıkarılabilir'
+                        : (dealer.boost_credits ?? 0) <= 0
+                          ? 'Kalan öne çıkarma hakkınız bulunmuyor'
+                          : '';
                     return (
                       <div
                         key={l.id}
-                        className={`py-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl px-2 ${managedListingId === l.id ? 'bg-[#FF8A1F]/8 ring-1 ring-[#FF8A1F]/30' : ''}`}
+                        data-testid="corporate-listing-card"
+                        className={`group relative rounded-xl border bg-[var(--bg-surface-secondary)]/35 p-3 transition-colors hover:border-[#FF8A1F]/30 hover:bg-[var(--bg-surface-secondary)]/60 ${managedListingId === l.id ? 'border-[#FF8A1F]/40 ring-1 ring-[#FF8A1F]/20' : 'border-[var(--border-app)]'}`}
                       >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-12 h-12 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] overflow-hidden shrink-0">
-                            {l.cover_image ? (
-                              <img
-                                src={resolveMediaUrl(l.cover_image)}
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                          <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden rounded-lg border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] sm:h-24 sm:w-36 sm:aspect-auto lg:h-28 lg:w-44">
+                            {coverImage ? (
+                              <Image
+                                src={coverImage}
                                 alt={l.title}
-                                className="w-full h-full object-cover"
+                                fill
+                                sizes="(max-width: 639px) calc(100vw - 4rem), (max-width: 1023px) 144px, 176px"
+                                className="object-cover transition-transform duration-300 group-hover:scale-[1.025]"
                               />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center text-[var(--text-dim)]">
-                                <ListPlus className="w-5 h-5" />
+                              <div className="flex h-full w-full items-center justify-center text-[var(--text-dim)]">
+                                <ImageIcon className="h-6 w-6" />
                               </div>
                             )}
                           </div>
-                          <div className="min-w-0 space-y-0.5">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-xs font-bold text-[var(--text-main)] truncate max-w-xs sm:max-w-md">
-                                {l.title}
-                              </span>
+                          <div className="min-w-0 flex-1 py-0.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="min-w-0 text-sm font-bold leading-snug text-[var(--text-main)] sm:text-base">{l.title}</h3>
+                              <span className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${status.className}`}>{status.label}</span>
                               {isBoosted && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-gradient-to-r from-amber-500 to-[#FF8A1F] text-white">
-                                  <Sparkles className="w-2.5 h-2.5 fill-current" />
-                                  ÖNE ÇIKARILDI
+                                <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-0.5 text-[9px] font-black text-amber-300" title={l.featured_until ? `Bitiş: ${formatDate(l.featured_until)}` : undefined}>
+                                  <Sparkles className="h-2.5 w-2.5" />
+                                  Aktif Boost{l.featured_until ? ` · ${formatTimeRemaining(l.featured_until).text}` : ''}
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-3 text-[11px] text-[var(--text-muted)]">
-                              <span className="font-bold text-[#FF8A1F]">${l.price?.toLocaleString('tr-TR')}</span>
-                              <span>•</span>
+                            <p className="mt-2 text-lg font-black tracking-tight text-[#FF9E45]">{formatCurrency(l.price)}</p>
+                            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--text-muted)]">
                               <span>{l.category === 'vehicle' ? 'Araç' : 'Mülk'}</span>
-                              <span>•</span>
-                              <span className={`inline-flex items-center gap-1 font-semibold ${remaining.isExpired ? 'text-[var(--color-danger)]' : 'text-[var(--color-success)]'}`}><Clock className="w-3 h-3" />{remaining.text}</span>
+                              <span aria-hidden="true">•</span>
+                              <span>{l.subcategory}</span>
+                              {l.status === 'ACTIVE' && (
+                                <>
+                                  <span aria-hidden="true">•</span>
+                                  <span className={`inline-flex items-center gap-1 font-semibold ${remaining.isExpired ? 'text-amber-300' : 'text-emerald-300'}`}><Clock className="h-3 w-3" />{remaining.text}</span>
+                                </>
+                              )}
                             </div>
                           </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex items-center gap-2 self-end sm:self-center shrink-0 text-xs">
-                          {isBoosted ? (
-                            <span className="px-3 py-1.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[11px] font-bold" title={l.featured_until ? `Bitiş: ${formatDate(l.featured_until)}` : undefined}>
-                              Aktif Boost{l.featured_until ? ` · ${formatTimeRemaining(l.featured_until).text}` : ''}
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleBoostListing(l.id)}
-                              disabled={actionLoading || isSubscriptionExpired || remaining.isExpired || (dealer.boost_credits ?? 0) <= 0}
-                              className="btn-secondary text-[11px] py-1.5 px-3 flex items-center gap-1.5 text-amber-400 hover:border-amber-400/40 cursor-pointer disabled:opacity-50"
-                              title={
-                                isSubscriptionExpired
-                                  ? 'Abonelik süreniz dolduğu için boost kullanılamaz'
-                                  : remaining.isExpired
-                                  ? 'Yayın süresi dolan ilan öne çıkarılamaz'
-                                  : (dealer.boost_credits ?? 0) <= 0
-                                  ? 'Kalan öne çıkarma hakkınız bulunmuyor'
-                                  : '24 saatliğine öne çıkar'
-                              }
-                            >
-                              <Zap className="w-3 h-3" />
-                              <span>Öne Çıkar</span>
-                            </button>
-                          )}
-
-                          <Link href={getListingUrl(l)} className="text-[var(--text-muted)] hover:text-[var(--text-main)]">
-                            Gör
-                          </Link>
-                          <Link href={`/hesabim/ilanlarim/${l.id}/duzenle`} className="text-[#FF8A1F] hover:underline font-medium">
-                            Düzenle
-                          </Link>
-                          {l.status === 'ACTIVE' && !remaining.isExpired && (
-                            <button
-                              type="button"
-                              onClick={() => openCloseListingModal(l)}
-                              className="text-[var(--color-danger)] hover:underline font-medium"
-                            >
-                              İlanı Kapat
-                            </button>
-                          )}
+                          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--border-app)] pt-3 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
+                            <Link href={getListingUrl(l)} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#FF8A1F]/30 bg-[var(--brand-orange-subtle)] px-3 text-xs font-bold text-[#FF9E45] transition-colors hover:border-[#FF8A1F]/50 hover:bg-[#FF8A1F]/15">
+                              <Eye className="h-3.5 w-3.5" />
+                              İlanı Gör
+                            </Link>
+                            <div className="relative" ref={openListingMenuId === l.id ? listingMenuRef : undefined}>
+                              <button type="button" onClick={() => setOpenListingMenuId((current) => current === l.id ? null : l.id)} aria-label={`${l.title} yönetim menüsü`} aria-haspopup="menu" aria-expanded={openListingMenuId === l.id} className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-app)] text-[var(--text-muted)] transition-colors hover:border-[var(--border-app-hover)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-main)]">
+                                <EllipsisVertical className="h-4 w-4" />
+                              </button>
+                              {openListingMenuId === l.id && (
+                                <div role="menu" className="absolute bottom-full right-0 z-30 mb-2 w-52 overflow-hidden rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-1.5 shadow-[0_18px_45px_rgba(0,0,0,.4)] sm:bottom-auto sm:top-full sm:mb-0 sm:mt-2">
+                                  {canManageActiveListing && (
+                                    <Link role="menuitem" href={`/hesabim/ilanlarim/${l.id}/duzenle`} onClick={() => setOpenListingMenuId(null)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-secondary)] hover:text-[var(--text-main)]">
+                                      <Edit3 className="h-3.5 w-3.5" />İlanı Düzenle
+                                    </Link>
+                                  )}
+                                  {!isBoosted && (
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      onClick={() => { setOpenListingMenuId(null); void handleBoostListing(l.id); }}
+                                      disabled={actionLoading || Boolean(boostDisabledReason)}
+                                      title={boostDisabledReason || '24 saatliğine öne çıkar'}
+                                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-amber-300 transition-colors hover:bg-amber-400/10 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                      <Zap className="h-3.5 w-3.5" />Öne Çıkar
+                                    </button>
+                                  )}
+                                  {canManageActiveListing && (
+                                    <>
+                                      <div className="my-1 border-t border-[var(--border-app)]" />
+                                      <button type="button" role="menuitem" onClick={() => { setOpenListingMenuId(null); void openCloseListingModal(l); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-red-300 transition-colors hover:bg-red-400/10">
+                                        <XCircle className="h-3.5 w-3.5" />İlanı Kapat
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     );

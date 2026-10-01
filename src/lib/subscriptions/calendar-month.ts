@@ -10,6 +10,7 @@ export function addCalendarMonth(value: Date): Date {
 }
 
 export const CORPORATE_RENEWAL_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+export const CORPORATE_PERIOD_BOOST_ALLOWANCE = 3;
 
 export function canRenewCorporateSubscription(
   subscriptionStatus: string | null | undefined,
