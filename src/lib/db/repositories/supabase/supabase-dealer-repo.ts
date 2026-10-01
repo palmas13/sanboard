@@ -1,7 +1,8 @@
 import { IDealerRepository } from '../types';
 import { getSupabaseClient, getSupabaseAdminClient } from '../../supabase-client';
 import { CorporateApplication, CorporateProfile, CharacterProfile } from '@/types';
-import { uploadCorporateLogo, uploadCorporateBanner, getStorageProvider } from '@/lib/storage';
+import { uploadCorporateLogo, uploadCorporateBanner } from '@/lib/storage';
+import { deleteMediaSafely } from '@/lib/storage/lifecycle';
 import { normalizePhone } from '@/lib/utils/format';
 import { normalizeSocialMedia } from '@/lib/dealers/social';
 import { notifyNewFollowerBestEffort } from '../../follow-notifications';
@@ -195,7 +196,6 @@ export class SupabaseDealerRepository implements IDealerRepository {
 
   async updateDealerProfile(id: string, data: Partial<CorporateProfile>): Promise<{ success: boolean; dealer?: CorporateProfile; error?: string }> {
     const client = this.getAdminClient();
-    const storage = getStorageProvider();
 
     // 1. Fetch current profile to capture old asset keys for cleanup
     const existing = await this.getDealerById(id);
@@ -240,13 +240,13 @@ export class SupabaseDealerRepository implements IDealerRepository {
       if (matches) {
         const mime = matches[1].toLowerCase();
         if (mime.includes('svg')) {
-          if (isNewLogoUpload && newLogoKey) await storage.delete(newLogoKey);
+          if (isNewLogoUpload && newLogoKey) await deleteMediaSafely(newLogoKey, 'CORPORATE_LOGO', 'CORPORATE_LOGO_REPLACED');
           return { success: false, error: 'SVG formatı kabul edilmemektedir. Lütfen PNG, JPG, JPEG veya WEBP kullanınız.' };
         }
         const buffer = Buffer.from(matches[2], 'base64');
         const uploadRes = await uploadCorporateBanner(buffer, id, mime);
         if (!uploadRes.success) {
-          if (isNewLogoUpload && newLogoKey) await storage.delete(newLogoKey);
+          if (isNewLogoUpload && newLogoKey) await deleteMediaSafely(newLogoKey, 'CORPORATE_LOGO', 'CORPORATE_LOGO_REPLACED');
           return { success: false, error: `R2 banner yükleme hatası: ${uploadRes.error}` };
         }
         newBannerKey = uploadRes.key;
@@ -306,17 +306,17 @@ export class SupabaseDealerRepository implements IDealerRepository {
 
     if (error || !resData) {
       // Cleanup newly uploaded objects if DB update failed
-      if (isNewLogoUpload && newLogoKey) await storage.delete(newLogoKey);
-      if (isNewBannerUpload && newBannerKey) await storage.delete(newBannerKey);
+      if (isNewLogoUpload && newLogoKey) await deleteMediaSafely(newLogoKey, 'CORPORATE_LOGO', 'CORPORATE_LOGO_REPLACED');
+      if (isNewBannerUpload && newBannerKey) await deleteMediaSafely(newBannerKey, 'CORPORATE_BANNER', 'CORPORATE_BANNER_REPLACED');
       return { success: false, error: error?.message || 'Veritabanı güncellenemedi.' };
     }
 
     // 6. DB update succeeded: cleanup old assets from R2
     if (isNewLogoUpload && oldLogoKey && oldLogoKey !== newLogoKey) {
-      await storage.delete(oldLogoKey);
+      await deleteMediaSafely(oldLogoKey, 'CORPORATE_LOGO', 'CORPORATE_LOGO_REPLACED');
     }
     if (isNewBannerUpload && oldBannerKey && oldBannerKey !== newBannerKey) {
-      await storage.delete(oldBannerKey);
+      await deleteMediaSafely(oldBannerKey, 'CORPORATE_BANNER', 'CORPORATE_BANNER_REPLACED');
     }
 
     return { success: true, dealer: mapCorporateProfile(resData)! };

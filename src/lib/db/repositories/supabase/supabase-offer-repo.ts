@@ -16,7 +16,8 @@ export class SupabaseOfferRepository implements IOfferRepository {
     const corporate=Array.isArray(thread.listing?.corporate)?thread.listing.corporate[0]:thread.listing?.corporate;
     const contact=withContact&&thread.status==='ACCEPTED'?(thread.listing?.seller_type==='CORPORATE'&&corporate?{phone:corporate.phone||'',sanmail_email:corporate.email||''}:redactPrivateContact(thread.seller)):undefined;
     const safeProfile=(profile:any)=>profile?{id:profile.id,public_id:profile.public_id,full_name:profile.full_name,avatar_url:profile.avatar_url||'',avatar_path:profile.avatar_path||''}:undefined;
-    return {...thread,buyer:safeProfile(thread.buyer),seller:safeProfile(thread.seller),events,actor_side:side,unread_count:events.filter((event:any)=>event.actor_profile_id!==actorProfileId&&(!readAt||event.created_at>readAt)).length,visible_contact:contact?{phone:contact.phone,sanmail_email:contact.sanmail_email}:undefined};
+    const historicalListing=thread.listing||thread.listing_snapshot;
+    return {...thread,listing:historicalListing,buyer:safeProfile(thread.buyer),seller:safeProfile(thread.seller),events,actor_side:side,unread_count:events.filter((event:any)=>event.actor_profile_id!==actorProfileId&&(!readAt||event.created_at>readAt)).length,visible_contact:contact?{phone:contact.phone,sanmail_email:contact.sanmail_email}:undefined};
   }
   async createOffer(input:any){const {data,error}=await this.client().rpc('create_offer_thread',{p_actor_profile_id:input.actorProfileId,p_listing_id:input.listingId,p_amount:input.amount});return this.result(data,error);}
   async actOnOffer(input:any){const {data,error}=await this.client().rpc('act_on_offer_thread',{p_actor_profile_id:input.actorProfileId,p_thread_id:input.threadId,p_action:input.action,p_amount:input.amount??null});return this.result(data,error);}

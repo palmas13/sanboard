@@ -299,7 +299,9 @@ export interface OfferEvent {
 
 export interface OfferThread {
   id: string;
-  listing_id: string;
+  listing_id: string | null;
+  original_listing_id?: string;
+  listing_snapshot?: Partial<Listing> | null;
   buyer_profile_id: string;
   seller_profile_id: string;
   seller_corporate_profile_id?: string | null;
@@ -351,7 +353,9 @@ export type ReportStatus = 'PENDING' | 'RESOLVED' | 'DISMISSED';
 export interface Report {
   id: string;
   reporter_profile_id: string;
-  listing_id: string;
+  listing_id: string | null;
+  historical_listing_id?: string;
+  listing_snapshot?: Partial<Listing> | null;
   reason: ReportReason;
   description: string;
   status: ReportStatus;

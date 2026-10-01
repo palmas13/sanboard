@@ -1,21 +1,13 @@
-import { timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { runExpiryLifecycle } from '@/lib/lifecycle/expiry';
+import { isAuthorizedWorkerRequest } from '@/lib/internal/worker-auth';
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
-function isAuthorized(request: NextRequest): boolean {
-  const secret = process.env.LIFECYCLE_CRON_SECRET;
-  const authorization = request.headers.get('authorization');
-  if (!secret || secret.length < 32 || !authorization?.startsWith('Bearer ')) return false;
-  const supplied = authorization.slice('Bearer '.length);
-  const expectedBuffer = Buffer.from(secret, 'utf8');
-  const suppliedBuffer = Buffer.from(supplied, 'utf8');
-  return expectedBuffer.length === suppliedBuffer.length && timingSafeEqual(expectedBuffer, suppliedBuffer);
-}
-
-export async function POST(request: NextRequest) {
-  if (!isAuthorized(request)) {
+async function run(request: NextRequest) {
+  if (!isAuthorizedWorkerRequest(request)) {
     return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
   }
   try {
@@ -25,3 +17,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Lifecycle operation failed.' }, { status: 500 });
   }
 }
+
+export const GET = run;
+export const POST = run;

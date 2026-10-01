@@ -1,6 +1,22 @@
-import { StorageProvider, StorageUploadOptions, StorageUploadResult, StorageDeleteResult } from './types';
+import {
+  StorageProvider,
+  StorageUploadOptions,
+  StorageUploadResult,
+  StorageDeleteResult,
+  StorageDeleteManyResult,
+} from './types';
+
+export interface MockStorageProviderOptions {
+  /** Keys whose deletion should fail, for testing partial-failure handling. */
+  failDeletesFor?: Iterable<string>;
+}
 
 export class MockStorageProvider implements StorageProvider {
+  private readonly failedDeleteKeys: Set<string>;
+
+  constructor(options: MockStorageProviderOptions = {}) {
+    this.failedDeleteKeys = new Set(options.failDeletesFor);
+  }
   isAvailable(): boolean {
     return true;
   }
@@ -47,8 +63,22 @@ export class MockStorageProvider implements StorageProvider {
   }
 
   async delete(key: string): Promise<StorageDeleteResult> {
+    if (this.failedDeleteKeys.has(key)) {
+      return { success: false, error: `Injected delete failure for ${key}` };
+    }
+    // Deleting a missing object is intentionally idempotent.
     this.objects.delete(key);
     return { success: true };
+  }
+
+  async deleteMany(keys: string[]): Promise<StorageDeleteManyResult> {
+    const results = await Promise.all(
+      keys.map(async (key) => ({ key, ...(await this.delete(key)) }))
+    );
+    return {
+      success: results.every((result) => result.success),
+      results,
+    };
   }
 
   async list(prefix?: string): Promise<{

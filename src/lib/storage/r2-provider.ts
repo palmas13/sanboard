@@ -1,5 +1,18 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { StorageProvider, StorageUploadOptions, StorageUploadResult, StorageDeleteResult } from './types';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
+  ListObjectsV2Command,
+} from '@aws-sdk/client-s3';
+import {
+  StorageProvider,
+  StorageUploadOptions,
+  StorageUploadResult,
+  StorageDeleteResult,
+  StorageDeleteManyItemResult,
+  StorageDeleteManyResult,
+} from './types';
 
 const ALLOWED_STORAGE_PREFIXES = [
   'avatars/',
@@ -177,6 +190,91 @@ export class CloudflareR2StorageProvider implements StorageProvider {
         error: err?.message || 'Dosya silinemedi.',
       };
     }
+  }
+
+  async deleteMany(keys: string[]): Promise<StorageDeleteManyResult> {
+    const results: StorageDeleteManyItemResult[] = new Array(keys.length);
+    const pending: { original: string; cleanKey: string; index: number }[] = [];
+
+    for (const [index, keyOrUrl] of keys.entries()) {
+      if (!keyOrUrl || typeof keyOrUrl !== 'string') {
+        results[index] = { key: keyOrUrl, success: true };
+        continue;
+      }
+      if (keyOrUrl.includes('images.unsplash.com') || keyOrUrl.startsWith('data:')) {
+        results[index] = { key: keyOrUrl, success: true };
+        continue;
+      }
+
+      let cleanKey = keyOrUrl;
+      if (cleanKey.startsWith('http://') || cleanKey.startsWith('https://')) {
+        try {
+          cleanKey = new URL(cleanKey).pathname;
+        } catch {
+          // Retain the original value and let normal validation reject it.
+        }
+      }
+      cleanKey = cleanKey.replace(/^\/+/, '');
+
+      if (cleanKey.includes('..') || cleanKey.includes('\\')) {
+        results[index] = { key: keyOrUrl, success: false, error: 'Geçersiz dosya anahtarı.' };
+      } else if (!ALLOWED_STORAGE_PREFIXES.some((prefix) => cleanKey.startsWith(prefix))) {
+        results[index] = {
+          key: keyOrUrl,
+          success: false,
+          error: 'Bu dizindeki dosyaları silme yetkiniz yok.',
+        };
+      } else {
+        pending.push({ original: keyOrUrl, cleanKey, index });
+      }
+    }
+
+    if (pending.length && (!this.isAvailable() || !this.client)) {
+      for (const item of pending) {
+        results[item.index] = {
+          key: item.original,
+          success: false,
+          error: 'Cloudflare R2 is not configured.',
+        };
+      }
+    } else {
+      // S3/R2 DeleteObjects accepts at most 1,000 objects per request.
+      for (let offset = 0; offset < pending.length; offset += 1000) {
+        const chunk = pending.slice(offset, offset + 1000);
+        try {
+          const response = await this.client!.send(new DeleteObjectsCommand({
+            Bucket: this.bucketName,
+            Delete: {
+              Objects: chunk.map(({ cleanKey }) => ({ Key: cleanKey })),
+              Quiet: false,
+            },
+          }));
+          const errors = response.Errors || [];
+          const unknownError = errors.find((error) => !error.Key);
+
+          for (const item of chunk) {
+            const itemError = errors.find((error) => error.Key === item.cleanKey) || unknownError;
+            results[item.index] = itemError
+              ? {
+                  key: item.original,
+                  success: false,
+                  error: itemError.Message || itemError.Code || 'Dosya silinemedi.',
+                }
+              : { key: item.original, success: true };
+          }
+        } catch (err: any) {
+          const error = err?.message || 'Dosya silinemedi.';
+          for (const item of chunk) {
+            results[item.index] = { key: item.original, success: false, error };
+          }
+        }
+      }
+    }
+
+    return {
+      success: results.every((result) => result.success),
+      results,
+    };
   }
 
   async list(

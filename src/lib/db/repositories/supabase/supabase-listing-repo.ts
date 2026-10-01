@@ -992,40 +992,18 @@ export class SupabaseListingRepository implements IListingRepository {
     // Update images if provided
     if (input.images) {
       // 1. Collect existing images to detect removed objects for R2 cleanup
-      const { data: existingImgs } = await client
-        .from('listing_images')
-        .select('storage_path')
-        .eq('listing_id', id);
-
-      const oldPaths = new Set(
-        (existingImgs || [])
-          .map((img: any) => img.storage_path)
-          .filter((p: any) => Boolean(p) && typeof p === 'string')
-      );
-
-      const retainedPaths = new Set<string>();
-
-      await client.from('listing_images').delete().eq('listing_id', id);
-      for (let i = 0; i < input.images.length; i++) {
-        const finalPath = input.images[i].storage_path;
-
-        retainedPaths.add(finalPath);
-
-        await client.from('listing_images').insert({
-          listing_id: id,
-          storage_path: finalPath,
-          sort_order: input.images[i].sort_order ?? i,
-          is_cover: Boolean(input.images[i].is_cover ?? i === 0),
-          size_bytes: input.images[i].size_bytes || 500000,
-        });
-      }
-
-      // 2. Safely delete removed objects from R2
-      const mediaType = existing.category === 'vehicle' ? 'VEHICLE_IMAGE' : 'PROPERTY_IMAGE';
-      for (const oldKey of oldPaths) {
-        if (!retainedPaths.has(oldKey)) {
-          await deleteMediaSafely(oldKey, mediaType, 'LISTING_IMAGE_REMOVED').catch(() => {});
-        }
+      const images = input.images.map((image, index) => ({
+        storage_path: image.storage_path,
+        sort_order: image.sort_order ?? index,
+        is_cover: Boolean(image.is_cover ?? index === 0),
+        size_bytes: image.size_bytes || 500000,
+      }));
+      const { data: imageResult, error: imageError } = await client.rpc('replace_listing_images_atomic', {
+        p_listing_id: id,
+        p_images: images,
+      });
+      if (imageError || !imageResult?.success) {
+        return { success: false, error: imageResult?.error || imageError?.message || 'İlan görselleri güncellenemedi.' };
       }
     }
 
@@ -1099,8 +1077,11 @@ export class SupabaseListingRepository implements IListingRepository {
       });
     }
     if (status === 'REMOVED') {
-      await this.cleanupListingMedia(id, listing.category, 'LISTING_REMOVED');
-      await client.from('listings').delete().eq('id', id).throwOnError();
+      const { error: enqueueError } = await client.rpc('enqueue_listing_purge_job', {
+        lid: id,
+        r: isAdminAction ? 'ADMIN_PERMANENT_DELETE' : 'LISTING_REMOVED',
+      });
+      if (enqueueError) return { success: false, error: `İlan kaldırıldı ancak temizleme işi oluşturulamadı: ${enqueueError.message}` };
     }
 
     return { success: true, listing: { ...listing, ...(closeResult.listing || {}), status, images: [] } };

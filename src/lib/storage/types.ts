@@ -25,6 +25,17 @@ export interface StorageDeleteResult {
   error?: string;
 }
 
+export interface StorageDeleteManyItemResult extends StorageDeleteResult {
+  /** The key (or URL) supplied by the caller. */
+  key: string;
+}
+
+export interface StorageDeleteManyResult {
+  /** False when at least one requested key could not be deleted. */
+  success: boolean;
+  results: StorageDeleteManyItemResult[];
+}
+
 export interface StorageProvider {
   /**
    * Uploads binary file buffer to storage.
@@ -38,6 +49,12 @@ export interface StorageProvider {
    * Deletes a file from storage by its key/path.
    */
   delete(key: string): Promise<StorageDeleteResult>;
+
+  /**
+   * Deletes several files and reports the outcome for every supplied key.
+   * Providers may implement this with their native bulk API.
+   */
+  deleteMany?(keys: string[]): Promise<StorageDeleteManyResult>;
 
   /**
    * Resolves the public CDN/access URL for a given storage key.

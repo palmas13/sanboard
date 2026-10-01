@@ -41,8 +41,8 @@ describe('listing close lifecycle', () => {
     assert.match(migration, /price BIGINT/);
     assert.match(migration, /description TEXT/);
     assert.match(migration, /closed_at TIMESTAMPTZ/);
-    assert.match(cleanup, /24 \* 60 \* 60 \* 1000/);
-    assert.match(cleanup, /deleteMediaSafely/);
-    assert.match(cleanup, /pending retry/);
+    assert.match(cleanup, /runListingPurgeWorker/);
+    assert.doesNotMatch(cleanup, /from\('listings'\)\.delete/);
+    assert.doesNotMatch(cleanup, /deleteMediaSafely/);
   });
 });

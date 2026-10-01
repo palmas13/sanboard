@@ -1,0 +1,146 @@
+import { describe, test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { runListingPurgeWorker } from '@/lib/lifecycle/listing-purge-worker';
+import { runMediaCleanupWorker } from '@/lib/lifecycle/media-cleanup-worker';
+import { MockStorageProvider } from '@/lib/storage/mock-provider';
+
+function clientFor(handlers: Record<string, (args: Record<string, unknown>) => unknown>) {
+  const calls: { name: string; args: Record<string, unknown> }[] = [];
+  return {
+    calls,
+    client: {
+      async rpc(name: string, args: Record<string, unknown> = {}) {
+        calls.push({ name, args });
+        try { return { data: handlers[name]?.(args) ?? null, error: null }; }
+        catch (error) { return { data: null, error: { message: error instanceof Error ? error.message : String(error) } }; }
+      },
+    },
+  };
+}
+
+describe('durable purge workers', () => {
+  test('listing purge deletes media, records the media phase, then purges DB', async () => {
+    const storage = new MockStorageProvider();
+    await storage.upload(Buffer.from('x'), { fileName: 'x.webp', category: 'listing', contentType: 'image/webp', key: 'listings/a/x.webp' });
+    const mock = clientFor({
+      discover_listing_purge_jobs: () => 1,
+      claim_listing_purge_jobs: () => [{ id: 'job', listing_id: 'listing', lock_token: 'lock', media_keys: ['listings/a/x.webp'], attempts: 1, max_attempts: 3 }],
+      is_media_key_referenced: () => false,
+      complete_listing_purge_media_key: () => true,
+      finalize_listing_purge: () => ({ success: true, result: 'DONE' }),
+    });
+    const counts = await runListingPurgeWorker({ dependencies: { client: mock.client, storage } });
+    assert.equal(counts.mediaDeleted, 1);
+    assert.equal(counts.dbPurged, 1);
+    assert.deepEqual(mock.calls.map((call) => call.name), [
+      'discover_listing_purge_jobs', 'claim_listing_purge_jobs', 'is_media_key_referenced',
+      'complete_listing_purge_media_key', 'finalize_listing_purge',
+    ]);
+  });
+
+  test('shared reference prevents deletion and schedules retry', async () => {
+    const storage = new MockStorageProvider();
+    let deletes = 0;
+    const original = storage.deleteMany.bind(storage);
+    storage.deleteMany = async (keys) => { deletes++; return original(keys); };
+    const mock = clientFor({
+      discover_listing_purge_jobs: () => 0,
+      claim_listing_purge_jobs: () => [{ id: 'job', listing_id: 'listing', lock_token: 'lock', media_keys: ['listings/a/x.webp'], attempts: 1, max_attempts: 3 }],
+      is_media_key_referenced: () => true,
+      retry_listing_purge_job: () => true,
+    });
+    const counts = await runListingPurgeWorker({ dependencies: { client: mock.client, storage } });
+    assert.equal(deletes, 0);
+    assert.equal(counts.referenced, 1);
+    assert.equal(counts.retried, 1);
+  });
+
+  test('stale lifecycle is counted as cancelled, not retried', async () => {
+    const mock = clientFor({
+      discover_listing_purge_jobs: () => 0,
+      claim_listing_purge_jobs: () => [{ id: 'job', listing_id: 'listing', lock_token: 'lock', media_keys: [] }],
+      finalize_listing_purge: () => ({ success: false, result: 'CANCELLED_STALE' }),
+    });
+    const counts = await runListingPurgeWorker({ dependencies: { client: mock.client, storage: new MockStorageProvider() } });
+    assert.equal(counts.cancelled, 1);
+    assert.equal(counts.retried, 0);
+  });
+
+  test('media failure retries and max-attempt failure is observable', async () => {
+    const storage = new MockStorageProvider({ failDeletesFor: ['avatars/a.webp'] });
+    const mock = clientFor({
+      claim_media_cleanup_jobs: () => [{ id: 'media', lock_token: 'lock', object_key: 'avatars/a.webp', attempt_count: 12, max_attempts: 12 }],
+      is_media_key_referenced: () => false,
+      retry_media_cleanup_job: () => true,
+    });
+    const counts = await runMediaCleanupWorker({ dependencies: { client: mock.client, storage } });
+    assert.equal(counts.failed, 1);
+    assert.equal(counts.completed, 0);
+  });
+
+  test('media worker never deletes a key that became referenced again', async () => {
+    const storage = new MockStorageProvider();
+    let deletes = 0;
+    storage.delete = async () => { deletes++; return { success: true }; };
+    const mock = clientFor({
+      claim_media_cleanup_jobs: () => [{ id: 'media', lock_token: 'lock', object_key: 'avatars/current.webp', attempt_count: 1, max_attempts: 12 }],
+      is_media_key_referenced: () => true,
+      retry_media_cleanup_job: () => true,
+    });
+    const counts = await runMediaCleanupWorker({ dependencies: { client: mock.client, storage } });
+    assert.equal(deletes, 0);
+    assert.equal(counts.referenced, 1);
+    assert.equal(counts.retried, 1);
+  });
+});
+
+describe('purge migration contract', () => {
+  const migration = fs.readFileSync(path.join(process.cwd(), 'supabase/migrations/20261002030000_durable_listing_purge_and_media_jobs.sql'), 'utf8');
+  test('contains exact retention rules and atomic claims', () => {
+    assert.match(migration, /closed_at<=now\(\)-interval '24 hours'/);
+    assert.match(migration, /expires_at<=now\(\)-interval '7 days'/);
+    assert.match(migration, /FOR UPDATE SKIP LOCKED/g);
+    assert.match(migration, /'FAILED','CANCELLED'/);
+    assert.match(migration, /idempotency_key text NOT NULL UNIQUE/);
+  });
+  test('preserves protected history and hard-purges operational listing data', () => {
+    assert.match(migration, /original_listing_id/);
+    assert.match(migration, /historical_listing_id/);
+    assert.match(migration, /historical_target_listing_id/);
+    assert.match(migration, /ON DELETE SET NULL/);
+    assert.match(migration, /DELETE FROM listing_price_history/);
+    assert.match(migration, /DELETE FROM listings WHERE id=l\.id/);
+    assert.doesNotMatch(migration, /DELETE FROM payments/);
+    assert.doesNotMatch(migration, /DELETE FROM offer_threads/);
+    assert.doesNotMatch(migration, /DELETE FROM reports/);
+  });
+
+  test('listing image replacement reads the locked database category and enforces canonical limits', () => {
+    assert.match(migration, /replace_listing_images_atomic\(p_listing_id uuid,p_images jsonb\)/);
+    assert.match(migration, /SELECT \* INTO l FROM listings WHERE id=p_listing_id FOR UPDATE/);
+    assert.match(migration, /image_count:=jsonb_array_length\(p_images\)/);
+    assert.match(migration, /IF image_count<1 THEN RAISE EXCEPTION 'invalid images'/);
+    assert.match(migration, /IF l\.category='vehicle'AND image_count>3 THEN RAISE EXCEPTION 'invalid images'/);
+    assert.match(migration, /IF l\.category='property'AND image_count>5 THEN RAISE EXCEPTION 'invalid images'/);
+    assert.doesNotMatch(migration, /jsonb_array_length\([^)]*\)NOT BETWEEN 1 AND 20/);
+  });
+
+  test('listing image replacement accepts only category-valid counts with exactly one cover', () => {
+    const accepted = (category: 'vehicle' | 'property', imageCount: number, coverCount: number) =>
+      imageCount >= 1 && imageCount <= (category === 'vehicle' ? 3 : 5) && coverCount === 1;
+
+    assert.equal(accepted('vehicle', 1, 1), true);
+    assert.equal(accepted('vehicle', 3, 1), true);
+    assert.equal(accepted('vehicle', 4, 1), false);
+    assert.equal(accepted('property', 1, 1), true);
+    assert.equal(accepted('property', 5, 1), true);
+    assert.equal(accepted('property', 6, 1), false);
+    assert.equal(accepted('vehicle', 0, 0), false);
+    assert.equal(accepted('property', 0, 0), false);
+    assert.equal(accepted('vehicle', 2, 2), false);
+    assert.equal(accepted('property', 2, 0), false);
+    assert.match(migration, /SELECT count\(\*\)FROM jsonb_array_elements\(p_images\)x WHERE coalesce\(\(x->>'is_cover'\)::boolean,false\)\)<>1/);
+  });
+});

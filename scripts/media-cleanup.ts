@@ -3,6 +3,7 @@ import { getSupabaseAdminClient } from '../src/lib/db/supabase-client';
 import { extractObjectKey } from '../src/lib/media/url';
 import { isValidSanboardStorageKey } from '../src/lib/storage/lifecycle';
 import { db } from '../src/lib/db/store';
+import { runMediaCleanupWorker } from '../src/lib/lifecycle/media-cleanup-worker';
 
 interface ScanReport {
   scannedCount: number;
@@ -32,33 +33,22 @@ async function collectDbReferences(): Promise<Set<string>> {
 
   if (process.env.DATA_STORE === 'supabase') {
     const client = getSupabaseAdminClient();
-    if (client) {
-      // 1. Character avatars
-      const { data: profiles } = await client.from('character_profiles').select('avatar_path, avatar_url');
-      (profiles || []).forEach((p: any) => {
-        addKey(p.avatar_path);
-        addKey(p.avatar_url);
-      });
-
-      // 2. Corporate logos and banners
-      const { data: dealers } = await client
-        .from('corporate_profiles')
-        .select('logo_path, logo_url, banner_path, banner_url');
-      (dealers || []).forEach((d: any) => {
-        addKey(d.logo_path);
-        addKey(d.logo_url);
-        addKey(d.banner_path);
-        addKey(d.banner_url);
-      });
-
-      // 3. Listing images
-      const { data: images } = await client.from('listing_images').select('storage_path');
-      (images || []).forEach((i: any) => {
-        addKey(i.storage_path);
-      });
-
-      return referencedKeys;
-    }
+    if (!client) throw new Error('Supabase admin credentials are required for orphan reconciliation.');
+    const pageSize = 1000;
+    const collect = async (table: string, columns: string, consume: (row: any) => void) => {
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await client.from(table).select(columns).range(from, from + pageSize - 1);
+        if (error) throw new Error(`Reference query failed for ${table}: ${error.message}`);
+        (data || []).forEach(consume);
+        if ((data || []).length < pageSize) break;
+      }
+    };
+    await collect('character_profiles', 'avatar_path, avatar_url', (p) => { addKey(p.avatar_path); addKey(p.avatar_url); });
+    await collect('corporate_profiles', 'logo_path, logo_url, banner_path, banner_url', (d) => {
+      addKey(d.logo_path); addKey(d.logo_url); addKey(d.banner_path); addKey(d.banner_url);
+    });
+    await collect('listing_images', 'storage_path', (i) => addKey(i.storage_path));
+    return referencedKeys;
   }
 
   // Memory fallback
@@ -83,9 +73,12 @@ export async function runOrphanScan(options: {
   execute?: boolean;
   graceHours?: number;
   quiet?: boolean;
+  maxObjects?: number;
 }) {
   const execute = Boolean(options.execute);
   const graceHours = options.graceHours !== undefined ? options.graceHours : 24;
+  if (!Number.isFinite(graceHours) || graceHours < 1) throw new Error('graceHours must be at least 1.');
+  const maxObjects = Math.max(1, Math.min(10_000, Math.floor(options.maxObjects || 5_000)));
   const gracePeriodMs = graceHours * 60 * 60 * 1000;
   const now = Date.now();
 
@@ -114,12 +107,16 @@ export async function runOrphanScan(options: {
   for (const prefix of prefixes) {
     let continuationToken: string | undefined = undefined;
 
-    if (typeof storage.list !== 'function') break;
+    if (typeof storage.list !== 'function') throw new Error('Storage provider does not support paginated listing.');
     do {
       const page = await storage.list(prefix, continuationToken);
       continuationToken = page.nextContinuationToken;
 
       for (const item of (page.objects || [])) {
+        if (report.scannedCount >= maxObjects) {
+          continuationToken = undefined;
+          break;
+        }
         report.scannedCount++;
 
         if (referencedKeys.has(item.key)) {
@@ -128,7 +125,9 @@ export async function runOrphanScan(options: {
         }
 
         // Check grace period
-        const itemAgeMs = item.lastModified ? now - item.lastModified.getTime() : Infinity;
+        // Unknown/invalid timestamps fail safe: never infer that an object is old.
+        const modified = item.lastModified?.getTime();
+        const itemAgeMs = modified && Number.isFinite(modified) ? now - modified : -1;
         if (itemAgeMs < gracePeriodMs) {
           report.skippedDueToGraceCount++;
           continue;
@@ -203,7 +202,8 @@ export async function runOrphanScan(options: {
         continue;
       }
       try {
-        await storage.delete(candidate.key);
+        const result = await storage.delete(candidate.key);
+        if (!result.success) throw new Error(result.error || 'Storage delete failed.');
         deletedCount++;
         deletedBytes += candidate.size;
       } catch (err: any) {
@@ -225,7 +225,11 @@ if (process.argv[1]?.endsWith('media-cleanup.ts')) {
   const graceArg = args.find((a) => a.startsWith('--grace-hours='));
   const graceHours = graceArg ? parseFloat(graceArg.split('=')[1]) : 24;
 
-  runOrphanScan({ execute: isExecute, graceHours })
+  const operation = args.includes('--orphan-scan')
+    ? runOrphanScan({ execute: isExecute, graceHours })
+    : runMediaCleanupWorker();
+
+  operation
     .then(() => process.exit(0))
     .catch((err) => {
       console.error('Media cleanup error:', err);
