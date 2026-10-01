@@ -124,7 +124,7 @@ describe('premium listing detail redesign', () => {
     assert.match(gallery, /ArrowLeft/);
     assert.match(gallery, /ArrowRight/);
     assert.match(gallery, /Escape/);
-    assert.match(gallery, /quality=\{92\}/);
+    assert.match(gallery, /priority unoptimized onLoad=\{startGalleryPreload\}/);
     assert.match(gallery, /const aspect = variant === 'property'/);
     assert.match(gallery, /\(min-width: 1280px\) 52vw, 100vw/);
     assert.doesNotMatch(gallery, /aspect-\[4\/3\]/);
