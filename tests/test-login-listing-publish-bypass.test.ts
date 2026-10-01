@@ -5,6 +5,7 @@ import { db } from '@/lib/db/store';
 import { createSessionToken } from '@/lib/auth/session';
 import { GET as getCredits } from '@/app/api/credits/route';
 import { POST as publishListing } from '@/app/api/listings/route';
+import { PUT as updateListing } from '@/app/api/user/listings/[id]/route';
 import { POST as boostListing } from '@/app/api/dealers/boost/route';
 import { TEST_LOGIN_FIXTURE_ACCOUNT_ID, TEST_LOGIN_CHARACTER_PREFIX } from '@/lib/auth/test-login';
 
@@ -46,6 +47,15 @@ describe('canonical test-login listing publish bypass', () => {
     const token = createSessionToken({ userId, profileId, role: 'USER' });
     return new NextRequest('http://localhost/api/listings', {
       method: 'POST',
+      headers: { cookie: `sanboard_session=${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  function updateRequest(profileId: string, userId: string, listingId: string, body: Record<string, unknown>) {
+    const token = createSessionToken({ userId, profileId, role: 'USER' });
+    return new NextRequest(`http://localhost/api/user/listings/${listingId}`, {
+      method: 'PUT',
       headers: { cookie: `sanboard_session=${token}`, 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
@@ -94,16 +104,28 @@ describe('canonical test-login listing publish bypass', () => {
   });
 
   test('property publish succeeds with five metadata-only image references', async () => {
-    const response = await publishListing(request(testProfileId, testUserId, {
+    const propertyPayload = {
       category: 'property', subcategory: 'Ev / Daire', title: 'Test mülkü', description: 'Beş görselli mülk', price: 250000,
-      images: imageReferences(5), location: 'Rockford Hills', floor: 2, room_count: '2+1', furnished: true,
-      market_value: 225000, furniture_value: 15000, building_type: 'Normal', balcony: true,
-    }));
+      images: imageReferences(5), location: 'Rockford Hills', floor: 2, room_count: '2+1', room_number: 5, furnished: true,
+      alarm: true, market_value: 225000, furniture_value: 15000, building_type: 'Normal', balcony: true,
+    };
+    const response = await publishListing(request(testProfileId, testUserId, propertyPayload));
     assert.equal(response.status, 200);
     const listing = (await response.json()).listing;
     assert.equal(listing.images.length, 5);
     assert.equal(listing.property_details.market_value, 225000);
+    assert.equal(listing.property_details.room_number, 5);
+    assert.equal(listing.property_details.alarm, true);
     assert.equal(listing.images.some((item: any) => item.storage_path.startsWith('data:')), false);
+
+    const editResponse = await updateListing(
+      updateRequest(testProfileId, testUserId, listing.id, { ...propertyPayload, room_number: 8, alarm: false }),
+      { params: Promise.resolve({ id: listing.id }) }
+    );
+    assert.equal(editResponse.status, 200);
+    const updated = (await editResponse.json()).listing;
+    assert.equal(updated.property_details.room_number, 8);
+    assert.equal(updated.property_details.alarm, false);
   });
 
   test('character switching remains isolated to the signed active test character', async () => {

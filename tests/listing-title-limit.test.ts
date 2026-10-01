@@ -26,7 +26,7 @@ describe('listing title 40 character limit', () => {
   const property = (title: string) => ({
     category: 'property', subcategory: 'Ev / Daire', title, description: 'Test', price: 1000,
     images: [{ storage_path: '/test.jpg', sort_order: 0, is_cover: true, size_bytes: 100 }],
-    location: 'Vinewood', floor: 1, room_count: '1+1', furnished: false, market_value: 900,
+    location: 'Vinewood', floor: 1, room_count: '1+1', room_number: 5, furnished: false, alarm: false, market_value: 900,
     furniture_value: null, building_type: 'Normal', balcony: false,
   });
 

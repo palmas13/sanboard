@@ -74,7 +74,9 @@ export default function IlanDuzenlePage({
   // Property Details
   const [floor, setFloor] = useState('1');
   const [roomCount, setRoomCount] = useState('2+1');
+  const [roomNumber, setRoomNumber] = useState('');
   const [furnished, setFurnished] = useState(false);
+  const [alarm, setAlarm] = useState<boolean | null>(null);
   const [marketValue, setMarketValue] = useState('');
   const [furnitureValue, setFurnitureValue] = useState('');
   const [buildingType, setBuildingType] = useState('Normal');
@@ -163,7 +165,9 @@ export default function IlanDuzenlePage({
           const pd = l.property_details;
           setFloor(String(pd.floor ?? '1'));
           setRoomCount(pd.room_count || '2+1');
+          setRoomNumber(pd.room_number != null ? normalizeIntegerInput(String(pd.room_number)) || '' : '');
           setFurnished(Boolean(pd.furnished));
+          setAlarm(typeof pd.alarm === 'boolean' ? pd.alarm : null);
           setMarketValue(pd.market_value != null ? normalizeTurkishIntegerInput(String(pd.market_value)) || '' : '');
           setFurnitureValue(pd.furniture_value != null ? normalizeTurkishIntegerInput(String(pd.furniture_value)) || '' : '');
           setBuildingType(pd.building_type || 'Normal');
@@ -239,8 +243,16 @@ export default function IlanDuzenlePage({
         setError('Mülk konumu zorunludur.');
         return;
       }
+      if (!isIntegerInRange(roomNumber, 1, 2_147_483_647)) {
+        setError('Oda no 0’dan büyük bir tam sayı olmalıdır.');
+        return;
+      }
+      if (alarm === null) {
+        setError('Alarm için Var veya Yok seçiniz.');
+        return;
+      }
       if (!isIntegerInRange(marketValue, 1, 1_000_000_000)) {
-        setError('Market değeri 0’dan büyük bir tam sayı olmalıdır.');
+        setError('Piyasa fiyatı 0’dan büyük bir tam sayı olmalıdır.');
         return;
       }
       if (furnished && !isIntegerInRange(furnitureValue, 1, 1_000_000_000)) {
@@ -310,7 +322,9 @@ export default function IlanDuzenlePage({
         payload.property_type = subcategory;
         payload.floor = Number(floor);
         payload.room_count = roomCount;
+        payload.room_number = Number(roomNumber);
         payload.furnished = furnished;
+        payload.alarm = alarm;
         payload.market_value = Number(marketValue);
         payload.furniture_value = furnished ? Number(furnitureValue) : null;
         payload.building_type = buildingType;
@@ -706,7 +720,7 @@ export default function IlanDuzenlePage({
               2. Mülk Detayları
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-[var(--text-muted)]">Kat</label>
                 <input
@@ -715,6 +729,11 @@ export default function IlanDuzenlePage({
                   onChange={(e) => setFloor(e.target.value)}
                   className="form-input text-sm"
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Oda No</label>
+                <input type="text" inputMode="numeric" pattern="[0-9]*" value={roomNumber} onChange={(e) => updateInteger(e.target.value, setRoomNumber)} className="form-input text-sm" />
               </div>
 
               <div className="space-y-1.5">
@@ -747,7 +766,7 @@ export default function IlanDuzenlePage({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
               <label className="flex items-center gap-2.5 p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] cursor-pointer">
                 <input
                   type="checkbox"
@@ -762,6 +781,19 @@ export default function IlanDuzenlePage({
                 <span className="text-xs font-semibold text-[var(--text-main)]">Eşyalı</span>
               </label>
 
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Alarm</label>
+                <CustomSelect
+                  value={alarm === null ? '' : alarm ? 'true' : 'false'}
+                  onChange={(value) => setAlarm(value === '' ? null : value === 'true')}
+                  options={[
+                    { value: '', label: 'Seçiniz' },
+                    { value: 'true', label: 'Var' },
+                    { value: 'false', label: 'Yok' },
+                  ]}
+                />
+              </div>
+
               <label className="flex items-center gap-2.5 p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] cursor-pointer">
                 <input
                   type="checkbox"
@@ -775,7 +807,7 @@ export default function IlanDuzenlePage({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-[var(--text-muted)]">Market Değeri ($)</label>
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Piyasa Fiyatı ($)</label>
                 <input type="text" inputMode="numeric" value={formatTurkishInteger(marketValue)} onChange={(e) => updateMoney(e.target.value, setMarketValue)} className="form-input text-sm" />
               </div>
               {furnished && (

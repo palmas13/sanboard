@@ -31,13 +31,13 @@ describe('premium listing detail redesign', () => {
     assert.match(layout, /data-testid="property-listing-layout"/);
     assert.match(layout, /xl:grid-cols-\[minmax\(0,1\.7fr\)_minmax\(300px,1fr\)_minmax\(260px,\.75fr\)\]/);
     assert.match(layout, /data-testid="property-gallery-block"/);
-    assert.match(layout, /data-testid="property-technical-column"[^>]*xl:col-start-2 xl:row-start-1/);
+    assert.match(layout, /data-testid="property-technical-column"[^>]*xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:self-stretch/);
     assert.match(layout, /data-testid="property-seller-rail"/);
     assert.match(layout, /data-testid="property-description-row"[^>]*xl:col-start-1 xl:row-start-2/);
     assert.match(page, /isVehicle \? <VehicleDetailsPanel[\s\S]*: <PropertyDetailsPanel/);
     assert.match(page, /variant=\{isVehicle \? 'vehicle' : 'property'\}/);
     assert.doesNotMatch(page, /min-h-\[calc\(100vh-5rem\)\]/);
-    assert.doesNotMatch(layout, /h-\[\d|row-span-2[^\n]*property-technical-column/);
+    assert.doesNotMatch(layout, /h-\[\d|min-h-\[\d/);
   });
 
   test('price and header actions remain centered in the emphasized price block', () => {
@@ -98,6 +98,11 @@ describe('premium listing detail redesign', () => {
     assert.match(property, /value: listing\.location/);
     assert.match(property, /details\.property_type/);
     assert.match(property, /details\.room_count/);
+    assert.match(property, /details\.room_number/);
+    assert.match(property, /details\.alarm === true \? 'Var' : details\.alarm === false \? 'Yok' : null/);
+    assert.match(property, /title="Fiyat ve Ek Bilgiler"/);
+    assert.match(property, /Piyasa Fiyatı/);
+    assert.doesNotMatch(property, /Market Değeri/);
     assert.match(property, /details\.building_type/);
     assert.doesNotMatch(property, /Belirtilmemiş/);
     assert.match(header, /listing\.category === 'vehicle' && listing\.location/);

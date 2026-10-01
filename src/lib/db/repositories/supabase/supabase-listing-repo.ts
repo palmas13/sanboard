@@ -714,8 +714,8 @@ export class SupabaseListingRepository implements IListingRepository {
       anti_theft_level: input.anti_theft_level ?? null, engine_health: input.engine_health ?? null,
       suspension: input.subcategory === 'Motosiklet' ? null : (input.suspension || null), fuel_type: input.fuel_type || null, factory_price: input.factory_price ?? null,
     } : {
-      property_type: input.subcategory, floor: input.floor || 1, room_count: input.room_count || '1+1',
-      furnished: Boolean(input.furnished), market_value: input.market_value, furniture_value: input.furnished ? (input.furniture_value ?? null) : null,
+      property_type: input.subcategory, floor: input.floor || 1, room_count: input.room_count || '1+1', room_number: input.room_number,
+      furnished: Boolean(input.furnished), alarm: input.alarm, market_value: input.market_value, furniture_value: input.furnished ? (input.furniture_value ?? null) : null,
       building_type: input.building_type || 'Normal', balcony: Boolean(input.balcony),
     };
 
@@ -973,8 +973,10 @@ export class SupabaseListingRepository implements IListingRepository {
       if (propType) propUpdate.property_type = propType;
       if (input.floor !== undefined) propUpdate.floor = Number(input.floor);
       if (input.room_count !== undefined) propUpdate.room_count = input.room_count;
+      if (input.room_number !== undefined) propUpdate.room_number = Number(input.room_number);
       if (input.building_type !== undefined) propUpdate.building_type = input.building_type;
       if (input.furnished !== undefined) propUpdate.furnished = Boolean(input.furnished);
+      if (input.alarm !== undefined) propUpdate.alarm = Boolean(input.alarm);
       if (input.market_value !== undefined) propUpdate.market_value = Number(input.market_value);
       if (input.furniture_value !== undefined || input.furnished === false) propUpdate.furniture_value = input.furnished === false ? null : input.furniture_value;
       if (input.balcony !== undefined) propUpdate.balcony = Boolean(input.balcony);
@@ -1153,7 +1155,7 @@ export class SupabaseListingRepository implements IListingRepository {
         created_at,
         updated_at,
         vehicle_details (listing_id, vehicle_category, brand, model, plate, mileage, engine_upgrade, transmission_upgrade, brake_upgrade, turbo, subwoofer, trade_available, lock_level, alarm_level, anti_theft_level, engine_health, suspension, fuel_type, factory_price),
-        property_details (listing_id, property_type, floor, room_count, furnished, market_value, furniture_value, building_type, balcony),
+        property_details (*),
         listing_images (id, listing_id, storage_path, sort_order, is_cover, size_bytes, created_at)
       `)
         .eq('seller_profile_id', safeProfileId)
@@ -1532,7 +1534,7 @@ export class SupabaseListingRepository implements IListingRepository {
           created_at,
           updated_at,
           vehicle_details (listing_id, vehicle_category, brand, model, plate, mileage, engine_upgrade, transmission_upgrade, brake_upgrade, turbo, subwoofer, trade_available, lock_level, alarm_level, anti_theft_level, engine_health, suspension, fuel_type, factory_price),
-          property_details (listing_id, property_type, floor, room_count, furnished, market_value, furniture_value, building_type, balcony),
+          property_details (*),
           listing_images (id, listing_id, storage_path, sort_order, is_cover, size_bytes, created_at)
         )
       `)

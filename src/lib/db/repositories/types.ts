@@ -61,7 +61,9 @@ export interface CreateListingInput {
   property_type?: string;
   floor?: number;
   room_count?: string;
+  room_number?: number;
   furnished?: boolean;
+  alarm?: boolean;
   market_value?: number;
   furniture_value?: number | null;
   building_type?: 'Normal' | 'Dubleks';

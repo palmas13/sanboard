@@ -108,7 +108,9 @@ export interface PropertyDetails {
   property_type: PropertyType;
   floor: number;
   room_count: RoomCount;
+  room_number?: number | null;
   furnished: boolean;
+  alarm?: boolean | null;
   market_value?: number | null;
   furniture_value?: number | null;
   building_type: BuildingType;

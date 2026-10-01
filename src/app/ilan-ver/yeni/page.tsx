@@ -100,7 +100,9 @@ export default function YeniIlanOlusturPage() {
   // Property Details
   const [floor, setFloor] = useState('1');
   const [roomCount, setRoomCount] = useState('2+1');
+  const [roomNumber, setRoomNumber] = useState('');
   const [furnished, setFurnished] = useState(false);
+  const [alarm, setAlarm] = useState<boolean | null>(null);
   const [marketValue, setMarketValue] = useState('');
   const [furnitureValue, setFurnitureValue] = useState('');
   const [buildingType, setBuildingType] = useState('Normal');
@@ -162,7 +164,9 @@ export default function YeniIlanOlusturPage() {
         setFactoryPrice(normalizeTurkishIntegerInput(String(draft.factoryPrice || '')) || '');
         setFloor(draft.floor || '1');
         setRoomCount(draft.roomCount || '2+1');
+        setRoomNumber(normalizeIntegerInput(String(draft.roomNumber || '')) || '');
         setFurnished(Boolean(draft.furnished));
+        setAlarm(typeof draft.alarm === 'boolean' ? draft.alarm : null);
         setMarketValue(normalizeTurkishIntegerInput(String(draft.marketValue || '')) || '');
         setFurnitureValue(normalizeTurkishIntegerInput(String(draft.furnitureValue || '')) || '');
         setBuildingType(draft.buildingType || 'Normal');
@@ -183,7 +187,7 @@ export default function YeniIlanOlusturPage() {
       step, category, subcategory, title, description, price, offersEnabled, minimumOffer, location, brand, model, plate,
       mileage, engineUpgrade, transmissionUpgrade, brakeUpgrade, turbo, subwoofer,
       tradeAvailable, lockLevel, alarmLevel, antiTheftLevel, engineHealth, suspension,
-      fuelType, factoryPrice, floor, roomCount, furnished, marketValue, furnitureValue, buildingType, balcony,
+      fuelType, factoryPrice, floor, roomCount, roomNumber, furnished, alarm, marketValue, furnitureValue, buildingType, balcony,
       images: images.map(({ preview_url: _previewUrl, ...image }) => image),
       savedAt: new Date().toISOString(),
     };
@@ -196,7 +200,7 @@ export default function YeniIlanOlusturPage() {
       setDraftSavedAt(draft.savedAt);
     }, 400);
     return () => window.clearTimeout(timer);
-  }, [draftStorageKey, draftReady, step, category, subcategory, title, description, price, offersEnabled, minimumOffer, location, brand, model, plate, mileage, engineUpgrade, transmissionUpgrade, brakeUpgrade, turbo, subwoofer, tradeAvailable, lockLevel, alarmLevel, antiTheftLevel, engineHealth, suspension, fuelType, factoryPrice, floor, roomCount, furnished, marketValue, furnitureValue, buildingType, balcony, images]);
+  }, [draftStorageKey, draftReady, step, category, subcategory, title, description, price, offersEnabled, minimumOffer, location, brand, model, plate, mileage, engineUpgrade, transmissionUpgrade, brakeUpgrade, turbo, subwoofer, tradeAvailable, lockLevel, alarmLevel, antiTheftLevel, engineHealth, suspension, fuelType, factoryPrice, floor, roomCount, roomNumber, furnished, alarm, marketValue, furnitureValue, buildingType, balcony, images]);
 
   const clearDraft = () => {
     if (!window.confirm('Bu taslağı silmek istediğinize emin misiniz?')) return;
@@ -230,7 +234,9 @@ export default function YeniIlanOlusturPage() {
     setFactoryPrice('');
     setFloor('1');
     setRoomCount('2+1');
+    setRoomNumber('');
     setFurnished(false);
+    setAlarm(null);
     setMarketValue('');
     setFurnitureValue('');
     setBuildingType('Normal');
@@ -332,8 +338,16 @@ export default function YeniIlanOlusturPage() {
         errors.push('Mülk konumu zorunludur.');
         invalid.location = true;
       }
+      if (!isIntegerInRange(roomNumber, 1, 2_147_483_647)) {
+        errors.push('Oda no 0’dan büyük bir tam sayı olmalıdır.');
+        invalid.roomNumber = true;
+      }
+      if (alarm === null) {
+        errors.push('Alarm için Var veya Yok seçiniz.');
+        invalid.alarm = true;
+      }
       if (!isIntegerInRange(marketValue, 1, 1_000_000_000)) {
-        errors.push('Market değeri 0’dan büyük bir tam sayı olmalıdır.');
+        errors.push('Piyasa fiyatı 0’dan büyük bir tam sayı olmalıdır.');
         invalid.marketValue = true;
       }
       if (furnished && !isIntegerInRange(furnitureValue, 1, 1_000_000_000)) {
@@ -467,7 +481,9 @@ export default function YeniIlanOlusturPage() {
       payload.location = location.trim();
       payload.floor = Number(floor);
       payload.room_count = roomCount;
+      payload.room_number = Number(roomNumber);
       payload.furnished = furnished;
+      payload.alarm = alarm;
       payload.market_value = Number(marketValue);
       payload.furniture_value = furnished ? Number(furnitureValue) : null;
       payload.building_type = buildingType;
@@ -1000,7 +1016,7 @@ export default function YeniIlanOlusturPage() {
                   Mülk Özellikleri
                 </h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-[var(--text-muted)]">Oda Sayısı</label>
                     <select
@@ -1016,6 +1032,18 @@ export default function YeniIlanOlusturPage() {
                       <option value="4+1">4+1</option>
                       <option value="5+1+">5+1+</option>
                     </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-[var(--text-muted)]">Oda No</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={roomNumber}
+                      onChange={(e) => updateInteger(e.target.value, setRoomNumber)}
+                      className={`form-input text-sm ${invalidFields.roomNumber ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
+                    />
                   </div>
 
                   <div className="space-y-1.5">
@@ -1041,7 +1069,7 @@ export default function YeniIlanOlusturPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
                   <label className="flex items-center gap-2 p-3 rounded-lg border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/50 cursor-pointer">
                     <input
                       type="checkbox"
@@ -1056,6 +1084,19 @@ export default function YeniIlanOlusturPage() {
                     <span className="text-xs font-semibold text-[var(--text-main)]">Eşyalı: Evet</span>
                   </label>
 
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-[var(--text-muted)]">Alarm</label>
+                    <select
+                      value={alarm === null ? '' : alarm ? 'true' : 'false'}
+                      onChange={(e) => setAlarm(e.target.value === '' ? null : e.target.value === 'true')}
+                      className={`form-input text-sm ${invalidFields.alarm ? 'border-[var(--color-danger)] ring-2 ring-[var(--color-danger)]/30' : ''}`}
+                    >
+                      <option value="">Seçiniz</option>
+                      <option value="true">Var</option>
+                      <option value="false">Yok</option>
+                    </select>
+                  </div>
+
                   <label className="flex items-center gap-2 p-3 rounded-lg border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/50 cursor-pointer">
                     <input
                       type="checkbox"
@@ -1069,7 +1110,7 @@ export default function YeniIlanOlusturPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-[var(--text-muted)]">Market Değeri ($)</label>
+                    <label className="text-xs font-semibold text-[var(--text-muted)]">Piyasa Fiyatı ($)</label>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -1238,6 +1279,16 @@ export default function YeniIlanOlusturPage() {
                   <div><span className="text-[var(--text-muted)]">{VEHICLE_LEVEL_FIELDS.transmission_upgrade.label}: </span><span className="font-bold text-[var(--text-main)]">{transmissionUpgrade}</span></div>
                   {!isMotorcycleCategory(vehicleCategory) && <div><span className="text-[var(--text-muted)]">{VEHICLE_LEVEL_FIELDS.suspension.label}: </span><span className="font-bold text-[var(--text-main)]">{suspension}</span></div>}
                   <div><span className="text-[var(--text-muted)]">{VEHICLE_LEVEL_FIELDS.turbo.label}: </span><span className="font-bold text-[var(--text-main)]">{turbo ? '1' : '0'}</span></div>
+                </div>
+              </div>
+            )}
+            {category === 'property' && (
+              <div className="max-w-sm mx-auto p-3.5 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] text-xs space-y-2">
+                <p className="font-bold text-[11px] uppercase tracking-wider text-[#FF8A1F]">Seçilen Mülk Bilgileri</p>
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div><span className="text-[var(--text-muted)]">Oda No: </span><span className="font-bold text-[var(--text-main)]">{roomNumber}</span></div>
+                  <div><span className="text-[var(--text-muted)]">Alarm: </span><span className="font-bold text-[var(--text-main)]">{alarm === null ? 'Seçilmedi' : alarm ? 'Var' : 'Yok'}</span></div>
+                  <div className="col-span-2"><span className="text-[var(--text-muted)]">Piyasa Fiyatı: </span><span className="font-bold text-[var(--text-main)]">{formatCurrency(Number(marketValue) || 0)}</span></div>
                 </div>
               </div>
             )}

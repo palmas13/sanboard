@@ -604,7 +604,9 @@ export async function createListingWithCredit(
       property_type: input.subcategory as PropertyType,
       floor: Number(input.floor),
       room_count: input.room_count,
+      room_number: Number(input.room_number),
       furnished: Boolean(input.furnished),
+      alarm: Boolean(input.alarm),
       market_value: Number(input.market_value),
       furniture_value: input.furnished && input.furniture_value != null ? Number(input.furniture_value) : null,
       building_type: input.building_type || 'Normal',
@@ -699,7 +701,9 @@ export async function updateListing(
     if (input.property_type) listing.property_details.property_type = input.property_type;
     listing.property_details.floor = Number(input.floor ?? listing.property_details.floor);
     listing.property_details.room_count = input.room_count || listing.property_details.room_count;
+    if (input.room_number !== undefined) listing.property_details.room_number = Number(input.room_number);
     listing.property_details.furnished = Boolean(input.furnished);
+    if (input.alarm !== undefined) listing.property_details.alarm = Boolean(input.alarm);
     if (input.market_value !== undefined) listing.property_details.market_value = Number(input.market_value);
     listing.property_details.furniture_value = input.furnished && input.furniture_value != null ? Number(input.furniture_value) : null;
     listing.property_details.building_type = input.building_type || listing.property_details.building_type;

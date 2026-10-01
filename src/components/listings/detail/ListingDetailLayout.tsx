@@ -32,12 +32,12 @@ export function ListingDetailLayout({
     <section
       data-testid="property-listing-layout"
       data-detail-layout="vehicle-theme"
-      className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,1fr)_minmax(260px,.75fr)]"
+      className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,1fr)_minmax(260px,.75fr)]"
     >
       <div data-testid="property-gallery-block" className="min-w-0 lg:col-span-2 xl:col-span-1 xl:col-start-1 xl:row-start-1">
         {gallery}
       </div>
-      <div data-testid="property-technical-column" className="min-w-0 lg:col-start-1 lg:row-start-2 xl:col-start-2 xl:row-start-1">
+      <div data-testid="property-technical-column" className="min-w-0 lg:col-start-1 lg:row-start-2 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:self-stretch">
         {details}
       </div>
       <aside data-testid="property-seller-rail" className="min-w-0 space-y-2.5 lg:col-start-2 lg:row-start-2 xl:col-start-3 xl:row-start-1 xl:row-span-2 xl:sticky xl:top-20">

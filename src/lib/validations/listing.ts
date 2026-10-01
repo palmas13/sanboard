@@ -143,8 +143,10 @@ export const propertyListingSchema = z.object({
   room_count: z.enum(roomCounts, {
     message: 'Geçerli bir oda sayısı seçiniz',
   }),
+  room_number: z.number({ message: 'Oda no sayı olmalıdır' }).int('Oda no tam sayı olmalıdır').positive('Oda no 0’dan büyük olmalıdır').max(2_147_483_647, 'Oda no çok yüksek'),
   furnished: z.boolean().default(false),
-  market_value: z.number().int('Market değeri tam sayı olmalıdır').positive('Market değeri 0’dan büyük olmalıdır').max(1_000_000_000, 'Market değeri çok yüksek'),
+  alarm: z.boolean({ message: 'Alarm bilgisi Var veya Yok olmalıdır' }),
+  market_value: z.number().int('Piyasa fiyatı tam sayı olmalıdır').positive('Piyasa fiyatı 0’dan büyük olmalıdır').max(1_000_000_000, 'Piyasa fiyatı çok yüksek'),
   furniture_value: z.number().int('Eşya bedeli tam sayı olmalıdır').positive('Eşya bedeli 0’dan büyük olmalıdır').max(1_000_000_000, 'Eşya bedeli çok yüksek').optional().nullable(),
   building_type: z.enum(buildingTypes).default('Normal'),
   balcony: z.boolean().default(false),
