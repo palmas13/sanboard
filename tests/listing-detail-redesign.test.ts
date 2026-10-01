@@ -19,6 +19,7 @@ describe('premium listing detail redesign', () => {
   const favorite = source('src/components/listings/FavoriteButton.tsx');
   const corporate = source('src/app/hesabim/kurumsal/page.tsx');
   const layout = source('src/components/listings/detail/ListingDetailLayout.tsx');
+  const description = source('src/components/listings/detail/ListingDescription.tsx');
 
   test('vehicle and property details share the same responsive marketplace layout', () => {
     assert.match(page, /<ListingDetailLayout/);
@@ -38,6 +39,16 @@ describe('premium listing detail redesign', () => {
     assert.match(page, /variant=\{isVehicle \? 'vehicle' : 'property'\}/);
     assert.doesNotMatch(page, /min-h-\[calc\(100vh-5rem\)\]/);
     assert.doesNotMatch(layout, /h-\[\d|min-h-\[\d/);
+  });
+
+  test('listing description safely wraps an uninterrupted 200-character value inside its card', () => {
+    const uninterruptedDescription = 'A'.repeat(200);
+
+    assert.equal(uninterruptedDescription.length, 200);
+    assert.match(layout, /data-testid="(?:vehicle|property)-description-row"[^>]*min-w-0/);
+    assert.match(description, /data-testid="listing-description"[^>]*min-w-0 max-w-full/);
+    assert.match(description, /<p className="[^"]*max-w-full[^"]*\[overflow-wrap:anywhere\][^"]*"/);
+    assert.doesNotMatch(description, /truncate|line-clamp|text-ellipsis|overflow-hidden/);
   });
 
   test('price and header actions remain centered in the emphasized price block', () => {
