@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 import { getDealerRepository, getListingRepository } from '@/lib/db/repositories';
 import { ListingCard } from '@/components/listings/ListingCard';
 import { CorporateStoreFollow } from '@/components/dealers/CorporateStoreFollow';
+import { SanboardImage } from '@/components/media/SanboardImage';
 import {
   BadgeCheck,
   MapPin,
@@ -14,7 +15,6 @@ import {
   Home,
   Calendar,
   AlertCircle,
-  Globe,
   Share2,
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/format';
@@ -125,17 +125,18 @@ export default async function CorporateStorePage({ params }: PageProps) {
   const bannerSrc = resolveMediaUrl(dealer.banner_path || dealer.banner_url);
 
   const isExpired = dealer.subscription_status === 'EXPIRED';
-  const social = dealer.social_media || {};
 
   return (
     <div className="space-y-8 pb-16">
       {/* Top Banner Image */}
       <div className="relative h-48 sm:h-72 w-full overflow-hidden bg-[var(--bg-surface-secondary)] border-b border-[var(--border-app)]">
         {bannerSrc ? (
-          <img
+          <SanboardImage
             src={bannerSrc}
             alt={dealer.company_name}
-            className="w-full h-full object-cover"
+            fill
+            sizes="100vw"
+            className="object-cover"
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-r from-[#1a1208] to-[var(--bg-surface-secondary)]" />
@@ -157,12 +158,14 @@ export default async function CorporateStorePage({ params }: PageProps) {
         {/* Dealer Header Profile Card */}
         <div className="surface-card -mt-20 sm:-mt-24 p-6 sm:p-8 rounded-2xl border border-[var(--border-app)] shadow-2xl relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 flex-1 min-w-0">
-            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden border-4 border-[var(--bg-surface)] shadow-lg bg-[var(--bg-surface)] shrink-0 flex items-center justify-center">
+            <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden border-4 border-[var(--bg-surface)] shadow-lg bg-[var(--bg-surface)] shrink-0 flex items-center justify-center">
               {logoSrc ? (
-                <img
+                <SanboardImage
                   src={logoSrc}
                   alt={dealer.company_name}
-                  className="w-full h-full object-cover"
+                  fill
+                  sizes="(max-width: 640px) 96px, 112px"
+                  className="object-cover"
                 />
               ) : (
                 <div className="w-full h-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] flex items-center justify-center text-3xl font-black">

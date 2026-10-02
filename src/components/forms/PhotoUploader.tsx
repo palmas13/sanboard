@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Upload, X, Star, AlertCircle, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { readJsonResponse } from '@/lib/http/json-response';
+import { SanboardImage } from '@/components/media/SanboardImage';
 
 export interface UploadedImage {
   id: string;
@@ -138,10 +139,12 @@ export function PhotoUploader({ images, onChange, maxImages = 3 }: PhotoUploader
               img.is_cover ? 'border-[#FF8A1F] ring-2 ring-[#FF8A1F]/30' : 'border-[var(--border-app)]'
             }`}
           >
-            <img
+            <SanboardImage
               src={img.preview_url || resolveMediaUrl(img.storage_path)}
               alt="İlan görseli"
-              className="w-full h-full object-cover"
+              fill
+              sizes="(max-width: 640px) 100vw, 33vw"
+              className="object-cover"
             />
 
             {/* Vitrin Badge */}

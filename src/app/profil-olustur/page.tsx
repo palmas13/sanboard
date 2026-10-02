@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
 import { User, Mail, Phone, Camera, Save, ArrowLeft, Trash2, Upload } from 'lucide-react';
 import Link from 'next/link';
+import { SanboardImage } from '@/components/media/SanboardImage';
 
 function ProfilOlusturContent() {
   const router = useRouter();
@@ -179,9 +180,12 @@ function ProfilOlusturContent() {
 
             <div className="flex items-center gap-4">
               {avatarPreview ? (
-                <img
+                <SanboardImage
                   src={avatarPreview}
                   alt={fullName}
+                  width={64}
+                  height={64}
+                  sizes="64px"
                   className="w-16 h-16 rounded-full object-cover border-2 border-[#FF8A1F] shadow-sm shrink-0"
                 />
               ) : (

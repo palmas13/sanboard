@@ -14,11 +14,9 @@ import {
   Settings,
   AlertTriangle,
   Trash2,
-  Ban,
   CheckCircle,
   Save,
   Loader2,
-  RefreshCw,
   Search,
   Building2,
   LifeBuoy,
@@ -35,6 +33,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatDateTime, formatDate } from '@/lib/utils/format';
 import { resolveMediaUrl } from '@/lib/media/url';
+import { SanboardImage } from '@/components/media/SanboardImage';
 import { FaviconSettings } from '@/components/admin/FaviconSettings';
 import styles from './admin.module.css';
 import type { TicketCategory } from '@/types';
@@ -197,6 +196,8 @@ export default function AdminPage() {
     }
   };
 
+  // Kept for the existing moderation action; the current admin UI does not expose its control yet.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleToggleBan = async (userId: string) => {
     setActionLoading(true);
     try {
@@ -890,9 +891,12 @@ export default function AdminPage() {
                               <td className="py-3 px-4">
                                 <div className="flex items-center gap-3">
                                   {d.logo_path || d.logo_url ? (
-                                    <img
+                                    <SanboardImage
                                       src={resolveMediaUrl(d.logo_path || d.logo_url)}
                                       alt={d.company_name}
+                                      width={36}
+                                      height={36}
+                                      sizes="36px"
                                       className="w-9 h-9 rounded-lg object-cover border border-[var(--border-app)] shrink-0"
                                     />
                                   ) : (

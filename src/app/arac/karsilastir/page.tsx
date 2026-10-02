@@ -9,6 +9,7 @@ import { Listing } from '@/types';
 import { formatCurrency } from '@/lib/utils/format';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { getListingUrl } from '@/lib/urls';
+import { SanboardImage } from '@/components/media/SanboardImage';
 
 export default function VehicleComparisonPage() {
   const { compareIds, removeFromCompare, clearCompare } = useCompare();
@@ -123,10 +124,12 @@ export default function VehicleComparisonPage() {
         <div>
           {/* Cover Photo */}
           <div className="relative aspect-[16/10] w-full overflow-hidden bg-[var(--bg-surface-secondary)]">
-            <img
+            <SanboardImage
               src={displayImg}
               alt={listing.title}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+              fill
+              sizes="(max-width: 768px) 100vw, 50vw"
+              className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
             />
             <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
               {listing.is_featured && (

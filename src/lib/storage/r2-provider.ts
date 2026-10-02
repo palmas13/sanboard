@@ -371,7 +371,7 @@ export class CloudflareR2StorageProvider implements StorageProvider {
         nextContinuationToken: response.NextContinuationToken,
         isTruncated: Boolean(response.IsTruncated),
       };
-    } catch (_err: any) {
+    } catch {
       return { objects: [], isTruncated: false };
     }
   }

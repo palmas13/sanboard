@@ -6,6 +6,7 @@ import { CharacterProfile, DealerProfile } from '@/types';
 import { Phone, Mail, Copy, Check, BadgeCheck, Building2, MapPin } from 'lucide-react';
 import { resolveAvatarUrl, resolveMediaUrl } from '@/lib/media/url';
 import { getCorporateUrl } from '@/lib/urls';
+import { SanboardImage } from '@/components/media/SanboardImage';
 
 interface SellerCardProps {
   seller?: CharacterProfile;
@@ -74,9 +75,12 @@ export function SellerCard({ seller, dealer, actions }: SellerCardProps) {
       <div className="flex items-center gap-3 border-b border-[var(--border-app)] pb-3">
         <Link href={publicUrl} className="shrink-0 group">
           {displayAvatar && !imgError ? (
-            <img
+            <SanboardImage
               src={displayAvatar}
               alt={displayName}
+              width={48}
+              height={48}
+              sizes="48px"
               onError={() => setImgError(true)}
               className={`h-12 w-12 object-cover shadow-sm transition-colors ${
                 isCorporate ? 'rounded-xl border border-[#FF8A1F]/35' : 'rounded-full border border-[var(--border-app)] group-hover:border-[#FF8A1F]'

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -27,7 +27,7 @@ export function NotificationDropdown() {
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const fetchNotifications = async (countOnly = false) => {
+  const fetchNotifications = useCallback(async (countOnly = false) => {
     if (!currentProfile?.id) return;
     try {
       const res = await fetch(countOnly ? '/api/notifications?countOnly=1' : '/api/notifications');
@@ -38,26 +38,26 @@ export function NotificationDropdown() {
     } catch {
       // Ignore
     }
-  };
+  }, [currentProfile?.id]);
 
   useEffect(() => {
     if (isAuthenticated && currentProfile?.id) {
       // Keep navbar work lightweight: fetch only the unread count until the
       // dropdown is opened. Full notification rows are secondary UI.
-      fetchNotifications(true);
-      const interval = setInterval(() => fetchNotifications(true), 60000);
+      void fetchNotifications(true);
+      const interval = setInterval(() => void fetchNotifications(true), 60000);
       return () => clearInterval(interval);
     } else {
       setNotifications([]);
       setUnreadCount(0);
     }
-  }, [isAuthenticated, currentProfile?.id]);
+  }, [isAuthenticated, currentProfile?.id, fetchNotifications]);
 
   useEffect(() => {
     if (isOpen && isAuthenticated && currentProfile?.id) {
-      fetchNotifications(false);
+      void fetchNotifications(false);
     }
-  }, [isOpen, isAuthenticated, currentProfile?.id]);
+  }, [isOpen, isAuthenticated, currentProfile?.id, fetchNotifications]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -194,10 +194,7 @@ export function NotificationDropdown() {
       {/* Bell Trigger Button */}
       <button
         type="button"
-        onClick={() => {
-          setIsOpen(!isOpen);
-          if (!isOpen) fetchNotifications();
-        }}
+        onClick={() => setIsOpen(!isOpen)}
         className={`relative p-2 rounded-xl border border-[var(--border-app)] transition-colors cursor-pointer flex items-center justify-center ${
           hasUnread
             ? 'bg-[var(--brand-orange-subtle)] text-[#FF8A1F] border-[#FF8A1F]/40'

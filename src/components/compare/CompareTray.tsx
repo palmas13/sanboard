@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { ArrowLeftRight, X, ArrowRight, Plus } from 'lucide-react';
 import { useCompare } from './CompareContext';
 import { formatCurrency } from '@/lib/utils/format';
+import { SanboardImage } from '@/components/media/SanboardImage';
 
 export function CompareTray() {
   const pathname = usePathname();
@@ -69,9 +70,12 @@ export function CompareTray() {
             {/* Slot 1 */}
             <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-app)] flex-1 min-w-0 max-w-[200px]">
               {slot1?.image && (
-                <img
+                <SanboardImage
                   src={slot1.image}
                   alt=""
+                  width={28}
+                  height={28}
+                  sizes="28px"
                   className="w-6 h-6 sm:w-7 sm:h-7 rounded-md object-cover shrink-0"
                 />
               )}
@@ -99,9 +103,12 @@ export function CompareTray() {
             {slot2 ? (
               <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-app)] flex-1 min-w-0 max-w-[200px]">
                 {slot2.image && (
-                  <img
+                  <SanboardImage
                     src={slot2.image}
                     alt=""
+                    width={28}
+                    height={28}
+                    sizes="28px"
                     className="w-6 h-6 sm:w-7 sm:h-7 rounded-md object-cover shrink-0"
                   />
                 )}

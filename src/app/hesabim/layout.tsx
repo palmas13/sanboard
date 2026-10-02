@@ -19,6 +19,7 @@ import {
   Bell,
 } from 'lucide-react';
 import { getCorporateSidebarLabel } from '@/lib/dealers/status';
+import { SanboardImage } from '@/components/media/SanboardImage';
 
 export default function HesabimLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -111,9 +112,12 @@ export default function HesabimLayout({ children }: { children: React.ReactNode 
       <div className="surface-card p-6 sm:p-7 rounded-2xl border border-[var(--border-app)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 shadow-sm">
         <div className="flex items-center gap-5">
           {resolvedAvatar && !headerImgError ? (
-            <img
+            <SanboardImage
               src={resolvedAvatar}
               alt={currentProfile.full_name}
+              width={64}
+              height={64}
+              sizes="64px"
               onError={() => setHeaderImgError(true)}
               className="w-16 h-16 rounded-full object-cover border-2 border-[#FF8A1F] shadow-sm shrink-0"
             />

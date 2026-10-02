@@ -1,6 +1,6 @@
 import React from 'react';
 import { SanboardLogo } from '@/components/common/SanboardLogo';
-import { ShieldCheck, Sparkles, Building, Car } from 'lucide-react';
+import { ShieldCheck, Building, Car } from 'lucide-react';
 
 export default function HakkimizdaPage() {
   return (

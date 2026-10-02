@@ -8,6 +8,7 @@ import { PublicListingSummary } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { getListingUrl } from '@/lib/urls';
 import { FeaturedBadge } from './FeaturedBadge';
+import { SanboardImage } from '@/components/media/SanboardImage';
 
 interface VehicleListingRowProps {
   listing: PublicListingSummary;
@@ -36,11 +37,12 @@ export function VehicleListingRow({ listing, className = '' }: VehicleListingRow
         <div className="hidden sm:flex items-center min-h-[135px] max-h-[160px] p-3 gap-4 lg:gap-5">
           {/* Cover Photo */}
           <div className="relative w-[180px] lg:w-[200px] h-[115px] shrink-0 rounded-lg overflow-hidden bg-[var(--bg-surface-secondary)]">
-            <img
+            <SanboardImage
               src={displayImage}
               alt={listing.title}
-              loading="lazy"
-              className="w-full h-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.025]"
+              fill
+              sizes="(min-width: 1024px) 200px, 180px"
+              className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.025]"
             />
             {listing.is_featured && (
               <FeaturedBadge className="absolute left-1.5 top-1.5 h-6 w-6" />
@@ -97,11 +99,12 @@ export function VehicleListingRow({ listing, className = '' }: VehicleListingRow
         {/* Mobile View: Compact Card Layout (No horizontal table overflow!) */}
         <div className="sm:hidden flex flex-col p-3 space-y-3">
           <div className="relative aspect-[16/10] w-full rounded-lg overflow-hidden bg-[var(--bg-surface-secondary)]">
-            <img
+            <SanboardImage
               src={displayImage}
               alt={listing.title}
-              loading="lazy"
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              fill
+              sizes="100vw"
+              className="object-cover transition-transform duration-300 group-hover:scale-105"
             />
             <div className="absolute top-2 left-2 flex items-center gap-1.5 flex-wrap">
               {listing.is_featured && (

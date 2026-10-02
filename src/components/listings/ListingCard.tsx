@@ -8,6 +8,7 @@ import { resolveMediaUrl } from '@/lib/media/url';
 import { getListingUrl } from '@/lib/urls';
 import { PropertyCompareButton } from '@/components/compare/PropertyCompareButton';
 import { FeaturedBadge } from './FeaturedBadge';
+import { SanboardImage } from '@/components/media/SanboardImage';
 
 interface ListingCardProps {
   listing: PublicListingSummary;
@@ -31,11 +32,12 @@ export function ListingCard({ listing, className = '', showCompare = true }: Lis
       <Link href={getListingUrl(listing)} className="block flex-1">
         {/* Cover Photo & Badges */}
         <div className="relative aspect-[16/10] w-full overflow-hidden bg-[var(--bg-surface-secondary)]">
-          <img
+          <SanboardImage
             src={displayImage}
             alt={listing.title}
-            loading="lazy"
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
           />
 
           {/* Category Tag & Featured Badge */}

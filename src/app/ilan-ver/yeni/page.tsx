@@ -31,6 +31,7 @@ import { getVehicleLevelOptions, normalizeVehicleLevel, VEHICLE_LEVEL_FIELDS } f
 import { formatTurkishInteger, isIntegerInRange, normalizeIntegerInput, normalizeTurkishIntegerInput } from '@/lib/forms/integer-input';
 import { readJsonResponse } from '@/lib/http/json-response';
 import { toListingImageReferences } from '@/lib/listings/image-references';
+import { SanboardImage } from '@/components/media/SanboardImage';
 
 const TITLE_MAX = LISTING_TITLE_MAX_LENGTH;
 const DESC_MAX = LISTING_DESCRIPTION_MAX_LENGTH;
@@ -1222,10 +1223,12 @@ function YeniIlanOlusturContent() {
             {/* Mini Card Preview */}
             <div className="max-w-sm mx-auto surface-card p-4 rounded-xl border border-[#FF8A1F]/30 bg-[var(--bg-surface-secondary)]/30 space-y-3">
               <div className="relative aspect-[16/10] rounded-lg overflow-hidden bg-black/30">
-                <img
+                <SanboardImage
                   src={resolveMediaUrl(coverImage)}
                   alt={title}
-                  className="w-full h-full object-cover"
+                  fill
+                  sizes="384px"
+                  className="object-cover"
                 />
                 <span className="absolute top-2 left-2 badge-tag bg-black/60 text-white border-white/20 text-[10px]">
                   {subcategory}

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/features/auth/AuthContext';
 import {
@@ -10,9 +10,7 @@ import {
   Loader2,
   Shield,
   User,
-  CheckCircle2,
   Lock,
-  Clock,
   AlertCircle,
 } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils/format';
@@ -21,7 +19,6 @@ import { getTicketCategoryLabel } from '@/lib/tickets/categories';
 
 export default function TicketDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const ticketId = params.id as string;
   const { currentProfile } = useAuth();
 
@@ -31,7 +28,7 @@ export default function TicketDetailPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
 
-  const fetchTicket = async () => {
+  const fetchTicket = useCallback(async () => {
     try {
       const res = await fetch(`/api/tickets/${ticketId}`);
       if (!res.ok) {
@@ -45,11 +42,11 @@ export default function TicketDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [ticketId]);
 
   useEffect(() => {
-    fetchTicket();
-  }, [ticketId]);
+    void fetchTicket();
+  }, [fetchTicket]);
 
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();

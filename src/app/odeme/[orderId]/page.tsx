@@ -11,7 +11,6 @@ import {
   ArrowRight,
   Loader2,
   Building,
-  AlertTriangle,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/format';
 import { SanboardLogo } from '@/components/common/SanboardLogo';

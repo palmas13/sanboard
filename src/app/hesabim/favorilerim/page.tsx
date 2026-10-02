@@ -8,6 +8,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { getListingUrl } from '@/lib/urls';
+import { SanboardImage } from '@/components/media/SanboardImage';
 
 export default function HesabimFavorilerimPage() {
   const { user, currentProfile } = useAuth();
@@ -75,10 +76,12 @@ export default function HesabimFavorilerimPage() {
                 }`}
               >
                   <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-black/40">
-                    <img
+                    <SanboardImage
                       src={coverImg}
                       alt={listing.title}
-                      className="w-full h-full object-cover"
+                      fill
+                      sizes="(max-width: 640px) 88px, 112px"
+                      className="object-cover"
                     />
 
                     {closedLabel ? (

@@ -8,6 +8,7 @@ import { resolveMediaUrl } from '@/lib/media/url';
 import { getListingUrl } from '@/lib/urls';
 import { PropertyCompareButton } from '@/components/compare/PropertyCompareButton';
 import { FeaturedBadge } from './FeaturedBadge';
+import { SanboardImage } from '@/components/media/SanboardImage';
 
 export function PropertyListingRow({ listing }: { listing: PublicListingSummary }) {
   const displayImage = resolveMediaUrl(listing.cover_image) || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&auto=format&fit=crop&q=80';
@@ -17,7 +18,7 @@ export function PropertyListingRow({ listing }: { listing: PublicListingSummary 
       <Link href={getListingUrl(listing)} className="absolute inset-0 z-0" aria-label={`${listing.title} ilanını aç`} />
       <div className="relative z-10 flex flex-col gap-4 p-3 pointer-events-none sm:min-h-[135px] sm:flex-row sm:items-center">
         <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden rounded-lg bg-[var(--bg-surface-secondary)] sm:h-[115px] sm:w-[180px] lg:w-[200px]">
-          <img src={displayImage} alt={listing.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.025] motion-reduce:transition-none motion-reduce:group-hover:transform-none" />
+          <SanboardImage src={displayImage} alt={listing.title} fill sizes="(max-width: 640px) 100vw, (min-width: 1024px) 200px, 180px" className="object-cover transition-transform duration-200 group-hover:scale-[1.025] motion-reduce:transition-none motion-reduce:group-hover:transform-none" />
           {listing.is_featured && <FeaturedBadge className="absolute left-1.5 top-1.5 h-6 w-6" />}
         </div>
         <div className="min-w-0 flex-1 space-y-1">

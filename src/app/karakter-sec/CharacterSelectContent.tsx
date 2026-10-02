@@ -6,6 +6,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { ChevronRight, CheckCircle2, Loader2 } from 'lucide-react';
 import { SanboardLogo } from '@/components/common/SanboardLogo';
 import { resolveAvatarUrl } from '@/lib/media/url';
+import { SanboardImage } from '@/components/media/SanboardImage';
 
 interface CharacterSelectContentProps {
   redirect: string;
@@ -125,9 +126,12 @@ export function CharacterSelectContent({ redirect, isTestSource, defaultCharacte
                 >
                   <div className="flex items-center gap-3.5">
                     {charAvatar && !hasImgError ? (
-                      <img
+                      <SanboardImage
                         src={charAvatar}
                         alt={char.displayName}
+                        width={48}
+                        height={48}
+                        sizes="48px"
                         onError={() => setImgErrors((prev) => ({ ...prev, [char.id]: true }))}
                         className="w-12 h-12 rounded-full object-cover border border-[var(--border-app)] group-hover:border-[#FF8A1F] transition-colors"
                       />

@@ -1,5 +1,5 @@
 import { db } from './store';
-import { DealerProfile, DealerStatus, Listing, CorporateApplication, CorporateProfile, CharacterProfile, CorporateFollower } from '@/types';
+import { DealerProfile, DealerStatus, Listing, CorporateApplication, CorporateProfile, CharacterProfile } from '@/types';
 import { getDealerRepository, getListingRepository, getNotificationRepository } from './repositories';
 import { normalizePhone } from '../utils/format';
 import { normalizeSocialMedia } from '../dealers/social';

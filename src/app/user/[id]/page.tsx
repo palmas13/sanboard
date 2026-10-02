@@ -7,6 +7,7 @@ import { isUuid } from '@/lib/db/id-mapper';
 import { User, Calendar, Phone, Mail, Car, Home } from 'lucide-react';
 import { formatDate } from '@/lib/utils/format';
 import { isPublicListingVisible } from '@/lib/listings/visibility';
+import { SanboardImage } from '@/components/media/SanboardImage';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -90,9 +91,12 @@ export default async function PublicUserProfilePage({ params }: PageProps) {
           {/* Avatar */}
           <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-[#FF8A1F] bg-[var(--bg-surface-secondary)] shadow-md shrink-0 flex items-center justify-center">
             {avatarSrc ? (
-              <img
+              <SanboardImage
                 src={avatarSrc}
                 alt={profile.full_name}
+                width={96}
+                height={96}
+                sizes="96px"
                 className="w-full h-full object-cover"
               />
             ) : (

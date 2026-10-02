@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '@/features/auth/AuthContext';
 import { Users, UserPlus, UserCheck, X, Loader2, ExternalLink } from 'lucide-react';
 import { resolveAvatarUrl } from '@/lib/media/url';
+import { SanboardImage } from '@/components/media/SanboardImage';
 
 interface FollowerItem {
   id: string;
@@ -234,7 +235,7 @@ export function CorporateStoreFollow({
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="w-9 h-9 rounded-full bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] overflow-hidden shrink-0 flex items-center justify-center">
                             {avatarSrc ? (
-                              <img src={avatarSrc} alt={f.name} className="w-full h-full object-cover" />
+                              <SanboardImage src={avatarSrc} alt={f.name} width={36} height={36} sizes="36px" className="w-full h-full object-cover" />
                             ) : (
                               <span className="text-xs font-bold text-[#FF8A1F]">{f.name?.[0] || 'U'}</span>
                             )}

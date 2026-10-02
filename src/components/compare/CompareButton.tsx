@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ArrowLeftRight, Check, X } from 'lucide-react';
+import { ArrowLeftRight } from 'lucide-react';
 import { useCompare, ComparePreviewItem } from './CompareContext';
 import { Listing, MemberListingDetail, PublicListingSummary } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
@@ -13,7 +13,7 @@ interface CompareButtonProps {
 }
 
 export function CompareButton({ listing, className = '', variant = 'default' }: CompareButtonProps) {
-  const { isInCompare, addToCompare, removeFromCompare, isFull, setIsTrayOpen } = useCompare();
+  const { isInCompare, addToCompare, removeFromCompare, setIsTrayOpen } = useCompare();
 
   // Property listings cannot be compared
   if (listing.category !== 'vehicle') {

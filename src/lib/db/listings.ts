@@ -13,8 +13,6 @@ import { generateListingNumber } from '../utils/format';
 import { createNotification } from './notifications';
 import { SupabaseListingRepository } from './repositories/supabase/supabase-listing-repo';
 import type { ListingPublishOptions } from './repositories/types';
-import { deleteMediaSafely } from '../storage/lifecycle';
-import { extractMediaKey } from '../media/url';
 import { isUuid, resolveUserId } from './id-mapper';
 import { resolveMockUserId } from '@/lib/integrations/gtaworld/mock-identities';
 import { isListingOwnedByActiveProfile } from '../dealers/eligibility';
@@ -508,7 +506,6 @@ export async function createListingWithCredit(
     return { success: false, error: `${input.category === 'vehicle' ? 'Araç' : 'Mülk'} ilanlarında en fazla ${imageLimit} fotoğraf kullanılabilir.` };
   }
   const now = new Date();
-  const sellerProfile = db.profiles.find((p) => p.id === sellerProfileId);
   const isCorporateRequest = input.seller_type === 'CORPORATE';
   let corporateProfileId: string | undefined = undefined;
 
@@ -861,7 +858,6 @@ export async function getUserListings(sellerProfileId: string): Promise<Listing[
   const soldCutoff = profile?.sold_listing_history_cleared_at ? new Date(profile.sold_listing_history_cleared_at).getTime() : 0;
 
   const activeHistory = listings.map((l) => {
-    const isExpired = l.expires_at ? new Date(l.expires_at) <= now : false;
     const favCount = db.favorites.filter((f) => f.listing_id === l.id).length;
     return {
       ...l,
@@ -901,7 +897,6 @@ export async function getCorporateListings(corporateProfileId: string): Promise<
   const now = new Date();
 
   return listings.map((l) => {
-    const isExpired = l.expires_at ? new Date(l.expires_at) <= now : false;
     const favCount = db.favorites.filter((f) => f.listing_id === l.id).length;
     return {
       ...l,

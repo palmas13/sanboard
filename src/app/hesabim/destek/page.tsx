@@ -1,15 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/features/auth/AuthContext';
 import {
   LifeBuoy,
   PlusCircle,
-  MessageSquare,
   Clock,
-  CheckCircle2,
-  XCircle,
   Send,
   Loader2,
   AlertCircle,
@@ -33,8 +30,8 @@ export default function HesabimDestekPage() {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
 
-  const fetchTickets = async () => {
-    if (!currentProfile) return;
+  const fetchTickets = useCallback(async () => {
+    if (!currentProfile?.id) return;
     setLoading(true);
     try {
       const res = await fetch('/api/tickets');
@@ -47,11 +44,11 @@ export default function HesabimDestekPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentProfile?.id]);
 
   useEffect(() => {
-    fetchTickets();
-  }, [currentProfile]);
+    void fetchTickets();
+  }, [fetchTickets]);
 
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();

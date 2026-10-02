@@ -84,7 +84,11 @@ export function FaviconSettings() {
       </div>
       <div className="grid gap-4 sm:grid-cols-[76px_1fr]">
         <div className="flex h-[76px] w-[76px] items-center justify-center rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]" aria-label="Favicon önizlemesi">
-          {src ? <img src={src} alt="Mevcut favicon" width={48} height={48} className="h-12 w-12 object-contain" /> : <ImageIcon className="h-6 w-6 text-[var(--text-dim)]" aria-hidden="true" />}
+          {src ? <>
+            {/* Tiny versioned admin preview from a runtime settings URL; native rendering is intentional. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={src} alt="Mevcut favicon" width={48} height={48} className="h-12 w-12 object-contain" />
+          </> : <ImageIcon className="h-6 w-6 text-[var(--text-dim)]" aria-hidden="true" />}
         </div>
         <form onSubmit={submit} className="space-y-3">
           <label htmlFor={inputId} className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[var(--border-app)] p-3 hover:border-[#FF8A1F]">

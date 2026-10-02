@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
 import { getListingUrl } from '@/lib/urls';
+import { SanboardImage } from '@/components/media/SanboardImage';
 import {
   Building2,
   Crown,
@@ -195,8 +196,8 @@ export default function HesabimKurumsalPage() {
     }
   };
 
-  const fetchDealer = async () => {
-    if (!currentProfile) return;
+  const fetchDealer = useCallback(async () => {
+    if (!currentProfile?.id) return;
     setLoading(true);
     try {
       const promises: Promise<any>[] = [
@@ -261,11 +262,11 @@ export default function HesabimKurumsalPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentProfile?.id]);
 
   useEffect(() => {
-    fetchDealer();
-  }, [currentProfile]);
+    void fetchDealer();
+  }, [fetchDealer]);
 
   const handleActivateSubscription = async () => {
     if (!dealer || !currentProfile) return;
@@ -597,12 +598,14 @@ export default function HesabimKurumsalPage() {
                     <div className="space-y-2">
                       <label className="text-xs font-semibold text-[var(--text-muted)]">Mağaza Logosu</label>
                       <div className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]">
-                        <div className="w-14 h-14 rounded-xl overflow-hidden border border-[var(--border-app)] bg-[var(--bg-surface)] shrink-0 flex items-center justify-center">
+                        <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-[var(--border-app)] bg-[var(--bg-surface)] shrink-0 flex items-center justify-center">
                           {displayLogo ? (
-                            <img
+                            <SanboardImage
                               src={displayLogo}
                               alt="Logo Önizleme"
-                              className="w-full h-full object-cover"
+                              fill
+                              sizes="56px"
+                              className="object-cover"
                             />
                           ) : (
                             <ImageIcon className="w-6 h-6 text-[var(--text-dim)]" />
@@ -632,12 +635,14 @@ export default function HesabimKurumsalPage() {
                     <div className="space-y-2">
                       <label className="text-xs font-semibold text-[var(--text-muted)]">Kapak Bannerı</label>
                       <div className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]">
-                        <div className="w-20 h-14 rounded-xl overflow-hidden border border-[var(--border-app)] bg-[var(--bg-surface)] shrink-0 flex items-center justify-center">
+                        <div className="relative w-20 h-14 rounded-xl overflow-hidden border border-[var(--border-app)] bg-[var(--bg-surface)] shrink-0 flex items-center justify-center">
                           {displayBanner ? (
-                            <img
+                            <SanboardImage
                               src={displayBanner}
                               alt="Banner Önizleme"
-                              className="w-full h-full object-cover"
+                              fill
+                              sizes="80px"
+                              className="object-cover"
                             />
                           ) : (
                             <ImageIcon className="w-6 h-6 text-[var(--text-dim)]" />
@@ -818,12 +823,14 @@ export default function HesabimKurumsalPage() {
 
               <div className="relative p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 z-10">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-                  <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-[#FF8A1F] bg-[var(--bg-surface)] shadow-lg shrink-0 flex items-center justify-center">
+                  <div className="relative w-20 h-20 rounded-2xl overflow-hidden border-2 border-[#FF8A1F] bg-[var(--bg-surface)] shadow-lg shrink-0 flex items-center justify-center">
                     {displayLogo ? (
-                      <img
+                      <SanboardImage
                         src={displayLogo}
                         alt={dealer.company_name}
-                        className="w-full h-full object-cover"
+                        fill
+                        sizes="80px"
+                        className="object-cover"
                       />
                     ) : (
                       <div className="w-full h-full bg-[var(--brand-orange-subtle)] text-[#FF8A1F] flex items-center justify-center text-2xl font-black">

@@ -49,6 +49,9 @@ export function AuthProvider({
   );
   const [characters, setCharacters] = useState<CharacterSummary[]>([]);
   const [isTestIdentity, setIsTestIdentity] = useState(false);
+  // Server-provided bootstrap data is a mount-time snapshot. Character changes
+  // after mount are owned by client state and must not restart session hydration.
+  const [initialProfileAtMount] = useState(initialProfile);
 
   const refreshProfile = useCallback(async () => {
     const profileId = currentProfile?.id;
@@ -91,7 +94,7 @@ export function AuthProvider({
       // If a protected segment supplied initial auth data, only hydrate the
       // character switcher in the background. Public root layout intentionally
       // does not block on auth/profile database reads.
-      if (initialProfile && isMounted) {
+      if (initialProfileAtMount && isMounted) {
         try {
           const charRes = await fetch('/api/user/characters');
           if (charRes.ok && isMounted) {
@@ -150,7 +153,7 @@ export function AuthProvider({
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [initialProfileAtMount]);
 
   const selectCharacter = async (characterId: string): Promise<CharacterProfile | null> => {
     try {
@@ -201,6 +204,8 @@ export function AuthProvider({
   };
 
   const login = async () => {
+    // Full document navigation is intentional: this server route starts the external GTA World OAuth flow.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = '/api/auth/gtaworld/login';
   };
 
@@ -212,6 +217,8 @@ export function AuthProvider({
     setCharacterProfiles({});
     setIsTestIdentity(false);
     setAuthStatus('unauthenticated');
+    // Reload intentionally clears client auth/profile state and any router or server-rendered authenticated cache.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = '/';
   };
 

@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { SanboardLogo } from '@/components/common/SanboardLogo';
 import { ShieldCheck, ArrowRight, AlertCircle, RefreshCw, FlaskConical } from 'lucide-react';
 import { normalizeInternalRedirect } from '@/lib/auth/redirect';
+import Image from 'next/image';
 
 function GirisContent({ testLoginEnabled }: { testLoginEnabled: boolean }) {
   const searchParams = useSearchParams();
@@ -13,6 +14,8 @@ function GirisContent({ testLoginEnabled }: { testLoginEnabled: boolean }) {
   const errorCode = searchParams.get('error');
 
   const handleLogin = () => {
+    // Full document navigation is intentional: this server route starts the external GTA World OAuth flow.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = `/api/auth/gtaworld/login?redirect=${encodeURIComponent(redirect)}`;
   };
 
@@ -49,7 +52,7 @@ function GirisContent({ testLoginEnabled }: { testLoginEnabled: boolean }) {
         </div>
 
         <button type="button" onClick={handleLogin} className="w-full btn-primary py-3 text-sm font-bold flex items-center justify-center gap-2.5 shadow-lg hover:shadow-orange-500/10 cursor-pointer">
-          <img src="/brands/gta-world.png" alt="GTA World" className="h-5 w-auto object-contain shrink-0" />
+          <Image src="/brands/gta-world.png" alt="GTA World" width={288} height={140} className="h-5 w-auto object-contain shrink-0" />
           <span>GTA World ile Giriş Yap</span><ArrowRight className="w-4 h-4 ml-1 opacity-70" />
         </button>
 
