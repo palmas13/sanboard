@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db/store';
 import { createSessionToken } from '@/lib/auth/session';
 import { resolveCorporateEligibility } from '@/lib/dealers/eligibility';
-import { buildListingPackageOptions } from '@/lib/listings/package-options';
+import { buildListingPackageOptions, resolveListingPackagePageState } from '@/lib/listings/package-options';
 import { GET as getPackageOptions } from '@/app/api/listing-package-options/route';
 import { POST as checkout } from '@/app/api/checkout/route';
 
@@ -59,6 +59,26 @@ describe('listing package options and entitlement-first UX', () => {
     assert.equal(result.individual.availableCredits, 1); assert.equal(result.individual.action, 'USE'); assert.equal(result.corporate?.availableCredits, 1); assert.equal(result.corporate?.action, 'USE');
   });
 
+  test('page state gates unresolved and failed lookups without a personal fallback', () => {
+    assert.deepEqual(resolveListingPackagePageState({ loading: true, options: null }), { status: 'LOADING' });
+    assert.deepEqual(resolveListingPackagePageState({ loading: false, error: 'lookup failed', options: null }), { status: 'ERROR', message: 'lookup failed' });
+  });
+
+  test('mixed and dual entitlement states remain explicit multi-option selections', async () => {
+    db.dealers = [activeDealer()];
+    const individualUse = buildListingPackageOptions({ profile, eligibility: await resolveCorporateEligibility(profileId), credits: [{ status: 'AVAILABLE', credit_type: 'INDIVIDUAL' }] });
+    const corporateUse = buildListingPackageOptions({ profile, eligibility: await resolveCorporateEligibility(profileId), credits: [{ status: 'AVAILABLE', credit_type: 'CORPORATE', corporate_profile_id: storeId }] });
+    const bothUse = buildListingPackageOptions({ profile, eligibility: await resolveCorporateEligibility(profileId), credits: [{ status: 'AVAILABLE', credit_type: 'INDIVIDUAL' }, { status: 'AVAILABLE', credit_type: 'CORPORATE', corporate_profile_id: storeId }] });
+    for (const options of [individualUse, corporateUse, bothUse]) {
+      const state = resolveListingPackagePageState({ loading: false, options });
+      assert.equal(state.status, 'READY');
+      if (state.status === 'READY') assert.equal(state.layout, 'MULTI_OPTION');
+    }
+    assert.equal(individualUse.individual.action, 'USE'); assert.equal(individualUse.corporate?.action, 'BUY');
+    assert.equal(corporateUse.individual.action, 'BUY'); assert.equal(corporateUse.corporate?.action, 'USE');
+    assert.equal(bothUse.individual.action, 'USE'); assert.equal(bothUse.corporate?.action, 'USE');
+  });
+
   test('fresh package endpoint reflects a newly granted corporate entitlement', async () => {
     db.dealers = [activeDealer()];
     let response = await getPackageOptions(request('/api/listing-package-options'));
@@ -81,8 +101,14 @@ describe('listing package options and entitlement-first UX', () => {
 
   test('package UI preserves identity routes, loading state and responsive layout', () => {
     const page = readFileSync(join(process.cwd(), 'src/app/ilan-ver/paket/page.tsx'), 'utf8');
-    assert.match(page, /router\.push\(kind === 'corporate' \? '\/ilan-ver\/yeni\?corporate=true' : '\/ilan-ver\/yeni'\)/);
-    assert.match(page, /lg:grid-cols-2/); assert.match(page, /mx-auto grid max-w-2xl/); assert.match(page, /PackageSkeleton/); assert.match(page, /cache: 'no-store'/); assert.match(page, /Kurumsal İlan Hakkını Kullan/);
+    const entry = readFileSync(join(process.cwd(), 'src/app/ilan-ver/page.tsx'), 'utf8');
+    const create = readFileSync(join(process.cwd(), 'src/app/ilan-ver/yeni/page.tsx'), 'utf8');
+    assert.match(page, /\/ilan-ver\/yeni\?mode=\$\{/);
+    assert.match(page, /lg:grid-cols-2/); assert.match(page, /mx-auto grid max-w-2xl/); assert.match(page, /PackageSkeleton/); assert.match(page, /cache: 'no-store'/); assert.match(page, /Bireysel İlan Hakkını Kullan/); assert.match(page, /Kurumsal İlan Hakkını Kullan/);
+    assert.match(page, /pageState\.status === 'LOADING'/); assert.match(page, /pageState\.status === 'ERROR'/); assert.doesNotMatch(page, /router\.(push|replace).*yeni.*useEffect/);
+    assert.match(entry, /router\.replace\('\/ilan-ver\/paket'\)/); assert.doesNotMatch(entry, /availableCredits > 0/);
+    assert.match(create, /if \(!identityReady\)/); assert.match(create, /mode=\$\{requestedMode\}/); assert.match(create, /fetch\('\/api\/listing-package-options', \{ cache: 'no-store' \}\)/);
+    assert.doesNotMatch(create, /fetch\('\/api\/dealers\/eligibility'/); assert.doesNotMatch(create, /fetch\('\/api\/credits'/);
   });
 
   test('payment result returns listing publication to the fresh package state', () => {

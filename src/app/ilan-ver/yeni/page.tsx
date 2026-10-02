@@ -40,7 +40,15 @@ export default function YeniIlanOlusturPage() {
   const router = useRouter();
   const { currentProfile, isAuthenticated, isLoading } = useAuth();
 
-  const [isCorporate, setIsCorporate] = useState(false);
+  const requestedMode = typeof window === 'undefined'
+    ? null
+    : new URLSearchParams(window.location.search).get('mode') === 'corporate' || new URLSearchParams(window.location.search).get('corporate') === 'true'
+      ? 'corporate'
+      : new URLSearchParams(window.location.search).get('mode') === 'personal'
+        ? 'personal'
+        : null;
+  const [isCorporate, setIsCorporate] = useState(requestedMode === 'corporate');
+  const [identityReady, setIdentityReady] = useState(false);
   const [dealer, setDealer] = useState<any>(null);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [submitting, setSubmitting] = useState(false);
@@ -113,7 +121,7 @@ export default function YeniIlanOlusturPage() {
   const [draftReady, setDraftReady] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
 
-  const draftStorageKey = currentProfile
+  const draftStorageKey = currentProfile && identityReady
     ? `sanboard_listing_draft_v${DRAFT_VERSION}_${currentProfile.id}_${isCorporate ? 'corporate' : 'individual'}`
     : null;
 
@@ -246,61 +254,43 @@ export default function YeniIlanOlusturPage() {
 
   // Auth guard & Credit check
   useEffect(() => {
-    let corpParam = false;
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('corporate') === 'true') {
-        setIsCorporate(true);
-        corpParam = true;
-      }
-    }
-
     if (isLoading) return;
+    setIdentityReady(false);
+    if (!requestedMode) {
+      router.replace('/ilan-ver/paket');
+      return;
+    }
+    const corpParam = requestedMode === 'corporate';
+    setIsCorporate(corpParam);
     if (!isAuthenticated || !currentProfile) {
-      router.push(`/giris?redirect=/ilan-ver/yeni${corpParam ? '?corporate=true' : ''}`);
+      router.push(`/giris?redirect=${encodeURIComponent(`/ilan-ver/yeni?mode=${requestedMode}`)}`);
       return;
     }
 
-    if (corpParam) {
-      // Authoritative corporate eligibility and store-scoped credit check.
-      fetch('/api/dealers/eligibility')
-        .then((res) => res.json())
-        .then(async (eligData) => {
-          if (!eligData.eligible || !eligData.dealer) {
-            router.replace('/hesabim/kurumsal');
+    // Use the same consolidated, canonical snapshot as the package page. The
+    // form stays gated until the explicitly selected identity has a USE action.
+    fetch('/api/listing-package-options', { cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'İlan hakkı doğrulanamadı.');
+        return data;
+      })
+      .then((data) => {
+        setTestPublishBypass(data.testPublishBypass === true);
+        if (corpParam) {
+          if (!data.corporate || data.corporate.action !== 'USE') {
+            router.replace('/ilan-ver/paket');
             return;
           }
-          setDealer(eligData.dealer);
-          const creditResponse = await fetch(`/api/credits?corporateProfileId=${encodeURIComponent(eligData.dealer.id)}`);
-          const creditData = await creditResponse.json();
-          const canBypassPayment = creditData.testPublishBypass === true;
-          setTestPublishBypass(canBypassPayment);
-          if ((creditData.scopedCorporateCredits || 0) < 1 && !canBypassPayment) {
-            router.replace('/hesabim/kurumsal');
-          }
-        })
-        .catch(() => {
-          router.replace('/hesabim/kurumsal');
-        });
-    }
-
-    // Verify user actually has an available credit for the chosen mode (INDIVIDUAL vs CORPORATE)
-    if (corpParam) return;
-    fetch('/api/credits')
-      .then((res) => res.json())
-      .then((data) => {
-        const canBypassPayment = data.testPublishBypass === true;
-        setTestPublishBypass(canBypassPayment);
-        const hasNeededCredit = data.individualCredits !== undefined ? data.individualCredits > 0 : data.availableCredits > 0;
-
-        if (!hasNeededCredit && !canBypassPayment) {
+          setDealer(data.corporate.dealer);
+        } else if (data.individual.action !== 'USE') {
           router.replace('/ilan-ver/paket');
+          return;
         }
+        setIdentityReady(true);
       })
-      .catch(() => {
-        router.replace('/ilan-ver/paket');
-      });
-  }, [isLoading, isAuthenticated, currentProfile, router]);
+      .catch(() => router.replace('/ilan-ver/paket'));
+  }, [isLoading, isAuthenticated, currentProfile, requestedMode, router]);
 
   const handleNextFromCategory = () => {
     if (category === 'vehicle') {
@@ -515,6 +505,22 @@ export default function YeniIlanOlusturPage() {
     propertyType: category === 'property' ? subcategory : undefined,
     roomCount, floor, buildingType,
   });
+
+  if (!identityReady) {
+    return <main className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6 lg:px-8" aria-label="İlan oluşturma kimliği doğrulanıyor">
+      <div className="animate-pulse space-y-6">
+        <div className="mx-auto h-7 w-52 rounded bg-[var(--bg-surface-secondary)]" />
+        <div className="mx-auto h-4 w-80 max-w-full rounded bg-[var(--bg-surface-secondary)]" />
+        <div className="surface-card rounded-2xl border border-[var(--border-app)] p-6 sm:p-8">
+          <div className="h-5 w-36 rounded bg-[var(--bg-surface-secondary)]" />
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div className="h-28 rounded-xl bg-[var(--bg-surface-secondary)]" />
+            <div className="h-28 rounded-xl bg-[var(--bg-surface-secondary)]" />
+          </div>
+        </div>
+      </div>
+    </main>;
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">

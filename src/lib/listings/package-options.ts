@@ -15,6 +15,35 @@ export interface ListingPackageOptions {
   testPublishBypass: boolean;
 }
 
+export type ListingPackagePageState =
+  | { status: 'LOADING' }
+  | { status: 'ERROR'; message: string }
+  | {
+      status: 'READY';
+      layout: 'SINGLE_OPTION' | 'MULTI_OPTION';
+      options: ListingPackageOptions;
+    };
+
+export function resolveListingPackagePageState(input: {
+  loading: boolean;
+  error?: string;
+  options: ListingPackageOptions | null;
+}): ListingPackagePageState {
+  if (input.loading) return { status: 'LOADING' };
+  if (input.error || !input.options) {
+    return {
+      status: 'ERROR',
+      message: input.error || 'İlan hakların yüklenirken bir sorun oluştu.',
+    };
+  }
+
+  return {
+    status: 'READY',
+    layout: input.options.corporate ? 'MULTI_OPTION' : 'SINGLE_OPTION',
+    options: input.options,
+  };
+}
+
 export function buildListingPackageOptions(input: {
   profile: CharacterProfile;
   eligibility: CorporateEligibilityResult;

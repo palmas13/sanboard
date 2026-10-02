@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
 import { PlusCircle, Loader2 } from 'lucide-react';
@@ -8,8 +8,6 @@ import { PlusCircle, Loader2 } from 'lucide-react';
 export default function IlanVerRouterPage() {
   const router = useRouter();
   const { currentProfile, isAuthenticated, isLoading } = useAuth();
-  const [checking, setChecking] = useState(true);
-
   useEffect(() => {
     if (isLoading) return;
     if (!isAuthenticated || !currentProfile) {
@@ -17,26 +15,10 @@ export default function IlanVerRouterPage() {
       return;
     }
 
-    // Check available credits
-    async function checkCredits() {
-      try {
-        const res = await fetch('/api/credits');
-        const data = await res.json();
-
-        if (data.testPublishBypass === true || data.availableCredits > 0) {
-          router.replace('/ilan-ver/yeni');
-        } else {
-          router.replace('/ilan-ver/paket');
-        }
-      } catch {
-        router.replace('/ilan-ver/paket');
-      } finally {
-        setChecking(false);
-      }
-    }
-
-    checkCredits();
-  }, [currentProfile, isAuthenticated, router]);
+    // Identity and entitlement selection always happens on the account-aware
+    // package route. A total credit count cannot safely choose PERSONAL.
+    router.replace('/ilan-ver/paket');
+  }, [currentProfile, isAuthenticated, isLoading, router]);
 
   return (
     <div className="min-h-[70vh] flex flex-col items-center justify-center space-y-4">
