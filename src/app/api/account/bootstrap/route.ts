@@ -3,6 +3,22 @@ import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { getSupabaseAdminClient } from '@/lib/db/supabase-client';
 import { db } from '@/lib/db/store';
 import { ServerTiming } from '@/lib/performance/server-timing';
+import { resolveCorporateEligibility } from '@/lib/dealers/eligibility';
+import { getListingCoverPath } from '@/lib/listings/images';
+
+function toUpcomingPersonalListings(listings: any[], now: number) {
+  return listings
+    .filter((listing) => listing.status === 'ACTIVE' && Boolean(listing.expires_at) && new Date(listing.expires_at).getTime() > now)
+    .sort((a, b) => new Date(a.expires_at).getTime() - new Date(b.expires_at).getTime())
+    .slice(0, 3)
+    .map((listing) => ({
+      id: listing.id,
+      public_id: listing.public_id || null,
+      title: listing.title,
+      expires_at: listing.expires_at,
+      cover_image: getListingCoverPath(listing.listing_images || listing.images) || null,
+    }));
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -25,11 +41,11 @@ export async function GET(req: NextRequest) {
       }
 
       // Parallel execution of all independent metrics
-      const [listingsRes, favsCountRes, creditRes, corpRes, ticketCountRes] =
+      const [listingsRes, favsCountRes, creditRes, corpRes, ticketCountRes, corporateEligibility] =
         await timing.measure('bootstrap', () => Promise.all([
           client
             .from('listings')
-            .select('id, status, expires_at')
+            .select('id, public_id, title, status, expires_at, listing_images(id, listing_id, storage_path, sort_order, is_cover, size_bytes, created_at)')
             .eq('seller_profile_id', profileId)
             .eq('seller_type', 'INDIVIDUAL')
             .is('corporate_profile_id', null),
@@ -54,6 +70,7 @@ export async function GET(req: NextRequest) {
             .select('*', { count: 'exact', head: true })
             .eq('profile_id', profileId)
             .eq('status', 'OPEN'),
+          resolveCorporateEligibility(profileId),
         ]));
 
       const personalListings = listingsRes.data || [];
@@ -76,10 +93,11 @@ export async function GET(req: NextRequest) {
       const availableCreditRows = creditRes.data || [];
       const individualCredits = availableCreditRows.filter((credit: any) => credit.credit_type === 'INDIVIDUAL' || !credit.credit_type).length;
       const corporateStoreId = corpRes.data?.id;
-      const corporateCredits = corporateStoreId
+      const corporateCredits = corporateEligibility.eligible && corporateStoreId
         ? availableCreditRows.filter((credit: any) => credit.credit_type === 'CORPORATE' && credit.corporate_profile_id === corporateStoreId).length
         : 0;
       const availableCredits = individualCredits + corporateCredits;
+      const upcomingPersonalListings = toUpcomingPersonalListings(personalListings, now);
       const favoritesCount = favsCountRes.count || 0;
       const openTickets = ticketCountRes.count || 0;
 
@@ -98,9 +116,11 @@ export async function GET(req: NextRequest) {
           individualCredits,
           corporateCredits,
         },
+        upcomingPersonalListings,
         corporate: {
-          isDealer: Boolean(corpRes.data && (corpRes.data.status === 'APPROVED' || corpRes.data.moderation_status === 'ACTIVE')),
+          isDealer: corporateEligibility.eligible,
           dealerProfile: corpRes.data || null,
+          eligibility: { eligible: corporateEligibility.eligible, reason: corporateEligibility.reason },
         },
         support: {
           openTickets,
@@ -124,10 +144,12 @@ export async function GET(req: NextRequest) {
     );
     const availableCreditRows = db.credits.filter((c) => c.profile_id === profileId && c.status === 'AVAILABLE');
     const individualCredits = availableCreditRows.filter((credit) => credit.credit_type === 'INDIVIDUAL' || !credit.credit_type).length;
-    const corporateCredits = corpStore
+    const corporateEligibility = await resolveCorporateEligibility(profileId);
+    const corporateCredits = corporateEligibility.eligible && corpStore
       ? availableCreditRows.filter((credit) => credit.credit_type === 'CORPORATE' && credit.corporate_profile_id === corpStore.id).length
       : 0;
     const availableCredits = individualCredits + corporateCredits;
+    const upcomingPersonalListings = toUpcomingPersonalListings(personalListings, now);
     const openTickets = db.tickets.filter(
       (t) => t.profile_id === profileId && t.status === 'OPEN'
     ).length;
@@ -147,9 +169,11 @@ export async function GET(req: NextRequest) {
         individualCredits,
         corporateCredits,
       },
+      upcomingPersonalListings,
       corporate: {
-        isDealer: Boolean(corpStore && corpStore.status === 'APPROVED'),
+        isDealer: corporateEligibility.eligible,
         dealerProfile: corpStore || null,
+        eligibility: { eligible: corporateEligibility.eligible, reason: corporateEligibility.reason },
       },
       support: {
         openTickets,

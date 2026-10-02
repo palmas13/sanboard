@@ -65,6 +65,24 @@ describe('dashboard entitlements and listing-history security', () => {
     assert.equal(body.credits.availableCredits, 2);
   });
 
+  test('bootstrap returns at most three nearest-expiry active personal listing summaries with cover only', async () => {
+    const now = Date.now();
+    db.listings.push(...[4, 2, 3, 1].map((days) => ({ id: `next-${days}`, public_id: `10000${days}`, seller_profile_id: profileA, seller_type: 'INDIVIDUAL', category: 'vehicle', subcategory: 'Otomobil', title: `Next ${days}`, description: '', price: 1, status: 'ACTIVE', expires_at: new Date(now + days * 86_400_000).toISOString(), images: [{ id: `img-${days}`, listing_id: `next-${days}`, storage_path: `listings/${days}.webp`, sort_order: 0, is_cover: true, size_bytes: 1, created_at: '' }], created_at: '', updated_at: '' } as any)));
+    const body = await (await bootstrap(request('/api/account/bootstrap', profileA))).json();
+    assert.deepEqual(body.upcomingPersonalListings.map((item: any) => item.id), ['active-a', 'next-1', 'next-2']);
+    assert.deepEqual(Object.keys(body.upcomingPersonalListings[1]).sort(), ['cover_image', 'expires_at', 'id', 'public_id', 'title']);
+    assert.equal(body.upcomingPersonalListings[1].cover_image, 'listings/1.webp');
+  });
+
+  test('bootstrap hides corporate credits when canonical publishing eligibility is inactive without mutating credits', async () => {
+    db.dealers[0].subscription_status = 'INACTIVE';
+    const body = await (await bootstrap(request('/api/account/bootstrap', profileA))).json();
+    assert.equal(body.credits.individualCredits, 1);
+    assert.equal(body.credits.corporateCredits, 0);
+    assert.equal(body.credits.availableCredits, 1);
+    assert.equal(db.credits.find((credit) => credit.id === 'corporate-a')?.status, 'AVAILABLE');
+  });
+
   test('overview entitlement messages distinguish individual, corporate and combined contexts', () => {
     assert.deepEqual(getCreditPresentation(2, 0), { total: 2, message: '2 bireysel ilan hakkınız var.', href: '/ilan-ver' });
     assert.deepEqual(getCreditPresentation(0, 3), { total: 3, message: '3 kurumsal ilan hakkınız var.', href: '/hesabim/kurumsal' });
@@ -84,11 +102,14 @@ describe('dashboard entitlements and listing-history security', () => {
   test('overview exact copy and character header button removals remain enforced', () => {
     const overview = source('src/app/hesabim/page.tsx');
     const layout = source('src/app/hesabim/layout.tsx');
-    assert.match(overview, /Bireysel ilanlarını görüntüle, düzenle ve durumunu kontrol et\./);
-    assert.match(overview, /İlan Haklarım/);
-    assert.match(overview, /\{creditPresentation\.total\}/);
-    assert.match(overview, />Bireysel</);
-    assert.match(overview, />Kurumsal</);
+    assert.match(overview, /Merhaba, \{firstName\} 👋/);
+    assert.match(overview, /İlan Hakların/);
+    assert.match(overview, /loading \? <div className="mt-1 h-\[72px\] animate-pulse/);
+    assert.match(overview, /Bireysel ilan hakkı/);
+    assert.match(overview, /data\.corporateCredits > 0/);
+    assert.match(overview, /Kurumsal ilan hakkı/);
+    assert.match(overview, /Yaklaşan Durumlar/);
+    assert.match(overview, /upcomingPersonalListings/);
     assert.doesNotMatch(overview, /Süresi Dolan İlanlarım|İlan Hakkı=/);
     assert.doesNotMatch(layout, /Mağazamı Aç|Yeni İlan Ver/);
   });

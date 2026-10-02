@@ -8,13 +8,14 @@ const source = (path: string) => readFileSync(join(process.cwd(), path), 'utf8')
 describe('dashboard overview and admin pagination regressions', () => {
   test('overview explains and exposes the available listing entitlement', () => {
     const overview = source('src/app/hesabim/page.tsx');
-    assert.match(overview, /İlan Haklarım/);
-    assert.match(overview, /creditPresentation\.total/);
-    assert.match(overview, /stats\.individualCredits/);
-    assert.match(overview, /stats\.corporateCredits/);
+    assert.match(overview, /İlan Hakların/);
+    assert.match(overview, /credits\.total/);
+    assert.match(overview, /data\.individualCredits/);
+    assert.match(overview, /data\.corporateCredits/);
     assert.doesNotMatch(overview, /İlan Hakkı=|Süresi Dolan İlanlarım/);
-    assert.match(overview, /Haklar yalnızca tanımlandıkları bireysel profil veya kurumsal mağaza kapsamında kullanılabilir/);
-    assert.match(overview, /İlan Hakkımı Kullan/);
+    assert.match(overview, /Bireysel ilan hakkı/);
+    assert.match(overview, /Kurumsal ilan hakkı/);
+    assert.match(overview, /İlan Hakkını Kullan/);
     assert.match(overview, /individualCredits/);
   });
 
