@@ -8,6 +8,9 @@ import { DELETE as clearListingHistory, GET as getListings } from '@/app/api/use
 import { createSessionToken } from '@/lib/auth/session';
 import { db } from '@/lib/db/store';
 import { getCreditPresentation } from '@/lib/dashboard/credit-presentation';
+import { filterOwnerDashboardListings, getOwnerDashboardCounts } from '@/lib/listings/owner-dashboard';
+import { getPublicListings, getUserListings } from '@/lib/db/listings';
+import { formatTimeRemaining } from '@/lib/utils/format';
 
 const source = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
 const accountA = '11111111-1111-4111-8111-111111111111';
@@ -88,5 +91,66 @@ describe('dashboard entitlements and listing-history security', () => {
     assert.match(overview, />Kurumsal</);
     assert.doesNotMatch(overview, /Süresi Dolan İlanlarım|İlan Hakkı=/);
     assert.doesNotMatch(layout, /Mağazamı Aç|Yeni İlan Ver/);
+  });
+
+  test('personal dashboard filters active, expired and sold rows with accurate full-dataset counts', () => {
+    const listings = [
+      ...db.listings,
+      { id: 'sold-a', listing_number: '#SOLD-A', seller_profile_id: profileA, seller_type: 'INDIVIDUAL', category: 'property', subcategory: 'Ev / Daire', title: 'Vinewood Satılık Ev', description: '', price: 3, status: 'SOLD', closed_at: new Date().toISOString(), created_at: '', updated_at: '' },
+    ] as any;
+    assert.deepEqual(getOwnerDashboardCounts(listings), { ACTIVE: 1, EXPIRED: 2, SOLD: 1 });
+    assert.deepEqual(filterOwnerDashboardListings(listings, { status: 'ACTIVE', type: 'ALL', query: '' }).map((item) => item.id), ['active-a']);
+    assert.deepEqual(filterOwnerDashboardListings(listings, { status: 'EXPIRED', type: 'vehicle', query: 'Expired A' }).map((item) => item.id), ['expired-a']);
+    assert.deepEqual(filterOwnerDashboardListings(listings, { status: 'SOLD', type: 'property', query: 'Vinewood' }).map((item) => item.id), ['sold-a']);
+    assert.deepEqual(filterOwnerDashboardListings(listings, { status: 'EXPIRED', type: 'property', query: '' }), []);
+  });
+
+  test('ACTIVE to EXPIRED transition moves the same personal listing between owner tabs while public retrieval stays hidden', async () => {
+    const listing = db.listings.find((item) => item.id === 'active-a')!;
+    assert.deepEqual(filterOwnerDashboardListings(await getUserListings(profileA), { status: 'ACTIVE', type: 'ALL', query: '' }).map((item) => item.id), ['active-a']);
+    assert.deepEqual(filterOwnerDashboardListings(await getUserListings(profileA), { status: 'EXPIRED', type: 'ALL', query: '' }).map((item) => item.id), ['expired-a']);
+
+    listing.status = 'EXPIRED';
+    listing.expires_at = new Date(Date.now() - 60_000).toISOString();
+    const after = await getUserListings(profileA);
+    assert.deepEqual(filterOwnerDashboardListings(after, { status: 'ACTIVE', type: 'ALL', query: '' }), []);
+    assert.deepEqual(filterOwnerDashboardListings(after, { status: 'EXPIRED', type: 'ALL', query: '' }).map((item) => item.id).sort(), ['active-a', 'expired-a']);
+    assert.equal(getOwnerDashboardCounts(after).EXPIRED, 2);
+    assert.equal(after.find((item) => item.id === 'active-a')?.seller_profile_id, profileA);
+    assert.equal((await getPublicListings()).some((item) => item.id === 'active-a'), false);
+    assert.equal(formatTimeRemaining(listing.expires_at).text, 'Süresi Doldu');
+  });
+
+  test('expired owner visibility lasts until purge removes the row and remains isolated from siblings and corporate inventory', async () => {
+    db.listings.push(
+      { id: 'recent-expired-a', listing_number: '#RECENT', seller_profile_id: profileA, seller_type: 'INDIVIDUAL', category: 'property', subcategory: 'Ev / Daire', title: 'Mirror Park House', description: '', price: 2, location: 'Mirror Park', status: 'EXPIRED', expires_at: new Date(Date.now() - 6 * 86_400_000).toISOString(), created_at: '', updated_at: '' },
+      { id: 'corporate-expired-a', listing_number: '#CORP', seller_profile_id: profileA, seller_type: 'CORPORATE', corporate_profile_id: 'store-a', category: 'vehicle', subcategory: 'Otomobil', title: 'Corporate Expired', description: '', price: 2, location: null, status: 'EXPIRED', expires_at: new Date(Date.now() - 60_000).toISOString(), created_at: '', updated_at: '' },
+    );
+    const ownerRows = await getUserListings(profileA);
+    assert.ok(ownerRows.some((item) => item.id === 'recent-expired-a'));
+    assert.equal(ownerRows.some((item) => item.id === 'expired-b'), false);
+    assert.equal(ownerRows.some((item) => item.id === 'corporate-expired-a'), false);
+    assert.deepEqual(filterOwnerDashboardListings(ownerRows, { status: 'EXPIRED', type: 'property', query: 'Mirror Park' }).map((item) => item.id), ['recent-expired-a']);
+
+    db.listings = db.listings.filter((item) => item.id !== 'recent-expired-a');
+    assert.equal((await getUserListings(profileA)).some((item) => item.id === 'recent-expired-a'), false);
+  });
+
+  test('personal dashboard source keeps compact cards, cover-only images and existing management actions', () => {
+    const page = source('src/app/hesabim/ilanlarim/page.tsx');
+    const repository = source('src/lib/db/repositories/supabase/supabase-listing-repo.ts');
+    const ownerMethod = repository.slice(repository.indexOf('async getUserListings'), repository.indexOf('async clearUserListingHistory'));
+    assert.match(page, /getListingCoverPath\(listing\.images\)/);
+    assert.match(page, /<Image[\s\S]*sizes=/);
+    assert.match(page, /İlanı Gör/);
+    assert.match(page, />Düzenle</);
+    assert.match(page, /İlanı Kapat/);
+    assert.match(page, /İlanı hangi nedenle kapatmak istiyorsun/);
+    assert.match(page, /role="menu"/);
+    assert.match(page, /event\.key !== 'Escape'/);
+    assert.match(page, /Bu filtreye uygun ilan bulunamadı/);
+    assert.doesNotMatch(page, /<img/);
+    assert.match(ownerMethod, /const client = this\.getAdminClient\(\)/);
+    assert.match(ownerMethod, /\.eq\('seller_profile_id', safeProfileId\)[\s\S]*\.eq\('seller_type', 'INDIVIDUAL'\)[\s\S]*\.is\('corporate_profile_id', null\)/);
   });
 });

@@ -45,9 +45,10 @@ describe('comparison redesign and listing number presentation', () => {
     assert.match(source, /data-different=\{isDifferent/);
   });
 
-  test('user-facing listing surfaces do not render listing_number while canonical public_id URLs stay covered', () => {
-    const paths = ['src/components/listings/ListingCard.tsx', 'src/app/ilan/[id]/page.tsx', 'src/app/hesabim/favorilerim/page.tsx', 'src/app/arac/karsilastir/page.tsx', 'src/app/hesabim/ilanlarim/page.tsx', 'src/app/hesabim/ilanlarim/[id]/duzenle/page.tsx', 'src/app/yonetim/page.tsx'];
+  test('public listing surfaces do not render listing_number while the private owner dashboard may manage by it', () => {
+    const paths = ['src/components/listings/ListingCard.tsx', 'src/app/ilan/[id]/page.tsx', 'src/app/hesabim/favorilerim/page.tsx', 'src/app/arac/karsilastir/page.tsx', 'src/app/hesabim/ilanlarim/[id]/duzenle/page.tsx', 'src/app/yonetim/page.tsx'];
     for (const path of paths) assert.doesNotMatch(readFileSync(join(process.cwd(), path), 'utf8'), /listing_number|#SB-/, `${path} must not present listing numbers`);
+    assert.match(readFileSync(join(process.cwd(), 'src/app/hesabim/ilanlarim/page.tsx'), 'utf8'), /listing\.listing_number/);
     const canonicalTests = readFileSync(join(process.cwd(), 'tests/canonical-urls.test.ts'), 'utf8');
     assert.match(canonicalTests, /immutable six-digit public id/);
     assert.match(canonicalTests, /temiz-sultan-rs-482731/);

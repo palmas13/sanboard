@@ -26,10 +26,14 @@ describe('dashboard overview and admin pagination regressions', () => {
     assert.doesNotMatch(corporate, /boost_credits \?\? 0\}\/3/);
   });
 
-  test('personal listing actions have a symmetric fixed-width layout', () => {
+  test('personal listing actions use a compact primary action and overflow hierarchy', () => {
     const listings = source('src/app/hesabim/ilanlarim/page.tsx');
-    assert.match(listings, /grid grid-cols-3 sm:grid-cols-1 items-stretch/);
-    assert.match(listings, /sm:w-32/);
+    assert.match(listings, /İlanı Gör/);
+    assert.match(listings, /aria-haspopup="menu"/);
+    assert.match(listings, /role="menu"/);
+    assert.match(listings, />Düzenle</);
+    assert.match(listings, /İlanı Kapat/);
+    assert.doesNotMatch(listings, /grid grid-cols-3 sm:grid-cols-1 items-stretch/);
   });
 
   test('admin collections initially show 20 rows and load 20 more', () => {

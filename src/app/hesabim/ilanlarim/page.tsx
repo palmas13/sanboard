@@ -1,34 +1,36 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
+import { AlertTriangle, CheckCircle, Clock, Edit3, ExternalLink, Heart, ImageIcon, ListPlus, Loader2, MoreHorizontal, RotateCcw, Search, Trash2, XCircle } from 'lucide-react';
 import { useAuth } from '@/features/auth/AuthContext';
-import {
-  ListPlus,
-  Clock,
-  CheckCircle,
-  AlertTriangle,
-  RotateCcw,
-  ExternalLink,
-  Loader2,
-  Heart,
-  Edit3,
-  Trash2,
-} from 'lucide-react';
-import { formatCurrency, formatTimeRemaining, formatDate } from '@/lib/utils/format';
-import { Listing } from '@/types';
+import { formatCurrency, formatDate, formatTimeRemaining } from '@/lib/utils/format';
+import type { Listing } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { getListingUrl } from '@/lib/urls';
-import { calculateListingQuality, ListingQualityInput } from '@/lib/listings/quality';
+import { getListingCoverPath } from '@/lib/listings/images';
+import { calculateListingQuality, type ListingQualityInput } from '@/lib/listings/quality';
+import { filterOwnerDashboardListings, getOwnerDashboardCounts, type OwnerDashboardStatus, type OwnerDashboardType } from '@/lib/listings/owner-dashboard';
 
 type SavedListingDraft = ListingQualityInput & { savedAt?: string; images?: unknown[] };
+const STATUS_TABS: Array<{ value: OwnerDashboardStatus; label: string }> = [{ value: 'ACTIVE', label: 'Aktif' }, { value: 'EXPIRED', label: 'Süresi Dolan' }, { value: 'SOLD', label: 'Satılan' }];
+const EMPTY_COPY: Record<OwnerDashboardStatus, string> = { ACTIVE: 'Aktif ilan bulunmuyor.', EXPIRED: 'Süresi dolan ilan bulunmuyor.', SOLD: 'Satılan ilan bulunmuyor.' };
+
+function StatusBadge({ status }: { status: OwnerDashboardStatus }) {
+  const style = status === 'ACTIVE' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : status === 'EXPIRED' ? 'border-white/10 bg-white/[0.04] text-[var(--text-muted)]' : 'border-blue-400/20 bg-blue-400/10 text-blue-300';
+  return <span className={`inline-flex rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-[0.1em] ${style}`}>{status === 'ACTIVE' ? 'Aktif' : status === 'EXPIRED' ? 'Süresi Doldu' : 'Satıldı'}</span>;
+}
 
 export default function HesabimIlanlarimPage() {
   const { currentProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<'ACTIVE' | 'EXPIRED' | 'SOLD'>('ACTIVE');
+  const [activeTab, setActiveTab] = useState<OwnerDashboardStatus>('ACTIVE');
+  const [typeFilter, setTypeFilter] = useState<OwnerDashboardType>('ALL');
+  const [query, setQuery] = useState('');
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
-
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const [closeModalListing, setCloseModalListing] = useState<Listing | null>(null);
   const [closeReason, setCloseReason] = useState<'SOLD' | 'CANCELLED' | 'OTHER'>('SOLD');
   const [isProcessingClose, setIsProcessingClose] = useState(false);
@@ -39,33 +41,24 @@ export default function HesabimIlanlarimPage() {
   const [clearHistoryStatus, setClearHistoryStatus] = useState<'EXPIRED' | 'SOLD' | null>(null);
   const [clearingHistory, setClearingHistory] = useState(false);
 
-  const fetchListings = async () => {
+  const fetchListings = useCallback(async () => {
     if (!currentProfile) return;
     setLoading(true);
     try {
-      const res = await fetch('/api/user/listings');
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setListings(data);
-      }
-    } catch {
-      // Ignore
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchListings();
+      const response = await fetch('/api/user/listings', { cache: 'no-store' });
+      const data = await response.json();
+      if (Array.isArray(data)) setListings(data);
+    } catch { setActionError('İlanlar yüklenemedi. Lütfen tekrar deneyin.'); }
+    finally { setLoading(false); }
   }, [currentProfile]);
 
+  useEffect(() => { void fetchListings(); }, [fetchListings]);
   useEffect(() => {
     if (!currentProfile) return;
     const keys = [`sanboard_listing_draft_v2_${currentProfile.id}_individual`, `sanboard_listing_draft_v2_${currentProfile.id}_corporate`];
     const drafts = keys.flatMap((key) => {
       try {
-        const raw = localStorage.getItem(key);
-        if (!raw) return [];
+        const raw = localStorage.getItem(key); if (!raw) return [];
         const draft = JSON.parse(raw) as SavedListingDraft;
         const result = calculateListingQuality({ ...draft, imageCount: Array.isArray(draft.images) ? draft.images.length : 0, hasContact: Boolean(currentProfile.phone?.trim() || currentProfile.sanmail_email?.trim()) });
         return [{ quality: result.percentage, savedAt: draft.savedAt, href: key.endsWith('_corporate') ? '/ilan-ver/yeni?corporate=true' : '/ilan-ver/yeni', storageKey: key }];
@@ -73,379 +66,77 @@ export default function HesabimIlanlarimPage() {
     });
     setSavedDraft(drafts.sort((a, b) => new Date(b.savedAt || 0).getTime() - new Date(a.savedAt || 0).getTime())[0] || null);
   }, [currentProfile]);
+  useEffect(() => {
+    if (!openMenuId) return;
+    const close = (event: MouseEvent | KeyboardEvent) => {
+      if (event instanceof KeyboardEvent && event.key !== 'Escape') return;
+      if (event instanceof MouseEvent && menuRef.current?.contains(event.target as Node)) return;
+      setOpenMenuId(null);
+    };
+    document.addEventListener('mousedown', close); document.addEventListener('keydown', close);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close); };
+  }, [openMenuId]);
 
-  const activeListings = listings.filter((l) => l.status === 'ACTIVE');
-  const expiredListings = listings.filter((l) => l.status === 'EXPIRED');
-  const soldListings = listings.filter((l) => l.status === 'SOLD');
+  const counts = useMemo(() => getOwnerDashboardCounts(listings), [listings]);
+  const filteredListings = useMemo(() => filterOwnerDashboardListings(listings, { status: activeTab, type: typeFilter, query }), [activeTab, listings, query, typeFilter]);
+  const totalFavorites = useMemo(() => listings.reduce((total, listing) => total + (listing.favorite_count || 0), 0), [listings]);
+  const hasFilters = Boolean(query.trim()) || typeFilter !== 'ALL';
 
-  const clearHistory = async () => {
-    if (!clearHistoryStatus) return;
-    setClearingHistory(true);
-    setActionError('');
-    try {
-      const response = await fetch('/api/user/listings', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: clearHistoryStatus }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.success) throw new Error(data.error || 'Liste temizlenemedi.');
-      setListings((current) => current.filter((listing) => listing.status !== clearHistoryStatus));
-      setClearHistoryStatus(null);
-    } catch (error: any) {
-      setActionError(error.message || 'Liste temizlenemedi.');
-    } finally {
-      setClearingHistory(false);
-    }
+  const openCloseModal = async (listing: Listing) => {
+    setOpenMenuId(null); setCloseReason('SOLD'); setCloseModalListing(listing);
+    const response = await fetch(`/api/offers?listingId=${encodeURIComponent(listing.id)}`);
+    const data = await response.json().catch(() => ({}));
+    setActiveOfferCount(response.ok ? Number(data.activeCount || 0) : 0);
   };
-
   const handleConfirmClose = async () => {
     if (!closeModalListing || !currentProfile) return;
-    setIsProcessingClose(true);
-    setActionError('');
-
+    setIsProcessingClose(true); setActionError('');
     try {
-      const res = await fetch('/api/user/listings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          listingId: closeModalListing.id,
-          action: closeReason === 'SOLD' ? 'SOLD' : 'REMOVED',
-          closeReason,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'İlan kapatılamadı.');
-      setCloseModalListing(null);
-      await fetchListings();
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'İlan kapatılamadı.');
-    } finally {
-      setIsProcessingClose(false);
-    }
+      const response = await fetch('/api/user/listings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ listingId: closeModalListing.id, action: closeReason === 'SOLD' ? 'SOLD' : 'REMOVED', closeReason }) });
+      const data = await response.json(); if (!response.ok) throw new Error(data.error || 'İlan kapatılamadı.');
+      setCloseModalListing(null); await fetchListings();
+    } catch (error) { setActionError(error instanceof Error ? error.message : 'İlan kapatılamadı.'); }
+    finally { setIsProcessingClose(false); }
   };
-
-  const handleDeleteDraft = () => {
-    if (!savedDraft) return;
-    if (!window.confirm('Bu taslağı silmek istediğinize emin misiniz?')) return;
-    localStorage.removeItem(savedDraft.storageKey);
-    setSavedDraft(null);
-  };
-
   const handleRepublish = async (listing: Listing) => {
-    setRepublishingId(listing.id);
-    setActionError('');
+    setRepublishingId(listing.id); setActionError('');
     try {
-      const res = await fetch('/api/user/listings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ listingId: listing.id, action: 'REPUBLISH' }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'İlan yeniden yayınlanamadı.');
-      await fetchListings();
-      setActiveTab('ACTIVE');
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'İlan yeniden yayınlanamadı.');
-    } finally {
-      setRepublishingId(null);
-    }
+      const response = await fetch('/api/user/listings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ listingId: listing.id, action: 'REPUBLISH' }) });
+      const data = await response.json(); if (!response.ok) throw new Error(data.error || 'İlan yeniden yayınlanamadı.');
+      await fetchListings(); setActiveTab('ACTIVE');
+    } catch (error) { setActionError(error instanceof Error ? error.message : 'İlan yeniden yayınlanamadı.'); }
+    finally { setRepublishingId(null); }
+  };
+  const clearHistory = async () => {
+    if (!clearHistoryStatus) return;
+    setClearingHistory(true); setActionError('');
+    try {
+      const response = await fetch('/api/user/listings', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: clearHistoryStatus }) });
+      const data = await response.json().catch(() => ({})); if (!response.ok || !data.success) throw new Error(data.error || 'Liste temizlenemedi.');
+      setListings((current) => current.filter((listing) => listing.status !== clearHistoryStatus)); setClearHistoryStatus(null);
+    } catch (error) { setActionError(error instanceof Error ? error.message : 'Liste temizlenemedi.'); }
+    finally { setClearingHistory(false); }
+  };
+  const handleDeleteDraft = () => {
+    if (!savedDraft || !window.confirm('Bu taslağı silmek istediğinize emin misiniz?')) return;
+    localStorage.removeItem(savedDraft.storageKey); setSavedDraft(null);
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header & Tabs */}
-      <div className="surface-card p-5 rounded-2xl border border-[var(--border-app)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-[var(--text-main)]">İlanlarım</h2>
-          <p className="text-xs text-[var(--text-muted)] mt-0.5">
-            Aktif ve süresi dolmuş tüm Sanboard ilanlarını buradan yönetebilirsin.
-          </p>
-        </div>
+  return <div className="space-y-5">
+    <header className="surface-card rounded-2xl border border-[var(--border-app)] p-5 sm:p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><h1 className="text-xl font-black tracking-tight text-[var(--text-main)] sm:text-2xl">İlanlarım</h1><p className="mt-1 text-sm text-[var(--text-muted)]">Aktif ve geçmiş ilanlarını buradan yönetebilirsin.</p>{!loading && listings.length > 0 && <p className="mt-2 text-xs font-semibold text-[var(--text-dim)]">{counts.ACTIVE} aktif ilan · Toplam {totalFavorites} favori</p>}</div><Link href="/ilan-ver" className="btn-primary inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs"><ListPlus className="h-4 w-4" />Yeni İlan Ver</Link></div></header>
 
-        <div className="flex rounded-xl bg-[var(--bg-surface-secondary)] p-1 border border-[var(--border-app)]">
-          <button
-            type="button"
-            onClick={() => setActiveTab('ACTIVE')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'ACTIVE'
-                ? 'bg-[var(--bg-surface)] text-[#FF8A1F] shadow-sm'
-                : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
-            }`}
-          >
-            Aktif ({activeListings.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('EXPIRED')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'EXPIRED'
-                ? 'bg-[var(--bg-surface)] text-[#FF8A1F] shadow-sm'
-                : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
-            }`}
-          >
-            Süresi Dolan ({expiredListings.length})
-          </button>
-          <button type="button" onClick={() => setActiveTab('SOLD')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeTab === 'SOLD' ? 'bg-[var(--bg-surface)] text-[#FF8A1F] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}>
-            Satılan ({soldListings.length})
-          </button>
-        </div>
-      </div>
+    <section className="surface-card rounded-2xl border border-[var(--border-app)] p-3 sm:p-4" aria-label="İlan filtreleri"><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row"><label className="relative min-w-0 flex-1 sm:max-w-md"><span className="sr-only">İlanlarda ara</span><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-dim)]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Başlık, ilan no veya kategori ara..." className="h-10 w-full rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] pl-9 pr-3 text-xs text-[var(--text-main)] outline-none transition-colors placeholder:text-[var(--text-dim)] focus:border-[#FF8A1F]/60" /></label><div className="flex rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] p-1" aria-label="İlan türü">{([['ALL', 'Tümü'], ['vehicle', 'Araç'], ['property', 'Mülk']] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setTypeFilter(value)} className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors sm:flex-none ${typeFilter === value ? 'bg-[var(--bg-surface)] text-[#FF9E45] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}>{label}</button>)}</div></div><div className="overflow-x-auto pb-1 lg:pb-0"><div className="flex min-w-max rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] p-1" role="tablist" aria-label="İlan durumu">{STATUS_TABS.map((tab) => <button key={tab.value} type="button" role="tab" aria-selected={activeTab === tab.value} onClick={() => setActiveTab(tab.value)} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${activeTab === tab.value ? 'bg-[var(--bg-surface)] text-[#FF9E45] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}>{tab.label} ({counts[tab.value]})</button>)}</div></div></div></section>
 
-      {!loading && ((activeTab === 'EXPIRED' && expiredListings.length > 0) || (activeTab === 'SOLD' && soldListings.length > 0)) && (
-        <div className="flex justify-end">
-          <button type="button" onClick={() => setClearHistoryStatus(activeTab as 'EXPIRED' | 'SOLD')} className="btn-secondary inline-flex items-center gap-1.5 px-3 py-2 text-xs text-[var(--color-danger)]">
-            <Trash2 className="h-3.5 w-3.5" />Listeyi Temizle
-          </button>
-        </div>
-      )}
+    {savedDraft && <div className="surface-card flex flex-col gap-3 rounded-2xl border border-[#FF8A1F]/25 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-bold text-[var(--text-main)]">Kaydedilmiş ilan taslağın var</p><p className="text-xs text-[var(--text-muted)]">%{savedDraft.quality} tamamlandı{savedDraft.savedAt ? ` · ${formatDate(savedDraft.savedAt)}` : ''}</p></div><div className="flex flex-wrap gap-2"><button type="button" onClick={handleDeleteDraft} className="btn-secondary inline-flex items-center gap-1.5 px-3 py-2 text-xs text-[var(--color-danger)]"><Trash2 className="h-3.5 w-3.5" />Taslağı Sil</button><Link href={savedDraft.href} className="btn-primary inline-flex items-center gap-1.5 px-3 py-2 text-xs"><Edit3 className="h-3.5 w-3.5" />Düzenlemeye Devam Et</Link></div></div>}
+    {!loading && (activeTab === 'EXPIRED' || activeTab === 'SOLD') && counts[activeTab] > 0 && <div className="flex justify-end"><button type="button" onClick={() => setClearHistoryStatus(activeTab)} className="btn-secondary inline-flex items-center gap-1.5 px-3 py-2 text-xs text-[var(--color-danger)]"><Trash2 className="h-3.5 w-3.5" />Listeyi Temizle</button></div>}
 
-      {savedDraft && (
-        <div className="surface-card rounded-2xl border border-[#FF8A1F]/25 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div><p className="text-sm font-bold text-[var(--text-main)]">Kaydedilmiş ilan taslağın var</p><p className="text-xs text-[var(--text-muted)]">%{savedDraft.quality} tamamlandı{savedDraft.savedAt ? ` • ${formatDate(savedDraft.savedAt)}` : ''}</p></div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={handleDeleteDraft} className="btn-secondary text-xs py-2 px-4 inline-flex items-center justify-center gap-1.5 text-[var(--color-danger)]"><Trash2 className="w-3.5 h-3.5" />Taslağı Sil</button>
-            <Link href={savedDraft.href} className="btn-primary text-xs py-2 px-4 inline-flex items-center justify-center gap-1.5"><Edit3 className="w-3.5 h-3.5" />Düzenlemeye Devam Et</Link>
-          </div>
-        </div>
-      )}
+    {loading ? <div className="surface-card flex items-center justify-center gap-2 rounded-2xl p-12 text-xs text-[var(--text-muted)]"><Loader2 className="h-4 w-4 animate-spin text-[#FF8A1F]" />İlanlar yükleniyor...</div> : listings.length === 0 ? <div className="surface-card rounded-2xl p-10 text-center"><ListPlus className="mx-auto h-8 w-8 text-[var(--text-dim)]" /><h2 className="mt-3 text-sm font-bold text-[var(--text-main)]">Henüz ilan vermedin.</h2><Link href="/ilan-ver" className="btn-primary mt-4 inline-flex px-4 py-2 text-xs">İlan Ver</Link></div> : filteredListings.length === 0 ? <div className="surface-card rounded-2xl p-10 text-center"><Clock className="mx-auto h-8 w-8 text-[var(--text-dim)]" /><h2 className="mt-3 text-sm font-bold text-[var(--text-main)]">{hasFilters ? 'Bu filtreye uygun ilan bulunamadı.' : EMPTY_COPY[activeTab]}</h2></div> : <div className="space-y-2.5">{filteredListings.map((listing) => {
+      const cover = resolveMediaUrl(getListingCoverPath(listing.images)); const remaining = formatTimeRemaining(listing.expires_at); const isActive = listing.status === 'ACTIVE'; const isExpired = listing.status === 'EXPIRED';
+      return <article key={listing.id} data-testid="personal-listing-card" className="group rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-3 transition-colors hover:border-[#FF8A1F]/30 hover:bg-[var(--bg-surface-secondary)]/30"><div className="grid gap-3 sm:grid-cols-[128px_minmax(0,1fr)] lg:grid-cols-[144px_minmax(0,1fr)_auto] lg:items-center"><div className="relative aspect-[16/10] overflow-hidden rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] sm:aspect-auto sm:h-24">{cover ? <Image src={cover} alt={`${listing.title} kapak görseli`} fill sizes="(max-width: 639px) calc(100vw - 4rem), (max-width: 1023px) 128px, 144px" className="object-cover" /> : <div className="flex h-full items-center justify-center text-[var(--text-dim)]"><ImageIcon className="h-6 w-6" /></div>}</div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="badge-tag px-2 py-0.5 text-[9px]">{listing.subcategory}</span><span className="text-[10px] font-semibold text-[var(--text-dim)]">{listing.listing_number}</span><span className="lg:hidden"><StatusBadge status={listing.status as OwnerDashboardStatus} /></span></div><h2 className="mt-1.5 line-clamp-2 text-sm font-bold leading-snug text-[var(--text-main)] sm:text-base">{listing.title}</h2><p className="mt-1 text-lg font-black tracking-tight text-[#FF9E45]">{formatCurrency(listing.price)}</p><div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-semibold text-[var(--text-muted)]"><span className={`inline-flex items-center gap-1 ${isActive ? 'text-emerald-300' : ''}`}><Clock className="h-3.5 w-3.5" />{isActive ? remaining.text : isExpired ? `Süresi doldu${listing.expires_at ? `: ${formatDate(listing.expires_at)}` : ''}` : `Kapanış: ${formatDate(listing.closed_at || listing.updated_at)}`}</span><span className="inline-flex items-center gap-1"><Heart className="h-3.5 w-3.5 text-[#FF8A1F]" />{listing.favorite_count || 0} favori</span></div></div><div className="flex items-center justify-between gap-2 border-t border-[var(--border-app)] pt-3 sm:col-span-2 lg:col-span-1 lg:border-0 lg:pt-0"><span className="hidden lg:inline-flex"><StatusBadge status={listing.status as OwnerDashboardStatus} /></span><div className="ml-auto flex items-center gap-2">{isExpired && <button type="button" onClick={() => void handleRepublish(listing)} disabled={republishingId === listing.id} className="btn-secondary inline-flex items-center gap-1.5 px-3 py-2 text-xs text-[#FF9E45]">{republishingId === listing.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}Yeniden Yayınla</button>}<Link href={getListingUrl(listing)} className="btn-primary inline-flex items-center gap-1.5 px-3 py-2 text-xs"><ExternalLink className="h-3.5 w-3.5" />İlanı Gör</Link>{isActive && <div className="relative" ref={openMenuId === listing.id ? menuRef : undefined}><button type="button" aria-label={`${listing.title} yönetim menüsünü aç`} aria-haspopup="menu" aria-expanded={openMenuId === listing.id} onClick={() => setOpenMenuId((current) => current === listing.id ? null : listing.id)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-app)] text-[var(--text-muted)] transition-colors hover:border-[#FF8A1F]/40 hover:text-[var(--text-main)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF8A1F]/60"><MoreHorizontal className="h-4 w-4" /></button>{openMenuId === listing.id && <div role="menu" className="absolute bottom-full right-0 z-20 mb-2 w-44 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-1.5 shadow-2xl"><Link role="menuitem" href={`/hesabim/ilanlarim/${listing.id}/duzenle`} onClick={() => setOpenMenuId(null)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--bg-surface-secondary)] hover:text-[var(--text-main)]"><Edit3 className="h-3.5 w-3.5" />Düzenle</Link><div className="my-1 border-t border-[var(--border-app)]" /><button type="button" role="menuitem" onClick={() => void openCloseModal(listing)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-red-300 hover:bg-red-400/10"><XCircle className="h-3.5 w-3.5" />İlanı Kapat</button></div>}</div>}</div></div></div></article>;
+    })}</div>}
 
-      {loading ? (
-        <div className="surface-card p-12 text-center text-xs text-[var(--text-muted)] flex items-center justify-center gap-2">
-          <Loader2 className="w-4 h-4 animate-spin text-[#FF8A1F]" />
-          <span>İlanlar yükleniyor...</span>
-        </div>
-      ) : activeTab === 'ACTIVE' ? (
-        activeListings.length > 0 ? (
-          <div className="space-y-4">
-            {activeListings.map((listing) => {
-              const rawCover =
-                listing.images?.find((i) => i.is_cover)?.storage_path ||
-                listing.images?.[0]?.storage_path;
-              const coverImg = resolveMediaUrl(rawCover);
-              const remaining = formatTimeRemaining(listing.expires_at);
-
-              return (
-                <div
-                  key={listing.id}
-                  className="surface-card p-4 sm:p-5 rounded-2xl border border-[var(--border-app)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-                >
-                  <div className="flex items-center gap-4">
-                    <img
-                      src={coverImg}
-                      alt={listing.title}
-                      className="w-20 h-16 sm:w-24 sm:h-20 rounded-xl object-cover shrink-0 border border-[var(--border-app)]"
-                    />
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="badge-tag inline-flex h-5 items-center px-1.5 py-0 text-[10px] leading-none">{listing.subcategory}</span>
-                      </div>
-                      <h3 className="font-bold text-sm text-[var(--text-main)] line-clamp-1">
-                        {listing.title}
-                      </h3>
-                      <p className="text-base font-extrabold text-[#FF8A1F]">
-                        {formatCurrency(listing.price)}
-                      </p>
-                      <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
-                        <span className="flex items-center gap-1 text-[var(--color-success)] font-semibold">
-                          <Clock className="w-3.5 h-3.5" />
-                          {remaining.text}
-                        </span>
-                        <span className="flex items-center gap-1 text-[var(--text-dim)]">
-                          <Heart className="w-3.5 h-3.5 text-[#FF8A1F]" />
-                          {listing.favorite_count || 0} favori
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 sm:grid-cols-1 items-stretch gap-2 w-full sm:w-32 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[var(--border-app)]">
-                    <Link
-                      href={`/hesabim/ilanlarim/${listing.id}/duzenle`}
-                      className="btn-secondary text-xs py-2 px-3 flex items-center justify-center gap-1 text-[#FF8A1F] hover:bg-[var(--brand-orange-subtle)]"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                      <span>Düzenle</span>
-                    </Link>
-
-                    <Link
-                      href={getListingUrl(listing)}
-                      className="btn-secondary text-xs py-2 px-3 flex items-center justify-center gap-1"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>İlanı Gör</span>
-                    </Link>
-
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        setCloseReason('SOLD');
-                        setCloseModalListing(listing);
-                        const response = await fetch(`/api/offers?listingId=${encodeURIComponent(listing.id)}`);
-                        const data = await response.json().catch(() => ({}));
-                        setActiveOfferCount(response.ok ? Number(data.activeCount || 0) : 0);
-                      }}
-                      className="btn-danger text-xs py-2 px-3 flex items-center justify-center gap-1 cursor-pointer"
-                    >
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      <span>İlanı Kapat</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="surface-card p-12 text-center space-y-3">
-            <ListPlus className="w-8 h-8 text-[var(--text-dim)] mx-auto" />
-            <h3 className="text-sm font-bold text-[var(--text-main)]">
-              Aktif ilanınız bulunmuyor.
-            </h3>
-            <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
-              Araç veya mülkünüzü Los Santos'a duyurmak için hemen yeni bir ilan paketi başlatabilirsiniz.
-            </p>
-            <div className="pt-2">
-              <Link href="/ilan-ver" className="btn-primary text-xs py-2 px-4 inline-flex">
-                İlan Ver ($2.000)
-              </Link>
-            </div>
-          </div>
-        )
-      ) : activeTab === 'EXPIRED' ? (expiredListings.length > 0 ? (
-        <div className="space-y-4">
-          {expiredListings.map((listing) => (
-            <div
-              key={listing.id}
-              className="surface-card p-4 sm:p-5 rounded-2xl border border-[var(--border-app)] opacity-85 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-            >
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="badge-tag bg-[var(--color-danger-subtle)] text-[var(--color-danger)] font-bold text-[10px]">
-                    SÜRESİ DOLDU
-                  </span>
-                </div>
-                <h3 className="font-bold text-sm text-[var(--text-main)]">{listing.title}</h3>
-                <p className="text-sm font-bold text-[var(--text-muted)]">
-                  Eski Fiyat: {formatCurrency(listing.price)}
-                </p>
-                <p className="text-xs text-[var(--text-dim)]">
-                  Yayın: {formatDate(listing.published_at)} • Bitiş: {formatDate(listing.expires_at)}
-                </p>
-              </div>
-
-              <div className="shrink-0 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => handleRepublish(listing)}
-                  disabled={republishingId === listing.id}
-                  className="w-full sm:w-auto btn-primary text-xs py-2.5 px-4 flex items-center justify-center gap-1.5 shadow"
-                >
-                  {republishingId === listing.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
-                  <span>Yeniden Yayınla ($2.000)</span>
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="surface-card p-12 text-center space-y-2">
-          <Clock className="w-8 h-8 text-[var(--text-dim)] mx-auto" />
-          <h3 className="text-sm font-bold text-[var(--text-main)]">
-            Süresi dolan ilanınız bulunmuyor.
-          </h3>
-          <p className="text-xs text-[var(--text-muted)]">
-            7 günlük yayın süresi tamamlanan ilanlarınız burada listelenir.
-          </p>
-        </div>
-      )) : soldListings.length > 0 ? (
-        <div className="space-y-3">
-          {soldListings.map((listing) => <div key={listing.id} className="surface-card rounded-2xl border border-[var(--border-app)] p-4 sm:p-5">
-            <span className="text-[10px] font-black text-emerald-400">SATILDI</span>
-            <h3 className="mt-1 text-sm font-bold text-[var(--text-main)]">{listing.title}</h3>
-            <p className="mt-1 text-sm font-bold text-[#FF8A1F]">{formatCurrency(listing.price)}</p>
-            <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{listing.description}</p>
-            <p className="mt-2 text-[11px] text-[var(--text-dim)]">Kapanış: {formatDate(listing.closed_at || listing.updated_at)}</p>
-          </div>)}
-        </div>
-      ) : <div className="surface-card p-12 text-center space-y-2"><CheckCircle className="w-8 h-8 text-[var(--text-dim)] mx-auto" /><h3 className="text-sm font-bold text-[var(--text-main)]">Satılan ilanınız bulunmuyor.</h3></div>}
-
-      {actionError && (
-        <div className="p-3 rounded-xl bg-[var(--color-danger-subtle)] text-[var(--color-danger)] text-xs font-semibold">
-          {actionError} Önce uygun ilan paketini satın alabilirsiniz.
-        </div>
-      )}
-
-      {closeModalListing && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="max-w-md w-full surface-card rounded-2xl border-2 border-[var(--color-danger)]/40 p-6 shadow-2xl space-y-5">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-[var(--color-danger-subtle)] text-[var(--color-danger)] flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="font-extrabold text-base text-[var(--text-main)]">
-                  İlanı hangi nedenle kapatmak istiyorsun?
-                </h3>
-                <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                  İlan yayından kalıcı olarak kaldırılacak, fotoğrafları ve favorileri temizlenecektir. <strong className="text-[var(--color-danger)]">Bu işlem geri alınamaz.</strong>
-                </p>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)] text-xs text-[var(--text-main)] font-semibold truncate">
-              {closeModalListing.title}
-            </div>
-            {activeOfferCount > 0 && <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-semibold text-amber-300">Bu ilan için {activeOfferCount} aktif teklif bulunuyor. İlanı kaldırırsanız bu tekliflerin tamamı kapatılacak.</p>}
-
-            <div className="grid gap-2">
-              {([
-                ['SOLD', 'Satıldı'],
-                ['CANCELLED', 'Satıştan vazgeçildi'],
-                ['OTHER', 'Diğer nedenle kapat'],
-              ] as const).map(([value, label]) => (
-                <label key={value} className="flex cursor-pointer items-center gap-2 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] p-3 text-xs font-semibold text-[var(--text-main)]">
-                  <input type="radio" name="closeReason" value={value} checked={closeReason === value} onChange={() => setCloseReason(value)} className="accent-[#FF8A1F]" />
-                  {label}
-                </label>
-              ))}
-            </div>
-
-            <div className="flex justify-end gap-2.5 pt-2 border-t border-[var(--border-app)]">
-              <button
-                type="button"
-                onClick={() => setCloseModalListing(null)}
-                disabled={isProcessingClose}
-                className="btn-secondary text-xs py-2 px-4"
-              >
-                Vazgeç
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmClose}
-                disabled={isProcessingClose}
-                className="btn-danger text-xs py-2 px-4 flex items-center gap-1.5"
-              >
-                {isProcessingClose ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <CheckCircle className="w-3.5 h-3.5" />
-                )}
-                <span>İlanı Kapat</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {clearHistoryStatus && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" role="dialog" aria-modal="true" aria-labelledby="clear-listing-history-title">
-          <div className="surface-card w-full max-w-md rounded-2xl border border-[var(--border-app)] p-6 shadow-2xl">
-            <h3 id="clear-listing-history-title" className="text-lg font-bold text-[var(--text-main)]">Listeyi görünümden temizle?</h3>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{clearHistoryStatus === 'SOLD' ? 'Satılan' : 'Süresi dolan'} ilanlar yalnızca bu karakter profilinin görünümünden kaldırılır. Aktif ilanlar, diğer karakterler ve denetim kayıtları etkilenmez.</p>
-            <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setClearHistoryStatus(null)} disabled={clearingHistory} className="btn-secondary px-4 py-2 text-xs">Vazgeç</button><button type="button" onClick={clearHistory} disabled={clearingHistory} className="btn-danger px-4 py-2 text-xs">{clearingHistory ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Listeyi Temizle'}</button></div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+    {actionError && <div className="rounded-xl bg-[var(--color-danger-subtle)] p-3 text-xs font-semibold text-[var(--color-danger)]">{actionError}</div>}
+    {closeModalListing && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" role="dialog" aria-modal="true" aria-labelledby="close-listing-title"><div className="surface-card w-full max-w-md rounded-2xl border border-[var(--color-danger)]/40 p-6 shadow-2xl"><div className="flex items-start gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-danger-subtle)] text-[var(--color-danger)]"><AlertTriangle className="h-5 w-5" /></div><div><h3 id="close-listing-title" className="font-extrabold text-[var(--text-main)]">İlanı hangi nedenle kapatmak istiyorsun?</h3><p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">İlan yayından kalıcı olarak kaldırılacak, fotoğrafları ve favorileri temizlenecektir. <strong className="text-[var(--color-danger)]">Bu işlem geri alınamaz.</strong></p></div></div><div className="mt-5 truncate rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] p-3 text-xs font-semibold text-[var(--text-main)]">{closeModalListing.title}</div>{activeOfferCount > 0 && <p className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-semibold text-amber-300">Bu ilan için {activeOfferCount} aktif teklif bulunuyor. İlanı kaldırırsanız bu tekliflerin tamamı kapatılacak.</p>}<div className="mt-4 grid gap-2">{([['SOLD', 'Satıldı'], ['CANCELLED', 'Satıştan vazgeçildi'], ['OTHER', 'Diğer nedenle kapat']] as const).map(([value, label]) => <label key={value} className="flex cursor-pointer items-center gap-2 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] p-3 text-xs font-semibold text-[var(--text-main)]"><input type="radio" name="closeReason" checked={closeReason === value} onChange={() => setCloseReason(value)} className="accent-[#FF8A1F]" />{label}</label>)}</div><div className="mt-5 flex justify-end gap-2 border-t border-[var(--border-app)] pt-4"><button type="button" onClick={() => setCloseModalListing(null)} disabled={isProcessingClose} className="btn-secondary px-4 py-2 text-xs">Vazgeç</button><button type="button" onClick={() => void handleConfirmClose()} disabled={isProcessingClose} className="btn-danger inline-flex items-center gap-1.5 px-4 py-2 text-xs">{isProcessingClose ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}İlanı Kapat</button></div></div></div>}
+    {clearHistoryStatus && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" role="dialog" aria-modal="true" aria-labelledby="clear-listing-history-title"><div className="surface-card w-full max-w-md rounded-2xl border border-[var(--border-app)] p-6 shadow-2xl"><h3 id="clear-listing-history-title" className="text-lg font-bold text-[var(--text-main)]">Listeyi görünümden temizle?</h3><p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{clearHistoryStatus === 'SOLD' ? 'Satılan' : 'Süresi dolan'} ilanlar yalnızca bu karakter profilinin görünümünden kaldırılır. Aktif ilanlar, diğer karakterler ve denetim kayıtları etkilenmez.</p><div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setClearHistoryStatus(null)} disabled={clearingHistory} className="btn-secondary px-4 py-2 text-xs">Vazgeç</button><button type="button" onClick={() => void clearHistory()} disabled={clearingHistory} className="btn-danger px-4 py-2 text-xs">{clearingHistory ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Listeyi Temizle'}</button></div></div></div>}
+  </div>;
 }

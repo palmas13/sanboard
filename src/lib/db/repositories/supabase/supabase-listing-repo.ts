@@ -1099,7 +1099,10 @@ export class SupabaseListingRepository implements IListingRepository {
       duration: number
     ) => void
   ): Promise<Listing[]> {
-    const client = this.getClient();
+    // This is an authenticated owner-management dataset, not a public listing
+    // feed. The route has already resolved the canonical active profile; use
+    // the server client and keep the query strictly scoped to that profile.
+    const client = this.getAdminClient();
     const safeProfileId = resolveProfileId(profileId);
     if (!isUuid(safeProfileId)) return [];
     const { data: historyProfile } = await this.getAdminClient()
