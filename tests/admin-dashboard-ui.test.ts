@@ -19,6 +19,16 @@ test('admin dashboard uses responsive sidebar and enriched-shape fallbacks', () 
   assert.match(page, /<FaviconSettings \/>/);
 });
 
+test('operational sections expose scoped headers, search and detail inspection', () => {
+  assert.match(page, /Global KPI cards intentionally belong to the overview only/);
+  assert.match(page, /pageMeta\[activeTab\]\.title/);
+  assert.match(page, /aria-label="Destek taleplerinde ara"/);
+  assert.match(page, /aria-label="Ödemelerde ara"/);
+  assert.match(page, /aria-labelledby="listing-dialog-title"/);
+  assert.match(page, /aria-labelledby="payment-dialog-title"/);
+  assert.match(page, />Yayından kaldır</);
+});
+
 test('report and corporate dialogs expose accessible modal semantics', () => {
   assert.match(page, /aria-labelledby="report-dialog-title"/);
   assert.match(page, /aria-labelledby="reject-application-title"/);

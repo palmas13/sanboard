@@ -70,6 +70,11 @@ export default function AdminPage() {
 
   // Search filter inside admin listings
   const [searchListingQuery, setSearchListingQuery] = useState('');
+  const [ticketSearchQuery, setTicketSearchQuery] = useState('');
+  const [paymentSearchQuery, setPaymentSearchQuery] = useState('');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('ALL');
+  const [selectedListing, setSelectedListing] = useState<any | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
   const [visibleCounts, setVisibleCounts] = useState<Record<string, number>>({});
   const visibleCount = (key: string) => visibleCounts[key] || ADMIN_PAGE_SIZE;
   const loadMore = (key: string) => setVisibleCounts((current) => ({ ...current, [key]: visibleCount(key) + ADMIN_PAGE_SIZE }));
@@ -99,14 +104,14 @@ export default function AdminPage() {
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
   const modalCloseRef = useRef<HTMLButtonElement>(null);
 
-  const anyModalOpen = Boolean(selectedReport || selectedTicket || rejectModalOpen || storeManageModalOpen || suspendModalOpen || deleteModalOpen);
+  const anyModalOpen = Boolean(selectedReport || selectedTicket || selectedListing || selectedPayment || rejectModalOpen || storeManageModalOpen || suspendModalOpen || deleteModalOpen);
   useEffect(() => {
     if (!anyModalOpen) return;
     const previous = document.activeElement as HTMLElement | null;
     const timer = window.setTimeout(() => modalCloseRef.current?.focus(), 0);
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      setSelectedReport(null); setSelectedTicket(null); setRejectModalOpen(false);
+      setSelectedReport(null); setSelectedTicket(null); setSelectedListing(null); setSelectedPayment(null); setRejectModalOpen(false);
       setStoreManageModalOpen(false); setSuspendModalOpen(false); setDeleteModalOpen(false);
     };
     document.addEventListener('keydown', onKeyDown);
@@ -448,8 +453,25 @@ export default function AdminPage() {
   const filteredTickets = (data?.tickets || []).filter((t: any) => {
     const matchesStatus = ticketStatusFilter === 'ALL' || t.status === ticketStatusFilter;
     const matchesCategory = ticketCategoryFilter === 'ALL' || normalizeTicketCategory(t.category) === ticketCategoryFilter;
-    return matchesStatus && matchesCategory;
+    const query = ticketSearchQuery.trim().toLowerCase();
+    const matchesSearch = !query || [t.id, t.subject, t.creator_name, t.profile?.full_name].some((value) => String(value || '').toLowerCase().includes(query));
+    return matchesStatus && matchesCategory && matchesSearch;
   });
+  const payments = data?.payments || [];
+  const filteredPayments = payments.filter((payment: any) => {
+    const query = paymentSearchQuery.trim().toLowerCase();
+    const matchesSearch = !query || [payment.id, payment.order_id, payment.profile_id].some((value) => String(value || '').toLowerCase().includes(query));
+    return matchesSearch && (paymentStatusFilter === 'ALL' || payment.status === paymentStatusFilter);
+  });
+  const pageMeta: Record<AdminTab, { title: string; description: string; metric: string; value: number | string }> = {
+    overview: { title: 'Operasyon Merkezi', description: 'Platform sağlığını ve bekleyen işleri tek bakışta izleyin.', metric: 'Açık iş', value: pendingAppsCount + openTicketsCount + stats.openReports },
+    listings: { title: 'İlan Yönetimi', description: 'İlanları inceleyin ve yayın durumlarını yönetin.', metric: 'Toplam ilan', value: listings.length },
+    tickets: { title: 'Destek Talepleri', description: 'Kullanıcı taleplerini bulun, inceleyin ve yanıtlayın.', metric: 'Açık talep', value: openTicketsCount },
+    dealers: { title: 'Kurumsal Yönetim', description: 'Başvuruları, mağazaları ve abonelikleri yönetin.', metric: 'Bekleyen başvuru', value: pendingAppsCount },
+    payments: { title: 'Ödemeler', description: 'Fleeca işlemlerini durum ve sipariş bilgisiyle izleyin.', metric: 'Toplam işlem', value: payments.length },
+    reports: { title: 'Raporlar', description: 'Kullanıcı bildirimlerini inceleyip sonuçlandırın.', metric: 'Açık rapor', value: stats.openReports },
+    settings: { title: 'Ayarlar', description: 'Platform fiyatlandırmasını ve marka varlıklarını yönetin.', metric: 'Paket fiyatı', value: formatCurrency(Number(packagePriceInput) || 0) },
+  };
   const workQueue = [
     { id: 'dealers' as const, icon: Building2, title: 'Bekleyen Kurumsal Başvurular', count: pendingAppsCount, description: `${pendingAppsCount} başvuru inceleme bekliyor`, action: 'İncele' },
     { id: 'tickets' as const, icon: LifeBuoy, title: 'Destek Talepleri', count: openTicketsCount, description: `${openTicketsCount} açık talep yanıt bekliyor`, action: 'Görüntüle' },
@@ -473,9 +495,13 @@ export default function AdminPage() {
         <div className={styles.sidebarFoot}><span className="w-2 h-2 rounded-full bg-[var(--color-success)]" /> Sistem aktif</div>
       </aside>
       <main className={styles.content}>
+        <header className={styles.pageHeader}>
+          <div><h1>{pageMeta[activeTab].title}</h1><p>{pageMeta[activeTab].description}</p></div>
+          <div className={styles.pageMetric}><span>{pageMeta[activeTab].metric}</span><strong>{pageMeta[activeTab].value}</strong></div>
+        </header>
 
-      {/* Compact 4-KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Global KPI cards intentionally belong to the overview only. */}
+      {activeTab === 'overview' && <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* 1. Toplam Kullanıcı */}
         <div className="surface-card p-5 rounded-2xl border border-[var(--border-app)] hover:border-[#FF8A1F]/30 transition-colors">
           <div className="flex items-center justify-between">
@@ -543,7 +569,7 @@ export default function AdminPage() {
             <p className="text-2xl font-black text-[#FF8A1F] mt-2">{pendingAppsCount}</p>
           )}
         </div>
-      </div>
+      </div>}
 
       {activeTab === 'overview' && (
         <section className={styles.overviewGrid} aria-labelledby="overview-title">
@@ -606,7 +632,7 @@ export default function AdminPage() {
                         {l.status}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-right">
+                    <td className="py-3 px-4 text-right"><div className="flex items-center justify-end gap-2"><button type="button" onClick={() => setSelectedListing(l)} className={styles.primaryAction}>İncele</button>
                       {l.status === 'ACTIVE' && (
                         <button
                           type="button"
@@ -614,9 +640,9 @@ export default function AdminPage() {
                           className="btn-danger text-[11px] py-1 px-2.5 flex items-center gap-1 ml-auto"
                         >
                           <Trash2 className="w-3 h-3" />
-                          <span>Kaldır</span>
+                          <span>Yayından kaldır</span>
                         </button>
-                      )}
+                      )}</div>
                     </td>
                   </tr>
                 ))}
@@ -917,6 +943,7 @@ export default function AdminPage() {
             </div>
 
             <div className="flex flex-col sm:items-end gap-2">
+            <div className={styles.search}><Search aria-hidden="true" /><input type="search" value={ticketSearchQuery} onChange={(event) => setTicketSearchQuery(event.target.value)} placeholder="Ticket no, konu veya kullanıcı ara" className="form-input py-1.5 text-xs" aria-label="Destek taleplerinde ara" /></div>
             <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-app)]">
               {(['ALL', 'OPEN', 'ANSWERED', 'CLOSED'] as const).map((st) => (
                 <button
@@ -1016,7 +1043,7 @@ export default function AdminPage() {
       {/* TAB CONTENT 5: ÖDEMELER */}
       {activeTab === 'payments' && (
         <div className="surface-card rounded-2xl border border-[var(--border-app)] p-6 space-y-4">
-          <h3 className="font-bold text-base text-[var(--text-main)]">Fleeca İşlem Geçmişi</h3>
+          <div className={styles.toolbar}><h3 className="mr-auto font-bold text-sm text-[var(--text-main)]">Fleeca İşlem Geçmişi</h3><div className={styles.search}><Search aria-hidden="true" /><input type="search" value={paymentSearchQuery} onChange={(event) => setPaymentSearchQuery(event.target.value)} placeholder="Sipariş veya profil ara" className="form-input py-1.5 text-xs" aria-label="Ödemelerde ara" /></div><select value={paymentStatusFilter} onChange={(event) => setPaymentStatusFilter(event.target.value)} className="form-input w-auto py-1.5 text-xs" aria-label="Ödeme durumu"><option value="ALL">Tüm durumlar</option>{Array.from(new Set(payments.map((payment: any) => payment.status))).map((status) => <option key={String(status)} value={String(status)}>{String(status)}</option>)}</select></div>
           <div className="overflow-x-auto rounded-xl border border-[var(--border-app)]">
             <table className="w-full text-left text-xs">
               <thead className="bg-[var(--bg-surface-secondary)] border-b border-[var(--border-app)] text-[var(--text-muted)] uppercase tracking-wider font-semibold">
@@ -1029,23 +1056,19 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-app)]">
-                {(data?.payments || []).slice(0, visibleCount('payments')).map((pay: any) => (
+                {filteredPayments.slice(0, visibleCount('payments')).map((pay: any) => (
                   <tr key={pay.id} className="hover:bg-[var(--bg-surface-secondary)]/30 transition-colors">
                     <td className="py-3 px-4 font-mono font-semibold text-[var(--text-main)]">{pay.order_id}</td>
                     <td className="py-3 px-4 text-[var(--text-muted)]">{formatDateTime(pay.created_at)}</td>
                     <td className="py-3 px-4 font-bold text-[#FF8A1F]">{formatCurrency(pay.amount)}</td>
                     <td className="py-3 px-4 text-[var(--text-dim)]">Fleeca Bank</td>
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--color-success-subtle)] text-[var(--color-success)]">
-                        {pay.status}
-                      </span>
-                    </td>
+                    <td className="py-3 px-4"><button type="button" onClick={() => setSelectedPayment(pay)} className={styles.primaryAction}><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--color-success-subtle)] text-[var(--color-success)]">{pay.status}</span><span>İncele</span></button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          {visibleCount('payments') < (data?.payments || []).length && <button type="button" onClick={() => loadMore('payments')} className="btn-secondary mx-auto flex px-5 py-2.5 text-xs">Daha Fazla Göster</button>}
+          {visibleCount('payments') < filteredPayments.length && <button type="button" onClick={() => loadMore('payments')} className="btn-secondary mx-auto flex px-5 py-2.5 text-xs">Daha Fazla Göster</button>}
         </div>
       )}
 
@@ -1167,6 +1190,14 @@ export default function AdminPage() {
         </div>
         <FaviconSettings />
         </div>
+      )}
+
+      {selectedListing && (
+        <div className={styles.modalBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedListing(null); }}><section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="listing-dialog-title"><div className={styles.modalHead}><div><span className="badge-tag">İLAN</span><h2 id="listing-dialog-title">{selectedListing.title}</h2></div><button ref={modalCloseRef} type="button" onClick={() => setSelectedListing(null)} aria-label="İlan ayrıntılarını kapat"><X /></button></div><dl className={styles.detailGrid}><div><dt>Durum</dt><dd>{selectedListing.status}</dd></div><div><dt>Kategori</dt><dd>{selectedListing.subcategory || selectedListing.category}</dd></div><div><dt>Fiyat</dt><dd>{formatCurrency(selectedListing.price)}</dd></div><div><dt>Konum</dt><dd>{selectedListing.location || 'Belirtilmedi'}</dd></div></dl><div className={styles.modalActions}><Link href={`/ilan/${selectedListing.id}`} className="btn-secondary inline-flex items-center gap-2">İlan sayfasını aç <ExternalLink className="h-3.5 w-3.5" /></Link>{selectedListing.status === 'ACTIVE' && <button type="button" className="btn-danger" onClick={() => handleDelist(selectedListing.id)}>Yayından kaldır</button>}</div></section></div>
+      )}
+
+      {selectedPayment && (
+        <div className={styles.modalBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedPayment(null); }}><section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="payment-dialog-title"><div className={styles.modalHead}><div><span className="badge-tag">ÖDEME</span><h2 id="payment-dialog-title">İşlem ayrıntıları</h2></div><button ref={modalCloseRef} type="button" onClick={() => setSelectedPayment(null)} aria-label="Ödeme ayrıntılarını kapat"><X /></button></div><dl className={styles.detailGrid}><div><dt>Sipariş no</dt><dd>{selectedPayment.order_id}</dd></div><div><dt>Durum</dt><dd>{selectedPayment.status}</dd></div><div><dt>Tutar</dt><dd>{formatCurrency(selectedPayment.amount)}</dd></div><div><dt>Tarih</dt><dd>{formatDateTime(selectedPayment.created_at)}</dd></div><div><dt>Sağlayıcı</dt><dd>Fleeca Bank</dd></div><div><dt>Profil</dt><dd>{selectedPayment.profile_id || '—'}</dd></div></dl></section></div>
       )}
 
       {selectedReport && (

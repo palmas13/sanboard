@@ -1,6 +1,7 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useId, useRef, useState } from 'react';
+import { CheckCircle, ImageIcon, Loader2, UploadCloud } from 'lucide-react';
 
 type Favicon = { url: string; version: string; sizeBytes: number };
 
@@ -33,6 +34,8 @@ export function FaviconSettings() {
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const inputId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch('/api/admin/settings/favicon', { cache: 'no-store' })
@@ -62,6 +65,7 @@ export function FaviconSettings() {
       setFavicon(nextFavicon);
       updateDocumentFavicon(versionedFaviconUrl(nextFavicon));
       setFile(null);
+      if (inputRef.current) inputRef.current.value = '';
       setMessage('Favicon güncellendi.');
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : 'Yükleme başarısız.');
@@ -73,39 +77,28 @@ export function FaviconSettings() {
   const src = favicon ? versionedFaviconUrl(favicon) : null;
 
   return (
-    <section className="surface-card max-w-xl space-y-5 rounded-2xl border border-[var(--border-app)] p-6">
-      <div>
-        <h2 className="text-lg font-bold">Site faviconu</h2>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          PNG, JPEG veya WEBP; en fazla 1 MB. Görsel güvenli bir 512×512
-          PNG&apos;ye dönüştürülür. ICO bu dönüştürücü tarafından desteklenmez.
-        </p>
+    <section className="surface-card rounded-2xl border border-[var(--border-app)] p-5" aria-labelledby="favicon-title">
+      <div className="mb-4">
+        <h2 id="favicon-title" className="text-sm font-bold">Site faviconu</h2>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">Tarayıcı sekmelerinde ve yer imlerinde kullanılan site simgesini yönetin.</p>
       </div>
-      {src && (
-        <img
-          src={src}
-          alt="Mevcut favicon"
-          width={64}
-          height={64}
-          className="rounded-xl border border-[var(--border-app)]"
-        />
-      )}
-      <form onSubmit={submit} className="space-y-3">
-        <input
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          required
-          onChange={(event) => setFile(event.target.files?.[0] || null)}
-        />
-        <button className="btn-primary px-4 py-2" disabled={busy || !file}>
-          {busy ? 'Yükleniyor…' : 'Faviconu kaydet'}
-        </button>
-      </form>
-      {message && (
-        <p role="status" className="text-sm text-[var(--text-muted)]">
-          {message}
-        </p>
-      )}
+      <div className="grid gap-4 sm:grid-cols-[76px_1fr]">
+        <div className="flex h-[76px] w-[76px] items-center justify-center rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]" aria-label="Favicon önizlemesi">
+          {src ? <img src={src} alt="Mevcut favicon" width={48} height={48} className="h-12 w-12 object-contain" /> : <ImageIcon className="h-6 w-6 text-[var(--text-dim)]" aria-hidden="true" />}
+        </div>
+        <form onSubmit={submit} className="space-y-3">
+          <label htmlFor={inputId} className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[var(--border-app)] p-3 hover:border-[#FF8A1F]">
+            <UploadCloud className="h-5 w-5 shrink-0 text-[#FF8A1F]" aria-hidden="true" />
+            <span className="min-w-0"><strong className="block truncate text-xs">{file?.name || 'Yeni görsel seçin'}</strong><small className="text-[10px] text-[var(--text-muted)]">PNG, JPEG veya WEBP · en fazla 1 MB</small></span>
+          </label>
+          <input ref={inputRef} id={inputId} className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" required onChange={(event) => setFile(event.target.files?.[0] || null)} />
+          <p className="text-[10px] text-[var(--text-dim)]">Görsel güvenli bir 512×512 PNG&apos;ye dönüştürülür. ICO bu dönüştürücü tarafından desteklenmez.</p>
+          <button className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-xs" disabled={busy || !file}>
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />}{busy ? 'Yükleniyor…' : 'Faviconu kaydet'}
+          </button>
+        </form>
+      </div>
+      {message && <p role="status" aria-live="polite" className="mt-3 text-xs text-[var(--text-muted)]">{message}</p>}
     </section>
   );
 }
