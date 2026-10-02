@@ -45,6 +45,25 @@ describe('Critical listing image and corporate follow regressions', () => {
     });
   }
 
+  test('followers modal is portaled above card-local favorite badges', () => {
+    const followSource = readFileSync(
+      join(process.cwd(), 'src/components/dealers/CorporateStoreFollow.tsx'),
+      'utf8'
+    );
+    const listingCardSource = readFileSync(
+      join(process.cwd(), 'src/components/listings/ListingCard.tsx'),
+      'utf8'
+    );
+
+    assert.match(followSource, /import \{ createPortal \} from 'react-dom'/);
+    assert.match(followSource, /modalOpen && createPortal\(/);
+    assert.match(followSource, /fixed inset-0 z-50/);
+    assert.match(followSource, /role="dialog"/);
+    assert.match(followSource, /aria-modal="true"/);
+    assert.match(followSource, /document\.body/);
+    assert.match(listingCardSource, /absolute top-2\.5 right-2\.5 z-10/);
+  });
+
   test('listing images use cover, sort_order and deterministic secondary ordering', () => {
     const images = [
       { id: 'b', listing_id: 'l', storage_path: 'listings/b.webp', sort_order: 1, is_cover: false, size_bytes: 1, created_at: '2026-01-02' },

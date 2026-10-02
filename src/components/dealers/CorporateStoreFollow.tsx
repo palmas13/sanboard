@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useAuth } from '@/features/auth/AuthContext';
 import { Users, UserPlus, UserCheck, X, Loader2, ExternalLink } from 'lucide-react';
@@ -192,14 +193,19 @@ export function CorporateStoreFollow({
       )}
 
       {/* Followers List Modal */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
-          <div className="surface-card w-full max-w-md rounded-2xl border border-[var(--border-app)] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+      {modalOpen && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="followers-modal-title"
+        >
+          <div className="surface-card relative z-10 w-full max-w-md rounded-2xl border border-[var(--border-app)] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
             {/* Modal Header */}
             <div className="p-4 sm:p-5 border-b border-[var(--border-app)] flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-[#FF8A1F]" />
-                <h3 className="font-bold text-sm sm:text-base text-[var(--text-main)]">
+                <h3 id="followers-modal-title" className="font-bold text-sm sm:text-base text-[var(--text-main)]">
                   Takipçiler ({followerCount})
                 </h3>
               </div>
@@ -260,7 +266,8 @@ export function CorporateStoreFollow({
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
