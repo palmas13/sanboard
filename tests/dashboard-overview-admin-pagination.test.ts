@@ -9,7 +9,7 @@ describe('dashboard overview and admin pagination regressions', () => {
   test('overview explains and exposes the available listing entitlement', () => {
     const overview = source('src/app/hesabim/page.tsx');
     assert.match(overview, /İlan Hakların/);
-    assert.match(overview, /credits\.total/);
+    assert.doesNotMatch(overview, /credits\.total/);
     assert.match(overview, /data\.individualCredits/);
     assert.match(overview, /data\.corporateCredits/);
     assert.doesNotMatch(overview, /İlan Hakkı=|Süresi Dolan İlanlarım/);

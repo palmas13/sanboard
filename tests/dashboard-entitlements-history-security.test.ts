@@ -104,7 +104,8 @@ describe('dashboard entitlements and listing-history security', () => {
     const layout = source('src/app/hesabim/layout.tsx');
     assert.match(overview, /Merhaba, \{firstName\} 👋/);
     assert.match(overview, /İlan Hakların/);
-    assert.match(overview, /loading \? <div className="mt-1 h-\[72px\] animate-pulse/);
+    assert.match(overview, /loading \? <div className="mt-3 h-\[72px\] animate-pulse/);
+    assert.doesNotMatch(overview, /credits\.total/);
     assert.match(overview, /Bireysel ilan hakkı/);
     assert.match(overview, /data\.corporateCredits > 0/);
     assert.match(overview, /Kurumsal ilan hakkı/);
