@@ -34,6 +34,7 @@ export function ListingGallery({ images, title, isLocked = false, variant = 'veh
   const currentImage = visibleImages[selectedIdx] || visibleImages[0];
   const imageUrls = useMemo(() => visibleImages.map((image) => resolveMediaUrl(image.storage_path)), [visibleImages]);
   const aspect = variant === 'property' ? 'aspect-[16/10] xl:aspect-[16/9]' : 'aspect-[16/10] xl:aspect-[16/9.25]';
+  const desktopVehicleHeight = variant === 'vehicle' ? 'lg:h-full lg:aspect-auto' : '';
   const move = useCallback((direction: number) => setSelectedIdx((current) => (current + direction + visibleImages.length) % visibleImages.length), [visibleImages.length]);
 
   const preloadUrls = useCallback((urls: string[]) => {
@@ -81,11 +82,11 @@ export function ListingGallery({ images, title, isLocked = false, variant = 'veh
 
   useEffect(() => () => cancelDeferredPreloadRef.current?.(), []);
 
-  if (!currentImage) return <div className={`flex w-full items-center justify-center rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] text-sm font-semibold text-[var(--text-muted)] ${aspect}`}><ImageIcon className="mr-2 h-5 w-5" />Fotoğraf bulunamadı</div>;
+  if (!currentImage) return <div className={`flex w-full items-center justify-center rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)] text-sm font-semibold text-[var(--text-muted)] ${aspect} ${desktopVehicleHeight}`}><ImageIcon className="mr-2 h-5 w-5" />Fotoğraf bulunamadı</div>;
   const imageUrl = resolveMediaUrl(currentImage.storage_path);
 
-  return <div data-testid="listing-gallery">
-    <div aria-label="İlan fotoğrafları" className={`group relative w-full overflow-hidden rounded-2xl border border-white/8 bg-black/30 shadow-[0_18px_55px_rgba(0,0,0,.2)] ${aspect}`}>
+  return <div data-testid="listing-gallery" className={desktopVehicleHeight}>
+    <div aria-label="İlan fotoğrafları" className={`group relative w-full overflow-hidden rounded-2xl border border-white/8 bg-black/30 shadow-[0_18px_55px_rgba(0,0,0,.2)] ${aspect} ${desktopVehicleHeight}`}>
       <button type="button" aria-label="Fotoğrafı tam ekran aç" disabled={isLocked} onClick={() => setLightboxOpen(true)} className="absolute inset-0 z-10 disabled:cursor-default" />
       <Image src={imageUrl} alt={title} fill priority unoptimized onLoad={startGalleryPreload} sizes={variant === 'property' ? '(min-width: 1280px) 52vw, 100vw' : '(min-width: 1440px) 47vw, (min-width: 1280px) 45vw, (min-width: 768px) 100vw, 100vw'} className="object-cover" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-24 bg-gradient-to-t from-black/55 to-transparent" />

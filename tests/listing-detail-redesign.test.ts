@@ -51,6 +51,19 @@ describe('premium listing detail redesign', () => {
     assert.doesNotMatch(description, /truncate|line-clamp|text-ellipsis|overflow-hidden/);
   });
 
+  test('vehicle gallery absorbs desktop row height while the description remains content-sized', () => {
+    assert.match(layout, /className="[^"]*lg:grid[^"]*lg:grid-rows-\[minmax\(20rem,1fr\)_auto\]" data-testid="vehicle-content-column"/);
+    assert.match(layout, /data-testid="vehicle-gallery-block"[^>]*lg:min-h-80/);
+    assert.match(layout, /data-testid="vehicle-description-row"[^>]*min-h-0 min-w-0/);
+    assert.doesNotMatch(layout, /data-testid="vehicle-description-row"[^>]*flex-1/);
+    assert.match(gallery, /variant === 'vehicle' \? 'lg:h-full lg:aspect-auto' : ''/);
+    assert.match(gallery, /data-testid="listing-gallery" className=\{desktopVehicleHeight\}/);
+    assert.match(gallery, /className="object-cover"/);
+    assert.match(description, /data-testid="listing-description"[^>]*h-auto min-h-0/);
+    assert.match(description, /<dl className="mt-3 /);
+    assert.doesNotMatch(description, /h-full|mt-auto/);
+  });
+
   test('price and header actions remain centered in the emphasized price block', () => {
     assert.match(header, /items-center justify-center[\s\S]*text-center/);
     assert.match(header, /text-\[34px\][\s\S]*sm:text-\[38px\][\s\S]*xl:text-\[40px\]/);
