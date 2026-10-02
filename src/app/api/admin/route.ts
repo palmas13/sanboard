@@ -17,6 +17,7 @@ import {
   suspendCorporateStore,
   reactivateCorporateStore,
   deleteCorporateStore,
+  manuallyActivateCorporateSubscription,
 } from '@/lib/db/dealers';
 import { getAllTicketsForAdmin, updateTicketStatus, addTicketMessage } from '@/lib/db/tickets';
 import { db } from '@/lib/db/store';
@@ -32,7 +33,8 @@ function isSameOrigin(req: NextRequest): boolean {
 }
 
 function safeMutationResult(result: { success: boolean; [key: string]: unknown }, error: string) {
-  return NextResponse.json(result.success ? result : { success: false, error }, { status: result.success ? 200 : 400 });
+  const domainError = typeof result.error === 'string' && result.error.trim() ? result.error : error;
+  return NextResponse.json(result.success ? result : { success: false, error: domainError }, { status: result.success ? 200 : 400 });
 }
 
 export async function GET(req: NextRequest) {
@@ -229,7 +231,18 @@ export async function POST(req: NextRequest) {
           undefined,
           actor.userId
         );
-        if (result.success) await recordAuditEvent({ eventType: 'ADMIN_APPLICATION_REVIEWED', userId: actor.userId, profileId: adminActorProfileId, metadata: { targetType: 'corporate_application', targetId: payload.applicationId, status: 'APPROVED' } });
+        if (result.success) {
+          await recordAuditEvent({ eventType: 'ADMIN_APPLICATION_REVIEWED', userId: actor.userId, profileId: adminActorProfileId, metadata: { targetType: 'corporate_application', targetId: payload.applicationId, status: 'APPROVED' } });
+          try {
+            const { revalidatePath } = await import('next/cache');
+            revalidatePath('/');
+            revalidatePath('/arac');
+            revalidatePath('/mulk');
+            revalidatePath('/hesabim');
+            revalidatePath('/hesabim/kurumsal');
+            revalidatePath('/yonetim');
+          } catch {}
+        }
         return safeMutationResult(result, 'Kurumsal başvuru onaylanamadı.');
       }
 
@@ -319,6 +332,38 @@ export async function POST(req: NextRequest) {
           }
         } catch {}
         return safeMutationResult(result, 'Kurumsal mağaza silinemedi.');
+      }
+
+      case 'manuallyActivateCorporateSubscription': {
+        if (!payload.dealerId || typeof payload.dealerId !== 'string') {
+          return NextResponse.json({ error: 'dealerId zorunludur.' }, { status: 400 });
+        }
+        const result = await manuallyActivateCorporateSubscription(payload.dealerId, adminActorProfileId);
+        if (result.success && result.dealer) {
+          await recordAuditEvent({
+            eventType: 'CORPORATE_SUBSCRIPTION_MANUAL_ACTIVATION',
+            userId: actor.userId,
+            profileId: adminActorProfileId,
+            metadata: {
+              targetType: 'corporate_profile',
+              targetId: result.dealer.id,
+              ownerProfileId: result.dealer.owner_profile_id || result.dealer.profile_id,
+              previousSubscriptionStatus: result.previousStatus,
+              newSubscriptionStatus: result.dealer.subscription_status,
+              activatedAt: result.activatedAt,
+              subscriptionExpiresAt: result.dealer.subscription_expires_at,
+              source: 'ADMIN_GRANT',
+            },
+          });
+          try {
+            const { revalidatePath } = await import('next/cache');
+            revalidatePath('/hesabim');
+            revalidatePath('/hesabim/kurumsal');
+            revalidatePath('/yonetim');
+            revalidatePath(`/premium/${result.dealer.id}`);
+          } catch {}
+        }
+        return safeMutationResult(result, 'Kurumsal üyelik manuel olarak aktifleştirilemedi.');
       }
 
       case 'updateDealer': {

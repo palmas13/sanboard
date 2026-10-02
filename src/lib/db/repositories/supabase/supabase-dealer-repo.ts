@@ -377,120 +377,18 @@ export class SupabaseDealerRepository implements IDealerRepository {
     reviewerAccountId?: string
   ): Promise<{ success: boolean; error?: string }> {
     const client = this.getAdminClient();
-
-    const { data: app, error: appErr } = await client
-      .from('corporate_applications')
-      .select('*')
-      .eq('id', applicationId)
-      .maybeSingle();
-
-    if (appErr || !app) {
-      return { success: false, error: 'Başvuru bulunamadı.' };
+    const { data, error } = await client.rpc('review_corporate_application', {
+      p_application_id: applicationId,
+      p_status: status,
+      p_rejection_reason: rejectionReason?.trim() || null,
+      p_reviewer_user_id: reviewerAccountId || null,
+    });
+    if (error) {
+      console.error('Corporate application review RPC failed', { code: error.code, details: error.details, hint: error.hint });
+      return { success: false, error: 'Kurumsal başvuru değerlendirme servisine ulaşılamadı.' };
     }
-    if (app.status !== 'PENDING') return { success: false, error: 'Başvuru daha önce değerlendirilmiş.' };
-    if (status === 'REJECTED' && !rejectionReason?.trim()) return { success: false, error: 'Red gerekçesi zorunludur.' };
-
-    const { data: profile } = await client
-      .from('character_profiles')
-      .select('id, user_id, full_name, avatar_path, avatar_url, phone, sanmail_email')
-      .or(`id.eq.${app.applicant_profile_id},external_character_id.eq.${app.applicant_profile_id}`)
-      .maybeSingle();
-
-    const targetUserId = profile?.user_id;
-    const targetProfileId = profile?.id || app.applicant_profile_id;
-
-    if (status === 'APPROVED') {
-      const { data: existingOwnerStore } = await client
-        .from('corporate_profiles')
-        .select('id')
-        .eq('owner_profile_id', targetProfileId)
-        .neq('moderation_status', 'DELETED')
-        .maybeSingle();
-
-      if (existingOwnerStore) {
-        return { success: false, error: 'Bu karakterin zaten onaylanmış bir kurumsal mağazası bulunmaktadır.' };
-      }
-
-      const slugBase = app.company_name.toLocaleLowerCase('tr-TR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ı/g, 'i').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'kurumsal-magaza';
-      const slug = `${slugBase}-${applicationId.slice(0, 8)}`;
-      const { data: newStore, error: storeError } = await client
-        .from('corporate_profiles')
-        .insert({
-          owner_profile_id: targetProfileId,
-          company_name: app.company_name,
-          slug,
-          description: app.purpose,
-          phone: app.contact_phone,
-          email: app.contact_email,
-          address: app.location,
-          status: 'APPROVED',
-          subscription_status: 'INACTIVE',
-          moderation_status: 'ACTIVE',
-          boost_credits: 0,
-        })
-        .select()
-        .single();
-
-      if (storeError || !newStore) return { success: false, error: 'Kurumsal mağaza oluşturulamadı.' };
-
-      const { data: reviewed, error: reviewError } = await client
-        .from('corporate_applications')
-        .update({ status: 'APPROVED', rejection_reason: null, reviewed_by: reviewerAccountId, reviewed_at: new Date().toISOString() })
-        .eq('id', applicationId)
-        .eq('status', 'PENDING')
-        .select('id')
-        .maybeSingle();
-      if (reviewError || !reviewed) {
-        await client.from('corporate_profiles').delete().eq('id', newStore.id);
-        return { success: false, error: 'Başvuru durumu güncellenemedi.' };
-      }
-
-      if (newStore) {
-        await client
-          .from('character_profiles')
-          .update({ is_dealer: true, dealer_id: newStore.id })
-          .eq('id', targetProfileId);
-      }
-
-      const { getNotificationRepository } = await import('../index');
-      await getNotificationRepository().createNotification({
-        recipient_profile_id: targetProfileId,
-        user_id: targetUserId || undefined,
-        type: 'CORPORATE_APPLICATION_APPROVED',
-        title: 'Kurumsal Profiliniz Onaylandı',
-        message: `"${app.company_name}" adına yaptığınız kurumsal satış başvurusu onaylanmıştır. Kurumsal panelden üyeliğinizi aktif ederek avantajlardan yararlanabilirsiniz.`,
-        entity_type: 'application',
-        entity_id: app.id,
-      });
-    } else if (status === 'REJECTED') {
-      const reason = rejectionReason || 'Fiziksel işletme bilgileri doğrulanamadığı için başvurunuz reddedildi.';
-      const { data: reviewed, error: reviewError } = await client
-        .from('corporate_applications')
-        .update({
-          status: 'REJECTED',
-          rejection_reason: reason,
-          reviewed_by: reviewerAccountId,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq('id', applicationId)
-        .eq('status', 'PENDING')
-        .select('id')
-        .maybeSingle();
-      if (reviewError || !reviewed) return { success: false, error: 'Başvuru reddedilemedi.' };
-
-      const { getNotificationRepository } = await import('../index');
-      await getNotificationRepository().createNotification({
-        recipient_profile_id: targetProfileId,
-        user_id: targetUserId || undefined,
-        type: 'CORPORATE_APPLICATION_REJECTED',
-        title: 'Kurumsal Başvurunuz Reddedildi',
-        message: `Kurumsal hesap başvurunuz reddedildi. Neden: ${reason}`,
-        entity_type: 'application',
-        entity_id: app.id,
-      });
-    }
-
-    return { success: true };
+    const result = Array.isArray(data) ? data[0] : data;
+    return { success: Boolean(result?.success), error: result?.error || undefined };
   }
 
   async activateSubscription(dealerId: string): Promise<{ success: boolean; dealer?: CorporateProfile; error?: string }> {
@@ -514,6 +412,26 @@ export class SupabaseDealerRepository implements IDealerRepository {
     }
 
     return { success: true, dealer: data as CorporateProfile };
+  }
+
+  async manuallyActivateSubscription(dealerId: string, adminProfileId: string): Promise<{ success: boolean; dealer?: CorporateProfile; previousStatus?: string; activatedAt?: string; error?: string }> {
+    const client = this.getAdminClient();
+    const { data, error } = await client.rpc('grant_corporate_subscription', {
+      p_corporate_profile_id: dealerId,
+      p_admin_profile_id: adminProfileId,
+    });
+    if (error) {
+      console.error('Manual corporate subscription RPC failed', { code: error.code, details: error.details, hint: error.hint });
+      return { success: false, error: 'Manuel üyelik aktivasyon servisine ulaşılamadı.' };
+    }
+    const result = Array.isArray(data) ? data[0] : data;
+    return {
+      success: Boolean(result?.success),
+      dealer: result?.dealer as CorporateProfile | undefined,
+      previousStatus: result?.previous_status,
+      activatedAt: result?.activated_at,
+      error: result?.error || undefined,
+    };
   }
 
   async boostListing(

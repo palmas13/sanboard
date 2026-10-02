@@ -275,13 +275,56 @@ export async function activateSubscription(dealerId: string): Promise<{ success:
   ensureDealers();
   const dealer = db.dealers.find((d) => d.id === dealerId);
   if (!dealer) return { success: false, error: 'Kurumsal mağaza bulunamadı.' };
+  if (dealer.status !== 'APPROVED' || dealer.moderation_status === 'DELETED') {
+    return { success: false, error: 'Kurumsal profil üyelik aktivasyonu için uygun değil.' };
+  }
+  if (dealer.subscription_status === 'ACTIVE' && dealer.subscription_expires_at && new Date(dealer.subscription_expires_at).getTime() > Date.now()) {
+    return { success: false, error: 'Kurumsal üyelik zaten aktif.' };
+  }
 
+  const now = new Date();
   dealer.subscription_status = 'ACTIVE';
-  dealer.subscription_expires_at = addCalendarMonth(new Date()).toISOString();
+  dealer.subscription_expires_at = addCalendarMonth(now).toISOString();
+  dealer.current_period_start = now.toISOString();
+  dealer.current_period_end = dealer.subscription_expires_at;
   dealer.boost_credits = 3;
-  dealer.updated_at = new Date().toISOString();
+  dealer.updated_at = now.toISOString();
 
   return { success: true, dealer };
+}
+
+export async function manuallyActivateCorporateSubscription(
+  dealerId: string,
+  adminProfileId: string,
+): Promise<{ success: boolean; dealer?: CorporateProfile; previousStatus?: string; activatedAt?: string; error?: string }> {
+  if (process.env.DATA_STORE === 'supabase') {
+    const repo = getDealerRepository();
+    if (typeof repo.manuallyActivateSubscription === 'function') {
+      return repo.manuallyActivateSubscription(dealerId, adminProfileId);
+    }
+  }
+
+  ensureDealers();
+  const dealer = db.dealers.find((item) => item.id === dealerId);
+  if (!dealer) return { success: false, error: 'Kurumsal mağaza bulunamadı.' };
+  const previousStatus = dealer.subscription_status || 'INACTIVE';
+  const result = await activateSubscription(dealerId);
+  if (!result.success || !result.dealer) return { success: false, error: result.error };
+
+  const activatedAt = result.dealer.current_period_start || new Date().toISOString();
+  const ownerProfileId = result.dealer.owner_profile_id || result.dealer.profile_id;
+  await getNotificationRepository().createNotification({
+    recipient_profile_id: ownerProfileId,
+    user_id: db.profiles.find((profile) => profile.id === ownerProfileId)?.user_id,
+    type: 'SYSTEM',
+    title: 'Kurumsal üyeliğiniz aktifleştirildi',
+    message: 'Kurumsal üyeliğiniz yönetim tarafından aktifleştirildi.',
+    entity_type: 'system',
+    entity_id: result.dealer.id,
+    metadata: { source: 'ADMIN_GRANT' },
+  });
+
+  return { success: true, dealer: result.dealer, previousStatus, activatedAt };
 }
 
 export async function boostListing(

@@ -184,6 +184,7 @@ export interface IDealerRepository {
   createApplication(params: { profileId: string; companyName: string; contactPhone?: string; contactEmail?: string; location?: string; purpose: string }): Promise<{ success: boolean; application?: CorporateApplication; error?: string }>;
   reviewApplication?(applicationId: string, status: 'APPROVED' | 'REJECTED', rejectionReason?: string, reviewerAccountId?: string): Promise<{ success: boolean; error?: string }>;
   activateSubscription?(dealerId: string): Promise<{ success: boolean; dealer?: CorporateProfile; error?: string }>;
+  manuallyActivateSubscription?(dealerId: string, adminProfileId: string): Promise<{ success: boolean; dealer?: CorporateProfile; previousStatus?: string; activatedAt?: string; error?: string }>;
   boostListing?(actorProfileId: string, listingId: string, now?: Date, options?: ListingBoostOptions): Promise<{ success: boolean; error?: string; code?: string; remainingBoosts?: number; featured_until?: string }>;
   toggleFollow?(followerProfileId: string, corporateProfileId: string): Promise<{ isFollowing: boolean; count: number; followerCount?: number }>;
   setFollow?(followerProfileId: string, corporateProfileId: string, shouldFollow: boolean): Promise<{ isFollowing: boolean; count: number; followerCount?: number }>;

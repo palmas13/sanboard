@@ -89,6 +89,8 @@ export default function AdminPage() {
   // Corporate management state (Section 12 & 23 & 24)
   const [corporateSubTab, setCorporateSubTab] = useState<'dealers' | 'applications'>('dealers');
   const [showDeletedStores, setShowDeletedStores] = useState(false);
+  const [applicationActionId, setApplicationActionId] = useState<string | null>(null);
+  const [corporateFeedback, setCorporateFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Corporate application rejection modal state
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -100,11 +102,12 @@ export default function AdminPage() {
   const [storeManageModalOpen, setStoreManageModalOpen] = useState(false);
   const [suspendModalOpen, setSuspendModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [manualActivationModalOpen, setManualActivationModalOpen] = useState(false);
   const [storeReasonInput, setStoreReasonInput] = useState('');
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
   const modalCloseRef = useRef<HTMLButtonElement>(null);
 
-  const anyModalOpen = Boolean(selectedReport || selectedTicket || selectedListing || selectedPayment || rejectModalOpen || storeManageModalOpen || suspendModalOpen || deleteModalOpen);
+  const anyModalOpen = Boolean(selectedReport || selectedTicket || selectedListing || selectedPayment || rejectModalOpen || storeManageModalOpen || suspendModalOpen || deleteModalOpen || manualActivationModalOpen);
   useEffect(() => {
     if (!anyModalOpen) return;
     const previous = document.activeElement as HTMLElement | null;
@@ -112,7 +115,7 @@ export default function AdminPage() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       setSelectedReport(null); setSelectedTicket(null); setSelectedListing(null); setSelectedPayment(null); setRejectModalOpen(false);
-      setStoreManageModalOpen(false); setSuspendModalOpen(false); setDeleteModalOpen(false);
+      setStoreManageModalOpen(false); setSuspendModalOpen(false); setDeleteModalOpen(false); setManualActivationModalOpen(false);
     };
     document.addEventListener('keydown', onKeyDown);
     return () => { window.clearTimeout(timer); document.removeEventListener('keydown', onKeyDown); previous?.focus(); };
@@ -247,7 +250,8 @@ export default function AdminPage() {
 
   // Application Review Handlers (Section 12 & 24)
   const handleApproveApplication = async (applicationId: string) => {
-    setActionLoading(true);
+    setApplicationActionId(applicationId);
+    setCorporateFeedback(null);
     try {
       const response = await fetch('/api/admin', {
         method: 'POST',
@@ -257,8 +261,45 @@ export default function AdminPage() {
           payload: { applicationId },
         }),
       });
-      if (!response.ok) return;
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) {
+        setCorporateFeedback({ type: 'error', message: result.error || 'Kurumsal başvuru onaylanamadı.' });
+        return;
+      }
       await fetchData();
+      setCorporateFeedback({ type: 'success', message: 'Kurumsal başvuru onaylandı ve satıcı listesine taşındı.' });
+    } catch {
+      setCorporateFeedback({ type: 'error', message: 'Kurumsal başvuru onaylanırken bağlantı hatası oluştu.' });
+    } finally {
+      setApplicationActionId(null);
+    }
+  };
+
+  const handleManualSubscriptionActivation = async () => {
+    if (!selectedStore) return;
+    setActionLoading(true);
+    setCorporateFeedback(null);
+    try {
+      const response = await fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'manuallyActivateCorporateSubscription',
+          payload: { dealerId: selectedStore.id },
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) {
+        setCorporateFeedback({ type: 'error', message: result.error || 'Kurumsal üyelik aktifleştirilemedi.' });
+        return;
+      }
+      setSelectedStore(result.dealer);
+      setManualActivationModalOpen(false);
+      setStoreManageModalOpen(false);
+      await fetchData();
+      setCorporateFeedback({ type: 'success', message: 'Kurumsal üyelik yönetici hakkı olarak aktifleştirildi.' });
+    } catch {
+      setCorporateFeedback({ type: 'error', message: 'Kurumsal üyelik aktifleştirilirken bağlantı hatası oluştu.' });
     } finally {
       setActionLoading(false);
     }
@@ -699,6 +740,11 @@ export default function AdminPage() {
           {/* SUB-VIEW A: ONAY BEKLEYENLER (Section 12A & 24) */}
           {corporateSubTab === 'applications' && (
             <div className="space-y-4">
+              {corporateFeedback && (
+                <div role="status" className={`rounded-xl border px-4 py-3 text-xs font-semibold ${corporateFeedback.type === 'success' ? 'border-[var(--color-success)]/30 bg-[var(--color-success-subtle)] text-[var(--color-success)]' : 'border-[var(--color-danger)]/30 bg-[var(--color-danger-subtle)] text-[var(--color-danger)]'}`}>
+                  {corporateFeedback.message}
+                </div>
+              )}
               <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
                 <span>İnceleme bekleyen <strong>{(data?.applications || []).length}</strong> başvuru bulunuyor.</span>
               </div>
@@ -748,11 +794,11 @@ export default function AdminPage() {
                               <button
                                 type="button"
                                 onClick={() => handleApproveApplication(app.id)}
-                                disabled={actionLoading}
+                                disabled={applicationActionId !== null}
                                 className="btn-primary text-[11px] py-1 px-3 flex items-center gap-1 shadow-sm"
                               >
-                                <Check className="w-3 h-3" />
-                                <span>Onayla</span>
+                                {applicationActionId === app.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                                <span>{applicationActionId === app.id ? 'Onaylanıyor...' : 'Onayla'}</span>
                               </button>
                               <button
                                 type="button"
@@ -761,7 +807,7 @@ export default function AdminPage() {
                                   setRejectionReasonInput('Fiziksel işletme bilgileri doğrulanamadığı için başvurunuz reddedildi.');
                                   setRejectModalOpen(true);
                                 }}
-                                disabled={actionLoading}
+                                disabled={applicationActionId !== null}
                                 className="btn-secondary text-[11px] py-1 px-3 text-red-400 hover:text-red-300"
                               >
                                 Reddet
@@ -787,6 +833,11 @@ export default function AdminPage() {
           {/* SUB-VIEW B: KURUMSAL SATICILAR (Section 12B & 23) */}
           {corporateSubTab === 'dealers' && (
             <div className="space-y-4">
+              {corporateFeedback && (
+                <div role="status" className={`rounded-xl border px-4 py-3 text-xs font-semibold ${corporateFeedback.type === 'success' ? 'border-[var(--color-success)]/30 bg-[var(--color-success-subtle)] text-[var(--color-success)]' : 'border-[var(--color-danger)]/30 bg-[var(--color-danger-subtle)] text-[var(--color-danger)]'}`}>
+                  {corporateFeedback.message}
+                </div>
+              )}
               <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
                 <span>
                   Toplam <strong>{(data?.dealers || []).filter((d: any) => showDeletedStores || d.moderation_status !== 'DELETED').length}</strong> kurumsal mağaza listeleniyor.
@@ -832,7 +883,7 @@ export default function AdminPage() {
                         .slice(0, visibleCount('dealers')).map((d: any) => {
                           const isSuspended = d.moderation_status === 'SUSPENDED';
                           const isDeleted = d.moderation_status === 'DELETED';
-                          const isSubActive = d.subscription_status === 'ACTIVE';
+                          const isSubActive = d.subscription_status === 'ACTIVE' && d.subscription_expires_at && new Date(d.subscription_expires_at).getTime() > Date.now();
 
                           return (
                             <tr key={d.id} className="hover:bg-[var(--bg-surface-secondary)]/30 transition-colors">
@@ -1455,8 +1506,8 @@ export default function AdminPage() {
 
               <div className="p-3 rounded-xl bg-[var(--bg-surface-secondary)]/50 border border-[var(--border-app)] space-y-1">
                 <span className="text-[10px] text-[var(--text-dim)] uppercase font-semibold">Abonelik Durumu</span>
-                <p className="font-bold text-[var(--text-main)]">
-                  {selectedStore.subscription_status === 'ACTIVE' ? 'Aktif Üye' : selectedStore.subscription_status === 'EXPIRED' ? 'Süresi Doldu' : 'Pasif'}
+                  <p className="font-bold text-[var(--text-main)]">
+                    {selectedStore.subscription_status === 'ACTIVE' && selectedStore.subscription_expires_at && new Date(selectedStore.subscription_expires_at).getTime() > Date.now() ? 'Aktif Üye' : selectedStore.subscription_status === 'EXPIRED' || (selectedStore.subscription_expires_at && new Date(selectedStore.subscription_expires_at).getTime() <= Date.now()) ? 'Süresi Doldu' : 'Pasif'}
                 </p>
                 <p className="text-[10px] text-[var(--text-dim)]">
                   Bitiş: {selectedStore.subscription_expires_at ? formatDate(selectedStore.subscription_expires_at) : '—'}
@@ -1506,7 +1557,25 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* Management Actions */}
+            <section className="rounded-xl border border-[#FF8A1F]/25 bg-[#FF8A1F]/[0.05] p-4 space-y-3" aria-labelledby="membership-actions-title">
+              <div>
+                <h4 id="membership-actions-title" className="text-xs font-bold text-[var(--text-main)]">Üyelik İşlemleri</h4>
+                <p className="mt-1 text-[11px] text-[var(--text-muted)]">Bu alan moderasyon işlemlerinden bağımsızdır. Manuel aktivasyon Fleeca ödemesi oluşturmaz.</p>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-xs">
+                  <p className="font-semibold text-[var(--text-main)]">Durum: {selectedStore.subscription_status === 'ACTIVE' && selectedStore.subscription_expires_at && new Date(selectedStore.subscription_expires_at).getTime() > Date.now() ? 'AKTİF' : selectedStore.subscription_status === 'EXPIRED' || (selectedStore.subscription_expires_at && new Date(selectedStore.subscription_expires_at).getTime() <= Date.now()) ? 'SÜRESİ DOLDU' : 'PASİF'}</p>
+                  <p className="text-[11px] text-[var(--text-dim)]">Bitiş: {selectedStore.subscription_expires_at ? formatDate(selectedStore.subscription_expires_at) : '—'}</p>
+                </div>
+                {selectedStore.moderation_status !== 'DELETED' && !(selectedStore.subscription_status === 'ACTIVE' && selectedStore.subscription_expires_at && new Date(selectedStore.subscription_expires_at).getTime() > Date.now()) && (
+                  <button type="button" onClick={() => setManualActivationModalOpen(true)} className="btn-primary text-xs py-2 px-3">
+                    Üyeliği Manuel Aktifleştir
+                  </button>
+                )}
+              </div>
+            </section>
+
+            {/* Moderation Actions */}
             <div className="pt-2 border-t border-[var(--border-app)] flex flex-wrap items-center justify-between gap-2">
               <Link
                 href={getCorporateUrl(selectedStore)}
@@ -1574,6 +1643,36 @@ export default function AdminPage() {
                   </span>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {manualActivationModalOpen && selectedStore && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in" role="presentation">
+          <div className="surface-card w-full max-w-md rounded-2xl border border-[#FF8A1F]/30 shadow-2xl p-6 space-y-4" role="dialog" aria-modal="true" aria-labelledby="manual-subscription-title">
+            <div className="flex items-center justify-between border-b border-[var(--border-app)] pb-3">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-[#FF8A1F]" />
+                <h3 id="manual-subscription-title" className="text-sm font-bold text-[var(--text-main)]">Kurumsal üyeliği manuel aktifleştir</h3>
+              </div>
+              <button type="button" onClick={() => setManualActivationModalOpen(false)} ref={modalCloseRef} aria-label="Manuel üyelik aktivasyon penceresini kapat" className="p-1 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-main)]">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-xs leading-5 text-[var(--text-muted)]">Bu işlem için Fleeca ödemesi oluşturulmayacak. Kurumsal profile yönetici tarafından üyelik hakkı tanımlanacak.</p>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 rounded-xl bg-[var(--bg-surface-secondary)]/60 p-3 text-xs">
+              <dt className="text-[var(--text-dim)]">Şirket / Galeri</dt><dd className="text-right font-semibold text-[var(--text-main)]">{selectedStore.company_name}</dd>
+              <dt className="text-[var(--text-dim)]">Sahip Karakter</dt><dd className="text-right font-semibold text-[var(--text-main)]">{selectedStore.owner_character_name || selectedStore.owner_profile_id || selectedStore.profile_id}</dd>
+              <dt className="text-[var(--text-dim)]">Mevcut Üyelik</dt><dd className="text-right font-semibold text-[var(--text-main)]">{selectedStore.subscription_status === 'EXPIRED' ? 'SÜRESİ DOLDU' : 'PASİF'}</dd>
+              <dt className="text-[var(--text-dim)]">Yeni Dönem</dt><dd className="text-right font-semibold text-[var(--text-main)]">1 takvim ayı</dd>
+            </dl>
+            <div className="flex justify-end gap-2 pt-1">
+              <button type="button" onClick={() => setManualActivationModalOpen(false)} disabled={actionLoading} className="btn-secondary text-xs py-2 px-4">Vazgeç</button>
+              <button type="button" onClick={handleManualSubscriptionActivation} disabled={actionLoading} className="btn-primary text-xs py-2 px-4 flex items-center gap-1.5">
+                {actionLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                <span>Üyeliği Aktifleştir</span>
+              </button>
             </div>
           </div>
         </div>

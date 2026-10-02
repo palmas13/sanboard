@@ -62,6 +62,10 @@ describe('SANBOARD admin authorization and moderation package 1', () => {
     db.applications = [{ id: 'application-1', applicant_profile_id: siblingB, company_name: 'Pending Store', purpose: 'Trade', status: 'PENDING', created_at: '' }];
     db.followers = [];
     db.notifications = [];
+    db.payments = [];
+    db.credits = [];
+    db.auditLogs = [];
+    db.notifications = [];
     db.auditLogs = [];
     db.payments = [];
     db.favorites = [];
@@ -148,6 +152,69 @@ describe('SANBOARD admin authorization and moderation package 1', () => {
     assert.equal(store.subscription_expires_at, undefined);
     assert.equal(store.boost_credits, 0);
     assert.equal(db.applications[0].reviewed_by, accountX);
+    assert.equal(db.applications[0].status, 'APPROVED');
+    assert.equal(store.status, 'APPROVED');
+    assert.equal(store.moderation_status, 'ACTIVE');
+    assert.equal(db.notifications.at(-1)?.type, 'CORPORATE_APPLICATION_APPROVED');
+
+    const aggregate = await getAdmin(request('/api/admin', adminA));
+    const body = await aggregate.json();
+    assert.equal(body.applications.some((item: any) => item.id === 'application-1'), false);
+    assert.equal(body.dealers.some((item: any) => item.id === store.id), true);
+  });
+
+  test('admin manually activates an inactive corporate membership without creating payment history', async () => {
+    db.dealers[0].subscription_status = 'INACTIVE';
+    db.dealers[0].subscription_expires_at = null;
+    db.dealers[0].boost_credits = 0;
+    const paymentsBefore = db.payments.length;
+    const creditsBefore = db.credits.length;
+
+    const response = await mutateAdmin(request('/api/admin', adminA, 'USER', {
+      action: 'manuallyActivateCorporateSubscription',
+      payload: { dealerId: 'store-1' },
+    }));
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.success, true);
+    assert.equal(db.dealers[0].subscription_status, 'ACTIVE');
+    assert.equal(db.dealers[0].current_period_start, body.activatedAt);
+    assert.equal(db.dealers[0].current_period_end, db.dealers[0].subscription_expires_at);
+    assert.equal(db.dealers[0].boost_credits, 3);
+    assert.equal(db.payments.length, paymentsBefore);
+    assert.equal(db.credits.length, creditsBefore);
+    assert.equal(db.notifications.at(-1)?.type, 'SYSTEM');
+    assert.equal(db.notifications.at(-1)?.metadata?.source, 'ADMIN_GRANT');
+    assert.equal(db.auditLogs.at(-1)?.event_type, 'CORPORATE_SUBSCRIPTION_MANUAL_ACTIVATION');
+    assert.equal(db.auditLogs.at(-1)?.profile_id, adminA);
+    assert.equal(db.auditLogs.at(-1)?.metadata?.targetId, 'store-1');
+  });
+
+  test('manual activation is admin-only, idempotent for active membership, and does not change moderation', async () => {
+    db.dealers[0].subscription_status = 'INACTIVE';
+    db.dealers[0].subscription_expires_at = null;
+    db.dealers[0].moderation_status = 'SUSPENDED';
+
+    const forbidden = await mutateAdmin(request('/api/admin', outsiderC, 'USER', {
+      action: 'manuallyActivateCorporateSubscription', payload: { dealerId: 'store-1' },
+    }));
+    assert.equal(forbidden.status, 403);
+    assert.equal(db.dealers[0].subscription_status, 'INACTIVE');
+
+    const first = await mutateAdmin(request('/api/admin', adminA, 'USER', {
+      action: 'manuallyActivateCorporateSubscription', payload: { dealerId: 'store-1' },
+    }));
+    assert.equal(first.status, 200);
+    assert.equal(db.dealers[0].moderation_status, 'SUSPENDED');
+    const expiry = db.dealers[0].subscription_expires_at;
+    const notificationCount = db.notifications.length;
+
+    const replay = await mutateAdmin(request('/api/admin', adminA, 'USER', {
+      action: 'manuallyActivateCorporateSubscription', payload: { dealerId: 'store-1' },
+    }));
+    assert.equal(replay.status, 400);
+    assert.equal(db.dealers[0].subscription_expires_at, expiry);
+    assert.equal(db.notifications.length, notificationCount);
   });
 
   test('application review validates input and cannot review the same application twice', async () => {

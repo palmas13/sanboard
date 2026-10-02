@@ -33,6 +33,7 @@ test('report and corporate dialogs expose accessible modal semantics', () => {
   assert.match(page, /aria-labelledby="report-dialog-title"/);
   assert.match(page, /aria-labelledby="reject-application-title"/);
   assert.match(page, /aria-labelledby="store-manage-title"/);
+  assert.match(page, /aria-labelledby="manual-subscription-title"/);
   assert.ok((page.match(/aria-modal="true"/g) || []).length >= 3);
   assert.match(page, /event\.key !== 'Escape'/);
   assert.match(page, /modalCloseRef\.current\?\.focus/);
@@ -41,7 +42,6 @@ test('report and corporate dialogs expose accessible modal semantics', () => {
 test('report and corporate mutations only close dialogs after successful responses', () => {
   for (const handler of [
     'handleReportAction',
-    'handleApproveApplication',
     'handleConfirmRejectApplication',
     'handleConfirmSuspendStore',
     'handleReactivateStore',
@@ -56,4 +56,22 @@ test('report and corporate mutations only close dialogs after successful respons
     assert.match(source, /await fetchData\(\)/);
     assert.ok(source.indexOf('if (!response.ok) return;') < source.indexOf('await fetchData()'));
   }
+});
+
+test('corporate approval and manual membership actions expose loading, feedback and separated confirmation UX', () => {
+  const approvalStart = page.indexOf('const handleApproveApplication');
+  const approvalEnd = page.indexOf('\n  };', approvalStart);
+  const approval = page.slice(approvalStart, approvalEnd);
+  assert.match(approval, /setApplicationActionId\(applicationId\)/);
+  assert.match(approval, /await response\.json/);
+  assert.match(approval, /setCorporateFeedback\(\{ type: 'error'/);
+  assert.match(approval, /await fetchData\(\)/);
+  assert.match(page, /Onaylanıyor\.\.\./);
+  assert.match(page, /Kurumsal başvuru onaylandı ve satıcı listesine taşındı/);
+  assert.match(page, /Üyelik İşlemleri/);
+  assert.match(page, /Üyeliği Manuel Aktifleştir/);
+  assert.match(page, /Bu işlem için Fleeca ödemesi oluşturulmayacak/);
+  assert.match(page, /1 takvim ayı/);
+  assert.match(page, /action: 'manuallyActivateCorporateSubscription'/);
+  assert.match(page, /setManualActivationModalOpen\(false\)[\s\S]*await fetchData\(\)/);
 });

@@ -92,6 +92,7 @@ describe('listing expiry and corporate subscription lifecycle', () => {
     const migration = readFileSync(join(process.cwd(), 'supabase/migrations/20261001000000_expiry_and_subscription_lifecycle.sql'), 'utf8');
     const renewal = readFileSync(join(process.cwd(), 'supabase/migrations/20260926060000_payment_boost_integrity_package_1.sql'), 'utf8');
     const calendarRenewal = readFileSync(join(process.cwd(), 'supabase/migrations/20261001010000_corporate_calendar_month_renewal.sql'), 'utf8');
+    const adminGrant = readFileSync(join(process.cwd(), 'supabase/migrations/20261002070000_corporate_admin_review_and_manual_subscription.sql'), 'utf8');
     const preflight = readFileSync(join(process.cwd(), 'supabase/scripts/expiry_lifecycle_preflight.sql'), 'utf8');
     const postflight = readFileSync(join(process.cwd(), 'supabase/scripts/expiry_lifecycle_postflight.sql'), 'utf8');
     assert.match(migration, /WHERE status = 'ACTIVE'[\s\S]*expires_at <= v_now[\s\S]*FOR UPDATE SKIP LOCKED/);
@@ -102,6 +103,14 @@ describe('listing expiry and corporate subscription lifecycle', () => {
     assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.run_expiry_lifecycle\(\) TO service_role/);
     assert.match(renewal, /GREATEST\(v_now, COALESCE\(v_old_expiry, v_now\)\) \+ INTERVAL '30 days'/);
     assert.match(calendarRenewal, /'1 month'/);
+    assert.match(adminGrant, /review_corporate_application[\s\S]*FOR UPDATE[\s\S]*CORPORATE_APPLICATION_APPROVED/);
+    assert.match(adminGrant, /grant_corporate_subscription[\s\S]*FOR UPDATE[\s\S]*INTERVAL '1 month'/);
+    assert.match(adminGrant, /current_period_start = v_now[\s\S]*current_period_end = v_expiry[\s\S]*boost_credits = 3/);
+    assert.match(adminGrant, /subscription_status = 'ACTIVE'[\s\S]*subscription_expires_at > v_now[\s\S]*Kurumsal üyelik zaten aktif/);
+    assert.match(adminGrant, /moderation_status = 'DELETED'/);
+    assert.match(adminGrant, /'SYSTEM'[\s\S]*'ADMIN_GRANT'/);
+    assert.doesNotMatch(adminGrant, /INSERT INTO public\.payments|external_payment_id|order_id/);
+    assert.match(adminGrant, /REVOKE ALL ON FUNCTION public\.grant_corporate_subscription[\s\S]*GRANT EXECUTE[\s\S]*service_role/);
     assert.match(renewal, /entitlement_applied_at IS NOT NULL/);
     assert.doesNotMatch(preflight.replace(/^\s*--.*$/gm, ''), /\b(INSERT|UPDATE|DELETE|ALTER|DROP|CREATE|TRUNCATE)\b/i);
     assert.doesNotMatch(postflight.replace(/^\s*--.*$/gm, ''), /\b(INSERT|UPDATE|DELETE|ALTER|DROP|CREATE|TRUNCATE)\b/i);
