@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { Suspense, useState, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
 import {
   Car,
@@ -36,17 +36,18 @@ const TITLE_MAX = LISTING_TITLE_MAX_LENGTH;
 const DESC_MAX = LISTING_DESCRIPTION_MAX_LENGTH;
 const DRAFT_VERSION = 2;
 
-export default function YeniIlanOlusturPage() {
+function YeniIlanOlusturContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { currentProfile, isAuthenticated, isLoading } = useAuth();
+  const currentProfileId = currentProfile?.id;
 
-  const requestedMode = typeof window === 'undefined'
-    ? null
-    : new URLSearchParams(window.location.search).get('mode') === 'corporate' || new URLSearchParams(window.location.search).get('corporate') === 'true'
-      ? 'corporate'
-      : new URLSearchParams(window.location.search).get('mode') === 'personal'
-        ? 'personal'
-        : null;
+  const modeParam = searchParams.get('mode');
+  const requestedMode = modeParam === 'corporate' || searchParams.get('corporate') === 'true'
+    ? 'corporate'
+    : modeParam === 'personal'
+      ? 'personal'
+      : null;
   const [isCorporate, setIsCorporate] = useState(requestedMode === 'corporate');
   const [identityReady, setIdentityReady] = useState(false);
   const [dealer, setDealer] = useState<any>(null);
@@ -262,14 +263,15 @@ export default function YeniIlanOlusturPage() {
     }
     const corpParam = requestedMode === 'corporate';
     setIsCorporate(corpParam);
-    if (!isAuthenticated || !currentProfile) {
+    if (!isAuthenticated || !currentProfileId) {
       router.push(`/giris?redirect=${encodeURIComponent(`/ilan-ver/yeni?mode=${requestedMode}`)}`);
       return;
     }
 
     // Use the same consolidated, canonical snapshot as the package page. The
     // form stays gated until the explicitly selected identity has a USE action.
-    fetch('/api/listing-package-options', { cache: 'no-store' })
+    const controller = new AbortController();
+    fetch('/api/listing-package-options', { cache: 'no-store', signal: controller.signal })
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'İlan hakkı doğrulanamadı.');
@@ -289,8 +291,12 @@ export default function YeniIlanOlusturPage() {
         }
         setIdentityReady(true);
       })
-      .catch(() => router.replace('/ilan-ver/paket'));
-  }, [isLoading, isAuthenticated, currentProfile, requestedMode, router]);
+      .catch((requestError) => {
+        if (requestError?.name !== 'AbortError') router.replace('/ilan-ver/paket');
+      });
+
+    return () => controller.abort();
+  }, [isLoading, isAuthenticated, currentProfileId, requestedMode, router]);
 
   const handleNextFromCategory = () => {
     if (category === 'vehicle') {
@@ -1346,4 +1352,19 @@ export default function YeniIlanOlusturPage() {
       )}
     </div>
   );
+}
+
+function CreatePageFallback() {
+  return <main className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6 lg:px-8" aria-label="İlan oluşturma kimliği doğrulanıyor">
+    <div className="animate-pulse space-y-6">
+      <div className="h-8 w-56 rounded bg-[var(--bg-surface-secondary)]" />
+      <div className="h-96 rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface)]" />
+    </div>
+  </main>;
+}
+
+export default function YeniIlanOlusturPage() {
+  return <Suspense fallback={<CreatePageFallback />}>
+    <YeniIlanOlusturContent />
+  </Suspense>;
 }
