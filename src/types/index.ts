@@ -245,6 +245,8 @@ export interface Payment {
   external_payment_id?: string;
   idempotency_key?: string;
   corporate_profile_id?: string | null;
+  historical_corporate_profile_id?: string | null;
+  corporate_profile_snapshot?: Record<string, unknown> | null;
   entitlement_type?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' | 'BOOST_CREDIT';
   purpose?: 'LISTING_PUBLICATION' | 'LISTING_BOOST' | 'CORPORATE_SUBSCRIPTION';
   target_listing_id?: string | null;
@@ -272,6 +274,8 @@ export interface ListingCredit {
   package_id: string;
   credit_type?: SellerType;
   corporate_profile_id?: string | null;
+  historical_corporate_profile_id?: string | null;
+  corporate_profile_snapshot?: Record<string, unknown> | null;
   amount?: number;
   status: CreditStatus;
   used_listing_id?: string;
@@ -335,6 +339,8 @@ export interface OfferThread {
   buyer_profile_id: string;
   seller_profile_id: string;
   seller_corporate_profile_id?: string | null;
+  historical_seller_corporate_profile_id?: string | null;
+  seller_corporate_snapshot?: Record<string, unknown> | null;
   current_amount: number;
   status: OfferThreadStatus;
   close_reason?: OfferCloseReason | null;
@@ -449,6 +455,7 @@ export interface DealerProfile {
   deleted_at?: string | null;
   deleted_by_profile_id?: string | null;
   deletion_reason?: string | null;
+  purge_requested_at?: string | null;
   created_at: string;
   updated_at: string;
 }

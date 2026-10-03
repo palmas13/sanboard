@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { runListingPurgeWorker } from '@/lib/lifecycle/listing-purge-worker';
 import { runMediaCleanupWorker } from '@/lib/lifecycle/media-cleanup-worker';
+import { runCorporatePurgeWorker } from '@/lib/lifecycle/corporate-purge-worker';
 import { MockStorageProvider } from '@/lib/storage/mock-provider';
 
 function clientFor(handlers: Record<string, (args: Record<string, unknown>) => unknown>) {
@@ -94,6 +95,98 @@ describe('durable purge workers', () => {
     assert.equal(counts.referenced, 1);
     assert.equal(counts.retried, 1);
   });
+
+  test('corporate purge deletes exact logo/banner snapshots before physical DB purge', async () => {
+    const storage = new MockStorageProvider();
+    await storage.upload(Buffer.from('logo'), { fileName: 'logo.webp', category: 'corporate_logo', contentType: 'image/webp', key: 'dealers/logos/store/logo.webp' });
+    await storage.upload(Buffer.from('banner'), { fileName: 'banner.webp', category: 'corporate_banner', contentType: 'image/webp', key: 'dealers/banners/store/banner.webp' });
+    const mock = clientFor({
+      discover_corporate_purge_jobs: () => 1,
+      claim_corporate_purge_jobs: () => [{ id: 'corporate-job', corporate_profile_id: 'store', lock_token: 'lock', media_keys: ['dealers/logos/store/logo.webp', 'dealers/banners/store/banner.webp'], attempts: 1, max_attempts: 12 }],
+      is_corporate_purge_media_key_referenced: () => false,
+      complete_corporate_purge_media_key: () => true,
+      finalize_corporate_profile_purge: () => ({ success: true, result: 'DONE' }),
+    });
+    const counts = await runCorporatePurgeWorker({ dependencies: { client: mock.client, storage } });
+    assert.equal(counts.mediaDeleted, 2);
+    assert.equal(counts.dbPurged, 1);
+    assert.deepEqual(mock.calls.map((call) => call.name), [
+      'discover_corporate_purge_jobs', 'claim_corporate_purge_jobs',
+      'is_corporate_purge_media_key_referenced', 'is_corporate_purge_media_key_referenced',
+      'complete_corporate_purge_media_key', 'complete_corporate_purge_media_key',
+      'finalize_corporate_profile_purge',
+    ]);
+  });
+
+  test('corporate purge treats already-absent objects idempotently and retries while listings remain', async () => {
+    const mock = clientFor({
+      discover_corporate_purge_jobs: () => 0,
+      claim_corporate_purge_jobs: () => [{ id: 'corporate-job', corporate_profile_id: 'store', lock_token: 'lock', media_keys: ['dealers/logos/store/missing.webp'], attempts: 1, max_attempts: 12 }],
+      is_corporate_purge_media_key_referenced: () => false,
+      complete_corporate_purge_media_key: () => true,
+      finalize_corporate_profile_purge: () => ({ success: false, result: 'LISTINGS_PENDING' }),
+      retry_corporate_purge_job: () => true,
+    });
+    const counts = await runCorporatePurgeWorker({ dependencies: { client: mock.client, storage: new MockStorageProvider() } });
+    assert.equal(counts.mediaDeleted, 1);
+    assert.equal(counts.blockedByListings, 1);
+    assert.equal(counts.retried, 1);
+  });
+
+  test('corporate purge never deletes media referenced by another store', async () => {
+    const storage = new MockStorageProvider();
+    let deletes = 0;
+    storage.deleteMany = async () => { deletes++; return { success: true, results: [] }; };
+    const mock = clientFor({
+      discover_corporate_purge_jobs: () => 0,
+      claim_corporate_purge_jobs: () => [{ id: 'corporate-job', corporate_profile_id: 'store', lock_token: 'lock', media_keys: ['dealers/logos/shared.webp'], attempts: 1, max_attempts: 12 }],
+      is_corporate_purge_media_key_referenced: () => true,
+      retry_corporate_purge_job: () => true,
+    });
+    const counts = await runCorporatePurgeWorker({ dependencies: { client: mock.client, storage } });
+    assert.equal(deletes, 0);
+    assert.equal(counts.retried, 1);
+  });
+});
+
+describe('corporate hard purge migration contract', () => {
+  const migration = fs.readFileSync(path.join(process.cwd(), 'supabase/migrations/20261003030000_corporate_profile_hard_purge_lifecycle.sql'), 'utf8');
+
+  test('replaces unconditional owner uniqueness with one-live-store partial uniqueness', () => {
+    assert.match(migration, /DROP CONSTRAINT IF EXISTS uq_corporate_profiles_owner_profile_id/);
+    assert.match(migration, /CREATE UNIQUE INDEX uq_corporate_profiles_active_owner[\s\S]*WHERE deleted_at IS NULL AND moderation_status <> 'DELETED'/);
+    assert.match(migration, /WHERE owner_profile_id = v_profile\.id[\s\S]*deleted_at IS NULL[\s\S]*moderation_status <> 'DELETED'/);
+  });
+
+  test('terminalizes immediately, clears owner links and entitlements, and reuses listing purge jobs', () => {
+    assert.match(migration, /request_corporate_profile_purge/);
+    assert.match(migration, /moderation_status = 'DELETED'/);
+    assert.match(migration, /subscription_status = 'INACTIVE'/);
+    assert.match(migration, /monthly_boost_credits = 0, purchased_boost_credits = 0, boost_credits = 0/);
+    assert.match(migration, /SET is_dealer = false, dealer_id = NULL/);
+    assert.match(migration, /enqueue_listing_purge_job\(l\.id, 'CORPORATE_PROFILE_PURGE'\)/);
+  });
+
+  test('preserves protected history, purges followers, and deletes the store only after media and listings', () => {
+    assert.match(migration, /historical_corporate_profile_id/);
+    assert.match(migration, /historical_seller_corporate_profile_id/);
+    assert.match(migration, /seller_corporate_snapshot/);
+    assert.match(migration, /is_corporate_purge_media_key_referenced/);
+    assert.match(migration, /LISTINGS_PENDING/);
+    assert.match(migration, /MEDIA_INCOMPLETE/);
+    assert.match(migration, /DELETE FROM public\.corporate_followers/);
+    assert.match(migration, /DELETE FROM public\.corporate_profiles/);
+    assert.doesNotMatch(migration, /DELETE FROM public\.(payments|listing_credits|offer_threads|audit_logs|notifications)/);
+  });
+
+  test('reconciles existing deleted rows without blind migration-time deletion and keeps purge RPCs service-role only', () => {
+    assert.match(migration, /discover_corporate_purge_jobs/);
+    assert.match(migration, /CORPORATE_PROFILE_RECONCILIATION/);
+    assert.match(migration, /UPDATE public\.listings SET status = 'REMOVED'[\s\S]*WHERE corporate_profile_id = c\.id AND status = 'ACTIVE'/);
+    assert.doesNotMatch(migration.split('CREATE OR REPLACE FUNCTION public.finalize_corporate_profile_purge')[0], /DELETE FROM public\.corporate_profiles/);
+    assert.match(migration, /REVOKE ALL ON FUNCTION[\s\S]*FROM PUBLIC, anon, authenticated/);
+    assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.request_corporate_profile_purge[\s\S]*TO service_role/);
+  });
 });
 
 describe('purge migration contract', () => {
@@ -159,18 +252,19 @@ describe('lifecycle scheduler contract', () => {
     ]);
   });
 
-  test('GitHub Actions is a manual-only fallback with the existing worker calls unchanged', () => {
+  test('GitHub Actions is a manual-only fallback for all lifecycle workers', () => {
+    assert.match(workflow, /corporate-purge:[\s\S]*\/api\/internal\/corporate-purge/);
     assert.match(workflow, /workflow_dispatch:/);
     assert.doesNotMatch(workflow, /^\s*schedule:/m);
     assert.doesNotMatch(workflow, /github\.event\.schedule/);
     assert.match(workflow, /listing-purge:[\s\S]*\/api\/internal\/listing-purge/);
     assert.match(workflow, /media-cleanup:[\s\S]*\/api\/internal\/media-cleanup/);
     assert.match(workflow, /expiry-lifecycle:[\s\S]*\/api\/internal\/expiry-lifecycle/);
-    assert.equal((workflow.match(/--request GET/g) || []).length, 3);
-    assert.equal((workflow.match(/curl --fail-with-body --silent --show-error/g) || []).length, 3);
-    assert.equal((workflow.match(/Authorization: Bearer \$CRON_SECRET/g) || []).length, 3);
-    assert.equal((workflow.match(/vars\.SANBOARD_PRODUCTION_URL/g) || []).length, 3);
-    assert.equal((workflow.match(/secrets\.CRON_SECRET/g) || []).length, 3);
+    assert.equal((workflow.match(/--request GET/g) || []).length, 4);
+    assert.equal((workflow.match(/curl --fail-with-body --silent --show-error/g) || []).length, 4);
+    assert.equal((workflow.match(/Authorization: Bearer \$CRON_SECRET/g) || []).length, 4);
+    assert.equal((workflow.match(/vars\.SANBOARD_PRODUCTION_URL/g) || []).length, 4);
+    assert.equal((workflow.match(/secrets\.CRON_SECRET/g) || []).length, 4);
     assert.doesNotMatch(workflow, /https:\/\/[^$"\s]+\/api\/internal/);
   });
 

@@ -44,7 +44,7 @@ export class SupabaseDealerRepository implements IDealerRepository {
 
   async getDealerByPublicId(publicId: number): Promise<CorporateProfile | null> {
     const client = this.getClient();
-    const { data, error } = await client.from('corporate_profiles').select('*').eq('public_id', publicId).maybeSingle();
+    const { data, error } = await client.from('corporate_profiles').select('*').eq('public_id', publicId).eq('moderation_status', 'ACTIVE').is('deleted_at', null).maybeSingle();
     if (error) {
       if (error.code === '42703' || error.message.includes('public_id')) {
         return null;
@@ -56,7 +56,7 @@ export class SupabaseDealerRepository implements IDealerRepository {
 
   async getDealerBySlug(slug: string): Promise<CorporateProfile | null> {
     const client = this.getClient();
-    const { data, error } = await client.from('corporate_profiles').select('*').eq('slug', slug).maybeSingle();
+    const { data, error } = await client.from('corporate_profiles').select('*').eq('slug', slug).eq('moderation_status', 'ACTIVE').is('deleted_at', null).maybeSingle();
     if (error) {
       throw new Error(`Supabase error fetching corporate profile by slug: ${error.message}`);
     }
@@ -746,30 +746,13 @@ export class SupabaseDealerRepository implements IDealerRepository {
     const dealer = await this.getDealerById(dealerId);
     if (!dealer) return { success: false, error: 'Kurumsal mağaza bulunamadı.' };
 
-    // Soft delete (Section 16)
-    const { error } = await client
-      .from('corporate_profiles')
-      .update({
-        moderation_status: 'DELETED',
-        deleted_at: new Date().toISOString(),
-        deleted_by_profile_id: adminProfileId,
-        deletion_reason: reason,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', dealerId);
-
-    if (error) return { success: false, error: error.message };
-
-    // Active corporate listings transition to REMOVED with existing safe media cleanup
-    const { getListingRepository } = await import('../index');
-    const listingRepo = getListingRepository();
-    const corporateListings = await listingRepo.getCorporateListings(dealerId);
-
-    for (const list of corporateListings) {
-      if (list.status === 'ACTIVE' && typeof listingRepo.removeListing === 'function') {
-        await listingRepo.removeListing(list.id, 'SYSTEM_ADMIN');
-      }
-    }
+    const { data, error } = await client.rpc('request_corporate_profile_purge', {
+      p_corporate_profile_id: dealerId,
+      p_reason: reason,
+      p_admin_profile_id: adminProfileId,
+    });
+    const purgeResult = Array.isArray(data) ? data[0] : data;
+    if (error || !purgeResult?.success) return { success: false, error: purgeResult?.error || error?.message || 'Kurumsal mağaza silme işlemi başlatılamadı.' };
 
     // Character-scoped notification to corporate store owner (Section 18)
     const ownerId = dealer.owner_profile_id || dealer.profile_id;

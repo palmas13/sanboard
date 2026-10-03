@@ -201,9 +201,18 @@ export async function reviewApplication(
   const targetUserId = profile?.user_id;
 
   if (status === 'APPROVED') {
-    let store = db.dealers.find((d) => (d.profile_id === app.applicant_profile_id || d.owner_profile_id === app.applicant_profile_id) && d.moderation_status !== 'DELETED');
-    if (!store) {
-      store = {
+    let store = db.dealers.find((d) =>
+      (d.profile_id === app.applicant_profile_id || d.owner_profile_id === app.applicant_profile_id) &&
+      d.moderation_status !== 'DELETED' &&
+      !d.deleted_at
+    );
+    if (store) {
+      app.status = 'PENDING';
+      app.reviewed_by = undefined;
+      app.reviewed_at = undefined;
+      return { success: false, error: 'Bu karakterin zaten onaylanmış bir kurumsal mağazası bulunmaktadır.' };
+    }
+    store = {
         id: `dealer-${Date.now()}`,
         profile_id: app.applicant_profile_id,
         owner_profile_id: app.applicant_profile_id,
@@ -221,14 +230,8 @@ export async function reviewApplication(
         boost_credits: 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      };
-      db.dealers.push(store);
-    } else {
-      store.status = 'APPROVED';
-      store.subscription_status = store.subscription_status || 'INACTIVE';
-      store.moderation_status = 'ACTIVE';
-      store.boost_credits = store.boost_credits ?? 0;
-    }
+    };
+    db.dealers.push(store);
 
     if (profile) {
       profile.is_dealer = true;
@@ -766,12 +769,29 @@ export async function deleteCorporateStore(
   const dealer = db.dealers.find((d) => d.id === dealerId);
   if (!dealer) return { success: false, error: 'Kurumsal mağaza bulunamadı.' };
 
-  // Soft delete (Section 16)
+  // Terminalize immediately, then model the durable purge to completion in memory.
+  const now = new Date().toISOString();
   dealer.moderation_status = 'DELETED';
-  dealer.deleted_at = new Date().toISOString();
+  dealer.deleted_at = now;
+  dealer.purge_requested_at = now;
   dealer.deleted_by_profile_id = adminProfileId;
   dealer.deletion_reason = reason;
-  dealer.updated_at = new Date().toISOString();
+  dealer.subscription_status = 'INACTIVE';
+  dealer.subscription_expires_at = null;
+  dealer.current_period_start = null;
+  dealer.current_period_end = null;
+  dealer.monthly_boost_credits = 0;
+  dealer.purchased_boost_credits = 0;
+  dealer.boost_credits = 0;
+  dealer.updated_at = now;
+
+  const ownerId = dealer.owner_profile_id || dealer.profile_id;
+  const owner = db.profiles.find((profile) => profile.id === ownerId);
+  if (owner?.dealer_id === dealer.id || owner?.is_dealer) {
+    owner.is_dealer = false;
+    owner.dealer_id = undefined;
+    owner.updated_at = now;
+  }
 
   // Active corporate listings transition to REMOVED with existing safe media cleanup
   const { removeListing } = await import('./listings');
@@ -788,7 +808,6 @@ export async function deleteCorporateStore(
   }
 
   // Character-scoped notification to corporate store owner (Section 18)
-  const ownerId = dealer.owner_profile_id || dealer.profile_id;
   if (ownerId) {
     const profile = db.profiles.find((p) => p.id === ownerId);
     await getNotificationRepository().createNotification({
@@ -815,6 +834,38 @@ export async function deleteCorporateStore(
       deletedBy: adminProfileId,
     },
   });
+
+  const snapshot = {
+    id: dealer.id,
+    owner_profile_id: ownerId,
+    company_name: dealer.company_name,
+    slug: dealer.slug || null,
+    public_id: dealer.public_id || null,
+    deleted_at: dealer.deleted_at,
+  };
+  for (const payment of db.payments) {
+    if (payment.corporate_profile_id === dealer.id) {
+      payment.historical_corporate_profile_id = dealer.id;
+      payment.corporate_profile_snapshot = snapshot;
+      payment.corporate_profile_id = null;
+    }
+  }
+  for (const credit of db.credits) {
+    if (credit.corporate_profile_id === dealer.id) {
+      credit.historical_corporate_profile_id = dealer.id;
+      credit.corporate_profile_snapshot = snapshot;
+      credit.corporate_profile_id = null;
+    }
+  }
+  for (const thread of db.offerThreads) {
+    if (thread.seller_corporate_profile_id === dealer.id) {
+      thread.historical_seller_corporate_profile_id = dealer.id;
+      thread.seller_corporate_snapshot = snapshot;
+      thread.seller_corporate_profile_id = null;
+    }
+  }
+  db.followers = db.followers.filter((follower) => follower.corporate_profile_id !== dealer.id);
+  db.dealers = db.dealers.filter((candidate) => candidate.id !== dealer.id);
 
   return { success: true };
 }

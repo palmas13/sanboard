@@ -487,7 +487,7 @@ describe('Sanboard – Corporate Listing Seller Context & Admin Moderation', () 
     });
   });
 
-  describe('30. Admin Store Soft Delete & Reapplication', () => {
+  describe('30. Admin Store Hard Purge & Reapplication', () => {
     beforeEach(() => {
       db.dealers.push({
         id: 'store-bum-01',
@@ -522,7 +522,7 @@ describe('Sanboard – Corporate Listing Seller Context & Admin Moderation', () 
       } as any);
     });
 
-    it('soft-deletes store: transitions listings to REMOVED, sends notification, and allows character to reapply', async () => {
+    it('terminalizes and purges store, removes listings through canonical lifecycle, and allows reapplication', async () => {
       const res = await deleteCorporateStore(
         'store-bum-01',
         'İşletme faaliyetini sonlandırdı',
@@ -530,11 +530,9 @@ describe('Sanboard – Corporate Listing Seller Context & Admin Moderation', () 
       );
 
       assert.strictEqual(res.success, true);
-      const store = db.dealers.find((d) => d.id === 'store-bum-01')!;
-      assert.strictEqual(store.moderation_status, 'DELETED');
-      assert.strictEqual(store.deletion_reason, 'İşletme faaliyetini sonlandırdı');
-      assert.strictEqual(store.deleted_by_profile_id, MAVIS_ADMIN_ID);
-      assert.ok(store.deleted_at);
+      assert.strictEqual(db.dealers.some((d) => d.id === 'store-bum-01'), false);
+      assert.strictEqual(db.profiles.find((p) => p.id === ZADE_CHAR_ID)?.is_dealer, false);
+      assert.strictEqual(db.profiles.find((p) => p.id === ZADE_CHAR_ID)?.dealer_id, undefined);
 
       // Corporate listings transitioned to REMOVED
       const listing = db.listings.find((l) => l.id === 'list-corp-01')!;
@@ -668,10 +666,10 @@ describe('Sanboard – Corporate Listing Seller Context & Admin Moderation', () 
       assert.match(zadeNotifs[0].message, /Bum Motors.*silinmiştir/);
       assert.strictEqual(raviNotifs.length, 0, 'Sibling Ravi must receive 0 notifications');
 
-      // Zade sees STORE_DELETED when resolved with store, but getDealerByProfileId(ZADE_CHAR_ID) excludes deleted store!
+      // Completed purge leaves no active or deleted store row.
       const eligibility = await resolveCorporateEligibility(ZADE_CHAR_ID);
       assert.strictEqual(eligibility.eligible, false);
-      assert.strictEqual(eligibility.reason, 'STORE_DELETED');
+      assert.strictEqual(eligibility.reason, 'NO_STORE');
 
       // Zade can reapply
       const applyRes = await applyForDealer({
