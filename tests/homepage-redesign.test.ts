@@ -97,6 +97,21 @@ describe('homepage marketplace redesign', () => {
     assert.match(featured, /5000/);
     assert.match(featured, /visibilitychange/);
     assert.match(featured, /onFocusCapture/);
+    assert.match(featured, /aspect-\[16\/10\]/);
+    assert.match(featured, /line-clamp-2[\s\S]*listing\.title/);
+    assert.match(featured, /line-clamp-2[\s\S]*listing\.description/);
+    assert.match(featured, /homepage-featured-category/);
+    assert.match(featured, /Önceki öne çıkan ilan/);
+    assert.match(featured, /Sonraki öne çıkan ilan/);
+  });
+
+  test('featured showcase stays compact and uses restrained premium controls', () => {
+    const css = source('src/app/globals.css');
+    assert.match(css, /\.homepage-featured-card \{[^}]*align-self: flex-start/);
+    assert.match(css, /\.homepage-featured-body \{[^}]*padding: 1rem 1\.05rem \.95rem/);
+    assert.match(css, /\.homepage-featured-arrow \{[^}]*width: 1\.8rem[^}]*height: 1\.8rem/);
+    assert.match(css, /\.homepage-featured-category \{[^}]*border-radius: 999px/);
+    assert.doesNotMatch(css, /\.homepage-featured-viewport, \.homepage-featured-card \{ height: 100%; \}/);
   });
 
   test('discovery surfaces use the requested headings and preserve descenders', () => {
