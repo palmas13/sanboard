@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, Building2, Car, CheckCircle2, Home, Sparkles, Store } from 'lucide-react';
+import { ArrowRight, Building2, Car, CheckCircle2, Home, Rocket, Sparkles, Store } from 'lucide-react';
 import { CorporateProfile, PublicListingSummary } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { getCorporateUrl } from '@/lib/urls';
@@ -49,7 +49,7 @@ export function HomepageMarketplace({ featuredListings, vehicleListings, propert
   return (
     <section className="mx-auto max-w-[1560px] px-4 sm:px-6 lg:px-8" aria-label="Sanboard ilan vitrini">
       <div className="homepage-marketplace-grid">
-        <div className="homepage-marketplace-column"><SectionHeader icon={Sparkles} title="Öne Çıkan İlanlar" subtitle="Öne çıkarılmış vitrin ilanları" href="/ilanlari-kesfet" /><div className="homepage-marketplace-content"><HomepageFeaturedRotator listings={featuredListings} /></div></div>
+        <div className="homepage-marketplace-column"><SectionHeader icon={Rocket} title="Öne Çıkan İlanlar" subtitle="Öne çıkarılmış vitrin ilanları" href="/ilanlari-kesfet" /><div className="homepage-marketplace-content"><HomepageFeaturedRotator listings={featuredListings} /></div></div>
         <div className="homepage-marketplace-column"><SectionHeader icon={Car} title="Yeni Araç İlanları" subtitle="En yeni araç ilanlarını keşfet" href="/arac" /><div className="homepage-marketplace-content"><HomepageListingRotator listings={vehicleListings} emptyMessage="Henüz yeni araç ilanı bulunmuyor." label="araç ilanları" /></div></div>
         <div className="homepage-marketplace-column"><SectionHeader icon={Home} title="Yeni Mülk İlanları" subtitle="En yeni mülk ilanlarını keşfet" href="/mulk" /><div className="homepage-marketplace-content"><HomepageListingRotator listings={propertyListings} emptyMessage="Henüz yeni mülk ilanı bulunmuyor." label="mülk ilanları" /></div></div>
         <div className="homepage-marketplace-column"><SectionHeader icon={Store} title="Kurumsal Satıcılar" subtitle="Aktif üyeliğe sahip kurumsal satıcılar" href="/ilanlari-kesfet" /><div className="homepage-marketplace-content"><CorporateSellerList sellers={corporateSellers} counts={corporateListingCounts} /></div></div>
