@@ -252,6 +252,32 @@ describe('SANBOARD dynamic identity foundation', () => {
     assert.doesNotMatch(store, /photo-1500648767791-00dcc994a43e/);
   });
 
+  test('authenticated navbar exposes character switch directly above logout without coupling it to logout', () => {
+    const navbar = readFileSync(join(process.cwd(), 'src/components/layout/Navbar.tsx'), 'utf8');
+    const switchIndex = navbar.indexOf('Karakter Değiştir');
+    const logoutIndex = navbar.indexOf('Çıkış Yap');
+
+    assert.ok(switchIndex >= 0);
+    assert.ok(logoutIndex > switchIndex);
+    assert.match(navbar, /<Link href="\/karakter-sec"[^>]*>[\s\S]*?<span>Karakter Değiştir<\/span><\/Link>/);
+    assert.match(navbar, /ArrowLeftRight/);
+    const switchLink = navbar.match(/<Link href="\/karakter-sec"[^>]*>[\s\S]*?<\/Link>/)?.[0] || '';
+    assert.doesNotMatch(switchLink, /logout|DELETE/);
+  });
+
+  test('character picker identifies the active profile and notification polling resets on profile change', () => {
+    const picker = readFileSync(join(process.cwd(), 'src/app/karakter-sec/CharacterSelectContent.tsx'), 'utf8');
+    const notifications = readFileSync(join(process.cwd(), 'src/components/notifications/NotificationDropdown.tsx'), 'utf8');
+
+    assert.match(picker, /currentProfile/);
+    assert.match(picker, /isActive \? 'Aktif'/);
+    assert.match(picker, /if \(switchingId\) return/);
+    assert.match(notifications, /setNotifications\(\[\]\)/);
+    assert.match(notifications, /setUnreadCount\(0\)/);
+    assert.match(notifications, /setInterval\(\(\) => void fetchNotifications\(true\), 60000\)/);
+    assert.match(notifications, /clearInterval\(interval\)/);
+  });
+
   test('banned account cannot switch or receive a new signed character session', async () => {
     const result = await syncGtaWorldAccountAndCharacters(account([['char-A', 'Alpha', 'One']]));
     result.user.status = 'BANNED';

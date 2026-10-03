@@ -16,7 +16,7 @@ interface CharacterSelectContentProps {
 
 export function CharacterSelectContent({ redirect, isTestSource, defaultCharacterName }: CharacterSelectContentProps) {
   const router = useRouter();
-  const { characters, selectCharacter, refreshCharacters } = useAuth();
+  const { characters, currentProfile, selectCharacter, refreshCharacters } = useAuth();
   const [switchingId, setSwitchingId] = React.useState<string | null>(null);
   const [imgErrors, setImgErrors] = React.useState<Record<string, boolean>>({});
   const [selectionError, setSelectionError] = React.useState('');
@@ -115,6 +115,8 @@ export function CharacterSelectContent({ redirect, isTestSource, defaultCharacte
               const targetId = char.id;
               const charAvatar = char.avatarUrl ? resolveAvatarUrl(char.avatarUrl) : null;
               const isSwitching = switchingId === targetId || switchingId === char.id;
+              const isActive = Boolean(char.profileId && char.profileId === currentProfile?.id)
+                || char.id === currentProfile?.id;
               const hasImgError = imgErrors[char.id];
 
               return (
@@ -153,7 +155,7 @@ export function CharacterSelectContent({ redirect, isTestSource, defaultCharacte
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <span className="inline-flex items-center gap-1 text-xs text-[var(--color-success)] font-medium">
                           <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>{char.hasProfile === false ? 'İlk kurulum gerekli' : 'Profil mevcut'}</span>
+                          <span>{isActive ? 'Aktif' : char.hasProfile === false ? 'İlk kurulum gerekli' : 'Profil mevcut'}</span>
                         </span>
                         {char.displayName === defaultCharacterName ? (
                           <span className="rounded border border-[var(--color-success)]/30 px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-success)]">

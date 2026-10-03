@@ -234,7 +234,8 @@ describe('SANBOARD admin authorization and moderation package 1', () => {
     const response = await getAdmin(request('/api/admin', adminA));
     const body = await response.json();
     assert.deepEqual(body.summary, body.stats);
-    assert.equal(body.stats.totalUsers, body.users.length);
+    assert.equal(body.stats.totalUsers, 3);
+    assert.equal(body.stats.totalUsers, body.summary.totalProfiles);
     assert.equal(body.summary.totalProfiles, 3);
     assert.equal(body.summary.totalCharacters, 3);
     assert.equal(body.summary.activeListings, 1);

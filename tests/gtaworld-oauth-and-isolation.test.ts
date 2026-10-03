@@ -12,6 +12,7 @@ import { GET as listCharacters } from '../src/app/api/user/characters/route';
 import { POST as selectCharacter } from '../src/app/api/auth/session/route';
 import { POST as createProfile } from '../src/app/api/user/profile/route';
 import { syncExternalGameAccount } from '../src/lib/auth/gtaworld-sync';
+import { getAdminStats } from '../src/lib/db/admin';
 
 describe('GTA World OAuth & Authorize URL Generation', () => {
   const origEnv = { ...process.env };
@@ -163,6 +164,48 @@ describe('Lazy GTA World character profile creation', () => {
     const rejected = await createProfile(new NextRequest('http://localhost/api/user/profile', { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ characterId: '999', fullName: 'Injected Character' }) }));
     assert.strictEqual(rejected.status, 403);
     assert.strictEqual((await rejected.json()).code, 'character_invalid');
+  });
+
+  it('counts only persistent character profiles in the admin user metric', async () => {
+    const createdAt = '2026-10-01T00:00:00.000Z';
+    db.profiles = Array.from({ length: 6 }, (_, index) => ({
+      id: `existing-profile-${index + 1}`,
+      user_id: `existing-account-${index + 1}`,
+      external_character_id: `existing-character-${index + 1}`,
+      full_name: `Existing Character ${index + 1}`,
+      avatar_url: '',
+      sanmail_email: '',
+      phone: '',
+      role: 'USER' as const,
+      created_at: createdAt,
+      updated_at: createdAt,
+    }));
+
+    assert.strictEqual((await getAdminStats()).totalUsers, 6);
+
+    const account = {
+      externalAccountId: 'lazy-metric-account',
+      characters: [
+        { externalCharacterId: 'lazy-a', firstName: 'Character', lastName: 'A', displayName: 'Character A' },
+        { externalCharacterId: 'lazy-b', firstName: 'Character', lastName: 'B', displayName: 'Character B' },
+        { externalCharacterId: 'lazy-c', firstName: 'Character', lastName: 'C', displayName: 'Character C' },
+      ],
+    };
+    const { user } = await syncExternalGameAccount(account, { createProfiles: false });
+    assert.strictEqual((await getAdminStats()).totalUsers, 6);
+
+    const cookie = `${CHARACTER_SELECTION_COOKIE}=${createCharacterSelectionToken(user.id, account.characters)}`;
+    const onboard = (characterId: string) => createProfile(new NextRequest('http://localhost/api/user/profile', {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ characterId }),
+    }));
+
+    assert.strictEqual((await onboard('lazy-a')).status, 200);
+    assert.strictEqual((await getAdminStats()).totalUsers, 7);
+    assert.strictEqual((await onboard('lazy-b')).status, 200);
+    assert.strictEqual((await getAdminStats()).totalUsers, 8);
+    assert.strictEqual(db.profiles.some((profile) => profile.external_character_id === 'lazy-c'), false);
   });
 });
 

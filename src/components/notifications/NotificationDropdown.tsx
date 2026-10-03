@@ -41,6 +41,10 @@ export function NotificationDropdown() {
   }, [currentProfile?.id]);
 
   useEffect(() => {
+    setIsOpen(false);
+    setNotifications([]);
+    setUnreadCount(0);
+
     if (isAuthenticated && currentProfile?.id) {
       // Keep navbar work lightweight: fetch only the unread count until the
       // dropdown is opened. Full notification rows are secondary UI.

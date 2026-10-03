@@ -43,7 +43,6 @@ export async function getAdminStats(): Promise<AdminStats> {
       const startOfDayIso = startOfDay.toISOString();
 
       const [
-        usersRes,
         profilesRes,
         activeListingsRes,
         corporateProfilesRes,
@@ -55,7 +54,6 @@ export async function getAdminStats(): Promise<AdminStats> {
         todayListingsRes,
         favoritesRes,
       ] = await Promise.all([
-        client.from('users').select('*', { count: 'exact', head: true }),
         client.from('character_profiles').select('*', { count: 'exact', head: true }),
         client.from('listings').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE').or(`expires_at.is.null,expires_at.gt.${nowIso}`),
         client.from('corporate_profiles').select('*', { count: 'exact', head: true }),
@@ -71,7 +69,7 @@ export async function getAdminStats(): Promise<AdminStats> {
       const totalRevenue = (paymentsRes.data || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
       return {
-        totalUsers: usersRes.count || 0,
+        totalUsers: profilesRes.count || 0,
         totalProfiles: profilesRes.count || 0,
         totalCharacters: profilesRes.count || 0,
         activeListings: activeListingsRes.count || 0,
@@ -110,7 +108,7 @@ export async function getAdminStats(): Promise<AdminStats> {
     .reduce((sum, p) => sum + p.amount, 0);
 
   return {
-    totalUsers: db.users.length,
+    totalUsers: db.profiles.length,
     totalProfiles: db.profiles.length,
     totalCharacters: db.profiles.length,
     activeListings: activeCount,
