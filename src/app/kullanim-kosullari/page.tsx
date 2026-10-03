@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   Users,
 } from 'lucide-react';
+import { CANONICAL_PRICING } from '@/lib/payments/pricing';
 
 export const metadata: Metadata = {
   title: 'Kullanım Koşulları | Sanboard',
@@ -75,9 +76,9 @@ const icSections = [
   {
     title: 'Ücretler ve Süreler',
     icon: BadgeDollarSign,
-    tags: ['$2.000', '7 gün'],
+    tags: [`$${CANONICAL_PRICING.STANDARD_7_DAY.toLocaleString('tr-TR')}`, '7 gün'],
     items: [
-      'Standart bireysel ilan yayınlama bedeli $2.000’dır.',
+      `Standart bireysel ilan yayınlama bedeli $${CANONICAL_PRICING.STANDARD_7_DAY.toLocaleString('tr-TR')}’dır.`,
       'Bu tutar yalnızca ilan hizmeti içindir; satış komisyonu değildir.',
       'Araç veya mülkün satış fiyatı standart ilan bedelini değiştirmez.',
       'Bakım veya teknik sorunlarda hizmet geçici olarak durdurulabilir.',

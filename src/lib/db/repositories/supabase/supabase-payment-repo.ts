@@ -2,7 +2,7 @@ import { IPaymentRepository } from '../types';
 import { getSupabaseClient, getSupabaseAdminClient } from '../../supabase-client';
 
 import { resolveProfileId, isUuid } from '../../id-mapper';
-import { getPaymentPrice, type PaymentPurpose } from '@/lib/payments/pricing';
+import { getPackagePrice, isPaymentPackageCode, type PaymentPurpose } from '@/lib/payments/pricing';
 
 export class SupabasePaymentRepository implements IPaymentRepository {
   private getClient() {
@@ -47,7 +47,7 @@ export class SupabasePaymentRepository implements IPaymentRepository {
     profileId: string,
     packageIdOrCode: string,
     options: { idempotencyKey?: string; corporateProfileId?: string | null; purpose?: PaymentPurpose; targetListingId?: string | null } = {}
-  ): Promise<{ orderId: string; amount: number; packageName?: string; entitlementType?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' | 'LISTING_BOOST' }> {
+  ): Promise<{ orderId: string; amount: number; packageName?: string; entitlementType?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' | 'BOOST_CREDIT' }> {
     const client = this.getAdminClient();
 
     // Query package by code or by id
@@ -66,6 +66,7 @@ export class SupabasePaymentRepository implements IPaymentRepository {
     }
 
     if (!packageRecord.active) throw new Error('İstenen ödeme paketi aktif değildir.');
+    if (!isPaymentPackageCode(packageRecord.code)) throw new Error('Desteklenmeyen ödeme paketi.');
     if (packageRecord.code === 'CORPORATE_SUBSCRIPTION_30_DAY') {
       if (packageRecord.seller_type !== 'CORPORATE' || packageRecord.duration_days !== 30) {
         throw new Error('Kurumsal üyelik paketi yapılandırması geçersizdir.');
@@ -83,8 +84,16 @@ export class SupabasePaymentRepository implements IPaymentRepository {
       throw new Error('Kurumsal ilan paketi yapılandırması geçersizdir.');
     }
 
-    const purpose = options.purpose || (packageRecord.code === 'CORPORATE_SUBSCRIPTION_30_DAY' ? 'CORPORATE_SUBSCRIPTION' : 'LISTING_PUBLICATION');
-    const entitlementType = purpose === 'CORPORATE_SUBSCRIPTION' ? 'CORPORATE_SUBSCRIPTION' : purpose === 'LISTING_BOOST' ? 'LISTING_BOOST' : 'LISTING_CREDIT';
+    const canonicalPurpose: PaymentPurpose = packageRecord.code === 'CORPORATE_SUBSCRIPTION_30_DAY'
+      ? 'CORPORATE_SUBSCRIPTION'
+      : packageRecord.code === 'LISTING_BOOST_24_HOUR' ? 'LISTING_BOOST' : 'LISTING_PUBLICATION';
+    const purpose = options.purpose || canonicalPurpose;
+    if (purpose !== canonicalPurpose) throw new Error('Ödeme amacı paketle eşleşmiyor.');
+    if (packageRecord.code === 'LISTING_BOOST_24_HOUR'
+      && (packageRecord.seller_type !== 'CORPORATE' || packageRecord.duration_days !== 1 || !options.corporateProfileId)) {
+      throw new Error('Boost kredisi paketi yapılandırması geçersizdir.');
+    }
+    const entitlementType = purpose === 'CORPORATE_SUBSCRIPTION' ? 'CORPORATE_SUBSCRIPTION' : purpose === 'LISTING_BOOST' ? 'BOOST_CREDIT' : 'LISTING_CREDIT';
 
     if (options.idempotencyKey) {
       const { data: existing, error: existingError } = await client
@@ -109,7 +118,7 @@ export class SupabasePaymentRepository implements IPaymentRepository {
     }
 
     const orderId = `ORD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-    const amount = getPaymentPrice(purpose);
+    const amount = getPackagePrice(packageRecord.code);
 
     const { error } = await client.from('payments').insert({
       order_id: orderId,
@@ -179,12 +188,12 @@ export class SupabasePaymentRepository implements IPaymentRepository {
       : { success: false, error: 'Ödeme terminal başarısız duruma geçirilemedi.' };
   }
 
-  async completeBoostPayment(orderId: string): Promise<{ success: boolean; error?: string; featured_until?: string }> {
+  async completeBoostPayment(orderId: string): Promise<{ success: boolean; error?: string; purchasedBoostCredits?: number }> {
     const client = this.getAdminClient();
     const { data, error } = await client.rpc('complete_sanboard_boost_payment', { p_order_id: orderId });
     if (error) return { success: false, error: error.message };
     const result = Array.isArray(data) ? data[0] : data;
-    return { success: Boolean(result?.success), error: result?.error || undefined, featured_until: result?.featured_until || undefined };
+    return { success: Boolean(result?.success), error: result?.error || undefined, purchasedBoostCredits: result?.purchased_boost_credits };
   }
 
   async getUserPayments(profileId: string): Promise<any[]> {

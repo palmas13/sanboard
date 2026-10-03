@@ -395,12 +395,23 @@ export class SupabaseDealerRepository implements IDealerRepository {
     const client = this.getAdminClient();
     const expiresAt = addCalendarMonth(new Date()).toISOString();
 
+    const { data: existing, error: existingError } = await client
+      .from('corporate_profiles')
+      .select('purchased_boost_credits')
+      .eq('id', dealerId)
+      .maybeSingle();
+    if (existingError || !existing) {
+      return { success: false, error: existingError?.message || 'Kurumsal mağaza bulunamadı.' };
+    }
+    const purchasedBoostCredits = existing.purchased_boost_credits || 0;
+
     const { data, error } = await client
       .from('corporate_profiles')
       .update({
         subscription_status: 'ACTIVE',
         subscription_expires_at: expiresAt,
-        boost_credits: 3,
+        monthly_boost_credits: 3,
+        boost_credits: 3 + purchasedBoostCredits,
         updated_at: new Date().toISOString(),
       })
       .eq('id', dealerId)
@@ -439,7 +450,7 @@ export class SupabaseDealerRepository implements IDealerRepository {
     listingId: string,
     _now?: Date,
     options?: { paymentMode?: 'REQUIRE_CREDIT' | 'TEST_BYPASS' }
-  ): Promise<{ success: boolean; error?: string; code?: string; remainingBoosts?: number; featured_until?: string }> {
+  ): Promise<{ success: boolean; error?: string; code?: string; remainingBoosts?: number; monthlyBoostCredits?: number; purchasedBoostCredits?: number; featured_until?: string }> {
     const client = this.getAdminClient();
     let { data, error } = await client.rpc('consume_corporate_boost', {
       p_actor_profile_id: actorProfileId,
@@ -462,6 +473,8 @@ export class SupabaseDealerRepository implements IDealerRepository {
       error: result?.error || undefined,
       code: result?.code || undefined,
       remainingBoosts: result?.remaining_boosts,
+      monthlyBoostCredits: result?.monthly_boost_credits,
+      purchasedBoostCredits: result?.purchased_boost_credits,
       featured_until: result?.featured_until,
     };
   }

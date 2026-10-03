@@ -147,10 +147,10 @@ describe('SANBOARD Business Logic Phase 1 regressions', () => {
     const zeroPrice = await createCheckoutOrder(ownerId, subscriptionPackage.code, {
       idempotencyKey: 'zero-price-subscription', corporateProfileId: storeId,
     });
-    assert.equal(zeroPrice.amount, 1);
+    assert.equal(zeroPrice.amount, 5500);
     assert.equal(db.payments.length, 1);
     assert.equal(db.payments[0].status, 'PENDING');
-    assert.equal(db.payments[0].amount, 1);
+    assert.equal(db.payments[0].amount, 5500);
     assert.equal(db.dealers[0].subscription_status, 'INACTIVE');
 
     db.payments = [];

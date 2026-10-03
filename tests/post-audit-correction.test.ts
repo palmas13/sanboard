@@ -461,7 +461,7 @@ describe('Sanboard Post-Audit Correction Pass: Sections 36-47', () => {
   // =========================================================================
   // 45. TEST — LISTING PRICES & CREDIT SEPARATION
   // =========================================================================
-  it('Section 45: Individual ($2,000 / 7 days) and Corporate ($1,750 / 14 days) credits reject cross-consumption', async () => {
+  it('Section 45: Individual ($1,500 / 7 days) and Corporate ($1,250 / 14 days) credits reject cross-consumption', async () => {
     // 1. Give Mavis INDIVIDUAL credit
     db.credits.push({
       id: 'crd-ind-only',
@@ -579,7 +579,7 @@ describe('Sanboard Post-Audit Correction Pass: Sections 36-47', () => {
     apexStore.moderation_status = 'ACTIVE';
     apexStore.subscription_expires_at = new Date(Date.now() + 30 * 86400000).toISOString();
 
-    // Checkout endpoint verification for Corporate Credit ($1,750)
+    // Checkout endpoint verification for Corporate Credit ($1,250)
     const checkoutReq = new NextRequest('http://localhost:3000/api/checkout', {
       method: 'POST',
       headers: {
@@ -597,7 +597,7 @@ describe('Sanboard Post-Audit Correction Pass: Sections 36-47', () => {
     const pendingPayment = db.payments.at(-1)!;
     assert.strictEqual(pendingPayment.profile_id, mavisProfileId, 'Corporate checkout owner must come from the signed active character');
     assert.strictEqual(pendingPayment.corporate_profile_id, 'dealer-apex-01');
-    assert.strictEqual(pendingPayment.amount, 1, 'Corporate credit checkout price must use centralized $1 pricing');
+    assert.strictEqual(pendingPayment.amount, 1250, 'Corporate credit checkout price must use canonical pricing');
     assert.strictEqual(pendingPayment.status, 'PENDING');
     assert.strictEqual(pendingPayment.external_payment_id, undefined);
   });

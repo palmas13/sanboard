@@ -10,7 +10,6 @@ type Purpose = 'LISTING_PUBLICATION' | 'LISTING_BOOST' | 'CORPORATE_SUBSCRIPTION
 export default function PaymentResultPage() {
   const [state, setState] = useState<State>('CHECKING');
   const [purpose, setPurpose] = useState<Purpose>('LISTING_PUBLICATION');
-  const [targetListingId, setTargetListingId] = useState<string>();
 
   useEffect(() => {
     let cancelled = false;
@@ -24,7 +23,6 @@ export default function PaymentResultPage() {
         const data = await response.json();
         if (cancelled) return;
         if (data.purpose) setPurpose(data.purpose);
-        if (data.targetListingId) setTargetListingId(data.targetListingId);
         const next = response.status === 404 ? 'NOT_FOUND' : data.state;
         setState(next);
         if ((next === 'PENDING' || next === 'UNVERIFIED') && attempts < 5) setTimeout(check, 2500);
@@ -37,14 +35,14 @@ export default function PaymentResultPage() {
   }, []);
 
   const successText = purpose === 'LISTING_BOOST'
-    ? 'Ödeme başarılı. İlanınız 24 saat öne çıkarıldı.'
+    ? 'Ödeme başarılı. 1 satın alınan Boost Kredisi hesabınıza tanımlandı.'
     : purpose === 'CORPORATE_SUBSCRIPTION'
       ? 'Ödeme başarılı. Kurumsal üyeliğiniz tanımlandı.'
       : 'Ödeme başarılı. 1 ilan hakkı hesabınıza tanımlandı.';
   const link = purpose === 'CORPORATE_SUBSCRIPTION' ? '/hesabim/kurumsal'
-    : purpose === 'LISTING_BOOST' && targetListingId ? `/ilan/${targetListingId}` : '/ilan-ver/paket';
+    : purpose === 'LISTING_BOOST' ? '/hesabim/kurumsal' : '/ilan-ver/paket';
   const linkText = purpose === 'CORPORATE_SUBSCRIPTION' ? 'Kurumsal Panele Dön'
-    : purpose === 'LISTING_BOOST' ? 'İlana Dön' : 'İlan Hakkını Kullan';
+    : purpose === 'LISTING_BOOST' ? 'Kurumsal Panele Dön' : 'İlan Hakkını Kullan';
 
   return <div className="min-h-[70vh] flex items-center justify-center px-4">
     <div className="surface-card max-w-lg w-full rounded-2xl border border-[var(--border-app)] p-8 text-center space-y-5">

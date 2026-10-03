@@ -415,14 +415,14 @@ describe('Sanboard Stabilization Pass: Auth, Role, Favorites, Notifications & Da
     test('Section 45: Corporate listing flow enforces eligibility redirects and CORPORATE seller_type', async () => {
       const packages = db.packages;
 
-      const corpPkg = packages.find((p) => p.code === 'CORPORATE_14_DAY' || p.price === 1750);
+      const corpPkg = packages.find((p) => p.code === 'CORPORATE_14_DAY');
       assert.ok(corpPkg, 'Corporate package must exist');
-      assert.strictEqual(corpPkg.price, 1750);
+      assert.strictEqual(corpPkg.price, 1250);
       assert.strictEqual(corpPkg.duration_days, 14);
 
-      const indivPkg = packages.find((p) => p.code === 'STANDARD_7_DAY' || p.price === 2000);
+      const indivPkg = packages.find((p) => p.code === 'STANDARD_7_DAY');
       assert.ok(indivPkg, 'Individual package must exist');
-      assert.strictEqual(indivPkg.price, 2000);
+      assert.strictEqual(indivPkg.price, 1500);
       assert.strictEqual(indivPkg.duration_days, 7);
     });
 

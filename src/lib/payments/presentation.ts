@@ -6,8 +6,8 @@ type PaymentProductMetadata = Pick<
 >;
 
 export function getPaymentProductLabel(payment: PaymentProductMetadata): string {
-  if (payment.purpose === 'LISTING_BOOST' || payment.entitlement_type === 'LISTING_BOOST') {
-    return 'İlan Öne Çıkarma';
+  if (payment.purpose === 'LISTING_BOOST' || payment.entitlement_type === 'BOOST_CREDIT') {
+    return 'Boost Kredisi';
   }
   if (payment.purpose === 'CORPORATE_SUBSCRIPTION' || payment.entitlement_type === 'CORPORATE_SUBSCRIPTION') {
     return 'Kurumsal Üyelik';
@@ -19,7 +19,7 @@ export function getPaymentProductLabel(payment: PaymentProductMetadata): string 
     case 'CORPORATE_14_DAY':
       return 'Kurumsal İlan Hakkı';
     case 'LISTING_BOOST_24_HOUR':
-      return 'İlan Öne Çıkarma';
+      return 'Boost Kredisi';
     case 'CORPORATE_SUBSCRIPTION_30_DAY':
       return 'Kurumsal Üyelik';
     default:

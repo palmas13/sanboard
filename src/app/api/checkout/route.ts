@@ -7,7 +7,7 @@ import {
 import { canRenewCorporateSubscription } from '@/lib/subscriptions/calendar-month';
 import { resolveOwnedActiveProfile } from '@/lib/auth/active-profile';
 import { setPaymentCorrelationCookie } from '@/lib/payments/correlation';
-import { getPaymentPrice, type PaymentPurpose } from '@/lib/payments/pricing';
+import { getPaymentDescription, isPaymentPackageCode, type PaymentPurpose } from '@/lib/payments/pricing';
 import { verifyAndFulfillPayment } from '@/lib/payments/verification';
 
 export async function GET(req: NextRequest) {
@@ -42,6 +42,9 @@ export async function POST(req: NextRequest) {
     const actor = await resolveOwnedActiveProfile(req);
     const body = await req.json().catch(() => ({}));
     const requestedPackage = body.packageCode || 'STANDARD_7_DAY';
+    if (!isPaymentPackageCode(requestedPackage) || requestedPackage === 'LISTING_BOOST_24_HOUR') {
+      return NextResponse.json({ error: 'Geçersiz ödeme paketi.' }, { status: 400 });
+    }
     const idempotencyKey = req.headers.get('idempotency-key') || body.idempotencyKey;
 
     // Do not trust raw profileId submitted from browser; resolve from signed session
@@ -72,7 +75,7 @@ export async function POST(req: NextRequest) {
       if (!eligibility.eligible || !eligibility.dealer) {
         return NextResponse.json(
           {
-            error: eligibility.message || 'Kurumsal ilan kredisi ($1.750) satın alma şartlarını sağlamıyorsunuz.',
+            error: eligibility.message || 'Kurumsal ilan hakkı satın alma şartlarını sağlamıyorsunuz.',
             reason: eligibility.reason,
           },
           { status: 403 }
@@ -125,14 +128,14 @@ export async function POST(req: NextRequest) {
       packageCode: requestedPackage,
       amount: order.amount,
       currency: 'USD',
-      description: `${purpose === 'CORPORATE_SUBSCRIPTION' ? 'Sanboard Corporate Subscription - SBC' : 'Sanboard Listing Publication - SBP'}-${order.orderId.slice(-8)}`,
+      description: getPaymentDescription(requestedPackage),
     });
     if (!providerOrder.paymentId || !providerOrder.paymentLink) throw new Error('Fleeca hosted payment bilgileri eksik.');
     await repo.attachProviderPayment(order.orderId, providerOrder.paymentId);
 
     const response = NextResponse.json({
       orderId: order.orderId,
-      amount: getPaymentPrice(purpose),
+      amount: order.amount,
       paymentLink: providerOrder.paymentLink,
       packageName: order.packageName || (requestedPackage === 'CORPORATE_14_DAY' ? '14 Günlük Kurumsal İlan' : '7 Günlük Standart İlan'),
       entitlementType: order.entitlementType,

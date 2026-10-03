@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { getCorporateUrl } from '@/lib/urls';
+import { CANONICAL_PRICING } from '@/lib/payments/pricing';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useRouter } from 'next/navigation';
 import {
@@ -1225,7 +1226,7 @@ export default function AdminPage() {
                 className="form-input text-sm"
               />
               <p className="text-[11px] text-[var(--text-dim)]">
-                Varsayılan değer: $2.000. Değiştirildiğinde tüm checkout akışları bu fiyattan çalışır.
+                Kanonik değer: ${CANONICAL_PRICING.STANDARD_7_DAY.toLocaleString('tr-TR')}. Checkout akışları sunucu tarafındaki kanonik fiyatı kullanır.
               </p>
             </div>
 

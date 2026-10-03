@@ -93,15 +93,19 @@ describe('SANBOARD payment / boost integrity package 1', () => {
     assert.equal(db.dealers[0].boost_credits, 3);
   });
 
-  test('early renewal extends expiry but preserves current-period credits, including zero', async () => {
+  test('early renewal extends expiry, refreshes monthly credits, and preserves purchased credits', async () => {
     for (const credits of [1, 0]) {
-      db.dealers[0].boost_credits = credits;
+      db.dealers[0].monthly_boost_credits = credits;
+      db.dealers[0].purchased_boost_credits = 2;
+      db.dealers[0].boost_credits = credits + 2;
       db.dealers[0].subscription_expires_at = '2026-10-26T12:00:00.000Z';
       db.payments = [];
       const order = await createCheckoutOrder(alex, 'CORPORATE_SUBSCRIPTION_30_DAY', { corporateProfileId: store, idempotencyKey: `renew-${credits}` });
       assert.equal((await completePaymentOrder(order.orderId, `external-${credits}`, clock)).success, true);
       assert.equal(db.dealers[0].subscription_expires_at, '2026-11-26T12:00:00.000Z');
-      assert.equal(db.dealers[0].boost_credits, credits);
+      assert.equal(db.dealers[0].monthly_boost_credits, 3);
+      assert.equal(db.dealers[0].purchased_boost_credits, 2);
+      assert.equal(db.dealers[0].boost_credits, 5);
     }
   });
 
@@ -120,7 +124,7 @@ describe('SANBOARD payment / boost integrity package 1', () => {
 
   test('subscription package creation uses centralized price and validates seller type and duration', async () => {
     const canonical = await createCheckoutOrder(alex, 'CORPORATE_SUBSCRIPTION_30_DAY', { corporateProfileId: store });
-    assert.equal(canonical.amount, 1);
+    assert.equal(canonical.amount, 5500);
 
     for (const mutation of [
       { seller_type: 'INDIVIDUAL' },
@@ -134,18 +138,18 @@ describe('SANBOARD payment / boost integrity package 1', () => {
     }
   });
 
-  test('all orders keep the centralized one-dollar snapshot after legacy package price changes', async () => {
+  test('all orders keep the canonical price snapshot after legacy package price changes', async () => {
     const oldOrder = await createCheckoutOrder(alex, 'CORPORATE_SUBSCRIPTION_30_DAY', { corporateProfileId: store });
-    assert.equal(oldOrder.amount, 1);
-    assert.equal(db.payments[0].amount, 1);
+    assert.equal(oldOrder.amount, 5500);
+    assert.equal(db.payments[0].amount, 5500);
 
     db.packages[0].price = 6000;
     const oldCompletion = await completePaymentOrder(oldOrder.orderId, 'snapshot-1', clock);
     assert.equal(oldCompletion.success, true);
 
     const newOrder = await createCheckoutOrder(alex, 'CORPORATE_SUBSCRIPTION_30_DAY', { corporateProfileId: store });
-    assert.equal(newOrder.amount, 1);
-    assert.equal(db.payments.find((payment) => payment.order_id === newOrder.orderId)?.amount, 1);
+    assert.equal(newOrder.amount, 5500);
+    assert.equal(db.payments.find((payment) => payment.order_id === newOrder.orderId)?.amount, 5500);
   });
 
   test('external verification uses each stored order amount rather than the live package price', async () => {
@@ -203,9 +207,11 @@ describe('SANBOARD payment / boost integrity package 1', () => {
     assert.equal(db.credits.length, 1);
   });
 
-  test('legacy active renewal initializes a technical period without resetting zero or one credit', async () => {
+  test('legacy active renewal initializes a technical period and refreshes monthly credits', async () => {
     for (const credits of [0, 1]) {
-      db.dealers[0].boost_credits = credits;
+      db.dealers[0].monthly_boost_credits = credits;
+      db.dealers[0].purchased_boost_credits = 1;
+      db.dealers[0].boost_credits = credits + 1;
       db.dealers[0].subscription_status = 'ACTIVE';
       db.dealers[0].subscription_expires_at = '2026-10-26T12:00:00.000Z';
       db.dealers[0].current_period_start = undefined;
@@ -217,7 +223,9 @@ describe('SANBOARD payment / boost integrity package 1', () => {
       });
       assert.equal((await completePaymentOrder(order.orderId, `legacy-external-${credits}`, clock)).success, true);
       assert.equal(db.dealers[0].subscription_expires_at, '2026-11-26T12:00:00.000Z');
-      assert.equal(db.dealers[0].boost_credits, credits);
+      assert.equal(db.dealers[0].monthly_boost_credits, 3);
+      assert.equal(db.dealers[0].purchased_boost_credits, 1);
+      assert.equal(db.dealers[0].boost_credits, 4);
       assert.equal(db.dealers[0].current_period_start, clock.toISOString());
       assert.equal(db.dealers[0].current_period_end, '2026-10-26T12:00:00.000Z');
     }
@@ -313,5 +321,19 @@ describe('SANBOARD payment / boost integrity package 1', () => {
     for (const check of ['start_without_end', 'end_without_start', 'start_not_before_end', 'period_beyond_subscription', 'active_future_with_null_period', 'expired_subscription_with_future_period', 'null_boost_credits', 'negative_boost_credits']) {
       assert.match(postflight, new RegExp(check));
     }
+  });
+
+  test('pricing migration converts legacy Boost entitlements between constraint drop and replacement', () => {
+    const migration = readFileSync(join(process.cwd(), 'supabase/migrations/20261003010000_pricing_and_corporate_boost_credits.sql'), 'utf8');
+    const dropConstraint = migration.indexOf('ALTER TABLE public.payments DROP CONSTRAINT IF EXISTS chk_payments_entitlement_type;');
+    const convertEntitlement = migration.indexOf("SET entitlement_type = 'BOOST_CREDIT'");
+    const addConstraint = migration.indexOf('ALTER TABLE public.payments ADD CONSTRAINT chk_payments_entitlement_type');
+
+    assert.ok(dropConstraint >= 0, 'legacy entitlement constraint must be dropped');
+    assert.ok(convertEntitlement >= 0, 'legacy Boost entitlements must be converted');
+    assert.ok(addConstraint >= 0, 'replacement entitlement constraint must be installed');
+    assert.ok(dropConstraint < convertEntitlement, 'constraint drop must precede the BOOST_CREDIT conversion');
+    assert.ok(convertEntitlement < addConstraint, 'BOOST_CREDIT conversion must precede the replacement constraint');
+    assert.match(migration.slice(addConstraint), /CHECK \(entitlement_type IN \('LISTING_CREDIT', 'BOOST_CREDIT', 'CORPORATE_SUBSCRIPTION'\)\)/);
   });
 });

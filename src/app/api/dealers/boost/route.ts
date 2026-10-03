@@ -7,6 +7,7 @@ import { recordAuditEvent } from '@/lib/audit';
 import { assertBoostAuthorization } from '@/lib/payments/verification';
 import { getFleecaPaymentProvider } from '@/lib/integrations/fleeca';
 import { setPaymentCorrelationCookie } from '@/lib/payments/correlation';
+import { getPaymentDescription } from '@/lib/payments/pricing';
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,19 +23,44 @@ export async function POST(req: NextRequest) {
     const testPaymentBypass = await canBypassTestPayment({ userId: actor.userId, profile: actor.profile });
     if (!testPaymentBypass) {
       await assertBoostAuthorization(actor.profileId, actor.userId, listingId);
+      const directResult = await dealerRepo.boostListing(actor.profileId, listingId);
+      if (directResult.success) {
+        try {
+          revalidatePath('/arac');
+          revalidatePath('/mulk');
+          revalidatePath('/');
+        } catch {}
+        return NextResponse.json({
+          success: true,
+          paymentRequired: false,
+          remainingBoosts: directResult.remainingBoosts,
+          monthlyBoostCredits: directResult.monthlyBoostCredits,
+          purchasedBoostCredits: directResult.purchasedBoostCredits,
+          featured_until: directResult.featured_until,
+          message: '1 Boost Kredisi kullanıldı. İlanınız 24 saat boyunca öne çıkarıldı.',
+        });
+      }
+      if (directResult.code !== 'NO_BOOST_CREDITS') {
+        const status = directResult.code === 'LISTING_NOT_OWNED' ? 403 : 400;
+        return NextResponse.json({ error: directResult.error || 'İlan öne çıkarılamadı.', code: directResult.code }, { status });
+      }
+
+      const dealer = await dealerRepo.getDealerByProfileId(actor.profileId);
+      if (!dealer) return NextResponse.json({ error: 'Kurumsal mağaza bulunamadı.' }, { status: 404 });
       const paymentRepo = getPaymentRepository();
       const order = await paymentRepo.createPaymentOrder(actor.profileId, 'LISTING_BOOST_24_HOUR', {
-        idempotencyKey: req.headers.get('idempotency-key') || `boost:${listingId}:${crypto.randomUUID()}`,
-        purpose: 'LISTING_BOOST', targetListingId: listingId,
+        idempotencyKey: req.headers.get('idempotency-key') || `boost-credit:${dealer.id}:${crypto.randomUUID()}`,
+        corporateProfileId: dealer.id,
+        purpose: 'LISTING_BOOST',
       });
       const providerOrder = await getFleecaPaymentProvider().createOrder({
         orderId: order.orderId, profileId: actor.profileId, characterName: actor.profile.full_name,
         packageCode: 'LISTING_BOOST_24_HOUR', amount: order.amount, currency: 'USD',
-        description: `Sanboard Listing Boost - SBB-${order.orderId.slice(-8)}`,
+        description: getPaymentDescription('LISTING_BOOST_24_HOUR'),
       });
       if (!providerOrder.paymentId || !providerOrder.paymentLink) throw new Error('Fleeca hosted payment bilgileri eksik.');
       await paymentRepo.attachProviderPayment(order.orderId, providerOrder.paymentId);
-      const response = NextResponse.json({ success: true, orderId: order.orderId, paymentLink: providerOrder.paymentLink, paymentRequired: true });
+      const response = NextResponse.json({ success: true, orderId: order.orderId, amount: order.amount, paymentLink: providerOrder.paymentLink, paymentRequired: true });
       setPaymentCorrelationCookie(response, order.orderId);
       return response;
     }

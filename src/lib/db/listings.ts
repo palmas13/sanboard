@@ -23,6 +23,7 @@ import { redactPrivateContact } from '../profiles/contact-privacy';
 import { getSupabaseAdminClient } from './supabase-client';
 import { sortPublicListings } from '@/lib/listings/public-sort';
 import { rankSimilarListings } from '@/lib/listings/similarity';
+import { CANONICAL_PRICING } from '@/lib/payments/pricing';
 
 export interface ListingFilterParams {
   category?: ListingCategory;
@@ -548,7 +549,7 @@ export async function createListingWithCredit(
   if (!credit && !testBypass) {
     return {
       success: false,
-      error: `${sellerType === 'CORPORATE' ? 'Kurumsal ($1.750)' : 'Bireysel ($2.000)'} ilan yayınlamak için uygun bir ilan hakkınız (krediniz) bulunmuyor.`,
+      error: `${sellerType === 'CORPORATE' ? `Kurumsal ($${CANONICAL_PRICING.CORPORATE_14_DAY.toLocaleString('tr-TR')})` : `Bireysel ($${CANONICAL_PRICING.STANDARD_7_DAY.toLocaleString('tr-TR')})`} ilan yayınlamak için uygun bir ilan hakkınız (krediniz) bulunmuyor.`,
     };
   }
   const newId = `lst-${Date.now()}-${Math.floor(Math.random() * 1000)}`;

@@ -287,7 +287,9 @@ export async function activateSubscription(dealerId: string): Promise<{ success:
   dealer.subscription_expires_at = addCalendarMonth(now).toISOString();
   dealer.current_period_start = now.toISOString();
   dealer.current_period_end = dealer.subscription_expires_at;
-  dealer.boost_credits = 3;
+  dealer.monthly_boost_credits = 3;
+  dealer.purchased_boost_credits = dealer.purchased_boost_credits || 0;
+  dealer.boost_credits = dealer.monthly_boost_credits + dealer.purchased_boost_credits;
   dealer.updated_at = now.toISOString();
 
   return { success: true, dealer };
@@ -332,7 +334,7 @@ export async function boostListing(
   listingId: string,
   now = new Date(),
   options: { paymentMode?: 'REQUIRE_CREDIT' | 'TEST_BYPASS' } = {}
-): Promise<{ success: boolean; error?: string; code?: string; remainingBoosts?: number; featured_until?: string }> {
+): Promise<{ success: boolean; error?: string; code?: string; remainingBoosts?: number; monthlyBoostCredits?: number; purchasedBoostCredits?: number; featured_until?: string }> {
   if (process.env.DATA_STORE === 'supabase') {
     const repo = getDealerRepository();
     if (typeof repo.boostListing === 'function') {
@@ -388,18 +390,26 @@ export async function boostListing(
     const nextPeriodEnd = new Date(Math.min(now.getTime() + 30 * 86400000, expiresAt.getTime()));
     dealer.current_period_start = now.toISOString();
     dealer.current_period_end = nextPeriodEnd.toISOString();
-    dealer.boost_credits = 3;
+    dealer.monthly_boost_credits = 3;
+    dealer.boost_credits = 3 + (dealer.purchased_boost_credits || 0);
   }
-  if (!testBypass && (dealer.boost_credits == null || dealer.boost_credits <= 0)) {
-    return { success: false, code: 'NO_BOOST_CREDITS', error: 'Bu abonelik dönemi için öne çıkarma hakkınız tükenmiştir.' };
-  }
+  const purchasedCredits = dealer.purchased_boost_credits || 0;
+  const monthlyCredits = dealer.monthly_boost_credits
+    ?? Math.max((dealer.boost_credits || 0) - purchasedCredits, 0);
 
   // STRICT: Corporate boost can ONLY boost corporate listings belonging to this store (Requirement 10 & 11)
   if (listing.seller_type !== 'CORPORATE' || listing.corporate_profile_id !== dealer.id) {
     return { success: false, code: 'LISTING_NOT_OWNED', error: 'İlan aktif karakterin kurumsal mağazasına ait değil.' };
   }
+  if (!testBypass && monthlyCredits <= 0 && purchasedCredits <= 0) {
+    return { success: false, code: 'NO_BOOST_CREDITS', error: 'Bu abonelik dönemi için öne çıkarma hakkınız tükenmiştir.' };
+  }
 
-  if (!testBypass) dealer.boost_credits = (dealer.boost_credits || 0) - 1;
+  if (!testBypass) {
+    if (monthlyCredits > 0) dealer.monthly_boost_credits = monthlyCredits - 1;
+    else dealer.purchased_boost_credits = purchasedCredits - 1;
+    dealer.boost_credits = (dealer.monthly_boost_credits || 0) + (dealer.purchased_boost_credits || 0);
+  }
   listing.is_featured = true;
   const boostEnd = new Date(now.getTime() + 24 * 3600 * 1000).toISOString();
   listing.featured_until = boostEnd;
@@ -407,6 +417,8 @@ export async function boostListing(
   return {
     success: true,
     remainingBoosts: dealer.boost_credits || 0,
+    monthlyBoostCredits: dealer.monthly_boost_credits || 0,
+    purchasedBoostCredits: dealer.purchased_boost_credits || 0,
     featured_until: boostEnd,
   };
 }

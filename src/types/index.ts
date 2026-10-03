@@ -225,7 +225,7 @@ export interface Payment {
   external_payment_id?: string;
   idempotency_key?: string;
   corporate_profile_id?: string | null;
-  entitlement_type?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' | 'LISTING_BOOST';
+  entitlement_type?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' | 'BOOST_CREDIT';
   purpose?: 'LISTING_PUBLICATION' | 'LISTING_BOOST' | 'CORPORATE_SUBSCRIPTION';
   target_listing_id?: string | null;
   package_code?: string | null;
@@ -412,6 +412,8 @@ export interface DealerProfile {
   current_period_start?: string | null;
   current_period_end?: string | null;
   boost_credits?: number;
+  monthly_boost_credits?: number;
+  purchased_boost_credits?: number;
   social_media?: CorporateSocialMedia[] | CorporateSocialMedia | { [key: string]: any } | null;
   follower_count?: number;
   is_following?: boolean;

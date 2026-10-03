@@ -3,7 +3,7 @@ import { RealFleecaPaymentProvider } from '@/lib/integrations/fleeca/real-provid
 
 export type SafePaymentState = 'PENDING' | 'SUCCESS' | 'FAILED' | 'UNVERIFIED';
 
-export async function verifyAndFulfillPayment(payment: any): Promise<{ state: SafePaymentState; featuredUntil?: string }> {
+export async function verifyAndFulfillPayment(payment: any): Promise<{ state: SafePaymentState }> {
   if (payment.status === 'SUCCESS' && payment.entitlement_applied_at) return { state: 'SUCCESS' };
   if (payment.status === 'FAILED') return { state: 'FAILED' };
   if (!payment.external_payment_id) return { state: 'UNVERIFIED' };
@@ -22,7 +22,7 @@ export async function verifyAndFulfillPayment(payment: any): Promise<{ state: Sa
   if (payment.purpose === 'LISTING_BOOST') {
     const completion = await repo.completeBoostPayment(payment.order_id);
     if (!completion.success) return { state: 'UNVERIFIED' };
-    return { state: 'SUCCESS', featuredUntil: completion.featured_until };
+    return { state: 'SUCCESS' };
   }
   const completion = await repo.completePayment(payment.order_id, payment.external_payment_id);
   return { state: completion.success ? 'SUCCESS' : 'UNVERIFIED' };

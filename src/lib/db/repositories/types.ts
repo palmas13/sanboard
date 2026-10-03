@@ -185,7 +185,7 @@ export interface IDealerRepository {
   reviewApplication?(applicationId: string, status: 'APPROVED' | 'REJECTED', rejectionReason?: string, reviewerAccountId?: string): Promise<{ success: boolean; error?: string }>;
   activateSubscription?(dealerId: string): Promise<{ success: boolean; dealer?: CorporateProfile; error?: string }>;
   manuallyActivateSubscription?(dealerId: string, adminProfileId: string): Promise<{ success: boolean; dealer?: CorporateProfile; previousStatus?: string; activatedAt?: string; error?: string }>;
-  boostListing?(actorProfileId: string, listingId: string, now?: Date, options?: ListingBoostOptions): Promise<{ success: boolean; error?: string; code?: string; remainingBoosts?: number; featured_until?: string }>;
+  boostListing?(actorProfileId: string, listingId: string, now?: Date, options?: ListingBoostOptions): Promise<{ success: boolean; error?: string; code?: string; remainingBoosts?: number; monthlyBoostCredits?: number; purchasedBoostCredits?: number; featured_until?: string }>;
   toggleFollow?(followerProfileId: string, corporateProfileId: string): Promise<{ isFollowing: boolean; count: number; followerCount?: number }>;
   setFollow?(followerProfileId: string, corporateProfileId: string, shouldFollow: boolean): Promise<{ isFollowing: boolean; count: number; followerCount?: number }>;
   getFollowers?(corporateProfileId: string): Promise<CharacterProfile[]>;
@@ -198,11 +198,11 @@ export interface IDealerRepository {
 
 export interface IPaymentRepository {
   getUserCredits(profileId: string): Promise<{ available: number; total: number; credits: any[] }>;
-  createPaymentOrder(profileId: string, packageIdOrCode: string, options?: { idempotencyKey?: string; corporateProfileId?: string | null; purpose?: import('@/lib/payments/pricing').PaymentPurpose; targetListingId?: string | null }): Promise<{ orderId: string; amount: number; packageName?: string; entitlementType?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' | 'LISTING_BOOST' }>;
+  createPaymentOrder(profileId: string, packageIdOrCode: string, options?: { idempotencyKey?: string; corporateProfileId?: string | null; purpose?: import('@/lib/payments/pricing').PaymentPurpose; targetListingId?: string | null }): Promise<{ orderId: string; amount: number; packageName?: string; entitlementType?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' | 'BOOST_CREDIT' }>;
   attachProviderPayment(orderId: string, providerPaymentId: string): Promise<void>;
   failPayment(orderId: string, externalPaymentId: string): Promise<{ success: boolean; error?: string }>;
   completePayment(orderId: string, externalPaymentId?: string): Promise<{ success: boolean; credit?: any; error?: string }>;
-  completeBoostPayment(orderId: string): Promise<{ success: boolean; error?: string; featured_until?: string }>;
+  completeBoostPayment(orderId: string): Promise<{ success: boolean; error?: string; purchasedBoostCredits?: number }>;
   getPaymentOrder(orderId: string): Promise<any | null>;
   getPaymentByExternalPaymentId(externalPaymentId: string): Promise<any | null>;
   getUserPayments(profileId: string): Promise<any[]>;

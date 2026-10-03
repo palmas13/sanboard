@@ -1,7 +1,7 @@
 import { db } from './store';
 import { ListingCredit, Payment } from '@/types';
 import { getPaymentRepository } from './repositories';
-import { getPaymentPrice, type PaymentPurpose } from '@/lib/payments/pricing';
+import { getPackagePrice, isPaymentPackageCode, type PaymentPurpose } from '@/lib/payments/pricing';
 import { addCalendarMonth } from '@/lib/subscriptions/calendar-month';
 
 export { addCalendarMonth } from '@/lib/subscriptions/calendar-month';
@@ -35,6 +35,9 @@ export async function createCheckoutOrder(
   if (!pkg) {
     return { orderId: '', amount: 0, packageName: '', error: 'Geçersiz veya pasif ilan paketi.' };
   }
+  if (!isPaymentPackageCode(pkg.code)) {
+    return { orderId: '', amount: 0, packageName: '', error: 'Desteklenmeyen ödeme paketi.' };
+  }
   if (
     pkg.code === 'CORPORATE_SUBSCRIPTION_30_DAY'
     && (pkg.seller_type !== 'CORPORATE' || pkg.duration_days !== 30 || !options.corporateProfileId)
@@ -59,8 +62,12 @@ export async function createCheckoutOrder(
   }
 
   const orderId = `ORD-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-  const purpose = options.purpose || (packageCode === 'CORPORATE_SUBSCRIPTION_30_DAY' ? 'CORPORATE_SUBSCRIPTION' : 'LISTING_PUBLICATION');
-  const entitlementType = purpose === 'CORPORATE_SUBSCRIPTION' ? 'CORPORATE_SUBSCRIPTION' : purpose === 'LISTING_BOOST' ? 'LISTING_BOOST' : 'LISTING_CREDIT';
+  const canonicalPurpose: PaymentPurpose = packageCode === 'CORPORATE_SUBSCRIPTION_30_DAY'
+    ? 'CORPORATE_SUBSCRIPTION'
+    : packageCode === 'LISTING_BOOST_24_HOUR' ? 'LISTING_BOOST' : 'LISTING_PUBLICATION';
+  const purpose = options.purpose || canonicalPurpose;
+  if (purpose !== canonicalPurpose) return { orderId: '', amount: 0, packageName: '', error: 'Ödeme amacı paketle eşleşmiyor.' };
+  const entitlementType = purpose === 'CORPORATE_SUBSCRIPTION' ? 'CORPORATE_SUBSCRIPTION' : purpose === 'LISTING_BOOST' ? 'BOOST_CREDIT' : 'LISTING_CREDIT';
 
   // Create payment record in DB
   const payment: Payment = {
@@ -69,7 +76,7 @@ export async function createCheckoutOrder(
     profile_id: profileId,
     package_id: pkg.id,
     provider: 'FLEECA',
-    amount: getPaymentPrice(purpose),
+    amount: getPackagePrice(pkg.code),
     status: 'PENDING',
     idempotency_key: options.idempotencyKey,
     corporate_profile_id: options.corporateProfileId || null,
@@ -152,14 +159,15 @@ export async function completePaymentOrder(
     }
     const wasActiveAndUnexpired = dealer.subscription_status === 'ACTIVE' && currentEnd > now;
     const legacyPeriodMissing = !periodStart && !periodEnd && wasActiveAndUnexpired;
-    const startsNewPeriod = !wasActiveAndUnexpired || Boolean(periodEnd && periodEnd <= now);
     dealer.subscription_status = 'ACTIVE';
     const nextSubscriptionEnd = addCalendarMonth(base);
     dealer.subscription_expires_at = nextSubscriptionEnd.toISOString();
-    if (startsNewPeriod) {
+    dealer.monthly_boost_credits = 3;
+    dealer.purchased_boost_credits = dealer.purchased_boost_credits || 0;
+    dealer.boost_credits = dealer.monthly_boost_credits + dealer.purchased_boost_credits;
+    if (!wasActiveAndUnexpired || Boolean(periodEnd && periodEnd <= now)) {
       dealer.current_period_start = now.toISOString();
       dealer.current_period_end = new Date(Math.min(addCalendarMonth(now).getTime(), nextSubscriptionEnd.getTime())).toISOString();
-      dealer.boost_credits = 3;
     } else if (legacyPeriodMissing) {
       dealer.current_period_start = now.toISOString();
       dealer.current_period_end = new Date(Math.min(addCalendarMonth(now).getTime(), currentEnd.getTime())).toISOString();
@@ -174,6 +182,21 @@ export async function completePaymentOrder(
     payment.paid_at = undefined;
     payment.external_payment_id = undefined;
     return { success: false, error: 'Kurumsal üyelik ödeme paketi doğrulanamadı.' };
+  }
+
+  if (payment.entitlement_type === 'BOOST_CREDIT' && pkg?.code === 'LISTING_BOOST_24_HOUR') {
+    const dealer = db.dealers.find((item) => item.id === payment.corporate_profile_id && (item.owner_profile_id || item.profile_id) === payment.profile_id);
+    if (!dealer || dealer.status !== 'APPROVED' || dealer.moderation_status !== 'ACTIVE') {
+      payment.status = 'PENDING';
+      payment.paid_at = undefined;
+      payment.external_payment_id = undefined;
+      return { success: false, error: 'Boost kredisi kurumsal mağazaya tanımlanamadı.' };
+    }
+    dealer.purchased_boost_credits = (dealer.purchased_boost_credits || 0) + 1;
+    dealer.boost_credits = (dealer.monthly_boost_credits || 0) + dealer.purchased_boost_credits;
+    dealer.updated_at = completedAt.toISOString();
+    payment.entitlement_applied_at = completedAt.toISOString();
+    return { success: true };
   }
 
   // Issue 1 available listing credit to profile

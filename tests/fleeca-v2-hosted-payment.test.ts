@@ -4,10 +4,10 @@ import { getPaymentPrice } from '@/lib/payments/pricing';
 import { parseFleecaCreateResponse, parseFleecaPaymentDetails } from '@/lib/integrations/fleeca/real-provider';
 
 describe('Fleeca V2 hosted payment contract', () => {
-  test('all temporary prices are one whole dollar', () => {
-    assert.equal(getPaymentPrice('LISTING_PUBLICATION'), 1);
-    assert.equal(getPaymentPrice('LISTING_BOOST'), 1);
-    assert.equal(getPaymentPrice('CORPORATE_SUBSCRIPTION'), 1);
+  test('uses canonical product prices', () => {
+    assert.equal(getPaymentPrice('LISTING_PUBLICATION'), 1500);
+    assert.equal(getPaymentPrice('LISTING_BOOST'), 1000);
+    assert.equal(getPaymentPrice('CORPORATE_SUBSCRIPTION'), 5500);
   });
 
   test('strictly accepts the authoritative HTTP 201 create response', () => {

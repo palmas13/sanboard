@@ -45,17 +45,19 @@ export class MemoryPaymentRepository implements IPaymentRepository {
 
   async completeBoostPayment(orderId: string) {
     const payment = db.payments.find((item) => item.order_id === orderId);
-    if (!payment || payment.purpose !== 'LISTING_BOOST' || !payment.target_listing_id) return { success: false, error: 'Boost ödemesi bulunamadı.' };
+    if (!payment || payment.purpose !== 'LISTING_BOOST') return { success: false, error: 'Boost kredisi ödemesi bulunamadı.' };
     if (payment.entitlement_applied_at) {
-      const listing = db.listings.find((item) => item.id === payment.target_listing_id);
-      return { success: true, featured_until: listing?.featured_until || undefined };
+      const dealer = db.dealers.find((item) => item.id === payment.corporate_profile_id && (item.owner_profile_id || item.profile_id) === payment.profile_id);
+      return { success: true, purchasedBoostCredits: dealer?.purchased_boost_credits || 0 };
     }
-    const { boostListing } = await import('../../dealers');
-    const result = await boostListing(payment.profile_id, payment.target_listing_id);
-    if (!result.success) return { success: false, error: result.error };
+    const dealer = db.dealers.find((item) => item.id === payment.corporate_profile_id && (item.owner_profile_id || item.profile_id) === payment.profile_id);
+    if (!dealer || dealer.status !== 'APPROVED' || dealer.moderation_status !== 'ACTIVE') return { success: false, error: 'Boost kredisi kurumsal mağazaya tanımlanamadı.' };
     const now = new Date().toISOString();
+    dealer.purchased_boost_credits = (dealer.purchased_boost_credits || 0) + 1;
+    dealer.boost_credits = (dealer.monthly_boost_credits || 0) + dealer.purchased_boost_credits;
+    dealer.updated_at = now;
     payment.status = 'SUCCESS'; payment.paid_at = now; payment.entitlement_applied_at = now; payment.processed_at = now;
-    return { success: true, featured_until: result.featured_until };
+    return { success: true, purchasedBoostCredits: dealer.purchased_boost_credits };
   }
 
   async getUserPayments(profileId: string) {

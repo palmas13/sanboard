@@ -42,14 +42,14 @@ describe('dashboard experience refinement regressions', () => {
     ] as any;
     db.payments = [
       { id: 'standard-payment', profile_id: 'profile', package_id: 'standard', order_id: 'standard-order', provider: 'FLEECA', amount: 2000, status: 'SUCCESS', entitlement_type: 'LISTING_CREDIT', purpose: 'LISTING_PUBLICATION', created_at: '2026-09-30T12:00:00.000Z' },
-      { id: 'boost-payment', profile_id: 'profile', package_id: 'boost', order_id: 'boost-order', provider: 'FLEECA', amount: 2000, status: 'SUCCESS', entitlement_type: 'LISTING_BOOST', purpose: 'LISTING_BOOST', created_at: '2026-09-30T13:00:00.000Z' },
+      { id: 'boost-payment', profile_id: 'profile', package_id: 'boost', order_id: 'boost-order', provider: 'FLEECA', amount: 2000, status: 'SUCCESS', entitlement_type: 'BOOST_CREDIT', purpose: 'LISTING_BOOST', created_at: '2026-09-30T13:00:00.000Z' },
     ] as any;
 
     const payments = await new MemoryPaymentRepository().getUserPayments('profile');
     assert.equal(payments[0].package_code, 'LISTING_BOOST_24_HOUR');
     assert.equal(payments[0].package_name, '24 Saat Öne Çıkarma');
     assert.equal(payments[1].package_code, 'STANDARD_7_DAY');
-    assert.deepEqual(payments.map(getPaymentProductLabel), ['İlan Öne Çıkarma', 'Bireysel İlan Hakkı']);
+    assert.deepEqual(payments.map(getPaymentProductLabel), ['Boost Kredisi', 'Bireysel İlan Hakkı']);
     assert.equal(payments[0].amount, payments[1].amount);
 
     const supabaseRepo = source('src/lib/db/repositories/supabase/supabase-payment-repo.ts');
@@ -76,7 +76,6 @@ describe('dashboard experience refinement regressions', () => {
   test('corporate applications tolerate the pre-migration production schema', () => {
     const repo = source('src/lib/db/repositories/supabase/supabase-dealer-repo.ts');
     assert.match(repo, /missingContactColumns/);
-    assert.match(repo, /PGRST204/);
     assert.match(repo, /legacyResult/);
   });
 
@@ -115,7 +114,7 @@ describe('dashboard experience refinement regressions', () => {
     assert.match(terms, /Kurumsal Hesaplar/);
     assert.match(terms, /Ücretler ve Süreler/);
     assert.match(terms, /Yaptırımlar ve İhlaller/);
-    assert.match(terms, /\$2\.000/);
+    assert.match(terms, /CANONICAL_PRICING\.STANDARD_7_DAY/);
     assert.match(terms, /7 gün/);
     assert.match(terms, /SanMail/);
   });

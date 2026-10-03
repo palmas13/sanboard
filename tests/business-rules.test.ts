@@ -116,7 +116,7 @@ describe('Sanboard Business Rules & Validation Tests', () => {
 
   test('Client cannot manipulate package price on server', async () => {
     const order = await createCheckoutOrder('char-mavis-01', 'STANDARD_7_DAY');
-    assert.strictEqual(order.amount, 1);
+    assert.strictEqual(order.amount, 1500);
   });
 
   test('Payment completion issues 1 available credit', async () => {

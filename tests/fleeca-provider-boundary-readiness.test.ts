@@ -36,7 +36,7 @@ describe('SANBOARD Fleeca provider boundary readiness', () => {
       { id: alex, user_id: accountId, full_name: 'Alex Stone', avatar_url: '', created_at: '', updated_at: '' },
       { id: jordan, user_id: accountId, full_name: 'Jordan Reed', avatar_url: '', created_at: '', updated_at: '' },
     ] as any;
-    db.packages = [{ id: 'package-A', code: 'STANDARD_7_DAY', name: 'Standard', price: 2000, duration_days: 7, active: true, seller_type: 'INDIVIDUAL' }] as any;
+    db.packages = [{ id: 'package-A', code: 'STANDARD_7_DAY', name: 'Standard', price: 1500, duration_days: 7, active: true, seller_type: 'INDIVIDUAL' }] as any;
     db.payments = [];
     db.credits = [];
     db.dealers = [];
@@ -67,7 +67,7 @@ describe('SANBOARD Fleeca provider boundary readiness', () => {
     payment_id: paymentId,
     payment_url: `https://fleeca.example/payments/${paymentId}`,
     mode: 'live',
-    amount: 1,
+    amount: 1500,
     payer_routing: null,
     payer_name: null,
     status,
@@ -154,7 +154,7 @@ describe('SANBOARD Fleeca provider boundary readiness', () => {
       const purposes = [
         { purpose: 'LISTING_PUBLICATION', entitlement_type: 'LISTING_CREDIT' },
         { purpose: 'CORPORATE_SUBSCRIPTION', entitlement_type: 'CORPORATE_SUBSCRIPTION', corporate_profile_id: 'dealer-A' },
-        { purpose: 'LISTING_BOOST', entitlement_type: 'LISTING_BOOST', target_listing_id: 'listing-A' },
+        { purpose: 'LISTING_BOOST', entitlement_type: 'BOOST_CREDIT', corporate_profile_id: 'dealer-A' },
       ] as const;
 
       for (const [index, purpose] of purposes.entries()) {
@@ -313,7 +313,7 @@ describe('SANBOARD Fleeca provider boundary readiness', () => {
     RealFleecaPaymentProvider.prototype.getPaymentDetails = async () => ({
       success: true as const,
       data: {
-        payment_id: paymentId, merchant_id: 1, amount: 1, description: 'Sanboard payment', status: 'awaiting_payment',
+          payment_id: paymentId, merchant_id: 1, amount: 1500, description: 'Sanboard payment', status: 'awaiting_payment',
         mode: 'live' as const, payer_routing: null, payer_name: null, paid_at: null,
         created_at: '2026-09-29T20:00:00.000Z', updated_at: '2026-09-29T20:00:00.000Z',
       },
@@ -346,7 +346,7 @@ describe('SANBOARD Fleeca provider boundary readiness', () => {
     const order = await createCheckoutOrder(alex, 'STANDARD_7_DAY', { idempotencyKey: 'price-snapshot' });
     db.packages[0].price = 9000;
     const payment = db.payments.find((item) => item.order_id === order.orderId)!;
-    assert.equal(payment.amount, 1);
+    assert.equal(payment.amount, 1500);
     const expected = { orderReference: payment.order_id, payerReference: payment.profile_id, amount: payment.amount, currency: 'GTA_DOLLAR', purposeReference: 'STANDARD_7_DAY' };
     const verified: VerifiedExternalPayment = { externalTransactionId: 'txn-B', status: 'VERIFIED', occurredAt: '2026-09-26T12:00:00.000Z', ...expected };
     assert.equal(validateExternalPayment(verified, expected).verified, true);

@@ -784,7 +784,7 @@ describe('Sanboard – Corporate Listing Seller Context & Admin Moderation', () 
     });
 
     // 1. Corporate dashboard listing preview: 14 days
-    it('1. Corporate listing preview canonical duration is 14 days ($1.750 model)', () => {
+    it('1. Corporate listing preview canonical duration is 14 days ($1.250 model)', () => {
       const isCorporate = true;
       const durationDays = isCorporate ? 14 : 7;
       const previewText = isCorporate ? '14 Gün Aktif' : '7 Gün Aktif';

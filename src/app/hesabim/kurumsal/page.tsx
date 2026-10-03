@@ -44,6 +44,7 @@ import { isListingActivelyFeatured } from '@/lib/listings/featured';
 import { normalizeSocialMedia } from '@/lib/dealers/social';
 import { readJsonResponse } from '@/lib/http/json-response';
 import { canRenewCorporateSubscription, CORPORATE_PERIOD_BOOST_ALLOWANCE } from '@/lib/subscriptions/calendar-month';
+import { CANONICAL_PRICING } from '@/lib/payments/pricing';
 type ListingTypeFilter = 'all' | 'vehicle' | 'property';
 type ListingStatusFilter = 'all' | 'ACTIVE' | 'EXPIRED' | 'SOLD';
 
@@ -175,7 +176,7 @@ export default function HesabimKurumsalPage() {
         return;
       }
 
-      // 3. Initiate corporate package checkout ($1.750, 14 days)
+      // 3. Initiate corporate package checkout ($1.250, 14 days)
       const checkoutRes = await fetch('/api/checkout', {
         method: 'POST',
         headers: {
@@ -923,13 +924,14 @@ export default function HesabimKurumsalPage() {
 
               <div className="surface-card rounded-xl border border-[var(--border-app)] p-4 transition-colors hover:border-[#FF8A1F]/25">
                 <div className="flex items-center justify-between text-[var(--text-muted)]">
-                  <span className="text-xs font-semibold">Kalan Öne Çıkarma</span>
+                  <span className="text-xs font-semibold">Boost Kredileri</span>
                   <Sparkles className="w-4 h-4 text-amber-400" />
                 </div>
-                <p className="mt-2 text-3xl font-black tabular-nums text-[var(--text-main)]">
-                  {dealer.boost_credits ?? 0}<span className="ml-1 text-base font-bold text-[var(--text-dim)]">/ {CORPORATE_PERIOD_BOOST_ALLOWANCE}</span>
-                </p>
-                <p className="mt-1 text-[11px] text-[var(--text-dim)]">Mevcut üyelik döneminde</p>
+                <div className="mt-2 space-y-1 text-[11px] text-[var(--text-dim)]">
+                  <p><span className="font-semibold text-[var(--text-main)]">Aylık Ücretsiz:</span> {dealer.boost_credits ?? 0} / {CORPORATE_PERIOD_BOOST_ALLOWANCE}</p>
+                  <p><span className="font-semibold text-[var(--text-main)]">Satın Alınan:</span> {dealer.purchased_boost_credits ?? 0}</p>
+                  <p className="pt-1 text-sm font-black text-[#FF9E45]">Toplam Kullanılabilir: {(dealer.boost_credits ?? 0) + (dealer.purchased_boost_credits ?? 0)}</p>
+                </div>
               </div>
 
               <div className="surface-card rounded-xl border border-[var(--border-app)] p-4 transition-colors hover:border-[#FF8A1F]/25">
@@ -1144,7 +1146,7 @@ export default function HesabimKurumsalPage() {
               <ul className="mt-4 space-y-3 text-xs leading-5 text-[var(--text-muted)] sm:text-sm">
               <li className="flex items-start gap-3">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                <span><strong className="text-[var(--text-main)]">İndirimli ilan:</strong> İlan başına $1.750.</span>
+                <span><strong className="text-[var(--text-main)]">İndirimli ilan:</strong> İlan başına {formatCurrency(CANONICAL_PRICING.CORPORATE_14_DAY)}.</span>
               </li>
               <li className="flex items-start gap-3">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
@@ -1152,7 +1154,7 @@ export default function HesabimKurumsalPage() {
               </li>
               <li className="flex items-start gap-3">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                <span><strong className="text-[var(--text-main)]">3 öne çıkarma hakkı:</strong> Her 30 günlük dönemde 24 saatlik boost.</span>
+                <span><strong className="text-[var(--text-main)]">Aylık 3 ücretsiz Boost Kredisi:</strong> Her kullanım ilanı 24 saat öne çıkarır.</span>
               </li>
               <li className="flex items-start gap-3">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />

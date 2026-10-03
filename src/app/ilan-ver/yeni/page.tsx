@@ -21,6 +21,7 @@ import {
 import { PhotoUploader, UploadedImage } from '@/components/forms/PhotoUploader';
 import { CustomSelect } from '@/components/ui/CustomSelect';
 import { formatCurrency } from '@/lib/utils/format';
+import { CANONICAL_PRICING } from '@/lib/payments/pricing';
 import { getVehicleBrandsByCategory, getVehicleModels, isMotorcycleCategory, isValidVehicleSelection, reconcileVehicleSelection, VEHICLE_CATEGORIES, VehicleCategory } from '@/lib/constants/vehicleCategories';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { getListingUrl } from '@/lib/urls';
@@ -1317,7 +1318,7 @@ function YeniIlanOlusturContent() {
             </p>
             {isCorporate && (
               <p className="text-[11px] text-[var(--text-muted)]">
-                Model: Kurumsal İlan ($1.750 / 14 Gün Yayın) • Mağaza: {dealer?.company_name || 'Kurumsal Profil'}
+                Model: Kurumsal İlan ({formatCurrency(CANONICAL_PRICING.CORPORATE_14_DAY)} / 14 Gün Yayın) • Mağaza: {dealer?.company_name || 'Kurumsal Profil'}
               </p>
             )}
           </div>

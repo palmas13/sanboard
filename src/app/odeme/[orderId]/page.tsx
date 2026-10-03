@@ -28,7 +28,7 @@ export default function FleecaCheckoutPage() {
     transactionId?: string;
     error?: string;
   } | null>(null);
-  const [order, setOrder] = useState<{ amount: number; entitlementType: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION'; packageName: string } | null>(null);
+  const [order, setOrder] = useState<{ amount: number; entitlementType: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' | 'BOOST_CREDIT'; packageName: string } | null>(null);
 
   const amount = order?.amount || 0;
   const buyerName = currentProfile?.full_name || 'Sanboard Kullanıcısı';
