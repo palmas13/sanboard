@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPaymentRepository, getDealerRepository } from '@/lib/db/repositories';
+import { getPaymentRepository, getDealerRepository, getUserRepository } from '@/lib/db/repositories';
 import {
   FleecaProviderNotConfiguredError,
   getFleecaPaymentProvider,
@@ -113,10 +113,18 @@ export async function POST(req: NextRequest) {
 
     // Backend determines price from packageCode strictly via payment repository
     const repo = getPaymentRepository();
+    const expectedPayerProfile = chargeProfileId === actor.profileId
+      ? actor.profile
+      : await getUserRepository().getCanonicalProfileById(chargeProfileId);
+    if (!expectedPayerProfile?.external_character_id || !expectedPayerProfile.full_name.trim()) {
+      return NextResponse.json({ error: 'Ödeme karakteri kimliği doğrulanamadı.' }, { status: 409 });
+    }
     const order = await repo.createPaymentOrder(chargeProfileId, requestedPackage, {
       idempotencyKey,
       corporateProfileId,
       purpose,
+      expectedExternalCharacterId: expectedPayerProfile.external_character_id,
+      expectedCharacterName: expectedPayerProfile.full_name,
     });
 
     // Also notify Fleeca provider
@@ -124,7 +132,7 @@ export async function POST(req: NextRequest) {
     const providerOrder = await fleeca.createOrder({
       orderId: order.orderId,
       profileId: chargeProfileId,
-      characterName: 'Kullanıcı',
+      characterName: expectedPayerProfile.full_name,
       packageCode: requestedPackage,
       amount: order.amount,
       currency: 'USD',

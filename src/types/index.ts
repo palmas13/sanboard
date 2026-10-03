@@ -215,6 +215,26 @@ export interface ListingPackage {
 }
 
 export type PaymentStatus = 'SUCCESS' | 'PENDING' | 'FAILED';
+export type PayerIdentityStatus = 'PENDING' | 'VERIFIED' | 'MISMATCH' | 'UNAVAILABLE' | 'FAILED';
+export type PayerIdentityFailureCode =
+  | 'PAYER_NAME_MISMATCH'
+  | 'PAYER_NAME_MISSING'
+  | 'PAYER_ROUTING_MISSING'
+  | 'PAYER_ROUTING_INVALID'
+  | 'PAYER_ROUTING_CONFLICT'
+  | 'PAYER_IDENTITY_UNAVAILABLE'
+  | 'PAYER_VERIFICATION_FAILED';
+
+export interface CharacterFleecaAccount {
+  id: string;
+  profile_id: string;
+  payer_routing: string;
+  verification_status: 'VERIFIED';
+  verified_payment_id: string;
+  verified_at: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface Payment {
   id: string;
@@ -232,6 +252,11 @@ export interface Payment {
   package_name?: string | null;
   entitlement_applied_at?: string | null;
   processed_at?: string | null;
+  expected_external_character_id?: string | null;
+  expected_character_name?: string | null;
+  payer_identity_status?: PayerIdentityStatus | null;
+  payer_identity_failure_code?: PayerIdentityFailureCode | null;
+  payer_identity_verified_at?: string | null;
   amount: number; // 2000
   status: PaymentStatus;
   created_at: string;

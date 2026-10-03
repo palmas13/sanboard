@@ -33,11 +33,12 @@ describe('SANBOARD Fleeca provider boundary readiness', () => {
     process.env.SANBOARD_SESSION_SECRET = 'fleeca-boundary-test-secret-at-least-32-characters';
     db.users = [{ id: accountId, provider: 'GTAWORLD', external_user_id: 'account-A', role: 'USER', status: 'ACTIVE', created_at: '', updated_at: '' }];
     db.profiles = [
-      { id: alex, user_id: accountId, full_name: 'Alex Stone', avatar_url: '', created_at: '', updated_at: '' },
-      { id: jordan, user_id: accountId, full_name: 'Jordan Reed', avatar_url: '', created_at: '', updated_at: '' },
+      { id: alex, user_id: accountId, external_character_id: 'gta-alex', full_name: 'Alex Stone', avatar_url: '', created_at: '', updated_at: '' },
+      { id: jordan, user_id: accountId, external_character_id: 'gta-jordan', full_name: 'Jordan Reed', avatar_url: '', created_at: '', updated_at: '' },
     ] as any;
     db.packages = [{ id: 'package-A', code: 'STANDARD_7_DAY', name: 'Standard', price: 1500, duration_days: 7, active: true, seller_type: 'INDIVIDUAL' }] as any;
     db.payments = [];
+    db.characterFleecaAccounts = [];
     db.credits = [];
     db.dealers = [];
     db.listings = [];

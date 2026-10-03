@@ -4,6 +4,8 @@ import {
   createCheckoutOrder,
   completePaymentOrder,
 } from '../../payments';
+import { normalizeFleecaPayerName, normalizeFleecaRouting } from '@/lib/payments/payer-identity';
+import type { PayerIdentityFailureCode, PayerIdentityStatus } from '@/types';
 
 export class MemoryPaymentRepository implements IPaymentRepository {
   async getUserCredits(profileId: string) {
@@ -12,11 +14,65 @@ export class MemoryPaymentRepository implements IPaymentRepository {
     return { available, total: credits.length, credits };
   }
 
-  async createPaymentOrder(profileId: string, packageId: string, options?: { idempotencyKey?: string; corporateProfileId?: string | null; purpose?: import('@/lib/payments/pricing').PaymentPurpose; targetListingId?: string | null }) {
+  async createPaymentOrder(profileId: string, packageId: string, options?: { idempotencyKey?: string; corporateProfileId?: string | null; purpose?: import('@/lib/payments/pricing').PaymentPurpose; targetListingId?: string | null; expectedExternalCharacterId?: string; expectedCharacterName?: string }) {
     const res = await createCheckoutOrder(profileId, packageId, options);
     if (res.error) throw new Error(res.error);
     const payment = db.payments.find((item) => item.order_id === res.orderId);
     return { orderId: res.orderId, amount: res.amount, packageName: res.packageName, entitlementType: payment?.entitlement_type };
+  }
+
+  async verifyPayerIdentityAndBind(orderId: string, payerName: string | null, payerRouting: string | null): Promise<{ success: boolean; status: PayerIdentityStatus; failureCode?: PayerIdentityFailureCode }> {
+    const payment = db.payments.find((item) => item.order_id === orderId);
+    if (!payment) return { success: false, status: 'FAILED', failureCode: 'PAYER_VERIFICATION_FAILED' };
+    if (!payment.expected_external_character_id && !payment.expected_character_name) {
+      return { success: true, status: 'VERIFIED' };
+    }
+
+    const reject = (status: PayerIdentityStatus, failureCode: PayerIdentityFailureCode) => {
+      payment.payer_identity_status = status;
+      payment.payer_identity_failure_code = failureCode;
+      payment.payer_identity_verified_at = null;
+      return { success: false, status, failureCode };
+    };
+
+    if (!payment.expected_external_character_id || !payment.expected_character_name) {
+      return reject('UNAVAILABLE', 'PAYER_IDENTITY_UNAVAILABLE');
+    }
+    if (!payerName || !payerName.trim()) return reject('UNAVAILABLE', 'PAYER_NAME_MISSING');
+    if (payerRouting === null || payerRouting === undefined || !String(payerRouting).trim()) {
+      return reject('UNAVAILABLE', 'PAYER_ROUTING_MISSING');
+    }
+    const routing = normalizeFleecaRouting(payerRouting);
+    if (!routing) return reject('FAILED', 'PAYER_ROUTING_INVALID');
+    if (normalizeFleecaPayerName(payerName) !== normalizeFleecaPayerName(payment.expected_character_name)) {
+      return reject('MISMATCH', 'PAYER_NAME_MISMATCH');
+    }
+    const conflict = db.characterFleecaAccounts.find(
+      (account) => account.payer_routing === routing && account.verification_status === 'VERIFIED' && account.profile_id !== payment.profile_id
+    );
+    if (conflict) return reject('MISMATCH', 'PAYER_ROUTING_CONFLICT');
+
+    const now = new Date().toISOString();
+    let mapping = db.characterFleecaAccounts.find(
+      (account) => account.payer_routing === routing && account.verification_status === 'VERIFIED'
+    );
+    if (!mapping) {
+      mapping = {
+        id: `fleeca-${crypto.randomUUID()}`,
+        profile_id: payment.profile_id,
+        payer_routing: routing,
+        verification_status: 'VERIFIED',
+        verified_payment_id: payment.id,
+        verified_at: now,
+        created_at: now,
+        updated_at: now,
+      };
+      db.characterFleecaAccounts.push(mapping);
+    }
+    payment.payer_identity_status = 'VERIFIED';
+    payment.payer_identity_failure_code = null;
+    payment.payer_identity_verified_at = now;
+    return { success: true, status: 'VERIFIED' };
   }
 
   async attachProviderPayment(orderId: string, providerPaymentId: string) {

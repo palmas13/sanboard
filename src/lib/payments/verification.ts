@@ -1,9 +1,11 @@
 import { getDealerRepository, getPaymentRepository } from '@/lib/db/repositories';
 import { RealFleecaPaymentProvider } from '@/lib/integrations/fleeca/real-provider';
+import { normalizeFleecaRouting } from '@/lib/payments/payer-identity';
+import type { PayerIdentityFailureCode } from '@/types';
 
 export type SafePaymentState = 'PENDING' | 'SUCCESS' | 'FAILED' | 'UNVERIFIED';
 
-export async function verifyAndFulfillPayment(payment: any): Promise<{ state: SafePaymentState }> {
+export async function verifyAndFulfillPayment(payment: any): Promise<{ state: SafePaymentState; failureCode?: PayerIdentityFailureCode }> {
   if (payment.status === 'SUCCESS' && payment.entitlement_applied_at) return { state: 'SUCCESS' };
   if (payment.status === 'FAILED') return { state: 'FAILED' };
   if (!payment.external_payment_id) return { state: 'UNVERIFIED' };
@@ -19,6 +21,13 @@ export async function verifyAndFulfillPayment(payment: any): Promise<{ state: Sa
   if (details.data.status !== 'payment_successful' || !details.data.paid_at) return { state: 'UNVERIFIED' };
 
   const repo = getPaymentRepository();
+  const routing = normalizeFleecaRouting(details.data.payer_routing);
+  const identity = await repo.verifyPayerIdentityAndBind(
+    payment.order_id,
+    details.data.payer_name,
+    routing
+  );
+  if (!identity.success) return { state: 'UNVERIFIED', failureCode: identity.failureCode };
   if (payment.purpose === 'LISTING_BOOST') {
     const completion = await repo.completeBoostPayment(payment.order_id);
     if (!completion.success) return { state: 'UNVERIFIED' };

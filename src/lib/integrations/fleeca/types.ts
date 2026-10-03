@@ -31,7 +31,7 @@ export interface FleecaPaymentDetailsResponse {
     description: string;
     status: string;
     mode: 'sandbox' | 'live';
-    payer_routing: unknown | null;
+    payer_routing: string | number | null;
     payer_name: string | null;
     paid_at: string | null;
     created_at: string;

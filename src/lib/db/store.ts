@@ -1,5 +1,6 @@
 import {
   CharacterProfile,
+  CharacterFleecaAccount,
   CorporateApplication,
   CorporateFollower,
   DealerProfile,
@@ -201,6 +202,8 @@ class SanboardDatabase {
       paid_at: '2026-09-21T09:31:00Z',
     },
   ];
+
+  characterFleecaAccounts: CharacterFleecaAccount[] = [];
 
   credits: ListingCredit[] = [
     {

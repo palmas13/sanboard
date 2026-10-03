@@ -198,7 +198,8 @@ export interface IDealerRepository {
 
 export interface IPaymentRepository {
   getUserCredits(profileId: string): Promise<{ available: number; total: number; credits: any[] }>;
-  createPaymentOrder(profileId: string, packageIdOrCode: string, options?: { idempotencyKey?: string; corporateProfileId?: string | null; purpose?: import('@/lib/payments/pricing').PaymentPurpose; targetListingId?: string | null }): Promise<{ orderId: string; amount: number; packageName?: string; entitlementType?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' | 'BOOST_CREDIT' }>;
+  createPaymentOrder(profileId: string, packageIdOrCode: string, options?: { idempotencyKey?: string; corporateProfileId?: string | null; purpose?: import('@/lib/payments/pricing').PaymentPurpose; targetListingId?: string | null; expectedExternalCharacterId?: string; expectedCharacterName?: string }): Promise<{ orderId: string; amount: number; packageName?: string; entitlementType?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' | 'BOOST_CREDIT' }>;
+  verifyPayerIdentityAndBind(orderId: string, payerName: string | null, payerRouting: string | null): Promise<{ success: boolean; status: import('@/types').PayerIdentityStatus; failureCode?: import('@/types').PayerIdentityFailureCode }>;
   attachProviderPayment(orderId: string, providerPaymentId: string): Promise<void>;
   failPayment(orderId: string, externalPaymentId: string): Promise<{ success: boolean; error?: string }>;
   completePayment(orderId: string, externalPaymentId?: string): Promise<{ success: boolean; credit?: any; error?: string }>;

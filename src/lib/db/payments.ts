@@ -13,7 +13,7 @@ export { addCalendarMonth } from '@/lib/subscriptions/calendar-month';
 export async function createCheckoutOrder(
   profileId: string,
   packageCode = 'STANDARD_7_DAY',
-  options: { idempotencyKey?: string; corporateProfileId?: string | null; purpose?: PaymentPurpose; targetListingId?: string | null } = {}
+  options: { idempotencyKey?: string; corporateProfileId?: string | null; purpose?: PaymentPurpose; targetListingId?: string | null; expectedExternalCharacterId?: string; expectedCharacterName?: string } = {}
 ): Promise<{ orderId: string; amount: number; packageName: string; error?: string }> {
   if (process.env.DATA_STORE === 'supabase') {
     const repo = getPaymentRepository();
@@ -83,6 +83,9 @@ export async function createCheckoutOrder(
     entitlement_type: entitlementType,
     purpose,
     target_listing_id: options.targetListingId || null,
+    expected_external_character_id: options.expectedExternalCharacterId || null,
+    expected_character_name: options.expectedCharacterName || null,
+    payer_identity_status: options.expectedExternalCharacterId && options.expectedCharacterName ? 'PENDING' : null,
     created_at: new Date().toISOString(),
   };
   db.payments.push(payment);

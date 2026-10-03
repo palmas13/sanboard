@@ -47,11 +47,16 @@ export async function POST(req: NextRequest) {
 
       const dealer = await dealerRepo.getDealerByProfileId(actor.profileId);
       if (!dealer) return NextResponse.json({ error: 'Kurumsal mağaza bulunamadı.' }, { status: 404 });
+      if (!actor.profile.external_character_id || !actor.profile.full_name.trim()) {
+        return NextResponse.json({ error: 'Ödeme karakteri kimliği doğrulanamadı.' }, { status: 409 });
+      }
       const paymentRepo = getPaymentRepository();
       const order = await paymentRepo.createPaymentOrder(actor.profileId, 'LISTING_BOOST_24_HOUR', {
         idempotencyKey: req.headers.get('idempotency-key') || `boost-credit:${dealer.id}:${crypto.randomUUID()}`,
         corporateProfileId: dealer.id,
         purpose: 'LISTING_BOOST',
+        expectedExternalCharacterId: actor.profile.external_character_id,
+        expectedCharacterName: actor.profile.full_name,
       });
       const providerOrder = await getFleecaPaymentProvider().createOrder({
         orderId: order.orderId, profileId: actor.profileId, characterName: actor.profile.full_name,

@@ -28,7 +28,7 @@ const detailsSchema = z.object({
   data: z.object({
     payment_id: z.uuid(), merchant_id: z.number().int(), amount: z.number().int().positive(),
     description: z.string(), status: z.string(), mode: z.enum(['sandbox', 'live']),
-    payer_routing: z.unknown().nullable(), payer_name: z.string().nullable(), paid_at: z.string().nullable(),
+    payer_routing: z.union([z.string(), z.number().int().nonnegative()]).nullable(), payer_name: z.string().nullable(), paid_at: z.string().nullable(),
     created_at: z.string(), updated_at: z.string(),
   }).strict(),
 }).strict();

@@ -3,6 +3,7 @@ import { getSupabaseClient, getSupabaseAdminClient } from '../../supabase-client
 
 import { resolveProfileId, isUuid } from '../../id-mapper';
 import { getPackagePrice, isPaymentPackageCode, type PaymentPurpose } from '@/lib/payments/pricing';
+import type { PayerIdentityFailureCode, PayerIdentityStatus } from '@/types';
 
 export class SupabasePaymentRepository implements IPaymentRepository {
   private getClient() {
@@ -46,7 +47,7 @@ export class SupabasePaymentRepository implements IPaymentRepository {
   async createPaymentOrder(
     profileId: string,
     packageIdOrCode: string,
-    options: { idempotencyKey?: string; corporateProfileId?: string | null; purpose?: PaymentPurpose; targetListingId?: string | null } = {}
+    options: { idempotencyKey?: string; corporateProfileId?: string | null; purpose?: PaymentPurpose; targetListingId?: string | null; expectedExternalCharacterId?: string; expectedCharacterName?: string } = {}
   ): Promise<{ orderId: string; amount: number; packageName?: string; entitlementType?: 'LISTING_CREDIT' | 'CORPORATE_SUBSCRIPTION' | 'BOOST_CREDIT' }> {
     const client = this.getAdminClient();
 
@@ -98,7 +99,7 @@ export class SupabasePaymentRepository implements IPaymentRepository {
     if (options.idempotencyKey) {
       const { data: existing, error: existingError } = await client
         .from('payments')
-        .select('order_id, amount, package_id, corporate_profile_id, entitlement_type, purpose, target_listing_id')
+        .select('order_id, amount, package_id, corporate_profile_id, entitlement_type, purpose, target_listing_id, expected_external_character_id, expected_character_name')
         .eq('profile_id', profileId)
         .eq('idempotency_key', options.idempotencyKey)
         .maybeSingle();
@@ -107,6 +108,11 @@ export class SupabasePaymentRepository implements IPaymentRepository {
         if (existing.package_id !== packageRecord.id || (existing.corporate_profile_id || null) !== (options.corporateProfileId || null)
           || existing.purpose !== purpose || (existing.target_listing_id || null) !== (options.targetListingId || null)) {
           throw new Error('Bu işlem anahtarı farklı bir ödeme için zaten kullanılmış.');
+        }
+        if (options.expectedExternalCharacterId && options.expectedCharacterName
+          && (existing.expected_external_character_id !== options.expectedExternalCharacterId
+            || existing.expected_character_name !== options.expectedCharacterName)) {
+          throw new Error('Bu işlem anahtarı farklı bir ödeme karakteri için zaten kullanılmış.');
         }
         return {
           orderId: existing.order_id,
@@ -131,6 +137,9 @@ export class SupabasePaymentRepository implements IPaymentRepository {
       entitlement_type: entitlementType,
       purpose,
       target_listing_id: options.targetListingId || null,
+      expected_external_character_id: options.expectedExternalCharacterId || null,
+      expected_character_name: options.expectedCharacterName || null,
+      payer_identity_status: options.expectedExternalCharacterId && options.expectedCharacterName ? 'PENDING' : null,
     });
 
     if (error) {
@@ -138,6 +147,22 @@ export class SupabasePaymentRepository implements IPaymentRepository {
     }
 
     return { orderId, amount, packageName: packageRecord.name, entitlementType };
+  }
+
+  async verifyPayerIdentityAndBind(orderId: string, payerName: string | null, payerRouting: string | null): Promise<{ success: boolean; status: PayerIdentityStatus; failureCode?: PayerIdentityFailureCode }> {
+    const client = this.getAdminClient();
+    const { data, error } = await client.rpc('verify_sanboard_fleeca_payer', {
+      p_order_id: orderId,
+      p_payer_name: payerName,
+      p_payer_routing: payerRouting,
+    });
+    if (error) return { success: false, status: 'FAILED', failureCode: 'PAYER_VERIFICATION_FAILED' };
+    const result = Array.isArray(data) ? data[0] : data;
+    return {
+      success: Boolean(result?.success),
+      status: (result?.status || 'FAILED') as PayerIdentityStatus,
+      failureCode: result?.failure_code || undefined,
+    };
   }
 
   async attachProviderPayment(orderId: string, providerPaymentId: string): Promise<void> {
