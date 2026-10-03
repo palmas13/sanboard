@@ -34,6 +34,9 @@ describe('Structured offer system', () => {
   test('create, duplicate, validation and account-level self-offer rules', async () => {
     const result = await create();
     assert.equal(result.success, true);
+    assert.equal(result.thread?.original_listing_id, listingId);
+    assert.equal(result.thread?.listing_id, listingId);
+    assert.equal(result.thread?.listing_snapshot, null);
     assert.equal(result.thread?.turn_profile_id, seller);
     assert.deepEqual(result.thread?.events?.map((event) => event.event_type), ['OFFER_CREATED']);
     assert.equal((await create(65000)).code, 'EXISTING_ACTIVE');
@@ -47,6 +50,19 @@ describe('Structured offer system', () => {
     assert.equal((await create(0)).code, 'INVALID_AMOUNT');
     assert.equal((await create(49999)).code, 'MINIMUM_OFFER_NOT_MET');
     assert.equal((await repo.createOffer({ listingId, amount: 60000, actorProfileId: sibling, actorUserId: 'seller-account' })).code, 'SELF_OFFER');
+  });
+
+  test('forward migration repairs durable offer creation without changing safeguards or snapshot lifecycle', () => {
+    const migration = readFileSync(join(process.cwd(), 'supabase/migrations/20261003000000_fix_offer_thread_original_listing_id.sql'), 'utf8');
+    const historyMigration = readFileSync(join(process.cwd(), 'supabase/migrations/20261002030000_durable_listing_purge_and_media_jobs.sql'), 'utf8');
+    assert.match(migration, /CREATE OR REPLACE FUNCTION public\.create_offer_thread\([\s\S]*p_actor_profile_id UUID,[\s\S]*p_listing_id UUID,[\s\S]*p_amount BIGINT/);
+    assert.match(migration, /INSERT INTO public\.offer_threads\(listing_id,original_listing_id,buyer_profile_id,seller_profile_id,seller_corporate_profile_id,current_amount,turn_profile_id,movement_count,expires_at,buyer_last_read_at\) VALUES\(p_listing_id,p_listing_id,p_actor_profile_id,v_seller,v_listing\.corporate_profile_id,p_amount,v_seller,1,LEAST\(v_now\+INTERVAL '24 hours',v_listing\.expires_at\),v_now\)/);
+    assert.doesNotMatch(migration, /listing_snapshot/);
+    for (const pattern of [/EXISTING_ACTIVE/, /SELF_OFFER/, /INTERVAL '30 minutes'/, /ACTIVE_LIMIT/, /RATE_LIMIT/, /seller_type='CORPORATE'/, /pg_advisory_xact_lock/]) assert.match(migration, pattern);
+    assert.match(historyMigration, /ADD COLUMN original_listing_id uuid,ADD COLUMN listing_snapshot jsonb/);
+    assert.match(historyMigration, /ALTER original_listing_id SET NOT NULL/);
+    assert.doesNotMatch(historyMigration, /CREATE OR REPLACE FUNCTION public\.create_offer_thread/);
+    assert.match(historyMigration, /UPDATE offer_threads SET original_listing_id=coalesce\(original_listing_id,l\.id\),listing_snapshot=coalesce\(listing_snapshot,snap\),listing_id=NULL WHERE listing_id=l\.id/);
   });
 
   test('minimum offer is enforced for individual, corporate, test-like and direct repository requests', async () => {
@@ -150,8 +166,14 @@ describe('Structured offer system', () => {
       { id: 'jane-listing', listing_number: '#JANE', seller_profile_id: jane.id, seller_type: 'INDIVIDUAL', category: 'vehicle', subcategory: 'Otomobil', title: 'Jane listing', description: '', price: 100000, offers_enabled: true, minimum_offer_amount: 50000, location: null, status: 'ACTIVE', published_at: now, expires_at: expires, created_at: now, updated_at: now, images: [] },
     ] as any;
 
-    assert.equal((await repo.createOffer({ listingId: 'mavis-listing', amount: 60000, actorProfileId: john.id, actorUserId: accountB.user.id })).success, true);
-    assert.equal((await repo.createOffer({ listingId: 'john-listing', amount: 60000, actorProfileId: mavis.id, actorUserId: accountA.user.id })).success, true);
+    const oauthOffer = await repo.createOffer({ listingId: 'mavis-listing', amount: 60000, actorProfileId: john.id, actorUserId: accountB.user.id });
+    assert.equal(oauthOffer.success, true);
+    assert.equal(oauthOffer.thread?.original_listing_id, 'mavis-listing');
+    assert.equal(oauthOffer.thread?.listing_snapshot, null);
+    const legacyOffer = await repo.createOffer({ listingId: 'john-listing', amount: 60000, actorProfileId: mavis.id, actorUserId: accountA.user.id });
+    assert.equal(legacyOffer.success, true);
+    assert.equal(legacyOffer.thread?.original_listing_id, 'john-listing');
+    assert.equal(legacyOffer.thread?.listing_snapshot, null);
     assert.equal((await repo.createOffer({ listingId: 'jane-listing', amount: 60000, actorProfileId: john.id, actorUserId: accountB.user.id })).code, 'SELF_OFFER');
     assert.equal((await repo.createOffer({ listingId: 'john-listing', amount: 60000, actorProfileId: jane.id, actorUserId: accountB.user.id })).code, 'SELF_OFFER');
 

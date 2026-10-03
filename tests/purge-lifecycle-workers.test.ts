@@ -115,6 +115,7 @@ describe('purge migration contract', () => {
     assert.doesNotMatch(migration, /DELETE FROM payments/);
     assert.doesNotMatch(migration, /DELETE FROM offer_threads/);
     assert.doesNotMatch(migration, /DELETE FROM reports/);
+    assert.match(migration, /UPDATE offer_threads SET original_listing_id=coalesce\(original_listing_id,l\.id\),listing_snapshot=coalesce\(listing_snapshot,snap\),listing_id=NULL WHERE listing_id=l\.id/);
   });
 
   test('listing image replacement reads the locked database category and enforces canonical limits', () => {
