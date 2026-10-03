@@ -12,6 +12,13 @@ function GirisContent({ testLoginEnabled }: { testLoginEnabled: boolean }) {
   const searchParams = useSearchParams();
   const redirect = normalizeInternalRedirect(searchParams.get('redirect'));
   const errorCode = searchParams.get('error');
+  const errorMessages: Record<string, string> = {
+    oauth_cancelled: 'GTA World ile giriş işlemi iptal edildi.',
+    oauth_invalid_state: 'Giriş doğrulaması geçersiz veya süresi dolmuş. Lütfen tekrar deneyin.',
+    oauth_token_failed: 'GTA World oturumu doğrulanamadı. Lütfen tekrar deneyin.',
+    oauth_user_failed: 'GTA World kullanıcı bilgileri alınamadı.',
+    oauth_sync_failed: 'Hesabınız Sanboard ile eşleştirilirken bir sorun oluştu.',
+  };
 
   const handleLogin = () => {
     // Full document navigation is intentional: this server route starts the external GTA World OAuth flow.
@@ -36,9 +43,7 @@ function GirisContent({ testLoginEnabled }: { testLoginEnabled: boolean }) {
               <AlertCircle className="w-4 h-4 flex-shrink-0" /><span>Giriş Yapılamadı</span>
             </div>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-              {errorCode === 'provider_not_configured'
-                ? 'GTA World bağlantısı henüz yapılandırılmadı.'
-                : 'GTA World ile giriş yapılamadı. Lütfen tekrar deneyin.'}
+              {errorCode === 'provider_not_configured' ? 'GTA World bağlantısı henüz yapılandırılmadı.' : errorMessages[errorCode || ''] || 'GTA World ile giriş yapılamadı. Lütfen tekrar deneyin.'}
             </p>
             <button type="button" onClick={handleLogin} className="mt-1 text-xs font-bold text-[#FF8A1F] hover:underline flex items-center gap-1.5">
               <RefreshCw className="w-3.5 h-3.5" /><span>Tekrar dene</span>

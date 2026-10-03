@@ -1,11 +1,17 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert';
-import { GtaWorldProviderNotConfiguredError, RealGtaWorldAuthProvider } from '../src/lib/integrations/gtaworld/real-provider';
+import { GtaWorldProviderNotConfiguredError, GtaWorldTokenError, GtaWorldUserError, RealGtaWorldAuthProvider } from '../src/lib/integrations/gtaworld/real-provider';
 import { MockGtaWorldAuthProvider } from '../src/lib/integrations/gtaworld/mock-provider';
 import { syncGtaWorldAccountAndCharacters } from '../src/lib/auth/gtaworld-sync';
-import { createSessionToken, verifySessionToken } from '../src/lib/auth/session';
+import { createSessionToken } from '../src/lib/auth/session';
 import { recordAuditEvent, sanitizeAuditMetadata } from '../src/lib/audit';
 import { db } from '../src/lib/db/store';
+import { NextRequest } from 'next/server';
+import { CHARACTER_SELECTION_COOKIE, createCharacterSelectionToken, verifySessionToken } from '../src/lib/auth/session';
+import { GET as listCharacters } from '../src/app/api/user/characters/route';
+import { POST as selectCharacter } from '../src/app/api/auth/session/route';
+import { POST as createProfile } from '../src/app/api/user/profile/route';
+import { syncExternalGameAccount } from '../src/lib/auth/gtaworld-sync';
 
 describe('GTA World OAuth & Authorize URL Generation', () => {
   const origEnv = { ...process.env };
@@ -26,6 +32,59 @@ describe('GTA World OAuth & Authorize URL Generation', () => {
     const provider = new RealGtaWorldAuthProvider();
     await assert.rejects(provider.exchangeCodeForToken('code'), GtaWorldProviderNotConfiguredError);
     await assert.rejects(provider.fetchAccount('token'), GtaWorldProviderNotConfiguredError);
+  });
+
+  it('builds the approved authorize URL with exact callback and state', () => {
+    process.env.GTAWORLD_CLIENT_ID = '102';
+    process.env.GTAWORLD_CLIENT_SECRET = 'not-a-real-secret';
+    process.env.GTAWORLD_REDIRECT_URI = 'https://sanboard.xyz/api/auth/gtaworld/callback';
+    const url = new URL(new RealGtaWorldAuthProvider().getAuthorizeUrl('secure-state'));
+    assert.strictEqual(url.origin + url.pathname, 'https://ucp-tr.gta.world/oauth/authorize');
+    assert.strictEqual(url.searchParams.get('client_id'), '102');
+    assert.strictEqual(url.searchParams.get('redirect_uri'), 'https://sanboard.xyz/api/auth/gtaworld/callback');
+    assert.strictEqual(url.searchParams.get('response_type'), 'code');
+    assert.strictEqual(url.searchParams.get('scope'), '');
+    assert.strictEqual(url.searchParams.get('state'), 'secure-state');
+  });
+
+  it('uses form token exchange and defensively adapts the official user response without real network', async () => {
+    process.env.GTAWORLD_CLIENT_ID = '102';
+    process.env.GTAWORLD_CLIENT_SECRET = 'not-a-real-secret';
+    process.env.GTAWORLD_REDIRECT_URI = 'https://sanboard.xyz/api/auth/gtaworld/callback';
+    const originalFetch = global.fetch;
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    global.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      calls.push({ url, init });
+      if (url.endsWith('/oauth/token')) return new Response(JSON.stringify({ access_token: 'test-access-token' }), { status: 200, headers: { 'content-type': 'application/json' } });
+      return new Response(JSON.stringify({ user: { id: 100, username: 'RenamedUser', confirmed: 1, role: { role_id: 'Manager' }, character: [{ id: 101, memberid: 100, firstname: 'Mavis', lastname: 'Pierce' }, { id: null, firstname: 'Bad', lastname: 'Item' }] } }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+    try {
+      const provider = new RealGtaWorldAuthProvider();
+      const token = await provider.exchangeCodeForToken('test-code');
+      const account = await provider.fetchAccount(token);
+      assert.strictEqual(token, 'test-access-token');
+      assert.deepStrictEqual(account, { externalAccountId: '100', characters: [{ externalCharacterId: '101', firstName: 'Mavis', lastName: 'Pierce', displayName: 'Mavis Pierce' }] });
+      assert.strictEqual(calls.length, 2);
+      assert.strictEqual(calls[0].init?.cache, 'no-store');
+      assert.strictEqual(calls[1].init?.cache, 'no-store');
+      assert.strictEqual(new URLSearchParams(String(calls[0].init?.body)).get('client_secret'), 'not-a-real-secret');
+      assert.strictEqual((calls[1].init?.headers as Record<string, string>).Authorization, 'Bearer test-access-token');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('rejects malformed token and user responses with safe typed errors', async () => {
+    process.env.GTAWORLD_CLIENT_ID = '102';
+    process.env.GTAWORLD_CLIENT_SECRET = 'not-a-real-secret';
+    process.env.GTAWORLD_REDIRECT_URI = 'https://sanboard.xyz/api/auth/gtaworld/callback';
+    const originalFetch = global.fetch;
+    try {
+      global.fetch = (async () => new Response('{}', { status: 200 })) as typeof fetch;
+      await assert.rejects(new RealGtaWorldAuthProvider().exchangeCodeForToken('code'), GtaWorldTokenError);
+      await assert.rejects(new RealGtaWorldAuthProvider().fetchAccount('token'), GtaWorldUserError);
+    } finally { global.fetch = originalFetch; }
   });
 });
 describe('GTA World Upstream Response & Defensive Validation', () => {
@@ -48,6 +107,62 @@ describe('GTA World Upstream Response & Defensive Validation', () => {
     assert.strictEqual(userRes.user.id, 1);
     assert.strictEqual(userRes.user.username, 'mavis_player');
     assert.strictEqual(userRes.user.character.length, 3);
+  });
+});
+
+describe('Lazy GTA World character profile creation', () => {
+  beforeEach(() => {
+    process.env.DATA_STORE = 'memory';
+    process.env.SANBOARD_SESSION_SECRET = 'lazy-character-test-secret-at-least-32-characters';
+    db.users = [];
+    db.profiles = [];
+    db.auditLogs = [];
+  });
+
+  it('discovers three verified characters but creates only the selected profile on Geç', async () => {
+    const account = {
+      externalAccountId: '100',
+      characters: [
+        { externalCharacterId: '101', firstName: 'Mavis', lastName: 'Pierce', displayName: 'Mavis Pierce' },
+        { externalCharacterId: '102', firstName: 'Zade', lastName: 'Vexnera', displayName: 'Zade Vexnera' },
+        { externalCharacterId: '103', firstName: 'Ravi', lastName: 'Blumon', displayName: 'Ravi Blumon' },
+      ],
+    };
+    const { user } = await syncExternalGameAccount(account, { createProfiles: false });
+    assert.strictEqual(db.profiles.length, 0);
+    const selectionToken = createCharacterSelectionToken(user.id, account.characters);
+    const cookie = `${CHARACTER_SELECTION_COOKIE}=${selectionToken}`;
+    const listed = await listCharacters(new NextRequest('http://localhost/api/user/characters', { headers: { cookie } }));
+    const listedBody = await listed.json();
+    assert.strictEqual(listedBody.characters.length, 3);
+    assert.ok(listedBody.characters.every((character: any) => character.hasProfile === false));
+
+    const selection = await selectCharacter(new NextRequest('http://localhost/api/auth/session', { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ characterId: '101' }) }));
+    assert.strictEqual(selection.status, 409);
+    assert.strictEqual((await selection.json()).onboardingRequired, true);
+
+    const created = await createProfile(new NextRequest('http://localhost/api/user/profile', { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ characterId: '101', fullName: 'Forged Name', firstname: 'Forged', lastname: 'Name' }) }));
+    assert.strictEqual(created.status, 200);
+    assert.strictEqual(db.profiles.length, 1);
+    assert.strictEqual(db.profiles[0].external_character_id, '101');
+    assert.strictEqual(db.profiles[0].full_name, 'Mavis Pierce');
+    assert.strictEqual(db.profiles[0].phone, '');
+    assert.strictEqual(db.profiles[0].sanmail_email, '');
+    assert.strictEqual(db.profiles.some((profile) => profile.external_character_id === '102' || profile.external_character_id === '103'), false);
+    assert.strictEqual(verifySessionToken(created.cookies.get('sanboard_session')!.value)?.profileId, db.profiles[0].id);
+  });
+
+  it('is idempotent and rejects a character outside the trusted account snapshot', async () => {
+    const { user } = await syncExternalGameAccount({ externalAccountId: '200', characters: [] }, { createProfiles: false });
+    const token = createCharacterSelectionToken(user.id, [{ externalCharacterId: '201', firstName: 'Alex', lastName: 'Stone' }]);
+    const cookie = `${CHARACTER_SELECTION_COOKIE}=${token}`;
+    const request = () => new NextRequest('http://localhost/api/user/profile', { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ characterId: '201', phone: '', sanmailEmail: '', avatarData: '' }) });
+    assert.strictEqual((await createProfile(request())).status, 200);
+    assert.strictEqual((await createProfile(request())).status, 200);
+    assert.strictEqual(db.profiles.filter((profile) => profile.external_character_id === '201').length, 1);
+    const rejected = await createProfile(new NextRequest('http://localhost/api/user/profile', { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ characterId: '999', fullName: 'Injected Character' }) }));
+    assert.strictEqual(rejected.status, 403);
+    assert.strictEqual((await rejected.json()).code, 'character_invalid');
   });
 });
 

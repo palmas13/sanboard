@@ -123,7 +123,7 @@ export class MemoryUserRepository implements IUserRepository {
     let profile = db.profiles.find(
       (p) =>
         p.user_id === data.userId &&
-        (p.id === extId || p.external_character_id === extId || p.full_name.toLowerCase() === trimmedName.toLowerCase())
+        (p.id === extId || p.external_character_id === extId)
     );
 
     const now = new Date().toISOString();

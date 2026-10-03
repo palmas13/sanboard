@@ -24,6 +24,8 @@ export interface GtaWorldAuthResult {
 /** Provider-neutral identity snapshot consumed by Sanboard application code. */
 export interface ExternalGameCharacter {
   externalCharacterId: string;
+  firstName?: string;
+  lastName?: string;
   displayName: string;
   avatarUrl?: string | null;
 }
@@ -86,6 +88,8 @@ export function adaptGtaWorldApiUser(user: GtaWorldApiUser): ExternalGameAccount
       if (!displayName) throw new Error('GTA World karakter adı eksik.');
       return {
         externalCharacterId: opaqueId(character.id, 'character ID'),
+        firstName: String(character.firstname || '').trim(),
+        lastName: String(character.lastname || '').trim(),
         displayName,
         avatarUrl: null,
       };

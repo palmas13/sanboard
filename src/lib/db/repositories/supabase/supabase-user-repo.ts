@@ -294,11 +294,7 @@ export class SupabaseUserRepository implements IUserRepository {
       .select('*')
       .eq('user_id', safeUserId);
 
-    const matched = (existingProfiles || []).find((p: any) => {
-      if (extId && p.external_character_id === extId) return true;
-      if (p.full_name?.toLowerCase() === trimmedName.toLowerCase()) return true;
-      return false;
-    });
+    const matched = (existingProfiles || []).find((p: any) => extId && p.external_character_id === extId);
 
     if (matched) {
       // Update with newly provided fields if present
@@ -375,6 +371,11 @@ export class SupabaseUserRepository implements IUserRepository {
       insertErr = retry.error;
     }
 
+    if (insertErr?.code === '23505' && extId) {
+      const recovered = await client.from('character_profiles').select('*').eq('external_character_id', extId).maybeSingle();
+      if (recovered.data && recovered.data.user_id === safeUserId) return { success: true, profile: recovered.data as CharacterProfile };
+      return { success: false, error: 'Bu GTA World karakteri başka bir hesaba bağlı.' };
+    }
     if (insertErr || !created) {
       return { success: false, error: insertErr?.message || 'Profil oluşturulamadı.' };
     }

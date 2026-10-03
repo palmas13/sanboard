@@ -164,6 +164,9 @@ export function AuthProvider({
         body: JSON.stringify({ characterId, profileId: characterId }),
       });
 
+      if (sessionRes.status === 409) {
+        return null;
+      }
       if (!sessionRes.ok) {
         return null;
       }

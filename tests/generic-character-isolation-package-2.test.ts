@@ -49,8 +49,8 @@ describe('SANBOARD generic character isolation package 2', () => {
       { id: morgan, user_id: accountY, full_name: 'Morgan Hale', avatar_url: '', sanmail_email: 'morgan@sanmail.test', phone: '2001', role: 'USER', public_id: 201, created_at: '2026-09-26T00:00:00.000Z', updated_at: '2026-09-26T00:00:00.000Z' },
     ];
     db.listings = [
-      { id: 'listing-alex', listing_number: '#A', seller_profile_id: alex, category: 'vehicle', subcategory: 'Otomobil', title: 'Alex Vehicle', description: 'Alex listing', price: 1000, status: 'ACTIVE', seller_type: 'INDIVIDUAL', created_at: '2026-09-26T00:00:00.000Z', updated_at: '2026-09-26T00:00:00.000Z', expires_at: '2026-10-03T00:00:00.000Z', images: [] },
-      { id: 'listing-jordan', listing_number: '#B', seller_profile_id: jordan, category: 'vehicle', subcategory: 'Otomobil', title: 'Jordan Vehicle', description: 'Jordan listing', price: 2000, status: 'ACTIVE', seller_type: 'INDIVIDUAL', created_at: '2026-09-26T00:00:00.000Z', updated_at: '2026-09-26T00:00:00.000Z', expires_at: '2026-10-03T00:00:00.000Z', images: [] },
+      { id: 'listing-alex', listing_number: '#A', seller_profile_id: alex, category: 'vehicle', subcategory: 'Otomobil', title: 'Alex Vehicle', description: 'Alex listing', price: 1000, status: 'ACTIVE', seller_type: 'INDIVIDUAL', created_at: '2026-09-26T00:00:00.000Z', updated_at: '2026-09-26T00:00:00.000Z', expires_at: '2099-01-01T00:00:00.000Z', images: [] },
+      { id: 'listing-jordan', listing_number: '#B', seller_profile_id: jordan, category: 'vehicle', subcategory: 'Otomobil', title: 'Jordan Vehicle', description: 'Jordan listing', price: 2000, status: 'ACTIVE', seller_type: 'INDIVIDUAL', created_at: '2026-09-26T00:00:00.000Z', updated_at: '2026-09-26T00:00:00.000Z', expires_at: '2099-01-01T00:00:00.000Z', images: [] },
     ] as any;
     db.credits = [{ id: 'credit-alex', profile_id: alex, package_id: 'pkg-standard-7-day', status: 'AVAILABLE', credit_type: 'INDIVIDUAL', created_at: '2026-09-26T00:00:00.000Z' }] as any;
     db.tickets = [

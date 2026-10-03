@@ -141,7 +141,7 @@ describe('SANBOARD temporary test character login harness', () => {
     assert.match(clientSource, /isTestSource &&/);
     assert.match(clientSource, /Bu karakterler gerçek GTA World hesabı veya UCP karakteri değildir/);
     assert.match(clientSource, /onClick=\{\(\) => handleSelect/);
-    assert.match(clientSource, /await selectCharacter\(characterId\)/);
+    assert.match(clientSource, /await selectCharacter\(character\?\.profileId \|\| characterId\)/);
   });
 
   test('canonical picker creates canonical session, rejects cross-account injection, and isolates favorites after switch', async () => {

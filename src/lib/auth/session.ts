@@ -14,6 +14,7 @@ export interface CharacterSelectionPayload {
   userId: string;
   nonce: string;
   purpose: 'CHARACTER_SELECTION';
+  characters?: Array<{ externalCharacterId: string; firstName: string; lastName: string }>;
   iat: number;
   exp: number;
 }
@@ -137,12 +138,13 @@ export function verifySessionToken(token: string): SessionPayload | null {
   }
 }
 
-export function createCharacterSelectionToken(userId: string): string {
+export function createCharacterSelectionToken(userId: string, characters?: CharacterSelectionPayload['characters']): string {
   const now = Math.floor(Date.now() / 1000);
   const payload: CharacterSelectionPayload = {
     userId,
     nonce: crypto.randomBytes(24).toString('base64url'),
     purpose: 'CHARACTER_SELECTION',
+    characters,
     iat: now,
     exp: now + CHARACTER_SELECTION_EXPIRY_SECONDS,
   };
@@ -315,5 +317,14 @@ export function clearCharacterSelectionCookieOnResponse(
     maxAge: 0,
     secure: process.env.NODE_ENV === 'production',
   });
+}
+
+export function setLegacyRoutingCookiesOnResponse(
+  response: import('next/server').NextResponse,
+  data: { userId: string; profileId: string; role: 'USER' | 'ADMIN' }
+): void {
+  response.cookies.set('sanboard_profile_id', data.profileId, { path: '/', maxAge: 86400, sameSite: 'lax' });
+  response.cookies.set('sanboard_user_id', data.userId, { path: '/', maxAge: 86400, sameSite: 'lax' });
+  response.cookies.set('sanboard_role', data.role, { path: '/', maxAge: 86400, sameSite: 'lax' });
 }
 

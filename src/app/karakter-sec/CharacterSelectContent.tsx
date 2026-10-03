@@ -35,7 +35,12 @@ export function CharacterSelectContent({ redirect, isTestSource, defaultCharacte
     setSwitchingId(characterId);
     setSelectionError('');
     try {
-      const res = await selectCharacter(characterId);
+      const character = characters.find((item) => item.id === characterId);
+      if (character && character.hasProfile === false) {
+        router.push(`/profil-olustur?charId=${encodeURIComponent(character.id)}&redirect=${encodeURIComponent(redirect)}`);
+        return;
+      }
+      const res = await selectCharacter(character?.profileId || characterId);
       if (res) {
         router.push(redirect);
       } else {
@@ -148,7 +153,7 @@ export function CharacterSelectContent({ redirect, isTestSource, defaultCharacte
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <span className="inline-flex items-center gap-1 text-xs text-[var(--color-success)] font-medium">
                           <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Profil mevcut</span>
+                          <span>{char.hasProfile === false ? 'İlk kurulum gerekli' : 'Profil mevcut'}</span>
                         </span>
                         {char.displayName === defaultCharacterName ? (
                           <span className="rounded border border-[var(--color-success)]/30 px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-success)]">

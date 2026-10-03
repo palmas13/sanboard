@@ -4,6 +4,7 @@ import React, { useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/features/auth/AuthContext';
 import { User, Mail, Phone, Camera, Save, ArrowLeft, Trash2, Upload } from 'lucide-react';
+import { normalizeInternalRedirect } from '@/lib/auth/redirect';
 import Link from 'next/link';
 import { SanboardImage } from '@/components/media/SanboardImage';
 
@@ -11,7 +12,7 @@ function ProfilOlusturContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const charId = searchParams.get('charId') || '';
-  const redirect = searchParams.get('redirect') || '/hesabim';
+  const redirect = normalizeInternalRedirect(searchParams.get('redirect'), '/hesabim');
 
   const { characters, selectCharacter } = useAuth();
   const char = characters.find((c) => c.id === charId) || {
@@ -27,7 +28,7 @@ function ProfilOlusturContent() {
   const [sanmailEmail, setSanmailEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [checkingExisting, setCheckingExisting] = useState(true);
+  const [checkingExisting, setCheckingExisting] = useState(characters.length === 0);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -35,15 +36,9 @@ function ProfilOlusturContent() {
     let active = true;
     async function checkExistingProfile() {
       try {
-        const res = await fetch('/api/user/profile');
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.success && data.profile && active) {
-            await selectCharacter(data.profile.id);
-            router.push(redirect);
-            return;
-          }
-        }
+        const list = characters.length ? characters : await fetch('/api/user/characters').then((response) => response.ok ? response.json() : null);
+        const selected = (Array.isArray(list) ? list : list?.characters)?.find((item: any) => item.id === charId);
+        if (selected?.hasProfile && selected.profileId && active) { await selectCharacter(selected.profileId); router.push(redirect); return; }
       } catch {
         // Continue to form
       }
@@ -53,7 +48,7 @@ function ProfilOlusturContent() {
     return () => {
       active = false;
     };
-  }, [charId, redirect, router, selectCharacter]);
+  }, [charId, characters, redirect, router, selectCharacter]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError('');
@@ -94,16 +89,15 @@ function ProfilOlusturContent() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitProfile = async (skipOptional = false) => {
     setError('');
 
-    let formattedSanMail = sanmailEmail.trim();
+    let formattedSanMail = skipOptional ? '' : sanmailEmail.trim();
     if (formattedSanMail && !formattedSanMail.includes('@')) {
       formattedSanMail = `${formattedSanMail}@sanmail.com`;
     }
 
-    const formattedPhone = phone.trim();
+    const formattedPhone = skipOptional ? '' : phone.trim();
 
     setIsSubmitting(true);
 
@@ -112,7 +106,8 @@ function ProfilOlusturContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          avatarData: avatarData || undefined,
+          characterId: charId,
+          avatarData: skipOptional ? undefined : avatarData || undefined,
           sanmailEmail: formattedSanMail || undefined,
           phone: formattedPhone || undefined,
         }),
@@ -125,13 +120,16 @@ function ProfilOlusturContent() {
         return;
       }
 
-      // Establish client session state with newly returned profile
-      await selectCharacter(data.profile.id);
-      router.push(redirect);
+      window.location.href = redirect;
     } catch {
       setError('Profil kaydedilirken bir bağlantı hatası oluştu.');
       setIsSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitProfile(false);
   };
 
   if (checkingExisting) {
@@ -282,14 +280,10 @@ function ProfilOlusturContent() {
             </p>
           </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full btn-primary py-3 text-sm font-bold flex items-center justify-center gap-2 mt-4"
-          >
-            <Save className="w-4 h-4" />
-            <span>{isSubmitting ? 'Kaydediliyor...' : 'Profili Kaydet ve Başla'}</span>
-          </button>
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            <button type="button" disabled={isSubmitting} onClick={() => submitProfile(true)} className="btn-secondary py-3 text-sm font-bold">Geç</button>
+            <button type="submit" disabled={isSubmitting} className="btn-primary py-3 text-sm font-bold flex items-center justify-center gap-2"><Save className="w-4 h-4" /><span>{isSubmitting ? 'Kaydediliyor...' : 'Onayla'}</span></button>
+          </div>
         </form>
       </div>
     </div>

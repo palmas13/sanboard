@@ -6,15 +6,13 @@ import {
   verifyLoginAttemptToken,
 } from '@/lib/auth/login-attempt';
 import {
-  clearCharacterSelectionCookieOnResponse,
   clearSessionCookieOnResponse,
   createCharacterSelectionToken,
-  createSessionToken,
   setCharacterSelectionCookieOnResponse,
-  setSessionCookieOnResponse,
 } from '@/lib/auth/session';
 import { syncExternalGameAccount } from '@/lib/auth/gtaworld-sync';
-import { GtaWorldProviderNotConfiguredError, RealGtaWorldAuthProvider } from '@/lib/integrations/gtaworld/real-provider';
+import { GtaWorldProviderNotConfiguredError, GtaWorldTokenError, GtaWorldUserError, RealGtaWorldAuthProvider } from '@/lib/integrations/gtaworld/real-provider';
+import crypto from 'crypto';
 
 function redirectWithClearedAttempt(req: NextRequest, path: string): NextResponse {
   const response = NextResponse.redirect(new URL(path, req.url));
@@ -30,14 +28,15 @@ export async function GET(req: NextRequest) {
   }
 
   const state = req.nextUrl.searchParams.get('state');
-  if (!state || state !== attempt.state) {
+  const stateMatches = Boolean(state) && Buffer.byteLength(state!) === Buffer.byteLength(attempt.state) && crypto.timingSafeEqual(Buffer.from(state!), Buffer.from(attempt.state));
+  if (!stateMatches) {
     await recordAuditEvent({ eventType: 'AUTH_LOGIN_FAILURE', metadata: { category: 'state_missing_or_mismatch' } });
-    return redirectWithClearedAttempt(req, '/giris?error=invalid_attempt');
+    return redirectWithClearedAttempt(req, '/giris?error=oauth_invalid_state');
   }
 
   if (req.nextUrl.searchParams.has('error') || req.nextUrl.searchParams.has('error_description')) {
     await recordAuditEvent({ eventType: 'AUTH_LOGIN_FAILURE', metadata: { category: 'upstream_oauth_error' } });
-    return redirectWithClearedAttempt(req, '/giris?error=oauth_denied');
+    return redirectWithClearedAttempt(req, '/giris?error=oauth_cancelled');
   }
 
   const code = req.nextUrl.searchParams.get('code');
@@ -50,57 +49,30 @@ export async function GET(req: NextRequest) {
     const provider = new RealGtaWorldAuthProvider();
     const accessToken = await provider.exchangeCodeForToken(code);
     const externalAccount = await provider.fetchAccount(accessToken);
-    const { user, profiles } = await syncExternalGameAccount(externalAccount);
-
+    const { user } = await syncExternalGameAccount(externalAccount, { createProfiles: false });
     if (user.status !== 'ACTIVE') {
       await recordAuditEvent({ eventType: 'AUTH_LOGIN_FAILURE', userId: user.id, metadata: { category: 'account_banned' } });
       return redirectWithClearedAttempt(req, '/giris?error=account_banned');
     }
 
-    const selectedProfile = profiles.length === 1 ? profiles[0] : undefined;
     await recordAuditEvent({
       eventType: 'AUTH_LOGIN_SUCCESS',
       userId: user.id,
-      profileId: selectedProfile?.id || null,
-      metadata: { provider: 'gtaworld', characterCount: profiles.length, autoSelected: Boolean(selectedProfile) },
+      profileId: null,
+      metadata: { provider: 'gtaworld', characterCount: externalAccount.characters.length, autoSelected: false },
     });
-
-    if (selectedProfile) {
-      await recordAuditEvent({
-        eventType: 'CHARACTER_SELECTED',
-        userId: user.id,
-        profileId: selectedProfile.id,
-        metadata: { characterName: selectedProfile.full_name, autoSelected: true },
-      });
-    }
-
-    const destination = selectedProfile
-      ? attempt.redirect
-      : `/karakter-sec?redirect=${encodeURIComponent(attempt.redirect)}`;
+    const destination = `/karakter-sec?redirect=${encodeURIComponent(attempt.redirect)}`;
     const response = NextResponse.redirect(new URL(destination, req.url));
     clearLoginAttemptCookie(response);
-
-    if (selectedProfile) {
-      setSessionCookieOnResponse(response, createSessionToken({
-        userId: user.id,
-        profileId: selectedProfile.id,
-        role: selectedProfile.role || 'USER',
-      }));
-      clearCharacterSelectionCookieOnResponse(response);
-      response.cookies.set('sanboard_user_id', user.id, { path: '/', maxAge: 86400, sameSite: 'lax' });
-      response.cookies.set('sanboard_role', selectedProfile.role || 'USER', { path: '/', maxAge: 86400, sameSite: 'lax' });
-      response.cookies.set('sanboard_profile_id', selectedProfile.id, { path: '/', maxAge: 86400, sameSite: 'lax' });
-    } else {
-      clearSessionCookieOnResponse(response);
-      setCharacterSelectionCookieOnResponse(response, createCharacterSelectionToken(user.id));
-      response.cookies.set('sanboard_profile_id', '', { path: '/', maxAge: 0 });
-      response.cookies.set('sanboard_user_id', '', { path: '/', maxAge: 0 });
-      response.cookies.set('sanboard_role', '', { path: '/', maxAge: 0 });
-    }
+    clearSessionCookieOnResponse(response);
+    setCharacterSelectionCookieOnResponse(response, createCharacterSelectionToken(user.id, externalAccount.characters.map((character) => ({ externalCharacterId: character.externalCharacterId, firstName: character.firstName || character.displayName, lastName: character.lastName || '' }))));
+    response.cookies.set('sanboard_profile_id', '', { path: '/', maxAge: 0 });
+    response.cookies.set('sanboard_user_id', '', { path: '/', maxAge: 0 });
+    response.cookies.set('sanboard_role', '', { path: '/', maxAge: 0 });
     return response;
   } catch (error) {
     await recordAuditEvent({ eventType: 'AUTH_LOGIN_FAILURE', metadata: { category: 'provider_or_sync_exception' } });
-    const errorCode = error instanceof GtaWorldProviderNotConfiguredError ? 'provider_not_configured' : 'auth_failed';
+    const errorCode = error instanceof GtaWorldProviderNotConfiguredError ? 'provider_not_configured' : error instanceof GtaWorldTokenError ? 'oauth_token_failed' : error instanceof GtaWorldUserError ? 'oauth_user_failed' : 'oauth_sync_failed';
     return redirectWithClearedAttempt(req, `/giris?error=${errorCode}`);
   }
 }

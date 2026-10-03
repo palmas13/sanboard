@@ -13,7 +13,7 @@ function isUniqueViolation(error: { code?: string } | null): boolean {
   return error?.code === '23505';
 }
 
-export async function syncExternalGameAccount(account: ExternalGameAccount): Promise<SyncGtaWorldResult> {
+export async function syncExternalGameAccount(account: ExternalGameAccount, options: { createProfiles?: boolean } = {}): Promise<SyncGtaWorldResult> {
   const externalUserId = String(account.externalAccountId);
   const now = new Date().toISOString();
 
@@ -39,7 +39,7 @@ export async function syncExternalGameAccount(account: ExternalGameAccount): Pro
     }
     if (!user) throw new Error(`GTA World account conflict recovery failed for ${externalUserId}.`);
 
-    for (const character of account.characters) {
+    if (options.createProfiles !== false) for (const character of account.characters) {
       const externalCharacterId = String(character.externalCharacterId);
       const fullName = character.displayName.trim();
       const findProfile = async () => {
@@ -77,7 +77,7 @@ export async function syncExternalGameAccount(account: ExternalGameAccount): Pro
     db.users.push(user);
   }
 
-  for (const character of account.characters) {
+  if (options.createProfiles !== false) for (const character of account.characters) {
     const externalCharacterId = String(character.externalCharacterId);
     const fullName = character.displayName.trim();
     let profile = db.profiles.find((candidate) => candidate.external_character_id === externalCharacterId);

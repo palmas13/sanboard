@@ -61,6 +61,11 @@ export interface CharacterProfile {
 
 export interface CharacterSummary {
   id: string;
+  profileId?: string | null;
+  externalCharacterId?: string;
+  firstName?: string;
+  lastName?: string;
+  hasProfile?: boolean;
   displayName: string;
   avatarUrl: string | null;
   role: UserRole;

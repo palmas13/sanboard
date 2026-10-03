@@ -48,17 +48,18 @@ export async function POST(req: NextRequest) {
     if (!characterId) return NextResponse.json({ error: 'characterId parametresi zorunludur.' }, { status: 400 });
 
     const userRepository = getUserRepository();
-    const [user, profile] = await Promise.all([
-      userRepository.getUserById(authenticatedUserId),
-      userRepository.getProfileById(characterId),
-    ]);
+    const [user, profile] = await Promise.all([userRepository.getUserById(authenticatedUserId), userRepository.getProfileById(characterId)]);
     if (!user) return NextResponse.json({ error: 'Hesap bulunamadı.' }, { status: 401 });
     if (isTestExternalAccountId(user.external_user_id) && !isTestLoginEnabled()) {
       return NextResponse.json({ error: 'Test login devre dışı.' }, { status: 404 });
     }
     if (user.status !== 'ACTIVE') return NextResponse.json({ error: 'Bu hesap ile oturum açılamaz.' }, { status: 403 });
 
-    if (!profile) return NextResponse.json({ error: 'Karakter profili bulunamadı.' }, { status: 404 });
+    if (!profile) {
+      const verifiedCharacter = selectionContext?.characters?.find((character) => character.externalCharacterId === characterId);
+      if (!verifiedCharacter) return NextResponse.json({ error: 'Seçilen karakter doğrulanamadı.', code: 'character_invalid' }, { status: 403 });
+      return NextResponse.json({ success: false, onboardingRequired: true, characterId: verifiedCharacter.externalCharacterId }, { status: 409 });
+    }
     if (profile.user_id !== authenticatedUserId) return NextResponse.json({ error: 'Bu karakter profili oturum hesabına ait değil.' }, { status: 403 });
 
     const role = profile.role || 'USER';

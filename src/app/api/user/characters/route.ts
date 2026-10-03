@@ -50,12 +50,29 @@ export async function GET(req: NextRequest) {
     dbProfiles = db.profiles.filter((p) => p.user_id === userId);
   }
 
-  const characters: CharacterSummary[] = dbProfiles.map((p) => ({
-    id: p.id,
-    displayName: p.full_name,
-    avatarUrl: resolveMediaUrl(p.avatar_path || p.avatar_url || '') || null,
-    role: p.role || 'USER',
-  }));
+  const profilesByExternalId = new Map(dbProfiles.map((profile) => [profile.external_character_id, profile]));
+  const discovered = selectionContext?.characters;
+  const characters: CharacterSummary[] = discovered?.length
+    ? discovered.map((character) => {
+        const profile = profilesByExternalId.get(character.externalCharacterId);
+        return {
+          id: character.externalCharacterId,
+          profileId: profile?.id || null,
+          externalCharacterId: character.externalCharacterId,
+          firstName: character.firstName,
+          lastName: character.lastName,
+          displayName: `${character.firstName} ${character.lastName}`,
+          avatarUrl: profile ? resolveMediaUrl(profile.avatar_path || profile.avatar_url || '') || null : null,
+          role: profile?.role || 'USER',
+          hasProfile: Boolean(profile),
+        };
+      })
+    : dbProfiles.map((profile) => ({
+        id: profile.id,
+        displayName: profile.full_name,
+        avatarUrl: resolveMediaUrl(profile.avatar_path || profile.avatar_url || '') || null,
+        role: profile.role || 'USER',
+      }));
 
   return NextResponse.json({
     success: true,

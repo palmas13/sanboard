@@ -146,6 +146,8 @@ export class MockGtaWorldAuthProvider implements GtaWorldAuthProvider {
       externalAccountId: this.account.externalAccountId,
       characters: this.account.characters.map((character) => ({
         externalCharacterId: character.id,
+        firstName: character.fullName.split(' ')[0] || character.fullName,
+        lastName: character.fullName.split(' ').slice(1).join(' '),
         displayName: character.fullName,
         avatarUrl: character.avatarUrl || null,
       })),
