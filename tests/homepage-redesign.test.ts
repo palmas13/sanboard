@@ -102,7 +102,7 @@ describe('homepage marketplace redesign', () => {
     assert.match(featured, /5000/);
     assert.match(featured, /visibilitychange/);
     assert.match(featured, /onFocusCapture/);
-    assert.match(featured, /aspect-\[16\/10\]/);
+    assert.match(featured, /aspect-\[4\/3\]/);
     assert.match(featured, /line-clamp-2[\s\S]*listing\.title/);
     assert.match(featured, /line-clamp-3[\s\S]*listing\.description/);
     assert.match(featured, /homepage-featured-category/);
@@ -112,13 +112,17 @@ describe('homepage marketplace redesign', () => {
 
   test('featured showcase fills the shared desktop height as a hero card', () => {
     const css = source('src/app/globals.css');
+    const featured = source('src/components/home/HomepageFeaturedRotator.tsx');
     assert.match(css, /\.homepage-featured-card \{[^}]*display: flex[^}]*flex-direction: column/);
     assert.match(css, /\.homepage-featured-body \{[^}]*flex: 1[^}]*flex-direction: column/);
     assert.match(css, /\.homepage-featured-footer \{[^}]*margin-top: auto/);
     assert.match(css, /\.homepage-featured-arrow \{[^}]*width: 1\.8rem[^}]*height: 1\.8rem/);
     assert.match(css, /\.homepage-featured-category \{[^}]*border-radius: 999px/);
     assert.match(css, /\.homepage-featured-viewport, \.homepage-featured-card \{ height: 100%; \}/);
-    assert.match(css, /\.homepage-featured-media \{ min-height: 14\.5rem; flex: 1 1 54%; aspect-ratio: auto; \}/);
+    assert.match(css, /\.homepage-featured-media \{ min-height: 0; flex: 0 0 46%; aspect-ratio: auto; \}/);
+    assert.match(css, /\.homepage-featured-body \{ flex: 1 1 54%; \}/);
+    assert.match(featured, /line-clamp-3 shrink-0[\s\S]*listing\.description/);
+    assert.match(featured, /homepage-featured-footer flex min-h-7 shrink-0/);
   });
 
   test('discovery surfaces use the requested headings and preserve descenders', () => {
