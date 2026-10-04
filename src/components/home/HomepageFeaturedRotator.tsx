@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BadgeCheck, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { PublicListingSummary } from '@/types';
 import { FavoriteButton } from '@/components/listings/FavoriteButton';
 import { formatCurrency } from '@/lib/utils/format';
@@ -13,7 +13,14 @@ import { FeaturedBadge } from '@/components/listings/FeaturedBadge';
 
 const FALLBACK = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=900&auto=format&fit=crop&q=80';
 
-export function HomepageFeaturedRotator({ listings }: { listings: PublicListingSummary[] }) {
+type HomepageFeaturedListing = PublicListingSummary & {
+  corporate_profile?: {
+    company_name: string;
+    is_verified: boolean;
+  };
+};
+
+export function HomepageFeaturedRotator({ listings }: { listings: HomepageFeaturedListing[] }) {
   const [index, setIndex] = useState(0);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -38,6 +45,9 @@ export function HomepageFeaturedRotator({ listings }: { listings: PublicListingS
   const listing = listings[index];
   const image = resolveMediaUrl(listing.cover_image) || FALLBACK;
   const hasMultipleListings = listings.length > 1;
+  const corporateProfile = listing.seller_type === 'CORPORATE' && listing.corporate_profile?.company_name
+    ? listing.corporate_profile
+    : null;
   const move = (direction: number) => setIndex((current) => (current + direction + listings.length) % listings.length);
 
   return <div className="homepage-featured-viewport" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onFocusCapture={() => setFocused(true)} onBlurCapture={(event) => setFocused(event.currentTarget.contains(event.relatedTarget as Node))}>
@@ -55,11 +65,17 @@ export function HomepageFeaturedRotator({ listings }: { listings: PublicListingS
       </div>
       <div className="homepage-featured-body pointer-events-none relative z-10">
         <p className="shrink-0 text-[1.65rem] font-black leading-none tracking-[-0.03em] text-[#ff8a1f]">{formatCurrency(listing.price)}</p>
-        <h3 className="mt-2.5 line-clamp-2 min-h-11 shrink-0 text-base font-extrabold leading-[1.35rem] text-[var(--text-main)] transition-colors group-hover:text-[#ff9d45]">{listing.title}</h3>
+        <div className="mt-2.5 min-h-11 shrink-0">
+          <h3 className={`${corporateProfile ? 'line-clamp-1' : 'line-clamp-2'} text-base font-extrabold leading-[1.35rem] text-[var(--text-main)] transition-colors group-hover:text-[#ff9d45]`}>{listing.title}</h3>
+          {corporateProfile && <p className="mt-0.5 flex min-w-0 items-center gap-1 text-[11px] font-semibold leading-[1.15rem] text-[var(--text-muted)]">
+            <span className="truncate">{corporateProfile.company_name}</span>
+            {corporateProfile.is_verified && <BadgeCheck aria-label="Doğrulanmış kurumsal profil" className="h-3.5 w-3.5 shrink-0 text-[#ff8a1f]" />}
+          </p>}
+        </div>
         <p className="mt-2 line-clamp-3 shrink-0 text-xs leading-[1.15rem] text-[var(--text-muted)]">{listing.description}</p>
         <div className="homepage-featured-footer flex min-h-7 shrink-0 items-center justify-between gap-3 border-t border-[var(--border-app)] pt-3 text-[10px] font-medium text-[var(--text-muted)]">
           <span className="homepage-featured-category min-w-0 truncate">{listing.subcategory}</span>
-          {listing.published_at && <span className="flex shrink-0 items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{new Intl.DateTimeFormat('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(listing.published_at))}</span>}
+          {listing.published_at && <span className="flex shrink-0 items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{new Intl.DateTimeFormat('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(listing.published_at))}</span>}
         </div>
       </div>
     </article>

@@ -58,6 +58,13 @@ describe('homepage marketplace redesign', () => {
     assert.match(rotator, /quality=\{88\}/);
   });
 
+  test('homepage client components format server-rendered dates in a deterministic timezone', () => {
+    const rotator = source('src/components/home/HomepageListingRotator.tsx');
+    const featured = source('src/components/home/HomepageFeaturedRotator.tsx');
+    assert.match(rotator, /Intl\.DateTimeFormat\('tr-TR', \{[^}]*timeZone: 'UTC'/);
+    assert.match(featured, /Intl\.DateTimeFormat\('tr-TR', \{[^}]*timeZone: 'UTC'/);
+  });
+
   test('hero decorative listing cards use canonical direct-delivery CDN assets', () => {
     const hero = source('src/components/home/HeroShowcase.tsx');
     const imageBoundary = source('src/components/media/SanboardImage.tsx');
@@ -101,6 +108,7 @@ describe('homepage marketplace redesign', () => {
   });
 
   test('featured showcase uses the dedicated homepage-only label', () => {
+    const page = source('src/app/page.tsx');
     const featured = source('src/components/home/HomepageFeaturedRotator.tsx');
     const marketplace = source('src/components/home/HomepageMarketplace.tsx');
     const badge = source('src/components/listings/FeaturedBadge.tsx');
@@ -118,8 +126,13 @@ describe('homepage marketplace redesign', () => {
     assert.match(featured, /visibilitychange/);
     assert.match(featured, /onFocusCapture/);
     assert.match(featured, /aspect-\[4\/3\]/);
-    assert.match(featured, /line-clamp-2[\s\S]*listing\.title/);
+    assert.match(featured, /corporateProfile \? 'line-clamp-1' : 'line-clamp-2'[\s\S]*listing\.title/);
     assert.match(featured, /line-clamp-3[\s\S]*listing\.description/);
+    assert.match(page, /listing\.seller_type === 'CORPORATE' && listing\.corporate_profile_id/);
+    assert.match(page, /company_name: corporateProfileName/);
+    assert.match(featured, /corporateProfile && <p[\s\S]*corporateProfile\.company_name/);
+    assert.match(featured, /corporateProfile\.is_verified && <BadgeCheck aria-label="Doğrulanmış kurumsal profil"/);
+    assert.doesNotMatch(featured, /Kurumsal mağaza|placeholder/i);
     assert.match(featured, /homepage-featured-category/);
     assert.match(featured, /Önceki öne çıkan ilan/);
     assert.match(featured, /Sonraki öne çıkan ilan/);
@@ -136,6 +149,7 @@ describe('homepage marketplace redesign', () => {
     assert.match(css, /\.homepage-featured-viewport, \.homepage-featured-card \{ height: 100%; \}/);
     assert.match(css, /\.homepage-featured-media \{ min-height: 0; flex: 0 0 46%; aspect-ratio: auto; \}/);
     assert.match(css, /\.homepage-featured-body \{ flex: 1 1 54%; \}/);
+    assert.match(featured, /mt-2\.5 min-h-11 shrink-0/);
     assert.match(featured, /line-clamp-3 shrink-0[\s\S]*listing\.description/);
     assert.match(featured, /homepage-featured-footer flex min-h-7 shrink-0/);
   });

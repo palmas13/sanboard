@@ -106,6 +106,7 @@ describe('listing package options and entitlement-first UX', () => {
     assert.match(page, /\/ilan-ver\/yeni\?mode=\$\{/);
     assert.match(page, /lg:grid-cols-2/); assert.match(page, /mx-auto grid max-w-2xl/); assert.match(page, /PackageSkeleton/); assert.match(page, /cache: 'no-store'/); assert.match(page, /Bireysel İlan Hakkını Kullan/); assert.match(page, /Kurumsal İlan Hakkını Kullan/);
     assert.match(page, /pageState\.status === 'LOADING'/); assert.match(page, /pageState\.status === 'ERROR'/); assert.doesNotMatch(page, /router\.(push|replace).*yeni.*useEffect/);
+    assert.doesNotMatch(page, /text-\[var\(--text-dim\)\)][^>]*>İlan hakkı<\/p>/);
     assert.match(entry, /router\.replace\('\/ilan-ver\/paket'\)/); assert.doesNotMatch(entry, /availableCredits > 0/);
     assert.match(create, /if \(!identityReady\)/); assert.match(create, /mode=\$\{requestedMode\}/); assert.match(create, /useSearchParams\(\)/); assert.match(create, /fetch\('\/api\/listing-package-options', \{ cache: 'no-store', signal: controller\.signal \}\)/);
     assert.match(create, /currentProfile\?\.id/); assert.match(create, /return \(\) => controller\.abort\(\)/); assert.doesNotMatch(create, /window\.location\.search/);

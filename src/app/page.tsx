@@ -17,7 +17,25 @@ export default async function HomePage() {
   ]);
 
   const now = Date.now();
-  const featuredListings = allListings.filter((listing) => isListingActivelyFeatured(listing, now));
+  const corporateProfilesById = new Map(allDealers
+    .filter((dealer) => dealer.status === 'APPROVED' && dealer.moderation_status === 'ACTIVE' && !dealer.deleted_at)
+    .map((dealer) => [dealer.id, dealer]));
+  const featuredListings = allListings
+    .filter((listing) => isListingActivelyFeatured(listing, now))
+    .map((listing) => {
+      const corporateProfile = listing.seller_type === 'CORPORATE' && listing.corporate_profile_id
+        ? corporateProfilesById.get(listing.corporate_profile_id)
+        : undefined;
+      const corporateProfileName = corporateProfile?.company_name.trim();
+
+      return {
+        ...listing,
+        corporate_profile: corporateProfileName ? {
+          company_name: corporateProfileName,
+          is_verified: Boolean(corporateProfile?.is_verified),
+        } : undefined,
+      };
+    });
   const vehicleListings = allListings.filter((listing) => listing.category === 'vehicle');
   const propertyListings = allListings.filter((listing) => listing.category === 'property');
   const corporateSellers = allDealers.filter((dealer) => dealer.status === 'APPROVED'

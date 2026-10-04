@@ -15,7 +15,7 @@ const FALLBACK_IMAGES = { vehicle: 'https://images.unsplash.com/photo-1552519507
 
 function HomepageCompactListing({ listing }: { listing: PublicListingSummary }) {
   const image = resolveMediaUrl(listing.cover_image) || FALLBACK_IMAGES[listing.category];
-  const date = listing.published_at ? new Intl.DateTimeFormat('tr-TR', { month: 'short', year: 'numeric' }).format(new Date(listing.published_at)) : null;
+  const date = listing.published_at ? new Intl.DateTimeFormat('tr-TR', { month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(listing.published_at)) : null;
   const primaryMeta = listing.location
     ? <span className="flex min-w-0 items-center gap-1"><MapPin className="h-3 w-3 shrink-0 text-[#ff8a1f]" /><span className="truncate">{listing.location}</span></span>
     : listing.category === 'vehicle'
