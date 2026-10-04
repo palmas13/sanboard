@@ -9,6 +9,7 @@ import { resolveAvatarUrl, resolveMediaUrl } from '@/lib/media/url';
 import { formatCurrency } from '@/lib/utils/format';
 import { resolveListingPackagePageState, type ListingPackageOptions } from '@/lib/listings/package-options';
 import { CANONICAL_PRICING } from '@/lib/payments/pricing';
+import { useToast } from '@/components/feedback/ToastProvider';
 
 type LoadingAction = 'individual-buy' | 'individual-use' | 'corporate-buy' | 'corporate-use' | null;
 
@@ -38,6 +39,7 @@ function FeatureList({ items }: { items: string[] }) {
 
 export default function IlanPaketSecPage() {
   const router = useRouter();
+  const { showToast } = useToast();
   const { currentProfile, isAuthenticated, isLoading: authLoading } = useAuth();
   const [options, setOptions] = useState<ListingPackageOptions | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,7 +94,7 @@ export default function IlanPaketSecPage() {
       if (!response.ok) throw new Error(data.error || 'Ödeme sayfası başlatılamadı.');
       window.location.assign(data.paymentLink);
     } catch (checkoutError: any) {
-      setError(checkoutError.message || 'Ödeme sayfası başlatılamadı.');
+      showToast(checkoutError.message || 'Ödeme sayfası başlatılamadı.', 'error');
       setLoadingAction(null);
     }
   };
@@ -110,8 +112,7 @@ export default function IlanPaketSecPage() {
     <section className="relative overflow-hidden rounded-3xl border border-[var(--border-app)] bg-[var(--bg-surface)] px-5 py-7 sm:px-8 sm:py-9">
       <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-[#FF8A1F]/8 blur-3xl" />
       <div className="relative max-w-3xl space-y-4">
-        <div className="inline-flex items-center gap-2 rounded-full border border-[#FF8A1F]/25 bg-[var(--brand-orange-subtle)] px-3 py-1 text-[11px] font-bold text-[#FF9E45]"><Sparkles className="h-3.5 w-3.5" /><span>PROFİL VE İLAN HAKKI SEÇİMİ</span></div>
-        <div className="space-y-2"><h1 className="text-3xl font-black tracking-tight text-[var(--text-main)] sm:text-4xl">İlan Vermeye Başla</h1><p className="max-w-2xl text-sm leading-6 text-[var(--text-muted)] sm:text-base">İlanını hangi profil altında yayınlayacağını seç ve mevcut ilan haklarını kullan.</p></div>
+        <div className="space-y-2"><h1 className="text-3xl font-black tracking-tight text-[var(--text-main)] sm:text-4xl">İlanını nasıl yayınlamak istiyorsun?</h1><p className="max-w-2xl text-sm leading-6 text-[var(--text-muted)] sm:text-base">Yayınlayan profili ve kullanacağın ilan hakkını aşağıdaki seçeneklerden belirle.</p></div>
         {pageState.status === 'READY' && <div className="flex flex-wrap gap-2 text-xs font-semibold text-[var(--text-muted)]">
           <span className="rounded-lg border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] px-3 py-2">{pageState.options.individual.availableCredits} bireysel ilan hakkı</span>
           {pageState.options.corporate && <span className="rounded-lg border border-[#FF8A1F]/20 bg-[#FF8A1F]/8 px-3 py-2 text-[#FFAE63]">{pageState.options.corporate.availableCredits} kurumsal ilan hakkı</span>}
@@ -122,15 +123,15 @@ export default function IlanPaketSecPage() {
     {pageState.status === 'ERROR' && <div role="alert" className="mt-5 flex items-center justify-between gap-4 rounded-xl border border-[rgba(229,72,77,0.3)] bg-[var(--color-danger-subtle)] p-4 text-sm font-semibold text-[var(--color-danger)]"><span>{pageState.message}</span><button type="button" onClick={() => void loadOptions()} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF8A1F]"><RefreshCw className="h-4 w-4" /> Tekrar Dene</button></div>}
 
     <section className="mt-7" aria-labelledby="package-options-title">
-      <div className="mb-4 flex items-center gap-3"><div className="h-px flex-1 bg-[var(--border-app)]" /><h2 id="package-options-title" className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--text-dim)]">Yayınlama Kimliğini Seç</h2><div className="h-px flex-1 bg-[var(--border-app)]" /></div>
+      <div className="mb-4"><h2 id="package-options-title" className="text-lg font-bold text-[var(--text-main)]">Yayınlayan profil ve ilan hakkı</h2><p className="mt-1 text-xs text-[var(--text-muted)]">Seçiminiz ilan süresini, satıcı kimliğini ve ödeme gereksinimini belirler.</p></div>
       {pageState.status === 'LOADING' ? <PackageSkeleton /> : pageState.status === 'READY' ? <div className={pageState.layout === 'MULTI_OPTION' ? 'grid gap-5 lg:grid-cols-2' : 'mx-auto grid max-w-2xl gap-5'}>
         <article className="surface-card group flex min-w-0 flex-col rounded-2xl border border-[var(--border-app)] p-5 shadow-lg transition duration-200 hover:-translate-y-0.5 hover:border-[#FF8A1F]/40 sm:p-7">
           <div className="flex items-center justify-between gap-3"><span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] px-3 py-1 text-[11px] font-black text-[var(--text-main)]"><User className="h-3.5 w-3.5 text-[#FF8A1F]" /> BİREYSEL İLAN</span><span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--text-dim)]"><Clock3 className="h-3.5 w-3.5" /> 7 gün</span></div>
-          <div className="mt-6 flex min-w-0 items-center gap-3 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)] p-3">
+          <div className="mt-6 flex min-w-0 items-center gap-3 border-y border-[var(--border-app)] py-4">
             {individualAvatar ? <Image src={individualAvatar} alt="" width={44} height={44} className="h-11 w-11 shrink-0 rounded-xl object-cover" /> : <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-orange-subtle)] text-[#FF8A1F]"><User className="h-5 w-5" /></span>}
-            <div className="min-w-0"><p className="text-[11px] font-semibold text-[var(--text-dim)]">Kişisel profil</p><p className="truncate text-sm font-bold text-[var(--text-main)]">{pageState.options.profile.full_name}</p></div>
+            <div className="min-w-0"><p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">Yayınlayan profil · Bireysel</p><p className="truncate text-sm font-bold text-[var(--text-main)]">{pageState.options.profile.full_name}</p></div>
           </div>
-          <div className="mt-6 border-b border-[var(--border-app)] pb-6"><h3 className="text-xl font-black text-[var(--text-main)]">7 Günlük Standart İlan</h3><div className="mt-3">{pageState.options.individual.action === 'USE' ? <p className="text-2xl font-black text-[var(--color-success)]">{pageState.options.individual.availableCredits || 1} İlan Hakkın Var</p> : <div className="flex items-baseline gap-2"><span className="text-4xl font-black text-[var(--text-main)]">{formatCurrency(CANONICAL_PRICING.STANDARD_7_DAY)}</span><span className="text-sm font-semibold text-[var(--text-muted)]">/ 7 gün</span></div>}</div><p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">İlan, aktif karakterinizin kişisel satıcı kimliği altında yayınlanır.</p></div>
+          <div className="mt-6 border-b border-[var(--border-app)] pb-6"><p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">İlan hakkı</p><h3 className="mt-1 text-xl font-black text-[var(--text-main)]">7 Günlük Standart İlan</h3><div className="mt-3">{pageState.options.individual.action === 'USE' ? <p className="text-2xl font-black text-[var(--color-success)]">{pageState.options.individual.availableCredits || 1} İlan Hakkın Var</p> : <div className="flex items-baseline gap-2"><span className="text-4xl font-black text-[var(--text-main)]">{formatCurrency(CANONICAL_PRICING.STANDARD_7_DAY)}</span><span className="text-sm font-semibold text-[var(--text-muted)]">/ 7 gün</span></div>}</div><p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">İlan, aktif profilinize tanımlanmış kişisel satıcı kimliği altında yayınlanır.</p></div>
           <div className="flex-1 py-6"><FeatureList items={individualFeatures} /></div>
           <button type="button" disabled={Boolean(loadingAction)} onClick={() => pageState.options.individual.action === 'USE' ? handleUseCredit('individual') : void startCheckout('individual')} className="btn-primary flex w-full items-center justify-center gap-2 py-3 text-sm font-bold shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF8A1F] disabled:opacity-60">{loadingAction?.startsWith('individual') ? <Loader2 className="h-4 w-4 animate-spin" /> : pageState.options.individual.action === 'USE' ? <Check className="h-4 w-4" /> : null}<span>{pageState.options.individual.action === 'USE' ? 'Bireysel İlan Hakkını Kullan' : `Bireysel İlan Satın Al (${formatCurrency(CANONICAL_PRICING.STANDARD_7_DAY)})`}</span>{!loadingAction?.startsWith('individual') && <ArrowRight className="h-4 w-4" />}</button>
         </article>
@@ -147,6 +148,6 @@ export default function IlanPaketSecPage() {
         </article>}
       </div> : null}
     </section>
-    <div className="mt-6 flex items-center justify-center gap-2 text-center text-[11px] text-[var(--text-dim)]"><ShieldCheck className="h-4 w-4 shrink-0 text-[var(--color-success)]" /><span>Mevcut ilan hakkı varsa ödeme açılmaz; hak yalnız ilan yayınlandığında kanonik akış tarafından kullanılır.</span></div>
+    <div className="mt-6 flex items-center justify-center gap-2 text-center text-[11px] text-[var(--text-dim)]"><ShieldCheck className="h-4 w-4 shrink-0 text-[var(--color-success)]" /><span>Ödeme altyapısı Fleeca Bank tarafından gerçekleştirilmektedir.</span></div>
   </main>;
 }
