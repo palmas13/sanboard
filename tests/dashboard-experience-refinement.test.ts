@@ -142,6 +142,17 @@ describe('dashboard experience refinement regressions', () => {
     assert.doesNotMatch(corporateProfile, /Kurumsal Galeri|Araç Galerisi|Emlak Portföyü/);
   });
 
+  test('profile photo selection preserves unsaved contact and visibility fields', () => {
+    const profile = source('src/app/hesabim/profil/page.tsx');
+    assert.match(profile, /hydratedProfileIdRef\.current === currentProfile\.id/);
+    assert.match(profile, /hydratedProfileIdRef\.current = currentProfile\.id/);
+    assert.match(profile, /\}, \[currentProfile\]\);/);
+    assert.doesNotMatch(profile, /\}, \[currentProfile, avatarFile\]\);/);
+    assert.match(profile, /setAvatarFile\(file\); setAvatarImgError\(false\);/);
+    assert.match(profile, /inputMode="numeric" maxLength=\{8\}/);
+    assert.match(profile, /replace\(\/\\D\/g, ''\)\.slice\(0, 8\)/);
+  });
+
   test('property view switch preserves URL-owned filters and renders both modes', () => {
     const page = source('src/app/mulk/page.tsx');
     const view = source('src/components/listings/PropertyListingsView.tsx');

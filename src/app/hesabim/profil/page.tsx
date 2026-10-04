@@ -18,6 +18,7 @@ function VisibilityControl({ value, onChange, label }: { value: ContactVisibilit
 export default function HesabimProfilPage() {
   const { currentProfile, updateCurrentProfile, refreshProfile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const hydratedProfileIdRef = useRef<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState(currentProfile?.avatar_path || currentProfile?.avatar_url || '');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarImgError, setAvatarImgError] = useState(false);
@@ -30,13 +31,16 @@ export default function HesabimProfilPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!currentProfile) return;
-    if (!avatarFile) setAvatarUrl(currentProfile.avatar_path || currentProfile.avatar_url || '');
+    if (!currentProfile || hydratedProfileIdRef.current === currentProfile.id) return;
+    hydratedProfileIdRef.current = currentProfile.id;
+    setAvatarUrl(currentProfile.avatar_path || currentProfile.avatar_url || '');
+    setAvatarFile(null);
+    setAvatarImgError(false);
     setPhone(currentProfile.phone || '');
     setSanmailEmail(currentProfile.sanmail_email || '');
     setPhoneVisibility(currentProfile.phone_visibility || 'PUBLIC');
     setSanmailVisibility(currentProfile.sanmail_visibility || 'PUBLIC');
-  }, [currentProfile, avatarFile]);
+  }, [currentProfile]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setError(''); const file = event.target.files?.[0]; if (!file) return;
@@ -65,7 +69,7 @@ export default function HesabimProfilPage() {
     {error && <div className="mt-5 flex items-center gap-2 rounded-xl border border-red-500/20 bg-[var(--color-danger-subtle)] p-3.5 text-xs font-semibold text-[var(--color-danger)]"><AlertCircle className="h-4 w-4" />{error}</div>}
     <form onSubmit={handleSave} className="mt-7 space-y-8">
       <section className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(280px,1.1fr)] lg:items-center"><div className="flex flex-col gap-5 sm:flex-row sm:items-center"><button type="button" onClick={() => fileInputRef.current?.click()} className="group relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border-2 border-[#FF8A1F]/60 bg-[var(--brand-orange-subtle)]">{displayAvatar && !avatarImgError ? <SanboardImage src={displayAvatar} alt="Profil" fill sizes="96px" onError={() => setAvatarImgError(true)} className="object-cover" /> : <span className="text-2xl font-black text-[#FF8A1F]">{currentProfile?.full_name?.charAt(0) || 'U'}</span>}<span className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover:opacity-100 motion-reduce:transition-none"><Camera className="h-5 w-5 text-white" /></span></button><div><button type="button" onClick={() => fileInputRef.current?.click()} className="btn-secondary inline-flex items-center gap-2 px-3.5 py-2 text-xs"><Camera className="h-3.5 w-3.5 text-[#FF8A1F]" />Fotoğraf Seç</button><p className="mt-2 text-[11px] text-[var(--text-dim)]">JPG, PNG veya WEBP · maksimum 2 MB</p><input ref={fileInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={handleFileChange} className="hidden" /></div></div><div><label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-[var(--text-muted)]"><User className="h-3.5 w-3.5" />Karakter Adı</label><input value={currentProfile?.full_name || ''} disabled className="form-input cursor-not-allowed bg-[var(--bg-surface-secondary)] text-sm font-semibold opacity-80" /><p className="mt-1.5 text-[11px] text-[var(--text-dim)]">Karakter adı GTA World profilinizden gelir · Kayıt: {currentProfile ? formatDate(currentProfile.created_at) : '-'}</p></div></section>
-      <section className="border-t border-[var(--border-app)] pt-8"><div className="grid gap-5 sm:grid-cols-2"><div className="space-y-3"><label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-muted)]"><Phone className="h-3.5 w-3.5 text-[#FF8A1F]" />Telefon</label><input value={phone} onChange={(e) => setPhone(e.target.value)} className="form-input text-sm" /><VisibilityControl label="Telefon görünürlüğü" value={phoneVisibility} onChange={setPhoneVisibility} /></div><div className="space-y-3"><label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-muted)]"><Mail className="h-3.5 w-3.5 text-[#FF8A1F]" />SanMail</label><input value={sanmailEmail} onChange={(e) => setSanmailEmail(e.target.value)} className="form-input text-sm" /><VisibilityControl label="SanMail görünürlüğü" value={sanmailVisibility} onChange={setSanmailVisibility} /></div></div></section>
+      <section className="border-t border-[var(--border-app)] pt-8"><div className="grid gap-5 sm:grid-cols-2"><div className="space-y-3"><label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-muted)]"><Phone className="h-3.5 w-3.5 text-[#FF8A1F]" />Telefon</label><input value={phone} inputMode="numeric" maxLength={8} onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 8))} className="form-input text-sm" /><VisibilityControl label="Telefon görünürlüğü" value={phoneVisibility} onChange={setPhoneVisibility} /></div><div className="space-y-3"><label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-muted)]"><Mail className="h-3.5 w-3.5 text-[#FF8A1F]" />SanMail</label><input value={sanmailEmail} onChange={(e) => setSanmailEmail(e.target.value)} className="form-input text-sm" /><VisibilityControl label="SanMail görünürlüğü" value={sanmailVisibility} onChange={setSanmailVisibility} /></div></div></section>
       <div className="flex justify-end border-t border-[var(--border-app)] pt-6"><button type="submit" disabled={submitting} className="btn-primary inline-flex min-w-40 items-center justify-center gap-2 px-6 py-2.5 text-xs">{submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{submitting ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}</button></div>
     </form></div>;
 }
