@@ -83,22 +83,22 @@ describe('listing title 40 character limit', () => {
     assert.equal(db.listings[0].title, 'Legacy title');
   });
 
-  test('individual create API accepts 200 and rejects 201 description characters', async () => {
+  test('individual create API accepts 240 and rejects 241 description characters', async () => {
     const validResponse = await createListing(request(
       'http://localhost/api/listings',
-      vehicle('Geçerli İlan', { description: 'A'.repeat(200) })
+      vehicle('Geçerli İlan', { description: 'A'.repeat(240) })
     ));
     assert.notEqual(validResponse.status, 400);
 
     const invalidResponse = await createListing(request(
       'http://localhost/api/listings',
-      vehicle('Geçersiz İlan', { description: 'A'.repeat(201) })
+      vehicle('Geçersiz İlan', { description: 'A'.repeat(241) })
     ));
     assert.equal(invalidResponse.status, 400);
     assert.equal((await invalidResponse.json()).error, LISTING_DESCRIPTION_MAX_ERROR);
   });
 
-  test('individual edit API rejects a legacy description over 200 without changing the listing', async () => {
+  test('individual edit API rejects a legacy description over 240 without changing the listing', async () => {
     db.listings.push({
       id: 'listing-description', listing_number: '#DESC', seller_profile_id: profileId,
       seller_type: 'INDIVIDUAL', corporate_profile_id: null,
@@ -109,7 +109,7 @@ describe('listing title 40 character limit', () => {
     const response = await updateListing(
       request(
         'http://localhost/api/user/listings/listing-description',
-        vehicle('Legacy description', { description: 'A'.repeat(201) }),
+        vehicle('Legacy description', { description: 'A'.repeat(241) }),
         'PUT'
       ),
       { params: Promise.resolve({ id: 'listing-description' }) }

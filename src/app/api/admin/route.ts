@@ -8,6 +8,7 @@ import {
   toggleUserBan,
   updatePackagePrice,
   updateReportStatus,
+  getRecentCharacterProfiles,
 } from '@/lib/db/admin';
 import {
   getAllDealers,
@@ -42,10 +43,11 @@ export async function GET(req: NextRequest) {
   if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
 
   try {
-    const [stats, listings, users, reports, rawDealers, rawApplications, tickets] = await Promise.all([
+    const [stats, listings, users, recentCharacters, reports, rawDealers, rawApplications, tickets] = await Promise.all([
       getAdminStats(),
       getAllListingsForAdmin(),
       getAllUsersForAdmin(),
+      getRecentCharacterProfiles(6),
       getReportsForAdmin(),
       getAllDealers(),
       getAllApplications(),
@@ -154,6 +156,7 @@ export async function GET(req: NextRequest) {
       stats,
       listings,
       users,
+      recentCharacters,
       reports,
       dealers: enrichedDealers,
       applications: enrichedApplications,

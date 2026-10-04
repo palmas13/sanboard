@@ -326,18 +326,18 @@ export function FilterSidebar({
 
           {/* Mileage Range */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[var(--text-muted)]">Kilometre</label>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">Mil</label>
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="number"
-                placeholder="Min KM"
+                placeholder="Min Mil"
                 value={minMileage}
                 onChange={(e) => setMinMileage(e.target.value)}
                 className="form-input text-xs"
               />
               <input
                 type="number"
-                placeholder="Max KM"
+                placeholder="Maks Mil"
                 value={maxMileage}
                 onChange={(e) => setMaxMileage(e.target.value)}
                 className="form-input text-xs"

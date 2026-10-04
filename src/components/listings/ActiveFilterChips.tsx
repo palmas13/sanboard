@@ -63,11 +63,11 @@ export function ActiveFilterChips({ baseRoute = '/arac', className = '' }: Activ
   if (minMileage || maxMileage) {
     let mileageLabel = '';
     if (minMileage && maxMileage) {
-      mileageLabel = `${Number(minMileage).toLocaleString('tr-TR')} km – ${Number(maxMileage).toLocaleString('tr-TR')} km`;
+      mileageLabel = `${Number(minMileage).toLocaleString('tr-TR')} mil – ${Number(maxMileage).toLocaleString('tr-TR')} mil`;
     } else if (minMileage) {
-      mileageLabel = `Min: ${Number(minMileage).toLocaleString('tr-TR')} km`;
+      mileageLabel = `Min: ${Number(minMileage).toLocaleString('tr-TR')} mil`;
     } else if (maxMileage) {
-      mileageLabel = `Maks: ${Number(maxMileage).toLocaleString('tr-TR')} km`;
+      mileageLabel = `Maks: ${Number(maxMileage).toLocaleString('tr-TR')} mil`;
     }
     chips.push({ id: 'mileage', label: mileageLabel, keysToRemove: ['minMileage', 'maxMileage'] });
   }

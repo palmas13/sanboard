@@ -233,7 +233,7 @@ export default function IlanDuzenlePage({
         return;
       }
       if (mileage === '' || !isIntegerInRange(mileage, 0, Number.MAX_SAFE_INTEGER)) {
-        setError('Kilometre 0 veya daha büyük bir tam sayı olmalıdır.');
+        setError('Mil 0 veya daha büyük bir tam sayı olmalıdır.');
         return;
       }
     }
@@ -563,9 +563,9 @@ export default function IlanDuzenlePage({
                 />
               </div>
 
-              {/* Kilometre */}
+              {/* Mil */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-[var(--text-muted)]">Kilometre</label>
+                <label className="text-xs font-semibold text-[var(--text-muted)]">Mil</label>
                 <input
                   type="text"
                   inputMode="numeric"

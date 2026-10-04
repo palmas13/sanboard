@@ -373,7 +373,7 @@ function YeniIlanOlusturContent() {
         invalid.plate = true;
       }
       if (mileage === '' || !isIntegerInRange(mileage, 0, Number.MAX_SAFE_INTEGER)) {
-        errors.push('Kilometre 0 veya daha büyük bir tam sayı olmalıdır.');
+        errors.push('Mil 0 veya daha büyük bir tam sayı olmalıdır.');
         invalid.mileage = true;
       }
       if (engineHealth !== '' && !isIntegerInRange(engineHealth, 0, 100)) {
@@ -857,7 +857,7 @@ function YeniIlanOlusturContent() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-[var(--text-muted)]">Kilometre</label>
+                      <label className="text-xs font-semibold text-[var(--text-muted)]">Mil</label>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -1285,9 +1285,9 @@ function YeniIlanOlusturContent() {
                     <span className="font-bold text-[var(--text-main)] font-mono">{plate}</span>
                   </div>
                   <div>
-                    <span className="text-[var(--text-muted)]">Kilometre: </span>
+                    <span className="text-[var(--text-muted)]">Mil: </span>
                     <span className="font-bold text-[var(--text-main)]">
-                      {Number(mileage).toLocaleString('tr-TR')} km
+                      {Number(mileage).toLocaleString('tr-TR')} mil
                     </span>
                   </div>
                   <div><span className="text-[var(--text-muted)]">{VEHICLE_LEVEL_FIELDS.brake_upgrade.label}: </span><span className="font-bold text-[var(--text-main)]">{brakeUpgrade}</span></div>

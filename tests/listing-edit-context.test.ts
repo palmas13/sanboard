@@ -62,7 +62,7 @@ describe('listing edit ownership and validation context', () => {
     assert.equal(db.listings[0].vehicle_details?.transmission_upgrade, 0);
   });
 
-  test('corporate edit API accepts 200 and rejects 201 description characters', async () => {
+  test('corporate edit API accepts 240 and rejects 241 description characters', async () => {
     const payload = {
       category: 'vehicle', subcategory: 'Otomobil', title: 'Kurumsal Araç', price: 1000,
       offers_enabled: true, minimum_offer_amount: null, images: db.listings[0].images,
@@ -73,17 +73,17 @@ describe('listing edit ownership and validation context', () => {
 
     const validResponse = await PUT(request('PUT', {
       ...payload,
-      description: 'A'.repeat(200),
+      description: 'A'.repeat(240),
     }), { params: Promise.resolve({ id: 'corporate-listing' }) });
     assert.equal(validResponse.status, 200);
-    assert.equal(db.listings[0].description.length, 200);
+    assert.equal(db.listings[0].description.length, 240);
 
     const invalidResponse = await PUT(request('PUT', {
       ...payload,
-      description: 'A'.repeat(201),
+      description: 'A'.repeat(241),
     }), { params: Promise.resolve({ id: 'corporate-listing' }) });
     assert.equal(invalidResponse.status, 400);
     assert.equal((await invalidResponse.json()).error, LISTING_DESCRIPTION_MAX_ERROR);
-    assert.equal(db.listings[0].description.length, 200);
+    assert.equal(db.listings[0].description.length, 240);
   });
 });

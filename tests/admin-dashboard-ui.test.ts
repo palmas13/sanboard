@@ -8,7 +8,8 @@ const css = readFileSync('src/app/yonetim/admin.module.css', 'utf8');
 test('admin dashboard uses responsive sidebar and enriched-shape fallbacks', () => {
   assert.match(page, /aria-label="Yönetim bölümleri"/);
   assert.match(page, /data\?\.summary \|\| data\?\.stats/);
-  assert.match(page, /data\?\.users\?\.items \|\| data\?\.users \|\| \[\]/);
+  assert.match(page, /data\?\.recentCharacters \|\| \[\]/);
+  assert.match(page, /profile\.full_name/);
   assert.match(page, /data\?\.reports\?\.items \|\| data\?\.reports \|\| \[\]/);
   assert.match(css, /@media\(max-width:900px\)/);
   assert.doesNotMatch(page, /Tabs Navigation|Sanboard Yönetim Paneli/);

@@ -3,10 +3,12 @@ import Link from 'next/link';
 import { BadgeHelp, FileCheck2, Info, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
 import { FaqAccordion } from '@/components/faq/FaqAccordion';
 import { faqGroups } from '@/data/faq';
+import { getAbsoluteUrl } from '@/lib/urls';
 
 export const metadata: Metadata = {
-  title: 'Bilgi Merkezi | Sanboard',
+  title: 'Keşfet | Sanboard',
   description: 'Sanboard hakkında sık sorulan sorular, kullanım koşulları, gizlilik politikası ve platform bilgileri.',
+  alternates: { canonical: getAbsoluteUrl('/kesfet') },
 };
 
 const sections = [

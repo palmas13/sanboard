@@ -20,6 +20,9 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    if (!/^\d+$/.test(contactPhone)) {
+      return NextResponse.json({ error: 'Telefon numarası yalnızca rakamlardan oluşmalıdır.' }, { status: 400 });
+    }
 
     const repo = getDealerRepository();
     const result = await repo.createApplication({

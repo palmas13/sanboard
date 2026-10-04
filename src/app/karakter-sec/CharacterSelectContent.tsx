@@ -153,7 +153,7 @@ export function CharacterSelectContent({ redirect, isTestSource, defaultCharacte
                         {char.displayName}
                       </h3>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="inline-flex items-center gap-1 text-xs text-[var(--color-success)] font-medium">
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium ${char.hasProfile === false ? 'text-amber-500' : 'text-[var(--color-success)]'}`}>
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>{isActive ? 'Aktif' : char.hasProfile === false ? 'İlk kurulum gerekli' : 'Profil mevcut'}</span>
                         </span>

@@ -47,7 +47,7 @@ export function calculateListingQuality(input: ListingQualityInput): ListingQual
     ? [
         { weight: 7, complete: hasText(input.brand), suggestion: 'Araç markasını ekle.', priority: 1 },
         { weight: 7, complete: hasText(input.model), suggestion: 'Araç modelini ekle.', priority: 1 },
-        { weight: 6, complete: hasNonNegativeNumber(input.mileage), suggestion: 'Kilometre bilgisini ekle.', priority: 2 },
+        { weight: 6, complete: hasNonNegativeNumber(input.mileage), suggestion: 'Mil bilgisini ekle.', priority: 2 },
         { weight: 4, complete: hasText(input.fuelType), suggestion: 'Yakıt türünü belirt.', priority: 3 },
         { weight: 4, complete: hasNonNegativeNumber(input.engineHealth), suggestion: 'Motor sağlığı bilgisini ekle.', priority: 3 },
       ]

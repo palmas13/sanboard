@@ -53,7 +53,7 @@ describe('Sanboard Business Rules & Validation Tests', () => {
     assert.equal(result.error?.issues[0]?.message, LISTING_TITLE_MAX_ERROR);
   });
 
-  test('Description length constraint accepts 200 and rejects 201 characters', () => {
+  test('Description length constraint accepts 240 and rejects 241 characters', () => {
     const base = {
       title: 'Geçerli Başlık',
       price: 50000,
@@ -73,11 +73,10 @@ describe('Sanboard Business Rules & Validation Tests', () => {
     assert.equal(result.error?.issues[0]?.message, LISTING_DESCRIPTION_MAX_ERROR);
   });
 
-  test('Description length migration expands listings column to 200 characters', () => {
-    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20260930230000_listing_description_length.sql'), 'utf8');
+  test('Description length migration expands listings column to 240 characters', () => {
+    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20261004010000_listing_description_length_240.sql'), 'utf8');
     assert.match(sql, /ALTER TABLE public\.listings/);
-    assert.match(sql, /ALTER COLUMN description TYPE VARCHAR\(200\)/);
-    assert.match(sql, /USING left\(description, 200\)/);
+    assert.match(sql, /ALTER COLUMN description TYPE VARCHAR\(240\)/);
   });
 
   test('Photo constraint: max 3 photos, each max 2MB, exactly one cover', () => {

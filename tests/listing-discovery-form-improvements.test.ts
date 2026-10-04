@@ -83,7 +83,8 @@ describe('listing discovery and form improvements', () => {
 
     const badge = source('src/components/listings/FeaturedBadge.tsx');
     assert.match(badge, /aria-label="Öne çıkan ilan"/);
-    assert.match(badge, /<Sparkles/);
+    assert.match(badge, /<Rocket/);
+    assert.doesNotMatch(badge, /Sparkles/);
     assert.doesNotMatch(badge, />\s*ÖNE ÇIKAN\s*</);
 
     const application = source('src/app/hesabim/kurumsal/basvuru/page.tsx');

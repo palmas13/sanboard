@@ -1,6 +1,6 @@
 import React from 'react';
 import { SanboardLogo } from '@/components/common/SanboardLogo';
-import { ShieldCheck, Building, Car } from 'lucide-react';
+import { ShieldCheck, Building, Car, Gamepad2 } from 'lucide-react';
 
 export default function HakkimizdaPage() {
   return (
@@ -44,6 +44,17 @@ export default function HakkimizdaPage() {
           </div>
         </div>
       </div>
+
+      <section className="rounded-2xl border border-sky-400/20 bg-sky-400/[0.04] p-6 sm:p-8" aria-labelledby="ooc-title">
+        <div className="flex items-start gap-4">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-400/10 text-sky-300"><Gamepad2 className="h-5 w-5" /></span>
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-300">OOC · Platform sınırları</p>
+            <h2 id="ooc-title" className="mt-2 text-lg font-bold text-[var(--text-main)]">Bağımsız bir topluluk projesi</h2>
+            <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">Sanboard, GTA World yönetimi tarafından işletilen veya resmî olarak desteklenen bir hizmet değildir. Tüm marka ve oyun varlıkları ilgili sahiplerine aittir; Sanboard gerçek para ticaretine aracılık etmez.</p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

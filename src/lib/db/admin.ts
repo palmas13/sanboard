@@ -1,6 +1,7 @@
 import { db } from './store';
 import { CharacterProfile, Listing, Report, User } from '@/types';
 import { getSupabaseAdminClient } from './supabase-client';
+import { getListingRepository } from './repositories';
 
 export interface AdminStats {
   totalUsers: number;
@@ -155,9 +156,29 @@ export async function getAllListingsForAdmin(): Promise<Listing[]> {
 }
 
 export async function adminDelistListing(listingId: string): Promise<boolean> {
-  const { removeListing } = await import('./listings');
-  const result = await removeListing(listingId, 'SYSTEM_ADMIN');
+  const repo = getListingRepository();
+  const result = repo.removeListing
+    ? await repo.removeListing(listingId, 'SYSTEM_ADMIN')
+    : await repo.closeListing(listingId, 'SYSTEM_ADMIN', 'REMOVED', 'OTHER');
   return result.success;
+}
+
+export async function getRecentCharacterProfiles(limit = 6): Promise<Pick<CharacterProfile, 'id' | 'full_name' | 'created_at' | 'role'>[]> {
+  if (process.env.DATA_STORE === 'supabase') {
+    const client = getSupabaseAdminClient();
+    if (client) {
+      const { data, error } = await client
+        .from('character_profiles')
+        .select('id, full_name, created_at, role')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) throw new Error(error.message);
+      return data || [];
+    }
+  }
+  return [...db.profiles]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, limit);
 }
 
 export async function getAllUsersForAdmin(): Promise<AdminUserSummary[]> {

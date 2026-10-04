@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE public.listings
+  ALTER COLUMN description TYPE VARCHAR(240);
+
+COMMIT;

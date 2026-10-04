@@ -477,7 +477,7 @@ export default function AdminPage() {
   };
 
   // Enriched payloads are preferred; legacy arrays remain supported during rollout.
-  const users = data?.users?.items || data?.users || [];
+  const recentCharacters = data?.recentCharacters || [];
   const reports = data?.reports?.items || data?.reports || [];
   const listings = data?.listings?.items || data?.listings || [];
 
@@ -616,8 +616,8 @@ export default function AdminPage() {
 
       {activeTab === 'overview' && (
         <section className={styles.overviewGrid} aria-labelledby="overview-title">
-          <div className="surface-card p-5"><h2 id="overview-title" className="font-bold">Son kullanıcılar</h2><p className="text-xs text-[var(--text-muted)] mt-1 mb-3">Hesap ve aktif karakter eşlemesi</p>
-            <div className={styles.compactList}>{users.slice(0, 6).map((item: any) => { const account = item.user || item; const chars = item.characters || account.characters || []; return <div key={account.id}><div><strong>{account.display_name || account.username || chars[0]?.display_name || 'İsimsiz hesap'}</strong><small>{chars.length ? chars.map((c: any) => c.display_name || c.name).join(', ') : 'Karakter eşleşmesi yok'}</small></div><span>{account.status || 'ACTIVE'}</span></div>; })}</div>
+          <div className="surface-card p-5"><h2 id="overview-title" className="font-bold">Son kullanıcılar</h2><p className="text-xs text-[var(--text-muted)] mt-1 mb-3">En son oluşturulan karakter profilleri</p>
+            <div className={styles.compactList}>{recentCharacters.map((profile: any) => <div key={profile.id}><div><strong>{profile.full_name}</strong><small>{new Date(profile.created_at).toLocaleDateString('tr-TR')}</small></div><span>{profile.role || 'USER'}</span></div>)}</div>
           </div>
           <div className="surface-card p-5 border border-[#FF8A1F]/20"><h2 className="font-bold">İlgilenmeniz Gerekenler</h2><p className="text-xs text-[var(--text-muted)] mt-1 mb-3">Admin aksiyonu bekleyen işlemler</p>{workQueue.length > 0 ? <div className="space-y-2">{workQueue.map((item) => { const Icon = item.icon; return <button key={item.id} type="button" onClick={() => { setActiveTab(item.id); if (item.id === 'dealers') setCorporateSubTab('applications'); }} className="w-full flex items-center gap-3 rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/40 p-3 text-left hover:border-[#FF8A1F]/35 transition-colors"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--brand-orange-subtle)] text-[#FF8A1F]"><Icon className="h-4 w-4" /></span><span className="min-w-0 flex-1"><strong className="block text-xs text-[var(--text-main)]">{item.title}</strong><small className="block truncate text-[11px] text-[var(--text-muted)]">{item.description}</small></span><b className="rounded-full bg-[#FF8A1F] px-2 py-0.5 text-[11px] text-black">{item.count}</b><span className="text-[11px] font-bold text-[#FF8A1F]">{item.action}</span></button>; })}</div> : <div className="rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/30 p-4 text-xs text-[var(--text-muted)]"><CheckCircle className="mb-2 h-5 w-5 text-[var(--color-success)]" />Şu an ilgilenmeniz gereken bir işlem yok.</div>}</div>
         </section>

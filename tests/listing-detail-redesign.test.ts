@@ -41,10 +41,10 @@ describe('premium listing detail redesign', () => {
     assert.doesNotMatch(layout, /h-\[\d|min-h-\[\d/);
   });
 
-  test('listing description safely wraps an uninterrupted 200-character value inside its card', () => {
-    const uninterruptedDescription = 'A'.repeat(200);
+  test('listing description safely wraps an uninterrupted 240-character value inside its card', () => {
+    const uninterruptedDescription = 'A'.repeat(240);
 
-    assert.equal(uninterruptedDescription.length, 200);
+    assert.equal(uninterruptedDescription.length, 240);
     assert.match(layout, /data-testid="(?:vehicle|property)-description-row"[^>]*min-w-0/);
     assert.match(description, /data-testid="listing-description"[^>]*min-w-0 max-w-full/);
     assert.match(description, /<p className="[^"]*max-w-full[^"]*\[overflow-wrap:anywhere\][^"]*"/);

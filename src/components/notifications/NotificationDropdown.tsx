@@ -311,7 +311,7 @@ export function NotificationDropdown() {
                 <Bell className="w-6 h-6 mx-auto text-[var(--text-dim)] stroke-1" />
                 <p className="font-semibold text-[var(--text-main)]">Henüz bildiriminiz yok</p>
                 <p className="text-[11px] text-[var(--text-dim)]">
-                  İlanlarınızla ilgili gelişmeler ve destek yanıtları burada listelenir.
+                  İlanlarınız, teklifleriniz, destek yanıtlarınız vb. gibi gelişmeleri buradan takip edebilirsiniz.
                 </p>
               </div>
             )}

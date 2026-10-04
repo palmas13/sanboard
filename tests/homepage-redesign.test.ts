@@ -93,7 +93,8 @@ describe('homepage marketplace redesign', () => {
     assert.match(featured, /<FeaturedBadge/);
     assert.match(featured, /icon="rocket"/);
     assert.match(marketplace, /SectionHeader icon=\{Rocket\} title="Öne Çıkan İlanlar"/);
-    assert.match(badge, /icon === 'rocket' \? Rocket : Sparkles/);
+    assert.match(badge, /<Rocket aria-hidden="true"/);
+    assert.doesNotMatch(badge, /Sparkles/);
     assert.doesNotMatch(featured, />Öne Çıkarılan</);
     assert.match(featured, /listing\.description/);
     assert.match(featured, /listing\.subcategory/);

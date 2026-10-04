@@ -78,7 +78,7 @@ export function getVehicleComparisonSections(listingA: Listing, listingB: Listin
       row('category', 'Kategori', listingA.subcategory, listingB?.subcategory, listingA.subcategory || 'Araç', listingB?.subcategory || '—'),
       row('brand', 'Marka', vA?.brand, vB?.brand, vA?.brand || 'Belirtilmemiş', missingB(vB?.brand || 'Belirtilmemiş')),
       row('model', 'Model', vA?.model, vB?.model, vA?.model || 'Belirtilmemiş', missingB(vB?.model || 'Belirtilmemiş')),
-      row('mileage', 'Kilometre', vA?.mileage, vB?.mileage, vA?.mileage === undefined ? 'Belirtilmemiş' : `${vA.mileage.toLocaleString('tr-TR')} km`, missingB(vB?.mileage === undefined ? 'Belirtilmemiş' : `${vB.mileage.toLocaleString('tr-TR')} km`)),
+      row('mileage', 'Mil', vA?.mileage, vB?.mileage, vA?.mileage === undefined ? 'Belirtilmemiş' : `${vA.mileage.toLocaleString('tr-TR')} mil`, missingB(vB?.mileage === undefined ? 'Belirtilmemiş' : `${vB.mileage.toLocaleString('tr-TR')} mil`)),
       row('fuel', 'Yakıt Tipi', vA?.fuel_type, vB?.fuel_type, formatFuel(vA?.fuel_type), missingB(formatFuel(vB?.fuel_type))),
     ]},
     { key: 'performance', title: 'Performans', description: 'Motor, aktarma ve sürüş donanımları', icon: Gauge, rows: performanceRows },

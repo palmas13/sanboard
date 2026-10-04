@@ -4,8 +4,8 @@ import { isMotorcycleCategory, isValidVehicleSelection, VEHICLE_CATEGORIES } fro
 
 export const LISTING_TITLE_MAX_LENGTH = 40;
 export const LISTING_TITLE_MAX_ERROR = 'İlan başlığı en fazla 40 karakter olabilir.';
-export const LISTING_DESCRIPTION_MAX_LENGTH = 200;
-export const LISTING_DESCRIPTION_MAX_ERROR = 'Açıklama en fazla 200 karakter olabilir';
+export const LISTING_DESCRIPTION_MAX_LENGTH = 240;
+export const LISTING_DESCRIPTION_MAX_ERROR = 'Açıklama en fazla 240 karakter olabilir';
 
 export const vehicleCategories = VEHICLE_CATEGORIES;
 
@@ -99,9 +99,9 @@ export const vehicleListingSchema = z.object({
   model: z.string().trim().min(1, 'Araç modeli zorunludur'),
   plate: z.string().trim().min(2, 'Plaka bilgisi zorunludur'),
   mileage: z
-    .number({ message: 'Kilometre geçerli bir sayı olmalıdır' })
+    .number({ message: 'Mil geçerli bir sayı olmalıdır' })
     .int()
-    .min(0, 'Kilometre negatif olamaz'),
+    .min(0, 'Mil negatif olamaz'),
   engine_upgrade: vehicleLevelSchema('engine_upgrade').default(0),
   transmission_upgrade: vehicleLevelSchema('transmission_upgrade').default(0),
   brake_upgrade: vehicleLevelSchema('brake_upgrade').default(0),

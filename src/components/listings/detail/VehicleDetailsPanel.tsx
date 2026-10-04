@@ -33,7 +33,7 @@ export function VehicleDetailsPanel({ listing }: { listing: MemberListingDetail 
     { label: 'Marka', value: details.brand, icon: CarFront },
     { label: 'Model', value: details.model, icon: Tag },
     { label: 'Plaka', value: details.plate, icon: Hash },
-    { label: 'Kilometre', value: Number.isFinite(details.mileage) ? `${formatNumber(details.mileage)} km` : null, icon: Gauge },
+    { label: 'Mil', value: Number.isFinite(details.mileage) ? `${formatNumber(details.mileage)} mil` : null, icon: Gauge },
   ];
   const upgrades: ListingInfoItem[] = [
     { label: 'Motor Yükseltme', value: level(details.engine_upgrade), badge: true },

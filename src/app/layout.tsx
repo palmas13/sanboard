@@ -23,6 +23,7 @@ import { CompareTray } from '@/components/compare/CompareTray';
 import { PropertyCompareProvider } from '@/components/compare/PropertyCompareContext';
 import { PropertyCompareTray } from '@/components/compare/PropertyCompareTray';
 import { OfferCenterProvider } from '@/components/offers/OfferCenter';
+import { ToastProvider } from '@/components/feedback/ToastProvider';
 
 export async function generateMetadata(): Promise<Metadata> {
   const favicon = await getFaviconSetting();
@@ -82,7 +83,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen flex flex-col antialiased bg-[var(--bg-app)] text-[var(--text-main)]`}
       >
-        <AuthProvider><OfferCenterProvider>
+        <ToastProvider><AuthProvider><OfferCenterProvider>
           <CompareProvider>
             <PropertyCompareProvider>
               <Navbar />
@@ -92,7 +93,7 @@ export default function RootLayout({
               <PropertyCompareTray />
             </PropertyCompareProvider>
           </CompareProvider>
-        </OfferCenterProvider></AuthProvider>
+        </OfferCenterProvider></AuthProvider></ToastProvider>
       </body>
     </html>
   );

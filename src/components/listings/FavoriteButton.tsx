@@ -5,6 +5,7 @@ import { Heart } from 'lucide-react';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useRouter } from 'next/navigation';
 import { readJsonResponse } from '@/lib/http/json-response';
+import { useToast } from '@/components/feedback/ToastProvider';
 
 interface FavoriteButtonProps {
   listingId: string;
@@ -109,6 +110,7 @@ export function FavoriteButton({
 }: FavoriteButtonProps) {
   const { currentProfile, isAuthenticated, authStatus } = useAuth();
   const router = useRouter();
+  const { showToast } = useToast();
 
   const profileId = currentProfile?.id;
   const cacheKey = profileId ? `${profileId}:${listingId}` : null;
@@ -117,7 +119,6 @@ export function FavoriteButton({
   const [isFavorited, setIsFavorited] = useState(cached?.isFavorited ?? initialIsFavorited);
   const [count, setCount] = useState(favoriteCountCache.get(listingId) ?? initialCount);
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
   const mutationPendingRef = useRef(false);
   const mutationVersionRef = useRef(0);
 
@@ -181,7 +182,6 @@ export function FavoriteButton({
     }
 
     if (mutationPendingRef.current) return;
-    setErrorMessage('');
 
     // Optimistic toggle
     const prevFavorited = isFavorited;
@@ -214,7 +214,7 @@ export function FavoriteButton({
         setIsFavorited(prevFavorited);
         setCount(prevCount);
         if (cacheKey) favoriteStateCache.delete(cacheKey);
-        setErrorMessage('Oturumunuz sona erdi. Lütfen tekrar giriş yapın.');
+        showToast('Oturumunuz sona erdi. Lütfen tekrar giriş yapın.', 'error');
         router.push(`/giris?redirect=/ilan/${listingId}`);
         return;
       }
@@ -234,7 +234,7 @@ export function FavoriteButton({
         };
         if (cacheKey) publishFavoriteState(cacheKey, revertEntry);
         onToggle?.(prevFavorited, prevCount);
-        setErrorMessage(error instanceof Error ? error.message : 'Favori işlemi tamamlanamadı.');
+        showToast(error instanceof Error ? error.message : 'Favori işlemi tamamlanamadı.', 'error');
         return;
       }
 
@@ -256,7 +256,7 @@ export function FavoriteButton({
       };
       if (cacheKey) publishFavoriteState(cacheKey, revertEntry);
       onToggle?.(prevFavorited, prevCount);
-      setErrorMessage(error instanceof Error ? error.message : 'Favori işlemi tamamlanamadı.');
+      showToast(error instanceof Error ? error.message : 'Favori işlemi tamamlanamadı.', 'error');
     } finally {
       if (mutationVersionRef.current === mutationVersion) mutationPendingRef.current = false;
       setIsLoading(false);
@@ -290,12 +290,6 @@ export function FavoriteButton({
     </button>
   );
 
-  const errorElement = errorMessage ? (
-    <span role="alert" className="max-w-64 text-right text-[10px] font-semibold text-[var(--color-danger)]">
-      {errorMessage}
-    </span>
-  ) : null;
-
   if (proofText) {
     return (
       <div data-testid="favorite-metadata" className="flex min-w-0 flex-1 flex-col items-stretch gap-1">
@@ -308,7 +302,6 @@ export function FavoriteButton({
           </div>
           <span className="ml-auto shrink-0">{buttonElement}</span>
         </div>
-        {errorElement}
       </div>
     );
   }
@@ -316,7 +309,6 @@ export function FavoriteButton({
   return (
     <span className="relative inline-flex flex-col items-end gap-1">
       {buttonElement}
-      {errorElement}
     </span>
   );
 }

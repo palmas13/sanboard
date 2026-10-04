@@ -43,7 +43,7 @@ describe('admin work queue, support categories and listing quality', () => {
   test('quality reacts to completion and category-specific omissions', () => {
     const empty = calculateListingQuality({ category: 'vehicle', imageCount: 0 });
     const improved = calculateListingQuality({ category: 'vehicle', title: 'Araç', price: 100, subcategory: 'Otomobil', description: 'Detay', imageCount: 3, brand: 'Bravado', model: 'Buffalo', fuelType: 'BENZIN', hasContact: true });
-    assert.ok(empty.percentage < 50); assert.ok(improved.percentage > empty.percentage); assert.ok(improved.suggestions.includes('Kilometre bilgisini ekle.'));
+    assert.ok(empty.percentage < 50); assert.ok(improved.percentage > empty.percentage); assert.ok(improved.suggestions.includes('Mil bilgisini ekle.'));
     assert.ok(calculateListingQuality({ category: 'property', title: 'Ev', price: 100, imageCount: 1 }).suggestions.includes('Mülkün konumunu belirt.'));
   });
 

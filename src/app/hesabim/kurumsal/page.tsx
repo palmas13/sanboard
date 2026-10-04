@@ -1135,6 +1135,7 @@ export default function HesabimKurumsalPage() {
             </span>
             <h2 className="mt-4 text-2xl font-black tracking-[-0.025em] text-[var(--text-main)] sm:text-3xl">Kurumsal Üyeliğinizi Aktifleştirin</h2>
             <p className="mt-2 text-sm font-semibold text-[#FF9E45]">{dealer.company_name} Kurumsal Paket</p>
+            <div className="mt-4 flex items-baseline gap-2"><strong className="text-3xl font-black text-[var(--text-main)]">{formatCurrency(CANONICAL_PRICING.CORPORATE_SUBSCRIPTION_30_DAY)}</strong><span className="text-sm font-semibold text-[var(--text-muted)]">/ ay</span></div>
             <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--text-muted)]">
               Kurumsal mağaza başvurunuz onaylandı. Aşağıdaki ödeme ile üyeliğinizi aktifleştirerek mağaza avantajlarını kullanabilirsiniz.
             </p>
