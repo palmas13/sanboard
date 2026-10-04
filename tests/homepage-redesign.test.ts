@@ -58,13 +58,27 @@ describe('homepage marketplace redesign', () => {
     assert.match(rotator, /quality=\{88\}/);
   });
 
-  test('hero decorative cards serve original public assets without optimizer recompression', () => {
+  test('hero decorative listing cards use canonical direct-delivery CDN assets', () => {
     const hero = source('src/components/home/HeroShowcase.tsx');
-    assert.match(hero, /\/home\/Vinewood Crest Estate\.webp/);
-    assert.match(hero, /\/home\/Grotti Turismo R\.webp/);
-    assert.match(hero, /\/home\/Nagasaki Shinobi\.png/);
-    assert.match(hero, /fill unoptimized[\s\S]*quality=\{95\}/);
+    const imageBoundary = source('src/components/media/SanboardImage.tsx');
+    assert.match(hero, /https:\/\/cdn\.sanboard\.xyz\/site\/listingcard/);
+    assert.match(hero, /vinewood-crest-estate\.webp/);
+    assert.match(hero, /grotti-turismo-r\.webp/);
+    assert.match(hero, /nagasaki-shinobi\.webp/);
+    assert.doesNotMatch(hero, /image: ['"`]\/home\//);
+    assert.doesNotMatch(hero, /Nagasaki Shinobi\.png|sanboard\.xyz\/home\//);
+    assert.match(hero, /<SanboardImage src=\{listing\.image\}/);
+    assert.match(imageBoundary, /url\.hostname === 'cdn\.sanboard\.xyz'/);
+    assert.match(imageBoundary, /unoptimized=\{delivery === 'direct'\}/);
+    assert.doesNotMatch(hero, /\/_next\/image/);
     assert.doesNotMatch(hero, /optimizeListingImage|thumbnail|resolveMediaUrl/);
+  });
+
+  test('homepage listing-card migration does not alter favicon paths', () => {
+    const hero = source('src/components/home/HeroShowcase.tsx');
+    const faviconStorage = source('src/lib/storage/index.ts');
+    assert.doesNotMatch(hero, /favicon|site\/favicon/);
+    assert.match(faviconStorage, /site\/favicon\/\$\{id\}\.png/);
   });
 
   test('homepage corporate sellers require active non-expired membership', () => {
