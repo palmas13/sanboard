@@ -86,6 +86,13 @@ describe('OfferCenter chat UX', () => {
     const actionBlock = center.slice(center.indexOf('const act ='), center.indexOf('const closeHideDialog'));
     assert.doesNotMatch(actionBlock, /setThread\(data\.thread\)/);
     for (const action of ['COUNTER', 'ACCEPT', 'REJECT', 'WITHDRAW']) assert.match(center, new RegExp(`'${action}'`));
+    assert.match(actionBlock, /proposalEventId/);
+  });
+
+  test('current proposal recipient sees accept, reject and counter regardless of buyer or seller role', () => {
+    assert.match(center, /const canRespond = thread\?\.status === 'ACTIVE' && thread\.turn_profile_id === currentProfile\?\.id/);
+    assert.match(center, /canRespond && <div className="space-y-2">[\s\S]*act\('COUNTER'\)[\s\S]*act\('ACCEPT'\)[\s\S]*act\('REJECT'\)/);
+    assert.doesNotMatch(center, /thread\.actor_side === 'SELLER' && canRespond/);
   });
 
   test('panel open/close and list/detail transitions are soft and reduced-motion safe', () => {

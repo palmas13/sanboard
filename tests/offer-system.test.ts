@@ -30,6 +30,8 @@ describe('Structured offer system', () => {
   });
 
   const create = (amount = 60000) => repo.createOffer({ listingId, amount, actorProfileId: buyer, actorUserId: 'buyer-account' });
+  const currentProposalId = (threadId: string) => db.offerEvents.filter((event) => event.thread_id === threadId && (event.event_type === 'OFFER_CREATED' || event.event_type === 'COUNTER_OFFER_CREATED')).sort((a, b) => a.created_at.localeCompare(b.created_at)).at(-1)?.id;
+  const actOnOffer = (input: Parameters<MemoryOfferRepository['actOnOffer']>[0]) => repo.actOnOffer({ ...input, proposalEventId: input.action === 'WITHDRAW' ? undefined : currentProposalId(input.threadId) });
 
   test('create, duplicate, validation and account-level self-offer rules', async () => {
     const result = await create();
@@ -87,33 +89,85 @@ describe('Structured offer system', () => {
     db.listings[0].seller_type = 'INDIVIDUAL';
     db.listings[0].corporate_profile_id = undefined;
     const id = (await create()).thread!.id;
-    assert.equal((await repo.actOnOffer({ threadId: id, actorProfileId: buyer, actorUserId: 'buyer-account', action: 'COUNTER', amount: 62000 })).success, false);
-    assert.equal((await repo.actOnOffer({ threadId: id, actorProfileId: seller, actorUserId: 'seller-account', action: 'COUNTER', amount: 70000 })).thread?.turn_profile_id, buyer);
-    assert.equal((await repo.actOnOffer({ threadId: id, actorProfileId: buyer, actorUserId: 'buyer-account', action: 'COUNTER', amount: 65000 })).thread?.turn_profile_id, seller);
-    assert.equal((await repo.actOnOffer({ threadId: id, actorProfileId: seller, actorUserId: 'seller-account', action: 'ACCEPT' })).thread?.status, 'ACCEPTED');
+    assert.equal((await actOnOffer({ threadId: id, actorProfileId: buyer, actorUserId: 'buyer-account', action: 'COUNTER', amount: 62000 })).success, false);
+    assert.equal((await actOnOffer({ threadId: id, actorProfileId: seller, actorUserId: 'seller-account', action: 'COUNTER', amount: 70000 })).thread?.turn_profile_id, buyer);
+    assert.equal((await actOnOffer({ threadId: id, actorProfileId: buyer, actorUserId: 'buyer-account', action: 'COUNTER', amount: 65000 })).thread?.turn_profile_id, seller);
+    assert.equal((await actOnOffer({ threadId: id, actorProfileId: seller, actorUserId: 'seller-account', action: 'ACCEPT' })).thread?.status, 'ACCEPTED');
     assert.equal(db.listings[0].status, 'ACTIVE');
+  });
+
+  test('buyer accepts seller counter with canonical amount, contact, notification and terminal lock', async () => {
+    const id = (await create(100000)).thread!.id;
+    const initialProposalId = currentProposalId(id)!;
+    await actOnOffer({ threadId: id, actorProfileId: seller, actorUserId: 'seller-account', action: 'COUNTER', amount: 110000 });
+    const sellerCounterId = currentProposalId(id)!;
+    assert.notEqual(sellerCounterId, initialProposalId);
+    assert.equal((await repo.actOnOffer({ threadId: id, actorProfileId: seller, actorUserId: 'seller-account', action: 'ACCEPT', proposalEventId: sellerCounterId })).success, false);
+    assert.equal((await repo.actOnOffer({ threadId: id, actorProfileId: buyer, actorUserId: 'buyer-account', action: 'ACCEPT', proposalEventId: initialProposalId })).code, 'STALE_PROPOSAL');
+    assert.equal((await repo.actOnOffer({ threadId: id, actorProfileId: sibling, actorUserId: 'seller-account', action: 'ACCEPT', proposalEventId: sellerCounterId })).success, false);
+
+    const accepted = await repo.actOnOffer({ threadId: id, actorProfileId: buyer, actorUserId: 'buyer-account', action: 'ACCEPT', proposalEventId: sellerCounterId });
+    assert.equal(accepted.success, true);
+    assert.equal(accepted.thread?.status, 'ACCEPTED');
+    assert.equal(accepted.thread?.current_amount, 110000);
+    assert.equal(accepted.thread?.turn_profile_id, null);
+    assert.equal(db.offerEvents.at(-1)?.event_type, 'ACCEPTED');
+    assert.equal(db.offerEvents.at(-1)?.actor_profile_id, buyer);
+    assert.equal(db.offerEvents.at(-1)?.amount, 110000);
+    const notifications = db.notifications.filter((notification) => notification.recipient_profile_id === seller && notification.entity_id === id && notification.metadata?.eventType === 'ACCEPTED');
+    assert.equal(notifications.length, 1);
+    assert.equal(notifications[0].metadata?.acceptedAmount, 110000);
+    assert.equal((await repo.getOffer(id, buyer)).thread?.visible_contact?.sanmail_email, 'seller@sanmail.com');
+    for (const action of ['COUNTER', 'ACCEPT', 'REJECT', 'WITHDRAW'] as const) {
+      const result = await repo.actOnOffer({ threadId: id, actorProfileId: action === 'WITHDRAW' ? buyer : seller, actorUserId: action === 'WITHDRAW' ? 'buyer-account' : 'seller-account', action, amount: action === 'COUNTER' ? 115000 : undefined, proposalEventId: sellerCounterId });
+      assert.equal(result.success, false);
+    }
+  });
+
+  test('multiple counters accept only the latest seller proposal amount', async () => {
+    const id = (await create(100000)).thread!.id;
+    await actOnOffer({ threadId: id, actorProfileId: seller, actorUserId: 'seller-account', action: 'COUNTER', amount: 120000 });
+    await actOnOffer({ threadId: id, actorProfileId: buyer, actorUserId: 'buyer-account', action: 'COUNTER', amount: 105000 });
+    await actOnOffer({ threadId: id, actorProfileId: seller, actorUserId: 'seller-account', action: 'COUNTER', amount: 115000 });
+    const accepted = await actOnOffer({ threadId: id, actorProfileId: buyer, actorUserId: 'buyer-account', action: 'ACCEPT' });
+    assert.equal(accepted.thread?.status, 'ACCEPTED');
+    assert.equal(accepted.thread?.current_amount, 115000);
+    assert.equal(db.offerEvents.at(-1)?.amount, 115000);
+  });
+
+  test('conflicting terminal actions allow only one winner', async () => {
+    const id = (await create(100000)).thread!.id;
+    await actOnOffer({ threadId: id, actorProfileId: seller, actorUserId: 'seller-account', action: 'COUNTER', amount: 110000 });
+    const proposalEventId = currentProposalId(id)!;
+    const [accepted, withdrawn] = await Promise.all([
+      repo.actOnOffer({ threadId: id, actorProfileId: buyer, actorUserId: 'buyer-account', action: 'ACCEPT', proposalEventId }),
+      repo.actOnOffer({ threadId: id, actorProfileId: buyer, actorUserId: 'buyer-account', action: 'WITHDRAW' }),
+    ]);
+    assert.equal([accepted.success, withdrawn.success].filter(Boolean).length, 1);
+    assert.equal(db.offerThreads[0].status, 'ACCEPTED');
+    assert.equal(db.offerEvents.filter((event) => event.thread_id === id && (event.event_type === 'ACCEPTED' || event.event_type === 'WITHDRAWN')).length, 1);
   });
 
   test('six price movements are the hard maximum', async () => {
     const id = (await create()).thread!.id;
     for (const [index, actor] of [seller, buyer, seller, buyer, seller].entries()) {
-      assert.equal((await repo.actOnOffer({ threadId: id, actorProfileId: actor, actorUserId: actor === seller ? 'seller-account' : 'buyer-account', action: 'COUNTER', amount: 61000 + index * 1000 })).success, true);
+      assert.equal((await actOnOffer({ threadId: id, actorProfileId: actor, actorUserId: actor === seller ? 'seller-account' : 'buyer-account', action: 'COUNTER', amount: 61000 + index * 1000 })).success, true);
     }
     assert.equal(db.offerThreads[0].movement_count, 6);
-    assert.equal((await repo.actOnOffer({ threadId: id, actorProfileId: buyer, actorUserId: 'buyer-account', action: 'COUNTER', amount: 70000 })).code, 'MOVEMENT_LIMIT');
+    assert.equal((await actOnOffer({ threadId: id, actorProfileId: buyer, actorUserId: 'buyer-account', action: 'COUNTER', amount: 70000 })).code, 'MOVEMENT_LIMIT');
   });
 
   test('reject, withdraw, cooldown and response expiry', async () => {
     let id = (await create()).thread!.id;
-    assert.equal((await repo.actOnOffer({ threadId: id, actorProfileId: seller, actorUserId: 'seller-account', action: 'REJECT' })).thread?.status, 'REJECTED');
+    assert.equal((await actOnOffer({ threadId: id, actorProfileId: seller, actorUserId: 'seller-account', action: 'REJECT' })).thread?.status, 'REJECTED');
     assert.equal((await create()).code, 'COOLDOWN');
     db.offerThreads[0].updated_at = new Date(Date.now() - 31 * 60000).toISOString();
     id = (await create()).thread!.id;
-    assert.equal((await repo.actOnOffer({ threadId: id, actorProfileId: buyer, actorUserId: 'buyer-account', action: 'WITHDRAW' })).thread?.status, 'WITHDRAWN');
+    assert.equal((await actOnOffer({ threadId: id, actorProfileId: buyer, actorUserId: 'buyer-account', action: 'WITHDRAW' })).thread?.status, 'WITHDRAWN');
     db.offerThreads.at(-1)!.updated_at = new Date(Date.now() - 31 * 60000).toISOString();
     id = (await create()).thread!.id;
     db.offerThreads.at(-1)!.expires_at = new Date(Date.now() - 1000).toISOString();
-    assert.equal((await repo.actOnOffer({ threadId: id, actorProfileId: seller, actorUserId: 'seller-account', action: 'ACCEPT' })).success, false);
+    assert.equal((await actOnOffer({ threadId: id, actorProfileId: seller, actorUserId: 'seller-account', action: 'ACCEPT' })).success, false);
     assert.equal(db.offerThreads.at(-1)?.status, 'EXPIRED');
   });
 
@@ -189,6 +243,19 @@ describe('Structured offer system', () => {
     for (const pattern of [/offer_threads/, /offer_events/, /ux_offer_threads_active_buyer_listing/, /ENABLE ROW LEVEL SECURITY/, /notifications_entity_type_check/, /close_listing_with_offers/, /expire_stale_offer_threads/, /pg_advisory_xact_lock/]) assert.match(sql, pattern);
   });
 
+  test('recipient acceptance migration validates the current proposal under atomic locks', () => {
+    const sql = readFileSync(join(process.cwd(), 'supabase/migrations/20261004010000_offer_actionable_recipient_acceptance.sql'), 'utf8');
+    assert.match(sql, /p_proposal_event_id UUID DEFAULT NULL/);
+    assert.match(sql, /SELECT \* INTO v_l FROM public\.listings WHERE id=v_listing_id FOR UPDATE;[\s\S]*SELECT \* INTO v_t FROM public\.offer_threads WHERE id=p_thread_id FOR UPDATE;/);
+    assert.match(sql, /v_t\.turn_profile_id IS DISTINCT FROM p_actor_profile_id/);
+    assert.match(sql, /event_type IN \('OFFER_CREATED','COUNTER_OFFER_CREATED'\)/);
+    assert.match(sql, /p_proposal_event_id IS DISTINCT FROM v_current_proposal_id/);
+    assert.match(sql, /'STALE_PROPOSAL'/);
+    assert.match(sql, /UPDATE public\.offer_threads SET status=v_event,turn_profile_id=NULL/);
+    assert.match(sql, /'acceptedAmount'/);
+    assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.act_on_offer_thread\(UUID,UUID,TEXT,BIGINT,UUID\) TO service_role/);
+  });
+
   test('participant hide is isolated, preserves history and remains hidden after reload, sync and new activity', async () => {
     await create();
     const thread = db.offerThreads[0];
@@ -198,7 +265,7 @@ describe('Structured offer system', () => {
     assert.equal((await repo.listOffers({ actorProfileId: seller, box: 'received' })).threads.length, 1);
     assert.equal(db.offerEvents.length, eventCount);
     assert.equal((await repo.hideOffer(thread.id, sibling)).success, false);
-    await repo.actOnOffer({ threadId: thread.id, actorProfileId: seller, actorUserId: 'seller-account', action: 'COUNTER', amount: 70000 });
+    await actOnOffer({ threadId: thread.id, actorProfileId: seller, actorUserId: 'seller-account', action: 'COUNTER', amount: 70000 });
     const freshRepo = new MemoryOfferRepository();
     assert.equal((await freshRepo.listOffers({ actorProfileId: buyer, box: 'sent' })).threads.length, 0);
     assert.equal((await freshRepo.getOffer(thread.id, buyer)).success, false);
@@ -216,7 +283,7 @@ describe('Structured offer system', () => {
     const thread = db.offerThreads[0];
     db.profiles[0].phone_visibility = 'PRIVATE';
     db.profiles[0].sanmail_visibility = 'PUBLIC';
-    await repo.actOnOffer({ threadId: thread.id, actorProfileId: seller, actorUserId: 'seller-account', action: 'ACCEPT' });
+    await actOnOffer({ threadId: thread.id, actorProfileId: seller, actorUserId: 'seller-account', action: 'ACCEPT' });
     const buyerDetail = await repo.getOffer(thread.id, buyer);
     const sellerDetail = await repo.getOffer(thread.id, seller);
     assert.deepEqual(buyerDetail.thread?.visible_contact, sellerDetail.thread?.visible_contact);
@@ -236,7 +303,7 @@ describe('Structured offer system', () => {
     db.dealers[0].sanmail_email = 'store@sanmail.com';
     await create();
     const thread = db.offerThreads[0];
-    await repo.actOnOffer({ threadId: thread.id, actorProfileId: seller, actorUserId: 'seller-account', action: 'ACCEPT' });
+    await actOnOffer({ threadId: thread.id, actorProfileId: seller, actorUserId: 'seller-account', action: 'ACCEPT' });
     const buyerDetail = await repo.getOffer(thread.id, buyer);
     const sellerDetail = await repo.getOffer(thread.id, seller);
     assert.deepEqual(buyerDetail.thread?.visible_contact, { phone: '5559000', sanmail_email: 'store@sanmail.com' });
@@ -249,7 +316,7 @@ describe('Structured offer system', () => {
     assert.deepEqual(await repo.getUnreadCounts(seller), { total: 1, received: 1, sent: 0 });
     assert.deepEqual(await repo.getUnreadCounts(buyer), { total: 0, received: 0, sent: 0 });
     const thread = db.offerThreads[0];
-    await repo.actOnOffer({ threadId: thread.id, actorProfileId: seller, actorUserId: 'seller-account', action: 'COUNTER', amount: 70000 });
+    await actOnOffer({ threadId: thread.id, actorProfileId: seller, actorUserId: 'seller-account', action: 'COUNTER', amount: 70000 });
     assert.deepEqual(await repo.getUnreadCounts(buyer), { total: 1, received: 0, sent: 1 });
     await repo.markRead(thread.id, buyer);
     assert.deepEqual(await repo.getUnreadCounts(buyer), { total: 0, received: 0, sent: 0 });
@@ -262,7 +329,7 @@ describe('Structured offer system', () => {
     db.listings.push({ ...db.listings[0], id: 'offer-other-listing', listing_number: '#OTHER', seller_profile_id: 'offer-other-seller', title: 'Other listing' } as any);
     assert.equal((await repo.createOffer({ listingId: 'offer-other-listing', amount: 60000, actorProfileId: seller, actorUserId: 'seller-account' })).success, true);
     const sentThread = db.offerThreads.find((thread) => thread.listing_id === 'offer-other-listing')!;
-    assert.equal((await repo.actOnOffer({ threadId: sentThread.id, actorProfileId: 'offer-other-seller', actorUserId: 'other-account', action: 'COUNTER', amount: 70000 })).success, true);
+    assert.equal((await actOnOffer({ threadId: sentThread.id, actorProfileId: 'offer-other-seller', actorUserId: 'other-account', action: 'COUNTER', amount: 70000 })).success, true);
 
     assert.deepEqual(await repo.getUnreadCounts(seller), { total: 2, received: 1, sent: 1 });
     const sentReadCursorBeforeReceivedBulkRead = sentThread.buyer_last_read_at;

@@ -133,7 +133,7 @@ export interface IOfferRepository {
   createOffer(input: { listingId: string; amount: number; actorProfileId: string; actorUserId: string }): Promise<{ success: boolean; thread?: OfferThread; error?: string; code?: string }>;
   listOffers(input: { actorProfileId: string; box?: 'received' | 'sent'; status?: string; cursor?: string; limit?: number }): Promise<{ threads: OfferThread[]; nextCursor?: string | null }>;
   getOffer(threadId: string, actorProfileId: string): Promise<{ success: boolean; thread?: OfferThread; error?: string }>;
-  actOnOffer(input: { threadId: string; actorProfileId: string; actorUserId: string; action: 'COUNTER' | 'ACCEPT' | 'REJECT' | 'WITHDRAW'; amount?: number }): Promise<{ success: boolean; thread?: OfferThread; error?: string; code?: string }>;
+  actOnOffer(input: { threadId: string; actorProfileId: string; actorUserId: string; action: 'COUNTER' | 'ACCEPT' | 'REJECT' | 'WITHDRAW'; amount?: number; proposalEventId?: string }): Promise<{ success: boolean; thread?: OfferThread; error?: string; code?: string }>;
   markRead(threadId: string, actorProfileId: string): Promise<{ success: boolean; unreadCount: number; error?: string }>;
   markAllRead(actorProfileId: string, box: 'received' | 'sent'): Promise<{ success: boolean; count: number; unreadCounts: { total: number; received: number; sent: number }; error?: string }>;
   hideOffer(threadId: string, actorProfileId: string): Promise<{ success: boolean; unreadCount: number; error?: string }>;
