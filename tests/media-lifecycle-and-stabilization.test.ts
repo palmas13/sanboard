@@ -48,6 +48,14 @@ describe('Media Resolution & URL Normalization', () => {
     assert.strictEqual(extracted, 'avatars/user-1/abc.webp');
   });
 
+  it('canonicalizes Sanboard CDN query strings but rejects external URLs', () => {
+    assert.strictEqual(
+      extractObjectKey('https://cdn.sanboard.xyz/listings/abc/file.webp?v=123#preview'),
+      'listings/abc/file.webp'
+    );
+    assert.strictEqual(extractObjectKey('https://example.com/listings/abc/file.webp'), null);
+  });
+
   it('should validate allowed Sanboard storage key prefixes and reject path traversal', () => {
     assert.strictEqual(isValidSanboardStorageKey('avatars/123/test.webp'), true);
     assert.strictEqual(isValidSanboardStorageKey('listings/456/test.webp'), true);

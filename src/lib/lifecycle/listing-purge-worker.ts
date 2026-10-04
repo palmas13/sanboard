@@ -1,4 +1,5 @@
 import { getSupabaseAdminClient } from '@/lib/db/supabase-client';
+import { extractObjectKey } from '@/lib/media/url';
 import { getStorageProvider } from '@/lib/storage';
 import { isValidSanboardStorageKey } from '@/lib/storage/lifecycle';
 import { errorMessage, rows, rpc, type RpcClient } from './worker-utils';
@@ -25,8 +26,13 @@ export async function runListingPurgeWorker(options: { batchSize?: number; depen
     try {
       if (!jobId) throw new Error('Claimed purge job has no id.');
       if (!job.lock_token) throw new Error('Claimed purge job has no lock token.');
-      const keys = [job.storage_path, ...(Array.isArray(job.storage_paths) ? job.storage_paths : []), ...(Array.isArray(job.media_keys) ? job.media_keys : [])]
-        .filter((key): key is string => typeof key === 'string' && isValidSanboardStorageKey(key));
+      const mediaValues = [job.storage_path, ...(Array.isArray(job.storage_paths) ? job.storage_paths : []), ...(Array.isArray(job.media_keys) ? job.media_keys : [])]
+        .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+      const canonicalKeys = mediaValues.map((value) => extractObjectKey(value));
+      if (canonicalKeys.some((key) => !key || !isValidSanboardStorageKey(key))) {
+        throw new Error('Purge snapshot contains a noncanonical or unsafe media key.');
+      }
+      const keys = canonicalKeys.filter((key): key is string => key !== null);
       const uniqueKeys = [...new Set(keys)];
       for (const key of uniqueKeys) {
         const referenced = await rpc(client, 'is_media_key_referenced', { k: key, x: job.listing_id });

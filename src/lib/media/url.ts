@@ -4,6 +4,13 @@
  */
 const DEFAULT_R2_PUBLIC_DOMAIN = "https://cdn.sanboard.xyz";
 
+function isAllowedSanboardMediaHost(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return normalized === 'cdn.sanboard.xyz'
+    || normalized === 'sanboard-media.esin18457.workers.dev'
+    || normalized.endsWith('.r2.dev');
+}
+
 export function getR2PublicDomain(): string {
   const domain =
     (typeof process !== 'undefined' &&
@@ -59,6 +66,7 @@ export function extractObjectKey(pathOrUrl?: string | null): string | null {
   if (pathPart.startsWith('http://') || pathPart.startsWith('https://')) {
     try {
       const url = new URL(pathPart);
+      if (!isAllowedSanboardMediaHost(url.hostname)) return null;
       pathPart = url.pathname;
     } catch {
       return null;

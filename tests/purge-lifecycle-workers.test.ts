@@ -41,6 +41,44 @@ describe('durable purge workers', () => {
     ]);
   });
 
+  test('listing purge canonicalizes and deduplicates mixed key representations', async () => {
+    const key = 'listings/abc/file.webp';
+    const storage = new MockStorageProvider();
+    await storage.upload(Buffer.from('x'), { fileName: 'file.webp', category: 'listing', contentType: 'image/webp', key });
+    let deletes = 0;
+    const originalDeleteMany = storage.deleteMany.bind(storage);
+    storage.deleteMany = async (keys) => { deletes++; assert.deepEqual(keys, [key]); return originalDeleteMany(keys); };
+    const mock = clientFor({
+      discover_listing_purge_jobs: () => 0,
+      claim_listing_purge_jobs: () => [{
+        id: 'job', listing_id: 'listing', lock_token: 'lock', attempts: 1, max_attempts: 3,
+        media_keys: [key, `https://cdn.sanboard.xyz/${key}`, `https://cdn.sanboard.xyz/${key}?v=123`],
+      }],
+      is_media_key_referenced: () => false,
+      complete_listing_purge_media_key: ({ k }) => k === key,
+      finalize_listing_purge: () => ({ success: true, result: 'DONE' }),
+    });
+    const counts = await runListingPurgeWorker({ dependencies: { client: mock.client, storage } });
+    assert.equal(deletes, 1);
+    assert.equal(counts.mediaDeleted, 1);
+    assert.equal(counts.dbPurged, 1);
+  });
+
+  test('listing purge rejects an external URL instead of treating it as an R2 key', async () => {
+    const storage = new MockStorageProvider();
+    let deletes = 0;
+    storage.deleteMany = async () => { deletes++; return { success: true, results: [] }; };
+    const mock = clientFor({
+      discover_listing_purge_jobs: () => 0,
+      claim_listing_purge_jobs: () => [{ id: 'job', listing_id: 'listing', lock_token: 'lock', media_keys: ['https://example.com/listings/abc/file.webp'], attempts: 1, max_attempts: 3 }],
+      retry_listing_purge_job: () => true,
+    });
+    const counts = await runListingPurgeWorker({ dependencies: { client: mock.client, storage } });
+    assert.equal(deletes, 0);
+    assert.equal(counts.retried, 1);
+    assert.equal(mock.calls.some((call) => call.name === 'finalize_listing_purge'), false);
+  });
+
   test('shared reference prevents deletion and schedules retry', async () => {
     const storage = new MockStorageProvider();
     let deletes = 0;
@@ -308,5 +346,45 @@ describe('orphan reconciliation queue migration contract', () => {
     assert.match(migration, /RETURN 'ALREADY_QUEUED'/);
     assert.match(migration, /reason = 'ORPHAN_RECONCILIATION'/);
     assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.enqueue_orphan_media_cleanup_job\(text, text\) TO service_role/);
+  });
+});
+
+describe('listing purge media-key reconciliation migration contract', () => {
+  const migration = fs.readFileSync(path.join(process.cwd(), 'supabase/migrations/20261004020000_listing_purge_media_key_reconciliation.sql'), 'utf8');
+
+  test('canonicalizes enqueue snapshots, query-string URLs, and cleanup identities', () => {
+    assert.match(migration, /CREATE OR REPLACE FUNCTION public\.canonical_sanboard_media_key/);
+    assert.match(migration, /split_part\(split_part\(value, '\?', 1\), '#', 1\)/);
+    assert.match(migration, /SELECT DISTINCT public\.canonical_sanboard_media_key\(storage_path\) AS key/);
+    assert.match(migration, /jsonb_agg\(key ORDER BY key\)/);
+    assert.match(migration, /RAISE EXCEPTION 'listing contains noncanonical media reference'/);
+    assert.match(migration, /'purge:' \|\| job_id \|\| ':' \|\| key/);
+    assert.match(migration, /object_key = canonical_key/);
+    assert.match(migration, /idempotency_key = 'purge:' \|\| purge_job\.id \|\| ':' \|\| canonical_key/);
+  });
+
+  test('repairs retry jobs and only lifecycle-safe MEDIA_INCOMPLETE failures', () => {
+    assert.match(migration, /j\.status IN \('PENDING', 'RETRY', 'FAILED'\)/);
+    assert.match(migration, /last_error IS DISTINCT FROM 'Purge finalization did not converge: MEDIA_INCOMPLETE'/);
+    assert.match(migration, /listing_row\.status IS DISTINCT FROM purge_job\.expected_status/);
+    assert.match(migration, /retention_anchor/);
+    assert.match(migration, /now\(\) < purge_job\.purge_after/);
+    assert.match(migration, /status = 'RETRY'/);
+    assert.match(migration, /attempts = least\(attempts, max_attempts - 1\)/);
+    assert.match(migration, /next_attempt_at = now\(\)/);
+  });
+
+  test('does not normalize unrecognized external URLs or weaken purge finalization', () => {
+    assert.match(migration, /canonical_sanboard_media_key\(value\) IS NULL/);
+    assert.doesNotMatch(migration, /CREATE OR REPLACE FUNCTION public\.finalize_listing_purge/);
+    const original = fs.readFileSync(path.join(process.cwd(), 'supabase/migrations/20261002030000_durable_listing_purge_and_media_jobs.sql'), 'utf8');
+    assert.match(original, /'MEDIA_INCOMPLETE'/);
+  });
+
+  test('preserves cleanup completion and attempts while collapsing duplicate representations', () => {
+    assert.match(migration, /bool_or\(m\.status = 'DONE'\)/);
+    assert.match(migration, /max\(m\.attempt_count\)/);
+    assert.match(migration, /m\.id <> cleanup_survivor/);
+    assert.match(migration, /CASE WHEN cleanup_done THEN 'DONE' ELSE 'PENDING' END/);
   });
 });
