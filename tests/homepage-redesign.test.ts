@@ -152,4 +152,35 @@ describe('homepage marketplace redesign', () => {
     assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
     assert.doesNotMatch(css, /\.homepage-rotator-controls|\.homepage-arrow/);
   });
+
+  test('homepage FAQ reuses the canonical FAQ source with auth-aware support routing', () => {
+    const page = source('src/app/page.tsx');
+    const faq = source('src/components/home/HomepageFaqSection.tsx');
+    const data = source('src/data/faq.ts');
+    const explore = source('src/app/kesfet/page.tsx');
+    assert.match(page, /<WhySanboardSection \/>[\s\S]*<HomepageFaqSection \/>/);
+    assert.match(explore, /import \{ faqGroups \} from '@\/data\/faq'/);
+    assert.match(faq, /homepageFaqItems/);
+    assert.match(data, /homepageQuestions\.map/);
+    assert.equal((data.match(/^  '.*\?',?$/gm) || []).length, 6);
+    assert.match(faq, /currentProfile \? supportPath : `\/giris\?redirect=/);
+    assert.match(faq, /aria-expanded=\{isOpen\}/);
+    assert.match(faq, /aria-controls=\{panelId\}/);
+    assert.match(faq, /useState<number \| null>\(0\)/);
+  });
+
+  test('why and FAQ sections use one-time viewport reveals and reduced motion support', () => {
+    const why = source('src/components/home/WhySanboardSection.tsx');
+    const faq = source('src/components/home/HomepageFaqSection.tsx');
+    const reveal = source('src/components/home/useHomepageReveal.ts');
+    const css = source('src/app/globals.css');
+    assert.match(why, /useHomepageReveal/);
+    assert.match(faq, /useHomepageReveal/);
+    assert.match(reveal, /IntersectionObserver/);
+    assert.match(reveal, /prefers-reduced-motion: reduce/);
+    assert.match(reveal, /observer\.disconnect\(\)/);
+    assert.match(css, /\.homepage-why\[data-revealed="true"\]/);
+    assert.match(css, /\.homepage-faq\[data-revealed="true"\]/);
+    assert.match(css, /grid-template-columns: minmax\(0,43%\) minmax\(0,57%\)/);
+  });
 });

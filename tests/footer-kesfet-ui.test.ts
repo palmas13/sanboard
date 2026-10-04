@@ -54,11 +54,12 @@ describe('footer and kesfet UI refinements', () => {
 
   test('kesfet keeps the four content areas separate and uses the requested copy', () => {
     const page = source('src/app/kesfet/page.tsx');
-    const categoryOrder = ['Genel', 'Platform', 'Gizlilik & Güvenlik'].map((title) => page.indexOf(`title: '${title}'`));
+    const faq = source('src/data/faq.ts');
+    const categoryOrder = ['Genel', 'Platform', 'Gizlilik & Güvenlik'].map((title) => faq.indexOf(`title: '${title}'`));
     assert.ok(categoryOrder.every((index) => index >= 0));
     assert.deepEqual([...categoryOrder].sort((a, b) => a - b), categoryOrder);
-    assert.match(page, /Sanboard; araç ve mülk sahiplerinin ilanlarını yayınlayabildiği/);
-    assert.match(page, /Sanboard’da teklif sistemi nasıl çalışır\?/);
+    assert.match(faq, /Sanboard; araç ve mülk sahiplerinin ilanlarını yayınlayabildiği/);
+    assert.match(faq, /Sanboard’da teklif sistemi nasıl çalışır\?/);
     assert.match(page, /title: 'Platformun Amacı'/);
     assert.match(page, /title: 'Hizmetin Kötüye Kullanılması'/);
     assert.match(page, /const privacyItems = \[/);

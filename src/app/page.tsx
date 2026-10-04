@@ -2,6 +2,7 @@ import { getDealerRepository, getListingRepository } from '@/lib/db/repositories
 import { HeroShowcase } from '@/components/home/HeroShowcase';
 import { HomepageMarketplace } from '@/components/home/HomepageMarketplace';
 import { WhySanboardSection } from '@/components/home/WhySanboardSection';
+import { HomepageFaqSection } from '@/components/home/HomepageFaqSection';
 import { getHomepageStats } from '@/lib/db/homepage-stats';
 import { isListingActivelyFeatured } from '@/lib/listings/featured';
 
@@ -36,6 +37,7 @@ export default async function HomePage() {
       <HeroShowcase stats={homepageStats} />
       <HomepageMarketplace featuredListings={featuredListings} vehicleListings={vehicleListings} propertyListings={propertyListings} corporateSellers={corporateSellers} corporateListingCounts={corporateListingCounts} />
       <WhySanboardSection />
+      <HomepageFaqSection />
     </div>
   );
 }
