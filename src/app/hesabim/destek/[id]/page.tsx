@@ -16,11 +16,13 @@ import {
 import { formatDateTime } from '@/lib/utils/format';
 import { SupportTicket, TicketMessage } from '@/types';
 import { getTicketCategoryLabel } from '@/lib/tickets/categories';
+import { useToast } from '@/components/feedback/ToastProvider';
 
 export default function TicketDetailPage() {
   const params = useParams();
   const ticketId = params.id as string;
   const { currentProfile } = useAuth();
+  const { showToast } = useToast();
 
   const [ticket, setTicket] = useState<(SupportTicket & { messages: TicketMessage[] }) | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,7 +71,7 @@ export default function TicketDetailPage() {
       setReplyText('');
       await fetchTicket();
     } catch (err: any) {
-      setError(err.message || 'Hata oluştu.');
+      showToast(err.message || 'Mesaj iletilemedi.', 'error');
     } finally {
       setSending(false);
     }
@@ -78,14 +80,16 @@ export default function TicketDetailPage() {
   const handleCloseTicket = async () => {
     if (!confirm('Bu destek talebini kapatmak istediğinize emin misiniz?')) return;
     try {
-      await fetch(`/api/tickets/${ticketId}`, {
+      const response = await fetch(`/api/tickets/${ticketId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'CLOSED' }),
       });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Talep kapatılamadı.');
       await fetchTicket();
-    } catch {
-      // Ignore
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Talep kapatılamadı.', 'error');
     }
   };
 

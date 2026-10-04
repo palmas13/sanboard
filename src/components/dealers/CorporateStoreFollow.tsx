@@ -7,6 +7,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { Users, UserPlus, UserCheck, X, Loader2, ExternalLink } from 'lucide-react';
 import { resolveAvatarUrl } from '@/lib/media/url';
 import { SanboardImage } from '@/components/media/SanboardImage';
+import { useToast } from '@/components/feedback/ToastProvider';
 
 interface FollowerItem {
   id: string;
@@ -30,6 +31,7 @@ export function CorporateStoreFollow({
   initialIsFollowing = null,
 }: CorporateStoreFollowProps) {
   const { currentProfile, isAuthenticated, authStatus } = useAuth();
+  const { showToast } = useToast();
   const [followerCount, setFollowerCount] = useState(initialFollowerCount);
   const [followState, setFollowState] = useState<FollowState>(
     initialIsFollowing === true
@@ -42,7 +44,6 @@ export function CorporateStoreFollow({
   const [modalOpen, setModalOpen] = useState(false);
   const [followers, setFollowers] = useState<FollowerItem[]>([]);
   const [loadingFollowers, setLoadingFollowers] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
 
   // Check follow status on mount & character switch (Sections 15-17)
   useEffect(() => {
@@ -86,13 +87,12 @@ export function CorporateStoreFollow({
 
   const handleToggleFollow = async () => {
     if (!isAuthenticated || !currentProfile) {
-      alert('Mağazayı takip etmek için lütfen giriş yapınız.');
+      showToast('Mağazayı takip etmek için lütfen giriş yapınız.', 'error');
       return;
     }
 
     if (actionLoading) return;
     const desiredIsFollowing = followState !== 'following';
-    setErrorMessage('');
     setActionLoading(true);
     try {
       const res = await fetch(`/api/dealers/${dealerId}/follow`, {
@@ -106,7 +106,7 @@ export function CorporateStoreFollow({
       setFollowState(data.isFollowing ? 'following' : 'not_following');
       setFollowerCount(data.followerCount ?? data.count ?? followerCount);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Takip işlemi gerçekleştirilemedi.');
+      showToast(error instanceof Error ? error.message : 'Takip işlemi gerçekleştirilemedi.', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -186,11 +186,6 @@ export function CorporateStoreFollow({
           </button>
         )}
       </div>
-      {errorMessage && (
-        <p role="alert" className="mt-2 text-xs font-semibold text-red-400">
-          {errorMessage}
-        </p>
-      )}
 
       {/* Followers List Modal */}
       {modalOpen && createPortal(

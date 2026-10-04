@@ -50,8 +50,12 @@ export default function HakkimizdaPage() {
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-400/10 text-sky-300"><Gamepad2 className="h-5 w-5" /></span>
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-300">OOC · Platform sınırları</p>
-            <h2 id="ooc-title" className="mt-2 text-lg font-bold text-[var(--text-main)]">Bağımsız bir topluluk projesi</h2>
-            <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">Sanboard, GTA World yönetimi tarafından işletilen veya resmî olarak desteklenen bir hizmet değildir. Tüm marka ve oyun varlıkları ilgili sahiplerine aittir; Sanboard gerçek para ticaretine aracılık etmez.</p>
+            <h2 id="ooc-title" className="mt-2 text-lg font-bold text-[var(--text-main)]">Bağımsız Sanboard projesi</h2>
+            <div className="mt-3 space-y-4 text-sm leading-6 text-[var(--text-muted)]">
+              <p>(( Sanboard, <a href="https://discord.com/users/1081946432401068125" target="_blank" rel="noopener noreferrer" className="font-semibold text-sky-400 underline decoration-sky-400/40 underline-offset-4 transition-colors hover:text-sky-300 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400">palmas</a> ve <a href="https://discord.com/users/1008025961431830559" target="_blank" rel="noopener noreferrer" className="font-semibold text-sky-400 underline decoration-sky-400/40 underline-offset-4 transition-colors hover:text-sky-300 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400">mavisim</a> tarafından GTA World Türkiye oyuncuları için bağımsız olarak geliştirilmiş bir ilan platformudur. Platformun temel amacı, oyuncuların oyun içi araç ve mülk ticaretini daha kolay, hızlı ve keyifli bir şekilde gerçekleştirebilmesini sağlamaktır.</p>
+              <p>Sanboard üzerinde yer alan ilanlar, fiyatlar, ödemeler ve diğer tüm ekonomik değerler yalnızca oyun içi kullanım amacı taşır ve gerçek hayatta herhangi bir maddi karşılığı bulunmaz. Sanboard’un GTA World veya GTA World Türkiye ile resmî bir bağlantısı, ortaklığı ya da temsil ilişkisi bulunmamaktadır. Platform tamamen bağımsız bir proje olarak geliştirilmiştir.</p>
+              <p>Site içerisinde karşılaştığınız hataları bildirmek, önerilerinizi iletmek veya bizimle iletişime geçmek için Discord adreslerimiz üzerinden bize ulaşabilirsiniz. ))</p>
+            </div>
           </div>
         </div>
       </section>

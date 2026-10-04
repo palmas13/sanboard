@@ -79,8 +79,12 @@ export class RealGtaWorldAuthProvider implements GtaWorldAuthProvider {
       if ((!Number.isSafeInteger(item?.id) && typeof item?.id !== 'string') || String(item.id).trim() === '') return [];
       const firstName = typeof item.firstname === 'string' ? item.firstname.trim() : '';
       const lastName = typeof item.lastname === 'string' ? item.lastname.trim() : '';
-      if (!firstName || !lastName) return [];
-      return [{ externalCharacterId: String(item.id).trim(), firstName, lastName, displayName: `${firstName} ${lastName}` }];
+      const displayName = [firstName, lastName].filter(Boolean).join(' ')
+        || (typeof item.name === 'string' ? item.name.trim() : '')
+        || (typeof item.display_name === 'string' ? item.display_name.trim() : '');
+      if (!displayName) return [];
+      const [resolvedFirstName, ...remainingName] = displayName.split(/\s+/);
+      return [{ externalCharacterId: String(item.id).trim(), firstName: firstName || resolvedFirstName, lastName: lastName || remainingName.join(' '), displayName }];
     });
     return { externalAccountId: String(user.id).trim(), characters };
   }

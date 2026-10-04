@@ -6,23 +6,24 @@ import { CreditCard, CheckCircle2, Clock, XCircle, Loader2, Trash2, ShieldCheck 
 import { formatCurrency, formatDateTime } from '@/lib/utils/format';
 import { Payment } from '@/types';
 import { getPaymentProductLabel } from '@/lib/payments/presentation';
+import { useToast } from '@/components/feedback/ToastProvider';
 
 export default function HesabimOdemelerPage() {
   const { currentProfile } = useAuth();
+  const { showToast } = useToast();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [clearModalOpen, setClearModalOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
-  const [clearError, setClearError] = useState('');
 
   const clearHistory = async () => {
-    setClearing(true); setClearError('');
+    setClearing(true);
     try {
       const res = await fetch('/api/user/payments', { method: 'DELETE' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(data.error || 'Geçmiş temizlenemedi.');
       setPayments([]); setClearModalOpen(false);
-    } catch (error: any) { setClearError(error.message || 'Geçmiş temizlenemedi.'); }
+    } catch (error: any) { showToast(error.message || 'Geçmiş temizlenemedi.', 'error'); }
     finally { setClearing(false); }
   };
 
@@ -126,7 +127,7 @@ export default function HesabimOdemelerPage() {
           </p>
         </div>
       )}
-      {clearModalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="clear-payment-title"><div className="surface-card w-full max-w-md rounded-2xl border border-[var(--border-app)] p-6 shadow-2xl"><div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--brand-orange-subtle)] text-[#FF8A1F]"><ShieldCheck className="h-5 w-5" /></div><h3 id="clear-payment-title" className="text-lg font-bold text-[var(--text-main)]">Ödeme geçmişini görünümden kaldır?</h3><p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">İşlem kayıtları güvenlik, finansal denetim ve hak doğrulama amacıyla korunur. Bu işlem yalnızca geçmişi bu karakter profilinin görünümünden kaldırır.</p>{clearError && <p className="mt-3 text-xs font-semibold text-[var(--color-danger)]">{clearError}</p>}<div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setClearModalOpen(false)} disabled={clearing} className="btn-secondary px-4 py-2 text-xs">Vazgeç</button><button type="button" onClick={clearHistory} disabled={clearing} className="btn-primary px-4 py-2 text-xs">{clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Görünümden Kaldır'}</button></div></div></div>}
+      {clearModalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="clear-payment-title"><div className="surface-card w-full max-w-md rounded-2xl border border-[var(--border-app)] p-6 shadow-2xl"><div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--brand-orange-subtle)] text-[#FF8A1F]"><ShieldCheck className="h-5 w-5" /></div><h3 id="clear-payment-title" className="text-lg font-bold text-[var(--text-main)]">Ödeme geçmişini görünümden kaldır?</h3><p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">İşlem kayıtları güvenlik, finansal denetim ve hak doğrulama amacıyla korunur. Bu işlem yalnızca geçmişi bu karakter profilinin görünümünden kaldırır.</p><div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setClearModalOpen(false)} disabled={clearing} className="btn-secondary px-4 py-2 text-xs">Vazgeç</button><button type="button" onClick={clearHistory} disabled={clearing} className="btn-primary px-4 py-2 text-xs">{clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Görünümden Kaldır'}</button></div></div></div>}
     </div>
   );
 }

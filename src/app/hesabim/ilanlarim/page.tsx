@@ -12,6 +12,7 @@ import { getListingUrl } from '@/lib/urls';
 import { getListingCoverPath } from '@/lib/listings/images';
 import { calculateListingQuality, type ListingQualityInput } from '@/lib/listings/quality';
 import { filterOwnerDashboardListings, getOwnerDashboardCounts, type OwnerDashboardStatus, type OwnerDashboardType } from '@/lib/listings/owner-dashboard';
+import { useToast } from '@/components/feedback/ToastProvider';
 
 type SavedListingDraft = ListingQualityInput & { savedAt?: string; images?: unknown[] };
 const STATUS_TABS: Array<{ value: OwnerDashboardStatus; label: string }> = [{ value: 'ACTIVE', label: 'Aktif' }, { value: 'EXPIRED', label: 'Süresi Dolan' }, { value: 'SOLD', label: 'Satılan' }];
@@ -24,6 +25,7 @@ function StatusBadge({ status }: { status: OwnerDashboardStatus }) {
 
 export default function HesabimIlanlarimPage() {
   const { currentProfile } = useAuth();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<OwnerDashboardStatus>('ACTIVE');
   const [typeFilter, setTypeFilter] = useState<OwnerDashboardType>('ALL');
   const [query, setQuery] = useState('');
@@ -95,7 +97,7 @@ export default function HesabimIlanlarimPage() {
       const response = await fetch('/api/user/listings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ listingId: closeModalListing.id, action: closeReason === 'SOLD' ? 'SOLD' : 'REMOVED', closeReason }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error || 'İlan kapatılamadı.');
       setCloseModalListing(null); await fetchListings();
-    } catch (error) { setActionError(error instanceof Error ? error.message : 'İlan kapatılamadı.'); }
+    } catch (error) { showToast(error instanceof Error ? error.message : 'İlan kapatılamadı.', 'error'); }
     finally { setIsProcessingClose(false); }
   };
   const handleRepublish = async (listing: Listing) => {
@@ -104,7 +106,7 @@ export default function HesabimIlanlarimPage() {
       const response = await fetch('/api/user/listings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ listingId: listing.id, action: 'REPUBLISH' }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error || 'İlan yeniden yayınlanamadı.');
       await fetchListings(); setActiveTab('ACTIVE');
-    } catch (error) { setActionError(error instanceof Error ? error.message : 'İlan yeniden yayınlanamadı.'); }
+    } catch (error) { showToast(error instanceof Error ? error.message : 'İlan yeniden yayınlanamadı.', 'error'); }
     finally { setRepublishingId(null); }
   };
   const clearHistory = async () => {
@@ -114,7 +116,7 @@ export default function HesabimIlanlarimPage() {
       const response = await fetch('/api/user/listings', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: clearHistoryStatus }) });
       const data = await response.json().catch(() => ({})); if (!response.ok || !data.success) throw new Error(data.error || 'Liste temizlenemedi.');
       setListings((current) => current.filter((listing) => listing.status !== clearHistoryStatus)); setClearHistoryStatus(null);
-    } catch (error) { setActionError(error instanceof Error ? error.message : 'Liste temizlenemedi.'); }
+    } catch (error) { showToast(error instanceof Error ? error.message : 'Liste temizlenemedi.', 'error'); }
     finally { setClearingHistory(false); }
   };
   const handleDeleteDraft = () => {

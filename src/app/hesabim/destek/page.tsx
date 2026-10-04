@@ -16,9 +16,11 @@ import {
 import { formatDateTime } from '@/lib/utils/format';
 import { SupportTicket, TicketCategory } from '@/types';
 import { getTicketCategoryLabel, TICKET_CATEGORIES } from '@/lib/tickets/categories';
+import { useToast } from '@/components/feedback/ToastProvider';
 
 export default function HesabimDestekPage() {
   const { currentProfile } = useAuth();
+  const { showToast } = useToast();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -82,7 +84,7 @@ export default function HesabimDestekPage() {
       setMessage('');
       await fetchTickets();
     } catch (err: any) {
-      setError(err.message || 'Bir hata oluştu.');
+      showToast(err.message || 'Talep oluşturulamadı.', 'error');
     } finally {
       setSubmitting(false);
     }

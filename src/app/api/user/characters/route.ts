@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
 
   const profilesByExternalId = new Map(dbProfiles.map((profile) => [profile.external_character_id, profile]));
   const discovered = selectionContext?.characters;
-  const characters: CharacterSummary[] = discovered?.length
+  const characters: CharacterSummary[] = discovered !== undefined
     ? discovered.map((character) => {
         const profile = profilesByExternalId.get(character.externalCharacterId);
         return {
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
           externalCharacterId: character.externalCharacterId,
           firstName: character.firstName,
           lastName: character.lastName,
-          displayName: `${character.firstName} ${character.lastName}`,
+          displayName: [character.firstName, character.lastName].filter(Boolean).join(' '),
           avatarUrl: profile ? resolveMediaUrl(profile.avatar_path || profile.avatar_url || '') || null : null,
           role: profile?.role || 'USER',
           hasProfile: Boolean(profile),

@@ -10,6 +10,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import { resolveMediaUrl } from '@/lib/media/url';
 import { getListingUrl } from '@/lib/urls';
 import { SanboardImage } from '@/components/media/SanboardImage';
+import { FeaturedBadge } from '@/components/listings/FeaturedBadge';
 
 export default function VehicleComparisonPage() {
   const { compareIds, removeFromCompare, clearCompare } = useCompare();
@@ -132,12 +133,7 @@ export default function VehicleComparisonPage() {
               className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
             />
             <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
-              {listing.is_featured && (
-                <span className="badge-tag bg-gradient-to-r from-amber-500 to-[#FF8A1F] text-white border-amber-400/30 font-extrabold text-[9px] uppercase px-1.5 py-0.5 shadow-md flex items-center gap-1">
-                  <Sparkles className="w-2.5 h-2.5 text-white fill-white" />
-                  ÖNE ÇIKAN
-                </span>
-              )}
+              {listing.is_featured && <FeaturedBadge className="h-6 w-6" />}
               <span className="badge-tag bg-black/65 backdrop-blur-md text-white border-white/10 text-[10px]">
                 {listing.subcategory}
               </span>

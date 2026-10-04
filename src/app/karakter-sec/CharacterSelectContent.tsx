@@ -154,8 +154,8 @@ export function CharacterSelectContent({ redirect, isTestSource, defaultCharacte
                       </h3>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <span className={`inline-flex items-center gap-1 text-xs font-medium ${char.hasProfile === false ? 'text-amber-500' : 'text-[var(--color-success)]'}`}>
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>{isActive ? 'Aktif' : char.hasProfile === false ? 'İlk kurulum gerekli' : 'Profil mevcut'}</span>
+                          {char.hasProfile === false ? <span aria-hidden="true" className="h-2 w-2 rounded-full bg-amber-400" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                          <span>{isActive ? 'Aktif' : char.hasProfile === false ? 'Profil oluştur' : 'Profil mevcut'}</span>
                         </span>
                         {char.displayName === defaultCharacterName ? (
                           <span className="rounded border border-[var(--color-success)]/30 px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-success)]">
@@ -178,7 +178,7 @@ export function CharacterSelectContent({ redirect, isTestSource, defaultCharacte
         )}
 
         <p className="text-center text-xs text-[var(--text-dim)] pt-2 border-t border-[var(--border-app)]">
-          {isTestSource ? 'Her test karakterinin Sanboard profili ve karakter kapsamlı verileri bağımsızdır.' : 'Bir GTA World hesabı birden fazla karaktere sahip olabilir. Her karakterin Sanboard profili bağımsızdır.'}
+          {isTestSource ? 'Her test karakterinin Sanboard profili ve karakter kapsamlı verileri bağımsızdır.' : '(( Bir GTA World hesabı birden fazla karaktere sahip olabilir. Her karakterin Sanboard profili bağımsızdır. ))'}
         </p>
       </div>
     </div>
