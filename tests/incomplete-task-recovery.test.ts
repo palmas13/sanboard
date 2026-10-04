@@ -35,7 +35,7 @@ describe('incomplete previous task recovery', () => {
   });
 
   test('about and character selection contain exact required copy and links', () => {
-    const about = source('src/app/hakkimizda/page.tsx');
+    const about = source('src/app/kesfet/page.tsx');
     const picker = source('src/app/karakter-sec/CharacterSelectContent.tsx');
     assert.match(about, /\(\( Sanboard, [\s\S]*palmas[\s\S]*mavisim[\s\S]*Discord adreslerimiz üzerinden bize ulaşabilirsiniz\. \)\)/);
     assert.match(about, /https:\/\/discord\.com\/users\/1081946432401068125/);
