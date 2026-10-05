@@ -69,7 +69,7 @@ export class SupabaseDealerRepository implements IDealerRepository {
   }
 
   async getDealerByProfileId(profileId: string, includeDeleted = false): Promise<CorporateProfile | null> {
-    const client = this.getClient();
+    const client = this.getAdminClient();
     let query = client.from('corporate_profiles').select('*').eq('owner_profile_id', profileId);
 
     if (!includeDeleted) {

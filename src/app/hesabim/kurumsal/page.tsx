@@ -98,6 +98,7 @@ export default function HesabimKurumsalPage() {
   const [dealer, setDealer] = useState<DealerProfile | null>(null);
   const [application, setApplication] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dealerLoadError, setDealerLoadError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -222,6 +223,7 @@ export default function HesabimKurumsalPage() {
   const fetchDealer = useCallback(async () => {
     if (!currentProfile?.id) return;
     setLoading(true);
+    setDealerLoadError('');
     try {
       const promises: Promise<any>[] = [
         fetch('/api/dealers/profile'),
@@ -233,6 +235,10 @@ export default function HesabimKurumsalPage() {
       const data = await dealerRes.json();
       const listingsData = await listingsRes.json();
       const applyData = await applyRes.json();
+
+      if (!dealerRes.ok) {
+        throw new Error(data.error || 'Kurumsal profil alınamadı.');
+      }
 
       if (applyData?.success && applyData.application) {
         setApplication(applyData.application);
@@ -280,8 +286,8 @@ export default function HesabimKurumsalPage() {
       setStats({
         activeListings: active.length,
       });
-    } catch {
-      // Ignore
+    } catch (err: any) {
+      setDealerLoadError(err?.message || 'Kurumsal profil alınamadı.');
     } finally {
       setLoading(false);
     }
@@ -520,6 +526,20 @@ export default function HesabimKurumsalPage() {
         <div className="surface-card p-12 text-center text-xs text-[var(--text-muted)] flex items-center justify-center gap-2 rounded-2xl border border-[var(--border-app)]">
           <Loader2 className="w-5 h-5 animate-spin text-[#FF8A1F]" />
           <span>Kurumsal satıcı bilgileri getiriliyor...</span>
+        </div>
+      ) : dealerLoadError ? (
+        <div role="alert" className="surface-card mx-auto max-w-lg space-y-4 rounded-2xl border border-red-500/30 p-8 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10 text-red-400">
+            <AlertCircle className="h-6 w-6" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-lg font-bold text-[var(--text-main)]">Kurumsal Profil Yüklenemedi</h2>
+            <p className="text-xs leading-relaxed text-[var(--text-muted)]">{dealerLoadError}</p>
+          </div>
+          <button type="button" onClick={() => void fetchDealer()} className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-xs">
+            <RefreshCw className="h-4 w-4" />
+            Tekrar Dene
+          </button>
         </div>
       ) : dealer?.moderation_status === 'SUSPENDED' ? (
         /* CASE SUSPENDED: STORE SUSPENDED BY ADMIN (Section 2 & 8) */
