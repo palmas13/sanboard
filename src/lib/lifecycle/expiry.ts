@@ -3,6 +3,8 @@ import { getSupabaseAdminClient } from '@/lib/db/supabase-client';
 export interface ExpiryLifecycleResult {
   expiredListings: number;
   expiredSubscriptions: number;
+  blockedSubscriptions: number;
+  frozenMembershipListings: number;
   closedOffers: number;
 }
 
@@ -23,6 +25,8 @@ export async function runExpiryLifecycle(): Promise<ExpiryLifecycleResult> {
   return {
     expiredListings: Number(result.expired_listings || 0),
     expiredSubscriptions: Number(result.expired_subscriptions || 0),
+    blockedSubscriptions: Number(result.blocked_subscriptions || 0),
+    frozenMembershipListings: Number(result.frozen_membership_listings || 0),
     closedOffers: Number(result.closed_offers || 0),
   };
 }

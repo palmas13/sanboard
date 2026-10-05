@@ -10,6 +10,12 @@ const styles = source('src/app/globals.css');
 const offerRoute = source('src/app/api/offers/route.ts');
 
 describe('OfferCenter chat UX', () => {
+  test('frozen listing threads explain and lock negotiation actions', () => {
+    const offerCenter = source('src/components/offers/OfferCenter.tsx');
+    assert.match(offerCenter, /listing\?\.status === 'FROZEN'/);
+    assert.match(offerCenter, /teklif işlemleri geçici olarak kullanılamıyor/);
+    assert.match(offerCenter, /listing\?\.status !== 'FROZEN'/);
+  });
   test('offer center guidance uses the concise requested copy', () => {
     assert.match(center, /Teklif görüşmelerini bu pencereden görüntüleyebilirsin\./);
     assert.match(center, /Tekliflerindeki son hareketler bu pencerede görünecektir\./);

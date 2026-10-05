@@ -77,6 +77,7 @@ export interface ListingPublishOptions {
 export interface ListingBoostOptions {
   paymentMode?: 'REQUIRE_CREDIT' | 'TEST_BYPASS';
 }
+export interface ListingFreezeTransitionResult { success:boolean; code?:string; error?:string; idempotent?:boolean; listingId?:string; status?:'ACTIVE'|'FROZEN'; frozenAt?:string|null; remainingListingSeconds?:number|null; remainingBoostSeconds?:number|null; expiresAt?:string|null; boostExpiresAt?:string|null; cooldownUntil?:string|null; retryAfterSeconds?:number }
 
 export interface IListingRepository {
   getPublicListings(params?: ListingFilterParams): Promise<PublicListingSummary[]>;
@@ -88,6 +89,7 @@ export interface IListingRepository {
   createListing(input: CreateListingInput, profileId: string, options?: ListingPublishOptions): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   updateListing(id: string, input: Partial<CreateListingInput>, profileId: string, userId?: string, role?: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   closeListing(id: string, profileId: string, status: 'SOLD' | 'REMOVED', closeReason?: 'SOLD' | 'CANCELLED' | 'OTHER'): Promise<{ success: boolean; listing?: Listing; error?: string }>;
+  transitionFreezeState(id:string,profileId:string,userId:string,action:'FREEZE'|'RESUME'):Promise<ListingFreezeTransitionResult>;
   markListingAsSold(id: string, profileId: string): Promise<{ success: boolean; error?: string }>;
   republishListing(id: string, profileId: string): Promise<{ success: boolean; listing?: Listing; error?: string }>;
   removeListing?(id: string, profileId: string): Promise<{ success: boolean; error?: string }>;

@@ -36,15 +36,18 @@ import {
   EllipsisVertical,
   Eye,
   Search,
+  PauseCircle,
+  PlayCircle,
 } from 'lucide-react';
 import { DealerProfile, Listing } from '@/types';
 import { resolveMediaUrl } from '@/lib/media/url';
-import { formatCurrency, formatDate, formatTimeRemaining } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatDurationSeconds, formatTimeRemaining } from '@/lib/utils/format';
 import { isListingActivelyFeatured } from '@/lib/listings/featured';
 import { normalizeSocialMedia } from '@/lib/dealers/social';
 import { readJsonResponse } from '@/lib/http/json-response';
 import { canRenewCorporateSubscription, CORPORATE_PERIOD_BOOST_ALLOWANCE } from '@/lib/subscriptions/calendar-month';
 import { CANONICAL_PRICING } from '@/lib/payments/pricing';
+import { ListingFreezeDialog } from '@/components/listings/ListingFreezeDialog';
 type ListingTypeFilter = 'all' | 'vehicle' | 'property';
 type ListingStatusFilter = 'all' | 'ACTIVE' | 'EXPIRED' | 'SOLD';
 
@@ -64,6 +67,7 @@ function getListingCover(listing: Listing) {
 function getListingStatusPresentation(listing: Listing) {
   if (listing.status === 'SOLD') return { label: 'Satıldı', className: 'border-blue-400/20 bg-blue-400/10 text-blue-300' };
   if (listing.status === 'REMOVED') return { label: 'Yayından kaldırıldı', className: 'border-red-400/20 bg-red-400/10 text-red-300' };
+  if (listing.status === 'FROZEN') return { label: 'Donduruldu', className: 'border-amber-400/20 bg-amber-400/10 text-amber-300' };
   if (listing.status === 'EXPIRED' || formatTimeRemaining(listing.expires_at).isExpired) {
     return { label: 'Süresi doldu', className: 'border-amber-400/20 bg-amber-400/10 text-amber-300' };
   }
@@ -99,6 +103,8 @@ export default function HesabimKurumsalPage() {
   const [closeReason, setCloseReason] = useState<'SOLD' | 'CANCELLED' | 'OTHER'>('SOLD');
   const [activeOfferCount, setActiveOfferCount] = useState(0);
   const [isProcessingClose, setIsProcessingClose] = useState(false);
+  const [freezeModalListing,setFreezeModalListing]=useState<Listing|null>(null);
+  const [freezeBusy,setFreezeBusy]=useState(false);
 
   // Edit profile fields (for approved dealers)
   const [editCompanyName, setEditCompanyName] = useState('');
@@ -130,7 +136,7 @@ export default function HesabimKurumsalPage() {
     const normalizedSearch = listingSearch.trim().toLocaleLowerCase('tr-TR');
     return storeListings.filter((listing) => {
       const matchesType = listingTypeFilter === 'all' || listing.category === listingTypeFilter;
-      const matchesStatus = listingStatusFilter === 'all' || listing.status === listingStatusFilter;
+      const matchesStatus = listingStatusFilter === 'all' || (listingStatusFilter === 'ACTIVE' ? ['ACTIVE','FROZEN'].includes(listing.status) : listing.status === listingStatusFilter);
       const searchable = [listing.title, listing.subcategory, listing.listing_number]
         .filter(Boolean)
         .join(' ')
@@ -378,6 +384,7 @@ export default function HesabimKurumsalPage() {
       setIsProcessingClose(false);
     }
   };
+  const handleFreezeTransition=async()=>{if(!freezeModalListing)return;setFreezeBusy(true);setError('');setSuccess('');try{const action=freezeModalListing.status==='FROZEN'?'RESUME':'FREEZE';const response=await fetch('/api/user/listings',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({listingId:freezeModalListing.id,action})});const data=await response.json().catch(()=>({}));if(!response.ok||!data.success)throw new Error(data.error||'İlan durumu değiştirilemedi.');setFreezeModalListing(null);setSuccess(action==='FREEZE'?'İlan donduruldu.':'İlan yeniden aktif edildi.');await fetchDealer();}catch(err:any){setError(err.message||'İlan durumu değiştirilemedi.');}finally{setFreezeBusy(false);}};
 
   const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1023,6 +1030,7 @@ export default function HesabimKurumsalPage() {
                     const coverImage = getListingCover(l);
                     const status = getListingStatusPresentation(l);
                     const canManageActiveListing = l.status === 'ACTIVE' && !remaining.isExpired;
+                    const canManageFrozenListing = l.status === 'FROZEN';
                     const boostDisabledReason = isSubscriptionExpired
                       ? 'Abonelik süreniz dolduğu için boost kullanılamaz'
                       : !canManageActiveListing
@@ -1062,6 +1070,7 @@ export default function HesabimKurumsalPage() {
                                   Aktif Boost{l.featured_until ? ` · ${formatTimeRemaining(l.featured_until).text}` : ''}
                                 </span>
                               )}
+                              {canManageFrozenListing && (l.remaining_boost_seconds || 0) > 0 && <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-0.5 text-[9px] font-black text-amber-300"><Sparkles className="h-2.5 w-2.5" />Kalan Boost: {formatDurationSeconds(l.remaining_boost_seconds)}</span>}
                             </div>
                             <p className="mt-2 text-lg font-black tracking-tight text-[#FF9E45]">{formatCurrency(l.price)}</p>
                             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--text-muted)]">
@@ -1072,6 +1081,12 @@ export default function HesabimKurumsalPage() {
                                 <>
                                   <span aria-hidden="true">•</span>
                                   <span className={`inline-flex items-center gap-1 font-semibold ${remaining.isExpired ? 'text-amber-300' : 'text-emerald-300'}`}><Clock className="h-3 w-3" />{remaining.text}</span>
+                                </>
+                              )}
+                              {canManageFrozenListing && (
+                                <>
+                                  <span aria-hidden="true">•</span>
+                                  <span className="inline-flex items-center gap-1 font-semibold text-amber-300"><Clock className="h-3 w-3" />Kalan süre: {formatDurationSeconds(l.remaining_listing_seconds)}</span>
                                 </>
                               )}
                             </div>
@@ -1087,7 +1102,7 @@ export default function HesabimKurumsalPage() {
                               </button>
                               {openListingMenuId === l.id && (
                                 <div role="menu" className="absolute bottom-full right-0 z-30 mb-2 w-52 overflow-hidden rounded-xl border border-[var(--border-app)] bg-[var(--bg-surface)] p-1.5 shadow-[0_18px_45px_rgba(0,0,0,.4)] sm:bottom-auto sm:top-full sm:mb-0 sm:mt-2">
-                                  {canManageActiveListing && (
+                                  {(canManageActiveListing || canManageFrozenListing) && (
                                     <Link role="menuitem" href={`/hesabim/ilanlarim/${l.id}/duzenle`} onClick={() => setOpenListingMenuId(null)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-secondary)] hover:text-[var(--text-main)]">
                                       <Edit3 className="h-3.5 w-3.5" />İlanı Düzenle
                                     </Link>
@@ -1104,9 +1119,12 @@ export default function HesabimKurumsalPage() {
                                       <Zap className="h-3.5 w-3.5" />Öne Çıkar
                                     </button>
                                   )}
-                                  {canManageActiveListing && (
+                                  {(canManageActiveListing || canManageFrozenListing) && (
                                     <>
                                       <div className="my-1 border-t border-[var(--border-app)]" />
+                                      <button type="button" role="menuitem" onClick={() => { setOpenListingMenuId(null); setFreezeModalListing(l); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-emerald-300 transition-colors hover:bg-emerald-400/10">
+                                        {canManageFrozenListing ? <PlayCircle className="h-3.5 w-3.5" /> : <PauseCircle className="h-3.5 w-3.5" />}{canManageFrozenListing ? 'İlanı Aktif Et' : 'İlanı Dondur'}
+                                      </button>
                                       <button type="button" role="menuitem" onClick={() => { setOpenListingMenuId(null); void openCloseListingModal(l); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-red-300 transition-colors hover:bg-red-400/10">
                                         <XCircle className="h-3.5 w-3.5" />İlanı Kapat
                                       </button>
@@ -1274,6 +1292,7 @@ export default function HesabimKurumsalPage() {
           </div>
         </div>
       )}
+      {freezeModalListing && <ListingFreezeDialog listing={freezeModalListing} corporate busy={freezeBusy} onCancel={() => setFreezeModalListing(null)} onConfirm={() => void handleFreezeTransition()} />}
     </div>
   );
 }

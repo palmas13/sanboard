@@ -422,6 +422,15 @@ export class SupabaseDealerRepository implements IDealerRepository {
       return { success: false, error: error?.message || 'Üyelik aktif edilemedi.' };
     }
 
+    const { error: resumeError } = await client.rpc('transition_corporate_membership_listings', {
+      p_corporate_profile_id: dealerId,
+      p_action: 'RESUME',
+    });
+    if (resumeError) {
+      console.error('Test corporate subscription listing resume failed', { code: resumeError.code, details: resumeError.details, hint: resumeError.hint });
+      return { success: false, error: 'Üyelik aktif edildi ancak ilanlar yeniden aktifleştirilemedi.' };
+    }
+
     return { success: true, dealer: data as CorporateProfile };
   }
 

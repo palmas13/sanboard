@@ -47,6 +47,7 @@ export class MemoryOfferRepository implements IOfferRepository {
   async createOffer({ listingId, amount, actorProfileId, actorUserId }: { listingId: string; amount: number; actorProfileId: string; actorUserId: string }) {
     const listing = db.listings.find(l => l.id === listingId); const buyer = db.profiles.find(p => p.id === actorProfileId);
     if (!listing || !buyer) return { success: false, code: 'NOT_FOUND', error: 'İlan bulunamadı.' };
+    if (listing.status === 'FROZEN') return { success: false, code: 'LISTING_FROZEN', error: 'İlan dondurulduğu için teklif işlemleri geçici olarak kullanılamıyor.' };
     if (getEffectiveListingStatus(listing) !== 'ACTIVE') return { success: false, code: 'LISTING_INACTIVE', error: 'İlan yayında olmadığı için teklif verilemez.' };
     if (listing.offers_enabled === false) return { success: false, code: 'OFFERS_DISABLED', error: 'Bu ilan tekliflere kapalı.' };
     if (!Number.isSafeInteger(amount) || amount <= 0 || amount > OFFER_MAX_AMOUNT) return { success: false, code: 'INVALID_AMOUNT', error: 'Geçerli bir teklif tutarı girin.' };
@@ -76,7 +77,7 @@ export class MemoryOfferRepository implements IOfferRepository {
   async getActiveThreadForListing(listingId:string,actorProfileId:string){const t=db.offerThreads.find(x=>x.listing_id===listingId&&x.status==='ACTIVE'&&(x.buyer_profile_id===actorProfileId||x.seller_profile_id===actorProfileId)&&!(x.buyer_profile_id===actorProfileId?x.buyer_hidden_at:x.seller_hidden_at));return t?this.hydrate(t,actorProfileId):null;}
   async actOnOffer({ threadId, actorProfileId, action, amount, proposalEventId }: any) {
     const t=db.offerThreads.find(x=>x.id===threadId); if(!t||(t.buyer_profile_id!==actorProfileId&&t.seller_profile_id!==actorProfileId)) return {success:false,error:'Teklif bulunamadı.'}; this.expire(t);
-    const listing=db.listings.find(l=>l.id===t.listing_id); if(!listing||getEffectiveListingStatus(listing)!=='ACTIVE') return {success:false,code:'LISTING_INACTIVE',error:'İlan yayında olmadığı için işlem yapılamaz.'}; if(t.status!=='ACTIVE') return {success:false,error:'Bu teklif artık aktif değil.'};
+    const listing=db.listings.find(l=>l.id===t.listing_id); if(listing?.status==='FROZEN') return {success:false,code:'LISTING_FROZEN',error:'İlan dondurulduğu için teklif işlemleri geçici olarak kullanılamıyor.'}; if(!listing||getEffectiveListingStatus(listing)!=='ACTIVE') return {success:false,code:'LISTING_INACTIVE',error:'İlan yayında olmadığı için işlem yapılamaz.'}; if(t.status!=='ACTIVE') return {success:false,error:'Bu teklif artık aktif değil.'};
     const isBuyer=actorProfileId===t.buyer_profile_id; const other=isBuyer?t.seller_profile_id:t.buyer_profile_id;
     const currentProposal=db.offerEvents.filter(e=>e.thread_id===t.id&&(e.event_type==='OFFER_CREATED'||e.event_type==='COUNTER_OFFER_CREATED')).sort((a,b)=>a.created_at.localeCompare(b.created_at)).at(-1);
     if(action==='WITHDRAW'){if(!isBuyer)return{success:false,error:'Yalnız alıcı teklifi geri çekebilir.'};t.status='WITHDRAWN';t.turn_profile_id=null;this.event(t,'WITHDRAWN',actorProfileId);}

@@ -1,4 +1,4 @@
-import { IListingRepository, CreateListingInput, ListingPublishOptions } from '../types';
+import { IListingRepository, CreateListingInput, ListingPublishOptions, ListingFreezeTransitionResult } from '../types';
 import { getSupabaseClient, getSupabaseAdminClient } from '../../supabase-client';
 import { Listing, MemberListingDetail, PublicListingSummary, SimilarListingSummary } from '@/types';
 import { ListingFilterParams } from '../../listings';
@@ -583,6 +583,10 @@ export class SupabaseListingRepository implements IListingRepository {
       }
     }
 
+    if (listing.status === 'FROZEN' && !isOwner) {
+      return { listing: null, isLocked: false, isOwner: false };
+    }
+
     // Owners retain dashboard access; public viewers require a live store subscription.
     if (listing.seller_type === 'CORPORATE') {
       if (!this.isPublicCorporateListingVisible(listing) && !isOwner) {
@@ -799,6 +803,14 @@ export class SupabaseListingRepository implements IListingRepository {
     return { success: Boolean(result?.success), listing: result?.listing, error: result?.error };
   }
 
+  async transitionFreezeState(id:string,profileId:string,userId:string,action:'FREEZE'|'RESUME'):Promise<ListingFreezeTransitionResult>{
+    const safeProfileId=resolveProfileId(profileId);const safeUserId=resolveUserId(userId);
+    if(!isUuid(id)||!isUuid(safeProfileId)||!isUuid(safeUserId))return{success:false,code:'INVALID_INPUT',error:'Geçersiz ilan veya profil bilgisi.'};
+    const{data,error}=await this.getAdminClient().rpc('transition_listing_freeze_state',{p_listing_id:id,p_actor_profile_id:safeProfileId,p_actor_user_id:safeUserId,p_action:action,p_source:'OWNER'});
+    if(error)return{success:false,code:'FREEZE_SERVICE_ERROR',error:'İlan durumu değiştirilemedi.'};
+    return(Array.isArray(data)?data[0]:data)as ListingFreezeTransitionResult;
+  }
+
   async updateListing(
     id: string,
     input: Partial<CreateListingInput>,
@@ -835,7 +847,7 @@ export class SupabaseListingRepository implements IListingRepository {
       return { success: false, error: 'Bu ilanı düzenleme yetkiniz yok.' };
     }
 
-    if (existing.status === 'SOLD' || existing.status === 'REMOVED') {
+    if (existing.status === 'SOLD' || existing.status === 'REMOVED' || existing.status === 'EXPIRED') {
       return { success: false, error: 'Satılmış veya yayından kaldırılmış ilanlar düzenlenemez.' };
     }
 
@@ -1132,6 +1144,12 @@ export class SupabaseListingRepository implements IListingRepository {
         price,
         location,
         status,
+        frozen_at,
+        remaining_listing_seconds,
+        remaining_boost_seconds,
+        last_freeze_transition_at,
+        freeze_count,
+        resume_count,
         is_featured,
         featured_until,
         published_at,

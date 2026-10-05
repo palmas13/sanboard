@@ -51,20 +51,22 @@ export async function PATCH(req: NextRequest) {
     }
 
     const repo = getListingRepository();
-    if (!['SOLD', 'REMOVED', 'REPUBLISH'].includes(action)) {
+    if (!['SOLD', 'REMOVED', 'REPUBLISH', 'FREEZE', 'RESUME'].includes(action)) {
       return NextResponse.json({ error: 'Geçersiz ilan işlemi.' }, { status: 400 });
     }
-    if (action !== 'REPUBLISH' && !['SOLD', 'CANCELLED', 'OTHER'].includes(closeReason)) {
+    if (!['REPUBLISH','FREEZE','RESUME'].includes(action) && !['SOLD', 'CANCELLED', 'OTHER'].includes(closeReason)) {
       return NextResponse.json({ error: 'Geçerli bir kapatma nedeni seçilmelidir.' }, { status: 400 });
     }
-    if ((action === 'SOLD') !== (closeReason === 'SOLD')) {
+    if (!['REPUBLISH','FREEZE','RESUME'].includes(action) && (action === 'SOLD') !== (closeReason === 'SOLD')) {
       return NextResponse.json({ error: 'İlan durumu ile kapatma nedeni uyuşmuyor.' }, { status: 400 });
     }
     const result = action === 'REPUBLISH'
       ? await repo.republishListing(listingId, actor.profileId)
+      : action === 'FREEZE' || action === 'RESUME'
+        ? await repo.transitionFreezeState(listingId, actor.profileId, actor.userId, action)
       : await repo.closeListing(listingId, actor.profileId, action, closeReason);
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
+      const code='code'in result?result.code:undefined;return NextResponse.json({error:result.error,code,retryAfterSeconds:'retryAfterSeconds'in result?result.retryAfterSeconds:undefined},{status:code==='FORBIDDEN'?403:code==='LISTING_TRANSITION_COOLDOWN'?429:400});
     }
 
     revalidatePath('/');
@@ -75,6 +77,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({
       success: true,
       listing: 'listing' in result ? result.listing : undefined,
+      transition: action === 'FREEZE' || action === 'RESUME' ? result : undefined,
     });
   } catch (error: any) {
     return NextResponse.json(

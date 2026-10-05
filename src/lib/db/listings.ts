@@ -382,6 +382,10 @@ export async function getListingById(
   const storeOwnerId = store?.owner_profile_id || store?.profile_id;
   const isOwner = isListingOwnedByActiveProfile(listing, viewerProfileId, storeOwnerId);
 
+  if (listing.status === 'FROZEN' && !isOwner) {
+    return { listing: null, isLocked: false, isOwner: false };
+  }
+
   if (listing.status === 'REMOVED') {
     return { listing: null, isLocked: false, isOwner };
   }
@@ -650,8 +654,8 @@ export async function updateListing(
     return { success: false, error: 'Bu ilanı düzenleme yetkiniz yok.' };
   }
 
-  if (listing.status !== 'ACTIVE') {
-    return { success: false, error: 'Yalnızca aktif ilanlar düzenlenebilir.' };
+  if (listing.status !== 'ACTIVE' && listing.status !== 'FROZEN') {
+    return { success: false, error: 'Yalnızca aktif veya dondurulmuş ilanlar düzenlenebilir.' };
   }
 
   const oldPrice = listing.price;

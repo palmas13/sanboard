@@ -12,9 +12,8 @@ export interface OwnerDashboardFilters {
 export function getOwnerDashboardCounts(listings: Listing[]) {
   return listings.reduce(
     (counts, listing) => {
-      if (listing.status === 'ACTIVE' || listing.status === 'EXPIRED' || listing.status === 'SOLD') {
-        counts[listing.status] += 1;
-      }
+      if (listing.status === 'ACTIVE' || listing.status === 'FROZEN') counts.ACTIVE += 1;
+      else if (listing.status === 'EXPIRED' || listing.status === 'SOLD') counts[listing.status] += 1;
       return counts;
     },
     { ACTIVE: 0, EXPIRED: 0, SOLD: 0 } as Record<OwnerDashboardStatus, number>
@@ -25,7 +24,7 @@ export function filterOwnerDashboardListings(listings: Listing[], filters: Owner
   const query = filters.query.trim().toLocaleLowerCase('tr-TR');
 
   return listings.filter((listing) => {
-    if (listing.status !== filters.status) return false;
+    if (filters.status === 'ACTIVE' ? !['ACTIVE','FROZEN'].includes(listing.status) : listing.status !== filters.status) return false;
     if (filters.type !== 'ALL' && listing.category !== filters.type) return false;
     if (!query) return true;
 

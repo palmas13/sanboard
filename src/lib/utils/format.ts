@@ -93,6 +93,16 @@ export function formatTimeRemaining(expiresAt?: string): {
   };
 }
 
+export function formatDurationSeconds(seconds?: number | null): string {
+  const total = Math.max(0, Math.floor(Number(seconds) || 0));
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor((total % 86400) / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (days > 0) return `${days} gün ${hours} saat`;
+  if (hours > 0) return `${hours} saat ${minutes} dakika`;
+  return `${minutes} dakika`;
+}
+
 /**
  * Strip any HTML tags and escape to prevent XSS
  */

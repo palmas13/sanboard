@@ -21,7 +21,7 @@ export type BuildingType = 'Normal' | 'Dubleks';
 
 export type UpgradeLevel = 0 | 1 | 2 | 3 | 4;
 
-export type ListingStatus = 'DRAFT' | 'ACTIVE' | 'EXPIRED' | 'SOLD' | 'REMOVED';
+export type ListingStatus = 'DRAFT' | 'ACTIVE' | 'FROZEN' | 'EXPIRED' | 'SOLD' | 'REMOVED';
 
 export type UserRole = 'USER' | 'ADMIN';
 export type UserStatus = 'ACTIVE' | 'BANNED';
@@ -145,6 +145,12 @@ export interface Listing {
   featured_until?: string | null;
   published_at?: string;
   expires_at?: string;
+  frozen_at?: string | null;
+  remaining_listing_seconds?: number | null;
+  remaining_boost_seconds?: number | null;
+  last_freeze_transition_at?: string | null;
+  freeze_count?: number;
+  resume_count?: number;
   created_at: string;
   updated_at: string;
 

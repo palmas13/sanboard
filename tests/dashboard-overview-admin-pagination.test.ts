@@ -22,6 +22,10 @@ describe('dashboard overview and admin pagination regressions', () => {
   test('corporate inventory exposes active boost state and remaining time', () => {
     const corporate = source('src/app/hesabim/kurumsal/page.tsx');
     assert.match(corporate, /Aktif Boost/);
+    assert.match(corporate, /Kalan süre:/);
+    assert.match(corporate, /Kalan Boost:/);
+    assert.match(corporate, /İlanı Dondur/);
+    assert.match(corporate, /İlanı Aktif Et/);
     assert.match(corporate, /formatTimeRemaining\(l\.featured_until\)/);
     assert.match(corporate, /dealer\.boost_credits/);
     assert.doesNotMatch(corporate, /boost_credits \?\? 0\}\/3/);
