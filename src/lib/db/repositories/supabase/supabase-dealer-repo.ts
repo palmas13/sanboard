@@ -10,8 +10,13 @@ import { addCalendarMonth } from '@/lib/subscriptions/calendar-month';
 
 function mapCorporateProfile(data: any): CorporateProfile | null {
   if (!data) return null;
+  const packageCode = data.active_package_code as string | null | undefined;
   return {
     ...data,
+    active_package_name: data.active_package_name
+      ?? (packageCode === 'CORPORATE_PLUS_30_DAY' ? 'Corporate Plus' : packageCode === 'CORPORATE_SUBSCRIPTION_30_DAY' ? 'Standard Corporate' : null),
+    active_package_price: data.active_package_price
+      ?? (packageCode === 'CORPORATE_PLUS_30_DAY' ? 25000 : packageCode === 'CORPORATE_SUBSCRIPTION_30_DAY' ? 5500 : null),
     social_media: normalizeSocialMedia(data.social_media),
   };
 }
@@ -85,7 +90,19 @@ export class SupabaseDealerRepository implements IDealerRepository {
       }
       throw new Error(`Supabase error fetching corporate profile by owner: ${error.message}`);
     }
-    return mapCorporateProfile(data);
+    const dealer = mapCorporateProfile(data);
+    if (!dealer) return null;
+
+    const { data: membershipSummary, error: summaryError } = await client.rpc('get_corporate_membership_summary', {
+      p_corporate_profile_id: dealer.id,
+    });
+    if (summaryError && summaryError.code !== 'PGRST202') {
+      throw new Error(`Supabase error fetching corporate membership summary: ${summaryError.message}`);
+    }
+
+    return membershipSummary && typeof membershipSummary === 'object'
+      ? mapCorporateProfile({ ...dealer, ...membershipSummary })
+      : dealer;
   }
 
   async getAllDealers(): Promise<CorporateProfile[]> {

@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
           { status: 409 }
         );
       }
-    } else if (requestedPackage === 'CORPORATE_SUBSCRIPTION_30_DAY') {
+    } else if (requestedPackage === 'CORPORATE_SUBSCRIPTION_30_DAY' || requestedPackage === 'CORPORATE_PLUS_30_DAY') {
       purpose = 'CORPORATE_SUBSCRIPTION';
       const dealerRepo = getDealerRepository();
       const dealer = await dealerRepo.getDealerByProfileId(activeProfileId, true);
@@ -107,6 +107,13 @@ export async function POST(req: NextRequest) {
       }
       if (!canRenewCorporateSubscription(dealer.subscription_status, dealer.subscription_expires_at)) {
         return NextResponse.json({ error: 'Üyelik yalnızca bitiş tarihine 7 gün veya daha az kaldığında yenilenebilir.' }, { status: 409 });
+      }
+      const activeUnexpired = dealer.subscription_status === 'ACTIVE'
+        && Boolean(dealer.subscription_expires_at)
+        && new Date(dealer.subscription_expires_at!).getTime() > Date.now();
+      const activePackageCode = dealer.active_package_code || 'CORPORATE_SUBSCRIPTION_30_DAY';
+      if (activeUnexpired && activePackageCode !== requestedPackage) {
+        return NextResponse.json({ error: 'Aktif üyelik yalnızca aynı paketle yenilenebilir.' }, { status: 409 });
       }
       corporateProfileId = dealer.id;
     }

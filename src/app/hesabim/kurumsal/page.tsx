@@ -46,10 +46,26 @@ import { isListingActivelyFeatured } from '@/lib/listings/featured';
 import { normalizeSocialMedia } from '@/lib/dealers/social';
 import { readJsonResponse } from '@/lib/http/json-response';
 import { canRenewCorporateSubscription, CORPORATE_PERIOD_BOOST_ALLOWANCE } from '@/lib/subscriptions/calendar-month';
-import { CANONICAL_PRICING } from '@/lib/payments/pricing';
 import { ListingFreezeDialog } from '@/components/listings/ListingFreezeDialog';
 type ListingTypeFilter = 'all' | 'vehicle' | 'property';
 type ListingStatusFilter = 'all' | 'ACTIVE' | 'EXPIRED' | 'SOLD';
+
+const CORPORATE_MEMBERSHIP_PACKAGES = [
+  {
+    code: 'CORPORATE_SUBSCRIPTION_30_DAY',
+    name: 'Standard',
+    price: 5500,
+    description: 'Düzenli ilan veren kurumsal mağazalar için güçlü başlangıç paketi.',
+    features: ['14 gün yayın süresi', `Ek ilan başına ${formatCurrency(1250)}`, 'Profesyonel mağaza vitrini'],
+  },
+  {
+    code: 'CORPORATE_PLUS_30_DAY',
+    name: 'Plus',
+    price: 25000,
+    description: 'Daha yüksek görünürlük ve ilan hacmi isteyen profesyonel mağazalar için.',
+    features: ['Ayda 20 ilan hakkı · 14 gün yayın', 'Ayda 3 Boost kredisi', 'Kullanılmayan haklarda rollover', `Ek ilan ${formatCurrency(1250)} · Ek Boost ${formatCurrency(1000)}`],
+  },
+] as const;
 
 function getSubscriptionRemainingLabel(expiresAt?: string | null) {
   if (!expiresAt) return 'Aktif üyelik';
@@ -275,7 +291,7 @@ export default function HesabimKurumsalPage() {
     void fetchDealer();
   }, [fetchDealer]);
 
-  const handleActivateSubscription = async () => {
+  const handleActivateSubscription = async (packageCode: string) => {
     if (!dealer || !currentProfile) return;
     setActionLoading(true);
     setError('');
@@ -285,7 +301,9 @@ export default function HesabimKurumsalPage() {
       const activationRes = await fetch('/api/dealers/subscription/activate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dealerId: dealer.id }),
+        body: packageCode === 'CORPORATE_SUBSCRIPTION_30_DAY'
+          ? JSON.stringify({ dealerId: dealer.id })
+          : JSON.stringify({ dealerId: dealer.id, packageCode }),
       });
       const activationData = await activationRes.json().catch(() => ({})) as {
         error?: string;
@@ -308,7 +326,11 @@ export default function HesabimKurumsalPage() {
           'Content-Type': 'application/json',
           'Idempotency-Key': `corporate-subscription:${dealer.id}:${crypto.randomUUID()}`,
         },
-        body: JSON.stringify({ packageCode: 'CORPORATE_SUBSCRIPTION_30_DAY' }),
+        body: JSON.stringify(
+          packageCode === 'CORPORATE_SUBSCRIPTION_30_DAY'
+            ? { packageCode: 'CORPORATE_SUBSCRIPTION_30_DAY' }
+            : { packageCode }
+        ),
       });
       const data = await readJsonResponse<{ paymentLink: string }>(res, 'Kurumsal üyelik ödeme siparişi oluşturulamadı.');
       window.location.assign(data.paymentLink);
@@ -552,7 +574,7 @@ export default function HesabimKurumsalPage() {
             </Link>
           </div>
         </div>
-      ) : dealer?.status === 'APPROVED' && (dealer?.subscription_status === 'ACTIVE' || isSubscriptionExpired) ? (
+      ) : dealer?.status === 'APPROVED' && dealer?.subscription_status === 'ACTIVE' && !isSubscriptionExpired ? (
         /* CASE 1: APPROVED STORE DASHBOARD (ACTIVE OR EXPIRED SUBSCRIPTION) */
         isEditingStore ? (
           /* SUBVIEW: EDITING VIEW (Section 13) */
@@ -901,14 +923,26 @@ export default function HesabimKurumsalPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={handleActivateSubscription}
-                  disabled={actionLoading}
+                  onClick={() => dealer.active_package_code && handleActivateSubscription(dealer.active_package_code)}
+                  disabled={actionLoading || !dealer.active_package_code}
                   className="btn-primary text-xs py-1.5 px-3 shrink-0"
                 >
-                  Üyeliği Yenile
+                  Aynı Paketi Yenile
                 </button>
               </div>
             )}
+
+            <section aria-labelledby="current-membership-title" className="surface-card rounded-2xl border border-[#FF8A1F]/25 p-5 sm:p-6">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                <div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FF9E45]">Mevcut Paket</p><h2 id="current-membership-title" className="mt-2 text-xl font-black text-[var(--text-main)]">{dealer.active_package_name || (dealer.active_package_code?.includes('PLUS') ? 'Plus' : 'Standard')}</h2><p className="mt-1 text-xs text-[var(--text-muted)]">Paketiniz {dealer.subscription_expires_at ? formatDate(dealer.subscription_expires_at) : 'belirtilmeyen tarihe'} kadar aktif.</p></div>
+                {dealer.active_package_price != null && <p className="text-xl font-black text-[var(--text-main)]">{formatCurrency(dealer.active_package_price)}<span className="text-xs font-semibold text-[var(--text-muted)]"> / ay</span></p>}
+              </div>
+              {dealer.active_package_code === 'CORPORATE_PLUS_30_DAY' && <dl className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="rounded-xl bg-[var(--bg-surface-secondary)] p-4"><dt className="text-[11px] text-[var(--text-dim)]">İlan hakkı</dt><dd className="mt-1 text-lg font-black text-[var(--text-main)]">{dealer.included_listing_credits ?? 0}</dd></div>
+                <div className="rounded-xl bg-[var(--bg-surface-secondary)] p-4"><dt className="text-[11px] text-[var(--text-dim)]">Pakete dahil Boost</dt><dd className="mt-1 text-lg font-black text-[var(--text-main)]">{dealer.included_boost_credits ?? dealer.monthly_boost_credits ?? 0}</dd></div>
+                <div className="rounded-xl bg-[var(--bg-surface-secondary)] p-4"><dt className="text-[11px] text-[var(--text-dim)]">Satın alınan Boost</dt><dd className="mt-1 text-lg font-black text-[#FF9E45]">{dealer.purchased_boost_credits ?? 0}</dd></div>
+              </dl>}
+            </section>
 
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <div className="surface-card rounded-xl border border-[var(--border-app)] p-4 transition-colors hover:border-[#FF8A1F]/25">
@@ -1145,55 +1179,32 @@ export default function HesabimKurumsalPage() {
         )
       ) : dealer?.status === 'APPROVED' ? (
         /* CASE 2: APPROVED BUT SUBSCRIPTION INACTIVE OR EXPIRED */
-        <div className="surface-card mx-auto max-w-2xl overflow-hidden rounded-3xl border border-[#FF8A1F]/25 shadow-[0_24px_80px_rgba(0,0,0,.22)]">
+        <div className="mx-auto max-w-5xl space-y-6">
+        <div className="surface-card overflow-hidden rounded-3xl border border-[#FF8A1F]/25 shadow-[0_24px_80px_rgba(0,0,0,.22)]">
           <div className="border-b border-[var(--border-app)] bg-gradient-to-br from-[#FF8A1F]/10 via-transparent to-transparent p-6 sm:p-8">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-400">
               <BadgeCheck className="h-3.5 w-3.5" />
               <span>Başvurunuz Onaylandı</span>
             </span>
             <h2 className="mt-4 text-2xl font-black tracking-[-0.025em] text-[var(--text-main)] sm:text-3xl">Kurumsal Üyeliğinizi Aktifleştirin</h2>
-            <p className="mt-2 text-sm font-semibold text-[#FF9E45]">{dealer.company_name} Kurumsal Paket</p>
-            <div className="mt-4 flex items-baseline gap-2"><strong className="text-3xl font-black text-[var(--text-main)]">{formatCurrency(CANONICAL_PRICING.CORPORATE_SUBSCRIPTION_30_DAY)}</strong><span className="text-sm font-semibold text-[var(--text-muted)]">/ ay</span></div>
+            <p className="mt-2 text-sm font-semibold text-[#FF9E45]">{dealer.company_name} için size uygun paketi seçin</p>
             <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--text-muted)]">
               Kurumsal mağaza başvurunuz onaylandı. Aşağıdaki ödeme ile üyeliğinizi aktifleştirerek mağaza avantajlarını kullanabilirsiniz.
             </p>
           </div>
 
-          <div className="space-y-6 p-6 sm:p-8">
-            <div className="rounded-2xl border border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/55 p-4 sm:p-5">
-              <h3 className="text-sm font-bold text-[var(--text-main)]">Kurumsal Paket Avantajları</h3>
-              <ul className="mt-4 space-y-3 text-xs leading-5 text-[var(--text-muted)] sm:text-sm">
-              <li className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                <span><strong className="text-[var(--text-main)]">İndirimli ilan:</strong> İlan başına {formatCurrency(CANONICAL_PRICING.CORPORATE_14_DAY)}.</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                <span><strong className="text-[var(--text-main)]">14 gün yayın:</strong> İlanlarınız daha uzun süre yayında kalır.</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                <span><strong className="text-[var(--text-main)]">Aylık 3 ücretsiz Boost Kredisi:</strong> Her kullanım ilanı 24 saat öne çıkarır.</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                <span><strong className="text-[var(--text-main)]">Mağaza vitrini:</strong> Logo, banner, sosyal medya ve özel mağaza adresi.</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                <span><strong className="text-[var(--text-main)]">Takipçi sistemi:</strong> Yeni ilanlarınız takipçilerinize ulaşır.</span>
-              </li>
-              </ul>
-            </div>
-
-            <div>
-              <button type="button" onClick={handleActivateSubscription} disabled={actionLoading} className="btn-primary flex w-full cursor-pointer items-center justify-center gap-2 py-3.5 text-sm shadow-lg">
-                {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-                <span>Kurumsal Üyeliği Aktifleştir</span>
-              </button>
-              <p className="mt-2 text-center text-[11px] text-[var(--text-dim)]">Ödeme Fleeca üzerinden tamamlanacaktır.</p>
-            </div>
+          <div className="grid gap-4 p-6 sm:grid-cols-2 sm:p-8" aria-label="Kurumsal üyelik paketleri">
+            {CORPORATE_MEMBERSHIP_PACKAGES.map((pkg) => <article key={pkg.code} className={`flex flex-col rounded-2xl border p-5 ${pkg.name === 'Plus' ? 'border-[#FF8A1F]/50 bg-[#FF8A1F]/5' : 'border-[var(--border-app)] bg-[var(--bg-surface-secondary)]/55'}`}>
+              <div className="flex items-center justify-between gap-3"><h3 className="text-xl font-black text-[var(--text-main)]">{pkg.name}</h3>{pkg.name === 'Plus' && <span className="rounded-full bg-[#FF8A1F]/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-[#FF9E45]">En kapsamlı</span>}</div>
+              <p className="mt-2 min-h-10 text-xs leading-5 text-[var(--text-muted)]">{pkg.description}</p>
+              <p className="mt-5 text-3xl font-black text-[var(--text-main)]">{formatCurrency(pkg.price)} <span className="text-xs font-semibold text-[var(--text-muted)]">/ ay</span></p>
+              <ul className="my-5 flex-1 space-y-3 text-sm text-[var(--text-muted)]">{pkg.features.map((feature) => <li key={feature} className="flex gap-2"><CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />{feature}</li>)}</ul>
+              <button type="button" onClick={() => handleActivateSubscription(pkg.code)} disabled={actionLoading} aria-label={`${pkg.name} paketini seç`} className="btn-primary flex w-full items-center justify-center gap-2 py-3 text-sm disabled:opacity-60">{actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}{pkg.name} Paketini Seç</button>
+            </article>)}
+            <p className="text-center text-[11px] text-[var(--text-dim)] sm:col-span-2">Seçiminizi ödeme öncesinde onaylayacaksınız. Ödeme Fleeca üzerinden güvenle tamamlanır.</p>
           </div>
+        </div>
+        {searchParams.get('payment') === 'success' && <div role="status" className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-5 text-sm text-emerald-300"><p className="font-bold">Paket seçiminiz onaylandı.</p><p className="mt-1">Ödemeniz doğrulandıktan sonra üyelik haklarınız otomatik olarak tanımlanacaktır.</p></div>}
         </div>
       ) : dealer?.status === 'PENDING' || application?.status === 'PENDING' ? (
         /* CASE 3: PENDING */

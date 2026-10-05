@@ -3,6 +3,7 @@ import {
   CharacterFleecaAccount,
   CorporateApplication,
   CorporateFollower,
+  CorporateBoostCredit,
   DealerProfile,
   Favorite,
   Listing,
@@ -22,6 +23,7 @@ import {
 
 // In-memory persistent state during server runtime
 class SanboardDatabase {
+  corporateBoostCredits: CorporateBoostCredit[] = [];
   offerThreads: OfferThread[] = [];
   offerEvents: OfferEvent[] = [];
   users: User[] = [
@@ -172,6 +174,15 @@ class SanboardDatabase {
       code: 'CORPORATE_SUBSCRIPTION_30_DAY',
       name: 'Aylık Kurumsal Üyelik',
       price: 5500,
+      duration_days: 30,
+      active: true,
+      seller_type: 'CORPORATE',
+    },
+    {
+      id: 'pkg-corporate-plus-subscription',
+      code: 'CORPORATE_PLUS_30_DAY',
+      name: 'Corporate Plus',
+      price: 25000,
       duration_days: 30,
       active: true,
       seller_type: 'CORPORATE',

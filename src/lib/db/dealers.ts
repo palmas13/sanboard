@@ -290,6 +290,11 @@ export async function activateSubscription(dealerId: string): Promise<{ success:
   dealer.subscription_expires_at = addCalendarMonth(now).toISOString();
   dealer.current_period_start = now.toISOString();
   dealer.current_period_end = dealer.subscription_expires_at;
+  dealer.active_package_code = 'CORPORATE_SUBSCRIPTION_30_DAY';
+  dealer.active_package_name = 'Aylık Kurumsal Üyelik';
+  dealer.active_package_price = 5500;
+  dealer.included_listing_credits = 0;
+  dealer.included_boost_credits = 0;
   dealer.monthly_boost_credits = 3;
   dealer.purchased_boost_credits = dealer.purchased_boost_credits || 0;
   dealer.boost_credits = dealer.monthly_boost_credits + dealer.purchased_boost_credits;
@@ -393,25 +398,39 @@ export async function boostListing(
     const nextPeriodEnd = new Date(Math.min(now.getTime() + 30 * 86400000, expiresAt.getTime()));
     dealer.current_period_start = now.toISOString();
     dealer.current_period_end = nextPeriodEnd.toISOString();
-    dealer.monthly_boost_credits = 3;
-    dealer.boost_credits = 3 + (dealer.purchased_boost_credits || 0);
+    if (dealer.active_package_code !== 'CORPORATE_PLUS_30_DAY') dealer.monthly_boost_credits = 3;
   }
   const purchasedCredits = dealer.purchased_boost_credits || 0;
-  const monthlyCredits = dealer.monthly_boost_credits
-    ?? Math.max((dealer.boost_credits || 0) - purchasedCredits, 0);
+  const durableIncludedCredit = db.corporateBoostCredits.find((credit) =>
+    credit.corporate_profile_id === dealer.id && credit.status === 'AVAILABLE'
+  );
+  const durableCredits = db.corporateBoostCredits.filter((credit) =>
+    credit.corporate_profile_id === dealer.id && credit.status === 'AVAILABLE'
+  ).length;
+  const monthlyCredits = dealer.active_package_code === 'CORPORATE_PLUS_30_DAY'
+    ? 0
+    : (dealer.monthly_boost_credits ?? Math.max((dealer.boost_credits || 0) - purchasedCredits, 0));
+  dealer.included_boost_credits = durableCredits;
+  dealer.boost_credits = durableCredits + monthlyCredits + purchasedCredits;
 
   // STRICT: Corporate boost can ONLY boost corporate listings belonging to this store (Requirement 10 & 11)
   if (listing.seller_type !== 'CORPORATE' || listing.corporate_profile_id !== dealer.id) {
     return { success: false, code: 'LISTING_NOT_OWNED', error: 'İlan aktif karakterin kurumsal mağazasına ait değil.' };
   }
-  if (!testBypass && monthlyCredits <= 0 && purchasedCredits <= 0) {
+  if (!testBypass && durableCredits <= 0 && monthlyCredits <= 0 && purchasedCredits <= 0) {
     return { success: false, code: 'NO_BOOST_CREDITS', error: 'Bu abonelik dönemi için öne çıkarma hakkınız tükenmiştir.' };
   }
 
   if (!testBypass) {
-    if (monthlyCredits > 0) dealer.monthly_boost_credits = monthlyCredits - 1;
-    else dealer.purchased_boost_credits = purchasedCredits - 1;
-    dealer.boost_credits = (dealer.monthly_boost_credits || 0) + (dealer.purchased_boost_credits || 0);
+    if (durableIncludedCredit) {
+      durableIncludedCredit.status = 'USED';
+      durableIncludedCredit.used_listing_id = listing.id;
+      durableIncludedCredit.used_at = now.toISOString();
+      dealer.included_boost_credits = durableCredits - 1;
+    } else if (monthlyCredits > 0) {
+      dealer.monthly_boost_credits = monthlyCredits - 1;
+    } else dealer.purchased_boost_credits = purchasedCredits - 1;
+    dealer.boost_credits = (dealer.included_boost_credits || 0) + (dealer.monthly_boost_credits || 0) + (dealer.purchased_boost_credits || 0);
   }
   listing.is_featured = true;
   const boostEnd = new Date(now.getTime() + 24 * 3600 * 1000).toISOString();

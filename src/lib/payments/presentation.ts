@@ -21,7 +21,9 @@ export function getPaymentProductLabel(payment: PaymentProductMetadata): string 
     case 'LISTING_BOOST_24_HOUR':
       return 'Boost Kredisi';
     case 'CORPORATE_SUBSCRIPTION_30_DAY':
-      return 'Kurumsal Üyelik';
+      return 'Kurumsal Standard Üyelik';
+    case 'CORPORATE_PLUS_30_DAY':
+      return 'Kurumsal Plus Üyelik';
     default:
       return payment.package_name || (payment.entitlement_type === 'LISTING_CREDIT' ? 'İlan Hakkı' : 'Ödeme Paketi');
   }

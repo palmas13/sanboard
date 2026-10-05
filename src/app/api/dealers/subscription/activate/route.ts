@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     const actor = await resolveOwnedActiveProfile(req);
     if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
 
-    const { dealerId } = await req.json().catch(() => ({}));
+    const { dealerId, packageCode } = await req.json().catch(() => ({}));
     if (!dealerId) {
       return NextResponse.json({ error: 'dealerId parametresi zorunludur.' }, { status: 400 });
     }
@@ -32,6 +32,12 @@ export async function POST(req: NextRequest) {
 
     const testActivationBypass = await canBypassTestPayment({ userId: actor.userId, profile: actor.profile });
     if (testActivationBypass) {
+      if (packageCode !== undefined && packageCode !== 'CORPORATE_SUBSCRIPTION_30_DAY' && packageCode !== 'CORPORATE_PLUS_30_DAY') {
+        return NextResponse.json({ error: 'Geçersiz kurumsal üyelik paketi.' }, { status: 400 });
+      }
+      if (packageCode === 'CORPORATE_PLUS_30_DAY') {
+        return NextResponse.json({ error: 'Test ödeme bypass yalnızca Standard paketini destekler.' }, { status: 400 });
+      }
       if (typeof dealerRepo.activateSubscription !== 'function') {
         return NextResponse.json({ error: 'Üyelik aktivasyonu kullanılamıyor.' }, { status: 503 });
       }

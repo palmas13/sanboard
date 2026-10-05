@@ -68,7 +68,7 @@ export class SupabasePaymentRepository implements IPaymentRepository {
 
     if (!packageRecord.active) throw new Error('İstenen ödeme paketi aktif değildir.');
     if (!isPaymentPackageCode(packageRecord.code)) throw new Error('Desteklenmeyen ödeme paketi.');
-    if (packageRecord.code === 'CORPORATE_SUBSCRIPTION_30_DAY') {
+    if (packageRecord.code === 'CORPORATE_SUBSCRIPTION_30_DAY' || packageRecord.code === 'CORPORATE_PLUS_30_DAY') {
       if (packageRecord.seller_type !== 'CORPORATE' || packageRecord.duration_days !== 30) {
         throw new Error('Kurumsal üyelik paketi yapılandırması geçersizdir.');
       }
@@ -85,7 +85,7 @@ export class SupabasePaymentRepository implements IPaymentRepository {
       throw new Error('Kurumsal ilan paketi yapılandırması geçersizdir.');
     }
 
-    const canonicalPurpose: PaymentPurpose = packageRecord.code === 'CORPORATE_SUBSCRIPTION_30_DAY'
+    const canonicalPurpose: PaymentPurpose = packageRecord.code === 'CORPORATE_SUBSCRIPTION_30_DAY' || packageRecord.code === 'CORPORATE_PLUS_30_DAY'
       ? 'CORPORATE_SUBSCRIPTION'
       : packageRecord.code === 'LISTING_BOOST_24_HOUR' ? 'LISTING_BOOST' : 'LISTING_PUBLICATION';
     const purpose = options.purpose || canonicalPurpose;

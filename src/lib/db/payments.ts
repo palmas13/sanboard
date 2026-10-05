@@ -39,7 +39,7 @@ export async function createCheckoutOrder(
     return { orderId: '', amount: 0, packageName: '', error: 'Desteklenmeyen ödeme paketi.' };
   }
   if (
-    pkg.code === 'CORPORATE_SUBSCRIPTION_30_DAY'
+    (pkg.code === 'CORPORATE_SUBSCRIPTION_30_DAY' || pkg.code === 'CORPORATE_PLUS_30_DAY')
     && (pkg.seller_type !== 'CORPORATE' || pkg.duration_days !== 30 || !options.corporateProfileId)
   ) {
     return { orderId: '', amount: 0, packageName: '', error: 'Kurumsal üyelik paketi yapılandırması geçersizdir.' };
@@ -62,7 +62,7 @@ export async function createCheckoutOrder(
   }
 
   const orderId = `ORD-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-  const canonicalPurpose: PaymentPurpose = packageCode === 'CORPORATE_SUBSCRIPTION_30_DAY'
+  const canonicalPurpose: PaymentPurpose = packageCode === 'CORPORATE_SUBSCRIPTION_30_DAY' || packageCode === 'CORPORATE_PLUS_30_DAY'
     ? 'CORPORATE_SUBSCRIPTION'
     : packageCode === 'LISTING_BOOST_24_HOUR' ? 'LISTING_BOOST' : 'LISTING_PUBLICATION';
   const purpose = options.purpose || canonicalPurpose;
@@ -135,7 +135,7 @@ export async function completePaymentOrder(
   const pkg = db.packages.find((p) => p.id === payment.package_id);
   if (
     payment.entitlement_type === 'CORPORATE_SUBSCRIPTION'
-    && pkg?.code === 'CORPORATE_SUBSCRIPTION_30_DAY'
+    && (pkg?.code === 'CORPORATE_SUBSCRIPTION_30_DAY' || pkg?.code === 'CORPORATE_PLUS_30_DAY')
     && pkg.active
     && pkg.seller_type === 'CORPORATE'
     && pkg.duration_days === 30
@@ -161,13 +161,26 @@ export async function completePaymentOrder(
       return { success: false, error: 'Kurumsal üyelik dönemi tutarsızdır.' };
     }
     const wasActiveAndUnexpired = dealer.subscription_status === 'ACTIVE' && currentEnd > now;
+    const activePackageCode = dealer.active_package_code || 'CORPORATE_SUBSCRIPTION_30_DAY';
+    if (wasActiveAndUnexpired && activePackageCode !== pkg.code) {
+      payment.status = 'PENDING'; payment.paid_at = undefined; payment.external_payment_id = undefined;
+      return { success: false, error: 'Aktif üyelik yalnızca aynı paketle yenilenebilir.' };
+    }
     const legacyPeriodMissing = !periodStart && !periodEnd && wasActiveAndUnexpired;
     dealer.subscription_status = 'ACTIVE';
     const nextSubscriptionEnd = addCalendarMonth(base);
     dealer.subscription_expires_at = nextSubscriptionEnd.toISOString();
-    dealer.monthly_boost_credits = 3;
+    dealer.active_package_code = pkg.code;
+    dealer.active_package_name = pkg.name;
+    dealer.active_package_price = payment.amount;
+    dealer.included_listing_credits = pkg.code === 'CORPORATE_PLUS_30_DAY' ? 20 : 0;
+    const preservedIncludedBoosts = db.corporateBoostCredits.filter((credit) => credit.corporate_profile_id === dealer.id && credit.status === 'AVAILABLE').length;
+    dealer.included_boost_credits = preservedIncludedBoosts + (pkg.code === 'CORPORATE_PLUS_30_DAY' ? 3 : 0);
+    // Standard retains the canonical renewable monthly allowance. Plus is backed
+    // exclusively by durable ledger rows, which never reset at a period boundary.
+    dealer.monthly_boost_credits = pkg.code === 'CORPORATE_SUBSCRIPTION_30_DAY' ? 3 : 0;
     dealer.purchased_boost_credits = dealer.purchased_boost_credits || 0;
-    dealer.boost_credits = dealer.monthly_boost_credits + dealer.purchased_boost_credits;
+    dealer.boost_credits = dealer.monthly_boost_credits + dealer.included_boost_credits + dealer.purchased_boost_credits;
     if (!wasActiveAndUnexpired || Boolean(periodEnd && periodEnd <= now)) {
       dealer.current_period_start = now.toISOString();
       dealer.current_period_end = new Date(Math.min(addCalendarMonth(now).getTime(), nextSubscriptionEnd.getTime())).toISOString();
@@ -176,11 +189,25 @@ export async function completePaymentOrder(
       dealer.current_period_end = new Date(Math.min(addCalendarMonth(now).getTime(), currentEnd.getTime())).toISOString();
     }
     dealer.updated_at = now.toISOString();
+    if (pkg.code === 'CORPORATE_PLUS_30_DAY') {
+      for (let sequence = 1; sequence <= 20; sequence += 1) db.credits.push({
+        id: `membership-${payment.id}-${sequence}`, profile_id: payment.profile_id,
+        payment_id: payment.id, package_id: payment.package_id, credit_type: 'CORPORATE',
+        corporate_profile_id: dealer.id, amount: 0, status: 'AVAILABLE',
+        usage_scope: 'NEW_LISTING_ONLY', grant_source: 'MEMBERSHIP_PLUS', grant_sequence: sequence,
+        created_at: now.toISOString(),
+      });
+      for (let sequence = 1; sequence <= 3; sequence += 1) db.corporateBoostCredits.push({
+        id: `membership-boost-${payment.id}-${sequence}`, corporate_profile_id: dealer.id,
+        payment_id: payment.id, grant_source: 'MEMBERSHIP_PLUS', grant_sequence: sequence,
+        status: 'AVAILABLE', created_at: now.toISOString(),
+      });
+    }
     payment.entitlement_applied_at = now.toISOString();
     return { success: true };
   }
 
-  if (payment.entitlement_type === 'CORPORATE_SUBSCRIPTION' || pkg?.code === 'CORPORATE_SUBSCRIPTION_30_DAY') {
+  if (payment.entitlement_type === 'CORPORATE_SUBSCRIPTION' || pkg?.code === 'CORPORATE_SUBSCRIPTION_30_DAY' || pkg?.code === 'CORPORATE_PLUS_30_DAY') {
     payment.status = 'PENDING';
     payment.paid_at = undefined;
     payment.external_payment_id = undefined;

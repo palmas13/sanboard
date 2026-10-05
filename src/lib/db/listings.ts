@@ -543,7 +543,14 @@ export async function createListingWithCredit(
           : undefined
     );
     if (sellerType === 'CORPORATE') {
-      return effectiveCreditType === 'CORPORATE' && c.corporate_profile_id === corporateProfileId;
+      if (effectiveCreditType !== 'CORPORATE' || c.corporate_profile_id !== corporateProfileId) return false;
+      if (c.grant_source === 'MEMBERSHIP_PLUS') {
+        const dealer = db.dealers.find((item) => item.id === corporateProfileId);
+        return dealer?.subscription_status === 'ACTIVE'
+          && Boolean(dealer.subscription_expires_at)
+          && new Date(dealer!.subscription_expires_at!).getTime() > now.getTime();
+      }
+      return true;
     } else {
       return effectiveCreditType === 'INDIVIDUAL';
     }
@@ -1005,6 +1012,7 @@ export async function republishListing(
   const credit = db.credits.find((item) =>
     item.profile_id === creditOwnerId &&
     item.status === 'AVAILABLE' &&
+    item.usage_scope !== 'NEW_LISTING_ONLY' &&
     item.credit_type === (listing.seller_type === 'CORPORATE' ? 'CORPORATE' : 'INDIVIDUAL') &&
     (listing.seller_type !== 'CORPORATE' || item.corporate_profile_id === listing.corporate_profile_id)
   );

@@ -283,9 +283,25 @@ export interface ListingCredit {
   historical_corporate_profile_id?: string | null;
   corporate_profile_snapshot?: Record<string, unknown> | null;
   amount?: number;
+  usage_scope?: 'NEW_LISTING_ONLY' | 'NEW_OR_REPUBLISH';
+  grant_source?: 'PURCHASE' | 'MEMBERSHIP_PLUS';
+  grant_sequence?: number;
+  membership_period_id?: string | null;
   status: CreditStatus;
   used_listing_id?: string;
   created_at: string;
+  used_at?: string;
+}
+
+export interface CorporateBoostCredit {
+  id: string;
+  corporate_profile_id: string;
+  payment_id: string;
+  grant_source: 'MEMBERSHIP_PLUS';
+  grant_sequence: number;
+  status: CreditStatus;
+  created_at: string;
+  used_listing_id?: string;
   used_at?: string;
 }
 
@@ -451,6 +467,11 @@ export interface DealerProfile {
   boost_credits?: number;
   monthly_boost_credits?: number;
   purchased_boost_credits?: number;
+  active_package_code?: string | null;
+  active_package_name?: string | null;
+  active_package_price?: number | null;
+  included_listing_credits?: number;
+  included_boost_credits?: number;
   social_media?: CorporateSocialMedia[] | CorporateSocialMedia | { [key: string]: any } | null;
   follower_count?: number;
   is_following?: boolean;
