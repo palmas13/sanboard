@@ -1256,7 +1256,9 @@ export class SupabaseListingRepository implements IListingRepository {
     corporateProfileId: string,
     onTiming?: (stage: 'db' | 'enrich', duration: number) => void
   ): Promise<Listing[]> {
-    const client = this.getClient();
+    // Corporate inventory is an authenticated owner-management surface. Use
+    // the trusted server client so public RLS policies cannot hide FROZEN rows.
+    const client = this.getAdminClient();
     const safeCorporateId = resolveProfileId(corporateProfileId);
 
     let query = client

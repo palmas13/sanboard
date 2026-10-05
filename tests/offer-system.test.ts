@@ -4,12 +4,15 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { db } from '@/lib/db/store';
 import { MemoryOfferRepository } from '@/lib/db/repositories/memory/memory-offer-repo';
+import { MemoryListingRepository } from '@/lib/db/repositories/memory/memory-listing-repo';
+import { getPublicListings } from '@/lib/db/listings';
 import { syncExternalGameAccount } from '@/lib/auth/gtaworld-sync';
 import { MockGtaWorldAuthProvider } from '@/lib/integrations/gtaworld/mock-provider';
 import { TEST_LOGIN_JANE_CHARACTER_ID, TEST_LOGIN_JOHN_CHARACTER_ID, TEST_LOGIN_MAVIS_CHARACTER_ID } from '@/lib/auth/test-login';
 
 describe('Structured offer system', () => {
   const repo = new MemoryOfferRepository();
+  const listingRepo = new MemoryListingRepository();
   const seller = 'offer-seller';
   const buyer = 'offer-buyer';
   const sibling = 'offer-sibling';
@@ -27,6 +30,7 @@ describe('Structured offer system', () => {
     db.offerThreads = [];
     db.offerEvents = [];
     db.notifications = [];
+    db.auditLogs = [];
   });
 
   const create = (amount = 60000) => repo.createOffer({ listingId, amount, actorProfileId: buyer, actorUserId: 'buyer-account' });
@@ -94,6 +98,60 @@ describe('Structured offer system', () => {
     assert.equal((await actOnOffer({ threadId: id, actorProfileId: buyer, actorUserId: 'buyer-account', action: 'COUNTER', amount: 65000 })).thread?.turn_profile_id, seller);
     assert.equal((await actOnOffer({ threadId: id, actorProfileId: seller, actorUserId: 'seller-account', action: 'ACCEPT' })).thread?.status, 'ACCEPTED');
     assert.equal(db.listings[0].status, 'ACTIVE');
+  });
+
+  test('owner can freeze active listings with no offer, active offer, or accepted offer', async () => {
+    assert.equal((await listingRepo.transitionFreezeState(listingId, seller, 'seller-account', 'FREEZE')).success, true);
+    assert.equal(db.listings[0].status, 'FROZEN');
+
+    db.listings[0].status = 'ACTIVE';
+    db.listings[0].last_freeze_transition_at = new Date(Date.now() - 61_000).toISOString();
+    const activeThread = (await create()).thread!;
+    assert.equal((await listingRepo.transitionFreezeState(listingId, seller, 'seller-account', 'FREEZE')).success, true);
+    assert.equal(db.offerThreads.find((thread) => thread.id === activeThread.id)?.status, 'ACTIVE');
+
+    db.listings[0].status = 'ACTIVE';
+    db.listings[0].last_freeze_transition_at = new Date(Date.now() - 61_000).toISOString();
+    db.offerThreads = [];
+    db.offerEvents = [];
+    const acceptedThread = (await create()).thread!;
+    await actOnOffer({ threadId: acceptedThread.id, actorProfileId: seller, actorUserId: 'seller-account', action: 'ACCEPT' });
+    const threadSnapshot = structuredClone(db.offerThreads[0]);
+    const eventSnapshot = structuredClone(db.offerEvents);
+
+    assert.equal((await listingRepo.transitionFreezeState(listingId, seller, 'seller-account', 'FREEZE')).success, true);
+    assert.equal(db.listings[0].status, 'FROZEN');
+    assert.deepEqual(db.offerThreads[0], threadSnapshot);
+    assert.deepEqual(db.offerEvents, eventSnapshot);
+    assert.equal((await getPublicListings()).some((listing) => listing.id === listingId), false);
+
+    db.listings[0].last_freeze_transition_at = new Date(Date.now() - 61_000).toISOString();
+    assert.equal((await listingRepo.transitionFreezeState(listingId, seller, 'seller-account', 'RESUME')).success, true);
+    assert.equal(db.listings[0].status, 'ACTIVE');
+    assert.deepEqual(db.offerThreads[0], threadSnapshot);
+    assert.deepEqual(db.offerEvents, eventSnapshot);
+    assert.equal((await getPublicListings()).some((listing) => listing.id === listingId), true);
+  });
+
+  test('frozen listing blocks new offers and every existing active-offer mutation', async () => {
+    const thread = (await create()).thread!;
+    db.listings[0].status = 'FROZEN';
+    db.listings[0].frozen_at = new Date().toISOString();
+    assert.equal((await repo.createOffer({ listingId, amount: 70000, actorProfileId: sibling, actorUserId: 'sibling-account' })).code, 'LISTING_FROZEN');
+
+    for (const action of ['COUNTER', 'ACCEPT', 'REJECT', 'WITHDRAW'] as const) {
+      const actorProfileId = action === 'WITHDRAW' ? buyer : seller;
+      const result = await repo.actOnOffer({
+        threadId: thread.id,
+        actorProfileId,
+        actorUserId: actorProfileId === buyer ? 'buyer-account' : 'seller-account',
+        action,
+        amount: action === 'COUNTER' ? 70000 : undefined,
+        proposalEventId: currentProposalId(thread.id),
+      });
+      assert.equal(result.code, 'LISTING_FROZEN');
+    }
+    assert.equal(db.offerThreads[0].status, 'ACTIVE');
   });
 
   test('buyer accepts seller counter with canonical amount, contact, notification and terminal lock', async () => {

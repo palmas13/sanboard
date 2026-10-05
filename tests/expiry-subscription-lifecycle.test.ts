@@ -130,23 +130,16 @@ describe('listing expiry and corporate subscription lifecycle', () => {
     assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.transition_corporate_membership_listings\(UUID,TEXT\) TO service_role/);
   });
 
-  test('accepted-offer membership expiry is deferred atomically and remains fail-closed publicly', () => {
-    const migration = readFileSync(join(process.cwd(), 'supabase/migrations/20261005000000_listing_freeze_resume_lifecycle.sql'), 'utf8');
-    assert.match(migration, /status='ACCEPTED'[\s\S]*code','INVALID_LISTING_STATE'/);
-    assert.match(migration, /IF NOT COALESCE\(\(transition_result->>'success'\)::BOOLEAN,FALSE\) THEN[\s\S]*RAISE EXCEPTION 'Corporate membership listing transition failed/);
-    assert.doesNotMatch(migration, /ELSIF transition_result->>'code' <> 'INVALID_LISTING_STATE'/);
-    assert.match(migration, /FOR store IN[\s\S]*BEGIN[\s\S]*transition_corporate_membership_listings\(store\.id,'FREEZE'\)[\s\S]*subscription_status='EXPIRED'[\s\S]*EXCEPTION WHEN OTHERS THEN[\s\S]*blocked_subscriptions:=blocked_subscriptions\+1/);
-
-    const now = new Date('2026-10-05T12:00:00.000Z');
-    const listing = { status: 'ACTIVE', expires_at: '2026-10-12T12:00:00.000Z', seller_type: 'CORPORATE', corporate_profile_id: 'accepted-store' } as any;
-    const membership = { moderation_status: 'ACTIVE', subscription_status: 'ACTIVE', subscription_expires_at: '2026-10-05T11:59:59.000Z' };
-    const acceptedOffer = { listing_id: 'accepted-listing', status: 'ACCEPTED', current_amount: 500000 };
-
-    // The store-level expiry subtransaction is deferred: durable states and accepted history stay intact.
-    assert.equal(listing.status, 'ACTIVE');
-    assert.equal(membership.subscription_status, 'ACTIVE');
-    assert.equal(acceptedOffer.status, 'ACCEPTED');
-    // Timestamp-based visibility still fails closed while the canonical SOLD/REMOVED action is pending.
-    assert.equal(isPublicListingVisible(listing, membership, now), false);
+  test('accepted offers do not defer membership expiry or block the canonical freeze transition', () => {
+    const originalMigration = readFileSync(join(process.cwd(), 'supabase/migrations/20261005000000_listing_freeze_resume_lifecycle.sql'), 'utf8');
+    const migration = readFileSync(join(process.cwd(), 'supabase/migrations/20261005010000_freeze_accepted_offers_owner_visibility.sql'), 'utf8');
+    const canonicalTransition = migration.slice(migration.indexOf('CREATE OR REPLACE FUNCTION public.transition_listing_freeze_state'), migration.indexOf('REVOKE ALL ON FUNCTION public.transition_listing_freeze_state'));
+    assert.match(originalMigration, /status='ACCEPTED'[\s\S]*Kabul edilmiş teklifi bulunan ilan dondurulamaz/);
+    assert.doesNotMatch(canonicalTransition, /status='ACCEPTED'|Kabul edilmiş teklifi bulunan ilan dondurulamaz/);
+    assert.match(migration, /CREATE OR REPLACE FUNCTION public\.transition_listing_freeze_state/);
+    assert.match(migration, /status = 'ACTIVE' AND expires_at > NOW\(\)/);
+    assert.match(migration, /corporate_profile_id IN[\s\S]*owner_profile_id IN \(SELECT public\.get_auth_profile_ids\(\)\)/);
+    assert.doesNotMatch(migration, /CREATE OR REPLACE FUNCTION public\.run_expiry_lifecycle/);
+    assert.doesNotMatch(migration, /CREATE OR REPLACE FUNCTION public\.transition_corporate_membership_listings/);
   });
 });

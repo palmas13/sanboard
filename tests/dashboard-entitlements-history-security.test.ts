@@ -9,7 +9,7 @@ import { createSessionToken } from '@/lib/auth/session';
 import { db } from '@/lib/db/store';
 import { getCreditPresentation } from '@/lib/dashboard/credit-presentation';
 import { filterOwnerDashboardListings, getOwnerDashboardCounts } from '@/lib/listings/owner-dashboard';
-import { getPublicListings, getUserListings } from '@/lib/db/listings';
+import { getCorporateListings, getPublicListings, getUserListings } from '@/lib/db/listings';
 import { formatTimeRemaining } from '@/lib/utils/format';
 
 const source = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
@@ -127,6 +127,20 @@ describe('dashboard entitlements and listing-history security', () => {
     assert.deepEqual(filterOwnerDashboardListings(listings, { status: 'EXPIRED', type: 'property', query: '' }), []);
   });
 
+  test('individual and corporate owner inventories retain frozen listings while public discovery hides them', async () => {
+    db.listings.push(
+      { id: 'frozen-individual', listing_number: '#FROZEN-I', seller_profile_id: profileA, seller_type: 'INDIVIDUAL', category: 'vehicle', subcategory: 'Otomobil', title: 'Frozen Individual', description: '', price: 2, location: null, status: 'FROZEN', frozen_at: new Date().toISOString(), remaining_listing_seconds: 3600, remaining_boost_seconds: 0, expires_at: new Date(Date.now() + 86_400_000).toISOString(), created_at: '', updated_at: '' },
+      { id: 'frozen-corporate', listing_number: '#FROZEN-C', seller_profile_id: profileA, seller_type: 'CORPORATE', corporate_profile_id: 'store-a', category: 'property', subcategory: 'Ev / Daire', title: 'Frozen Corporate', description: '', price: 3, location: null, status: 'FROZEN', frozen_at: new Date().toISOString(), remaining_listing_seconds: 7200, remaining_boost_seconds: 1800, expires_at: new Date(Date.now() + 86_400_000).toISOString(), created_at: '', updated_at: '' },
+    );
+
+    const individualRows = await getUserListings(profileA);
+    const corporateRows = await getCorporateListings('store-a');
+    assert.ok(individualRows.some((item) => item.id === 'frozen-individual'));
+    assert.ok(corporateRows.some((item) => item.id === 'frozen-corporate'));
+    assert.ok(filterOwnerDashboardListings(individualRows, { status: 'ACTIVE', type: 'ALL', query: '' }).some((item) => item.id === 'frozen-individual'));
+    assert.equal((await getPublicListings()).some((item) => ['frozen-individual', 'frozen-corporate'].includes(item.id)), false);
+  });
+
   test('ACTIVE to EXPIRED transition moves the same personal listing between owner tabs while public retrieval stays hidden', async () => {
     const listing = db.listings.find((item) => item.id === 'active-a')!;
     assert.deepEqual(filterOwnerDashboardListings(await getUserListings(profileA), { status: 'ACTIVE', type: 'ALL', query: '' }).map((item) => item.id), ['active-a']);
@@ -174,5 +188,8 @@ describe('dashboard entitlements and listing-history security', () => {
     assert.doesNotMatch(page, /<img/);
     assert.match(ownerMethod, /const client = this\.getAdminClient\(\)/);
     assert.match(ownerMethod, /\.eq\('seller_profile_id', safeProfileId\)[\s\S]*\.eq\('seller_type', 'INDIVIDUAL'\)[\s\S]*\.is\('corporate_profile_id', null\)/);
+    const corporateMethod = repository.slice(repository.indexOf('async getCorporateListings'), repository.indexOf('async toggleFavorite'));
+    assert.match(corporateMethod, /const client = this\.getAdminClient\(\)/);
+    assert.doesNotMatch(corporateMethod, /\.eq\('status', 'ACTIVE'\)/);
   });
 });
