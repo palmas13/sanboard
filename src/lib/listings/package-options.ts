@@ -49,12 +49,13 @@ export function buildListingPackageOptions(input: {
   eligibility: CorporateEligibilityResult;
   credits: Array<{
     status?: string;
+    used_at?: string | null;
     credit_type?: string | null;
     corporate_profile_id?: string | null;
   }>;
   testPublishBypass?: boolean;
 }): ListingPackageOptions {
-  const availableCredits = input.credits.filter((credit) => credit.status === 'AVAILABLE');
+  const availableCredits = input.credits.filter((credit) => credit.status === 'AVAILABLE' && credit.used_at == null);
   const individualCredits = availableCredits.filter(
     (credit) => credit.credit_type === 'INDIVIDUAL' || !credit.credit_type
   ).length;

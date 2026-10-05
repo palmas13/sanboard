@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
       repo.getUserCredits(actor.profileId),
       canBypassTestPayment({ userId: actor.userId, profile: actor.profile }),
     ]);
-    const availableList = (result.credits || []).filter((c: any) => c.status === 'AVAILABLE');
+    const availableList = (result.credits || []).filter((c: any) => c.status === 'AVAILABLE' && c.used_at == null);
     const individualCredits = availableList.filter((c: any) => c.credit_type === 'INDIVIDUAL').length;
     const corporateCredits = availableList.filter((c: any) => c.credit_type === 'CORPORATE').length;
     const corporateProfileId = req.nextUrl.searchParams.get('corporateProfileId');

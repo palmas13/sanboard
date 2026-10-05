@@ -68,6 +68,32 @@ describe('two-package corporate membership application behavior', () => {
     assert.equal(db.credits.filter((credit) => credit.status === 'AVAILABLE').length, 20);
   });
 
+  test('consumed stale Plus rows cannot be reused or overwritten, while unused Plus remains usable', async () => {
+    await buy('CORPORATE_PLUS_30_DAY', 'stale-plus');
+    for (const [index, credit] of db.credits.entries()) {
+      credit.status = 'AVAILABLE'; credit.used_at = new Date(now.getTime() - 1000).toISOString(); credit.used_listing_id = `previous-${index}`;
+    }
+    const input = { seller_type: 'CORPORATE', category: 'vehicle', subcategory: 'car', title: 'Fresh', description: '', price: 1 } as any;
+    assert.equal((await createListingWithCredit(input, owner)).success, false);
+    assert.deepEqual(db.credits.map((credit) => credit.used_listing_id), Array.from({ length: 20 }, (_, index) => `previous-${index}`));
+    const usable = db.credits[0]; delete usable.used_at; delete usable.used_listing_id;
+    assert.equal((await createListingWithCredit(input, owner)).success, true);
+    assert.equal(usable.status, 'USED'); assert.ok(usable.used_at); assert.ok(usable.used_listing_id);
+  });
+
+  test('paid corporate credits remain usable for create and republish after Plus exhaustion', async () => {
+    await buy('CORPORATE_PLUS_30_DAY', 'paid-fallback');
+    for (const credit of db.credits) { credit.status = 'AVAILABLE'; credit.used_at = now.toISOString(); credit.used_listing_id = 'previous'; }
+    db.credits.push({ id: 'paid-create', profile_id: owner, payment_id: 'paid-1', package_id: 'paid-package', credit_type: 'CORPORATE', corporate_profile_id: store, status: 'AVAILABLE', used_at: null, usage_scope: 'NEW_OR_REPUBLISH', grant_source: 'PURCHASE', created_at: now.toISOString() } as any);
+    const input = { seller_type: 'CORPORATE', category: 'vehicle', subcategory: 'car', title: 'Paid', description: '', price: 1 } as any;
+    const created = await createListingWithCredit(input, owner); assert.equal(created.success, true); assert.equal(db.credits.find((credit) => credit.id === 'paid-create')?.status, 'USED');
+    assert.ok(created.listing); created.listing!.status = 'EXPIRED';
+    db.credits.push({ id: 'paid-republish', profile_id: owner, payment_id: 'paid-2', package_id: 'paid-package', credit_type: 'CORPORATE', corporate_profile_id: store, status: 'AVAILABLE', used_at: null, usage_scope: 'NEW_OR_REPUBLISH', grant_source: 'PURCHASE', created_at: now.toISOString() } as any);
+    assert.equal((await republishListing(created.listing!.id, owner)).success, true);
+    assert.equal(db.credits.find((credit) => credit.id === 'paid-republish')?.status, 'USED');
+    assert.ok(db.credits.filter((credit) => credit.grant_source === 'MEMBERSHIP_PLUS').every((credit) => credit.used_listing_id === 'previous'));
+  });
+
   test('preserved Plus listing rows require an active membership while paid corporate fallback remains eligible', async () => {
     await buy('CORPORATE_PLUS_30_DAY', 'listing-membership');
     db.dealers[0].subscription_status = 'EXPIRED';

@@ -15,7 +15,7 @@ describe('listing package options and entitlement-first UX', () => {
   const profileId = 'package-profile';
   const storeId = 'package-store';
   const now = '2026-10-02T12:00:00.000Z';
-  const profile = { id: profileId, user_id: accountId, full_name: 'Mavis Reed', avatar_url: '', sanmail_email: 'mavis@test', phone: '100', created_at: now, updated_at: now } as any;
+  const profile = { id: profileId, user_id: accountId, external_character_id: 'package-character', full_name: 'Mavis Reed', avatar_url: '', sanmail_email: 'mavis@test', phone: '100', created_at: now, updated_at: now } as any;
   const activeDealer = () => ({ id: storeId, profile_id: profileId, owner_profile_id: profileId, company_name: 'Vinewood Motors', description: '', logo_url: '', banner_url: '', status: 'APPROVED', moderation_status: 'ACTIVE', subscription_status: 'ACTIVE', subscription_expires_at: '2026-11-02T12:00:00.000Z', created_at: now, updated_at: now } as any);
 
   function request(path: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) {
@@ -50,6 +50,17 @@ describe('listing package options and entitlement-first UX', () => {
     db.dealers = [activeDealer()];
     const result = buildListingPackageOptions({ profile, eligibility: await resolveCorporateEligibility(profileId), credits: [] });
     assert.equal(result.corporate?.dealer.id, storeId); assert.equal(result.corporate?.action, 'BUY'); assert.equal(result.individual.action, 'BUY');
+  });
+
+  test('consumed stale AVAILABLE corporate credit selects BUY and does not block checkout', async () => {
+    db.dealers = [activeDealer()];
+    const stale = { id: 'stale-plus', profile_id: profileId, payment_id: 'plus-payment', package_id: 'plus-package', credit_type: 'CORPORATE', corporate_profile_id: storeId, status: 'AVAILABLE', used_at: now, used_listing_id: 'old-listing', usage_scope: 'NEW_LISTING_ONLY', grant_source: 'MEMBERSHIP_PLUS', created_at: now } as any;
+    const options = buildListingPackageOptions({ profile, eligibility: await resolveCorporateEligibility(profileId), credits: [stale] });
+    assert.equal(options.corporate?.availableCredits, 0); assert.equal(options.corporate?.action, 'BUY');
+    db.credits = [stale];
+    const response = await checkout(request('/api/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ packageCode: 'CORPORATE_14_DAY' }) }));
+    const body = await response.json();
+    assert.notEqual(response.status, 409); assert.notEqual(body.code, 'ENTITLEMENT_AVAILABLE'); assert.equal(db.payments.length, 1);
   });
 
   test('available individual and store-scoped corporate credits select USE', async () => {

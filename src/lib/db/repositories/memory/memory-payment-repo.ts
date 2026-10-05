@@ -10,7 +10,7 @@ import type { PayerIdentityFailureCode, PayerIdentityStatus } from '@/types';
 export class MemoryPaymentRepository implements IPaymentRepository {
   async getUserCredits(profileId: string) {
     const credits = db.credits.filter((c) => c.profile_id === profileId);
-    const available = credits.filter((c) => c.status === 'AVAILABLE').length;
+    const available = credits.filter((c) => c.status === 'AVAILABLE' && c.used_at == null).length;
     return { available, total: credits.length, credits };
   }
 

@@ -533,7 +533,7 @@ export async function createListingWithCredit(
 
   // 1. Find available credit strictly matching the seller_type
   const credit = db.credits.find((c) => {
-    if (c.profile_id !== sellerProfileId || c.status !== 'AVAILABLE') return false;
+    if (c.profile_id !== sellerProfileId || c.status !== 'AVAILABLE' || c.used_at != null) return false;
     const packageCode = db.packages.find((pkg) => pkg.id === c.package_id)?.code;
     const effectiveCreditType = c.credit_type || (
       packageCode === 'CORPORATE_14_DAY'
@@ -1012,6 +1012,7 @@ export async function republishListing(
   const credit = db.credits.find((item) =>
     item.profile_id === creditOwnerId &&
     item.status === 'AVAILABLE' &&
+    item.used_at == null &&
     item.usage_scope !== 'NEW_LISTING_ONLY' &&
     item.credit_type === (listing.seller_type === 'CORPORATE' ? 'CORPORATE' : 'INDIVIDUAL') &&
     (listing.seller_type !== 'CORPORATE' || item.corporate_profile_id === listing.corporate_profile_id)

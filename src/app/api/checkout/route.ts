@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     if (requestedPackage === 'STANDARD_7_DAY') {
       const creditResult = await getPaymentRepository().getUserCredits(activeProfileId);
       const hasIndividualCredit = (creditResult.credits || []).some(
-        (credit: any) => credit.status === 'AVAILABLE' && (credit.credit_type === 'INDIVIDUAL' || !credit.credit_type)
+        (credit: any) => credit.status === 'AVAILABLE' && credit.used_at == null && (credit.credit_type === 'INDIVIDUAL' || !credit.credit_type)
       );
       if (hasIndividualCredit) {
         return NextResponse.json(
@@ -86,6 +86,7 @@ export async function POST(req: NextRequest) {
       const creditResult = await getPaymentRepository().getUserCredits(chargeProfileId);
       const hasCorporateCredit = (creditResult.credits || []).some(
         (credit: any) => credit.status === 'AVAILABLE'
+          && credit.used_at == null
           && credit.credit_type === 'CORPORATE'
           && credit.corporate_profile_id === corporateProfileId
       );

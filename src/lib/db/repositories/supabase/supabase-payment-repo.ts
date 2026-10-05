@@ -40,7 +40,7 @@ export class SupabasePaymentRepository implements IPaymentRepository {
       throw new Error(`Supabase error fetching user credits: ${error.message}`);
     }
 
-    const available = (data || []).filter((c: any) => c.status === 'AVAILABLE').length;
+    const available = (data || []).filter((c: any) => c.status === 'AVAILABLE' && c.used_at == null).length;
     return { available, total: (data || []).length, credits: data || [] };
   }
 
